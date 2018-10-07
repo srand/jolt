@@ -19,7 +19,11 @@ class GitInfluenceProvider(HashInfluenceProvider):
             pass
         assert False, "failed to change directory to {}".format(self.path)
 
-    
+
+def global_influence(path, cls=GitInfluenceProvider):
+    HashInfluenceRegistry.get().register(cls(path))
+
+
 def influence(path, cls=GitInfluenceProvider):
     def _decorate(taskcls):
         if "influence" not in taskcls.__dict__:

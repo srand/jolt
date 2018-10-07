@@ -28,6 +28,9 @@ class tmpdir(object):
         if self._path:
             fs.rmtree(self._path)
 
+    def get_path(self):
+        return self._path
+
 
 class cwd(object):
     def __init__(self, path):

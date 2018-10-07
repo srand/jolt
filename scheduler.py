@@ -21,6 +21,7 @@ class LocalExecutor(Executor):
             task.run(self.cache)
         except:
             log.error("Execution failed: {}", task.name)
+            raise
 
 
 class ExecutorRegistry(object):

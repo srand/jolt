@@ -4,8 +4,8 @@ import utils
 from copy import copy
 
 
-class DiskInfluenceProvider(HashInfluenceProvider):
-    name = "Disk"
+class DirectoryInfluenceProvider(HashInfluenceProvider):
+    name = "Directory"
     path = "."
     pattern = "*"
 
@@ -22,8 +22,12 @@ class DiskInfluenceProvider(HashInfluenceProvider):
             pass
         assert False, "failed to change directory to {}".format(self.path)
 
-    
-def influence(path, pattern=None, cls=DiskInfluenceProvider):
+
+def global_influence(path, pattern=None, cls=DirectoryInfluenceProvider):
+    HashInfluenceRegistry.get().register(cls(path, pattern))
+
+
+def influence(path, pattern=None, cls=DirectoryInfluenceProvider):
     def _decorate(taskcls):
         if "influence" not in taskcls.__dict__:
             taskcls.influence = copy(taskcls.influence)

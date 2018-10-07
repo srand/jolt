@@ -6,6 +6,7 @@ import json
 import copy
 import os
 from tempfile import mkdtemp
+import tools
 
 
 class StorageProvider(object):
@@ -215,6 +216,9 @@ class Artifact(object):
 
     def collect(self, files, dest=None, flatten=False):
         assert self._temp, "artifact is already published"
+        files = self._node.task._get_expansion(files)
+        dest = self._node.task._get_expansion(dest) if dest is not None else None
+
         files = glob.glob(files)
         dirname = fs.path.join(self._temp, dest) if dest else self._temp + fs.sep
         for src in files:
@@ -225,6 +229,23 @@ class Artifact(object):
                           fs.path.join(dirname, fs.path.basename(src))
                 fs.copy(src, dest)
                 log.verbose("Collected {} -> {}", src, dest[len(self._temp):])
+
+    def copy(self, pattern, dest, flatten=False):
+        assert not self._temp, "artifact is not published"
+        pattern = self._node.task._get_expansion(pattern)
+        dest = self._node.task._get_expansion(dest)
+
+        files = []
+        with tools.cwd(self._path):
+            files = glob.glob(pattern)
+        for src in files:
+            srcs = fs.scandir(src) if fs.path.isdir(src) and flatten else [src]
+            for src in srcs:
+                destfile = fs.path.join(dest, src) \
+                           if not flatten else \
+                              fs.path.join(dest, fs.path.basename(src))
+                fs.copy(fs.path.join(self._path, src), destfile)
+                log.verbose("Copied {} -> {}", src, destfile)
 
     def compress(self):
         assert not self._temp, "artifact is not published, can't compress"
@@ -261,6 +282,7 @@ class Context(object):
             ArtifactAttributeSetRegistry.unapply_all(artifact)
 
     def __getitem__(self, key):
+        key = self._node.task._get_expansion(key)
         assert key in self._artifacts, "no such dependency: {}".format(key)
         return self._artifacts[key]
 

@@ -20,6 +20,10 @@ class RepoInfluenceProvider(HashInfluenceProvider):
         assert False, "failed to change directory to {}".format(self.path)
 
     
+def global_influence(path, cls=RepoInfluenceProvider):
+    HashInfluenceRegistry.get().register(cls(path))
+
+
 def influence(path, cls=RepoInfluenceProvider):
     def _decorate(taskcls):
         if "influence" not in taskcls.__dict__:
