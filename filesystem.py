@@ -2,6 +2,7 @@ import os
 import errno
 import shutil
 import zipfile
+import tempfile
 
 
 path = os.path
@@ -15,6 +16,8 @@ def makedirs(path):
     except OSError as e:
         if e.errno != errno.EEXIST:
             raise
+
+mkdtemp = tempfile.mkdtemp
 
 def rename(old, new):
     return os.rename(old, new)

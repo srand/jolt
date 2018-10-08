@@ -9,6 +9,20 @@ import log
 import utils
 
 
+class TaskTools(object):
+    cwd = tools.cwd
+    tmpdir = tools.tmpdir
+    
+    def __init__(self, node):
+        self._node = node
+
+    def builddir(self, *args, **kwargs):
+        return tools.builddir(self._node)
+
+    def run(self, cmd, *args, **kwargs):
+        return tools.run(cmd, *args, **kwargs)
+
+
 class TaskProxy(object):
     def __init__(self, task):
         self.task = task
@@ -58,7 +72,8 @@ class TaskProxy(object):
 
         if not cache.is_available_locally(self):
             with cache.get_context(self) as context:
-                self.task.run(context, tools)
+                t = TaskTools(self)
+                self.task.run(context, t)
 
             with cache.get_artifact(self) as artifact:
                 self.task.publish(artifact)

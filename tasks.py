@@ -46,6 +46,9 @@ class TaskRegistry(object):
 
     def get_task_class(self, name):
         return self.classes.get(name)
+
+    def get_task_classes(self):
+        return self.classes.values()
     
     def get_task(self, name, extra_params=None):
         name, params = utils.parse_task_name(name)
@@ -79,6 +82,7 @@ class Task(object):
     def __init__(self, name=None):
         super(Task, self).__init__()
         self.attributes = utils.as_list(self.__class__.attributes)
+        self.influence = utils.as_list(self.__class__.influence)
         self.requires = utils.as_list(utils.call_or_return(self, self.__class__.requires))
         self.name = self.__class__.name
         self._create_parameters()
@@ -151,4 +155,7 @@ class Task(object):
         pass
 
     def publish(self, artifact):
+        pass
+
+    def cleanup(self):
         pass

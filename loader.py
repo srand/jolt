@@ -6,6 +6,7 @@ import glob
 import filesystem as fs
 import log
 import utils
+import os
 
 
 @utils.Singleton
@@ -16,7 +17,7 @@ class JoltLoader(object):
         self._tasks = []
         self._source = []
 
-    def load_file(self, path):
+    def _load_file(self, path):
         classes = []
 
         name, ext = fs.path.splitext(fs.path.basename(path))
@@ -29,18 +30,27 @@ class JoltLoader(object):
             if inspect.isclass(module.__dict__[name]):
                 classes.append(module.__dict__[name])
 
-        tasks = [cls for cls in classes if issubclass(cls, Task)]
+        tasks = [cls for cls in classes if issubclass(cls, Task) and cls is not Task]
         self._tasks += tasks
 
         log.verbose("Loaded: {}", path)
         
         return tasks
 
-    def load_directory(self, path=".", recursive=False):
-        files = glob.glob(fs.path.join(path, JoltLoader.filename))
-        for file in files:
-            self.load_file(file)
+    def load(self, recursive=False):
+        files = []
+        path = os.getcwd()
+        root = fs.path.normpath("/")
+        while not files:
+            files = glob.glob(fs.path.join(path, JoltLoader.filename))
+            for file in files:
+                self._load_file(file)
+            path = fs.path.dirname(path)
+            if path == root:
+                break
         return self._tasks
 
+    
+    
     def get_sources(self):
         return "".join(self._source)

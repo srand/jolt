@@ -38,7 +38,7 @@ def cli(verbose, extra_verbose, config_file):
             with open(path) as fd:
                 imp.load_module("plugins." + section, fd, path, ('.py', 'r', imp.PY_SOURCE))
 
-    for cls in loader.JoltLoader().get().load_directory():
+    for cls in loader.JoltLoader().get().load():
         TaskRegistry.get().add_task_class(cls)
 
 
@@ -77,21 +77,22 @@ def list(task=None, reverse=False, all=False):
     result = []
 
     if not task:
-        for task in sorted(Task.instances.values(), key=lambda x: x.name):
-            print(task.name)
+        for task in sorted(TaskRegistry().get().get_task_classes(), key=lambda x: x.name):
+            if task.name:
+                print(task.name)
         return
 
     task_registry = TaskRegistry.get()
 
     tasks = [task_registry.get_task(task)]
-    dag = graph.GraphBuilder.build(tasks, task_registry)
+    dag = graph.GraphBuilder.build(tasks)
     tasks = dag.select(lambda graph, node: node.name == task)
     successors = set()
     for task in tasks:
         map(successors.add, dag.successors(task))
 
     for task in sorted(successors):
-        print(task.name)
+        print(task.qualified_name)
 
 
 def main():
