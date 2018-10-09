@@ -16,10 +16,12 @@ class JoltLoader(object):
     def __init__(self):
         self._tasks = []
         self._source = []
+        self._path = None
 
     def _load_file(self, path):
         classes = []
 
+        directory = fs.path.dirname(path)
         name, ext = fs.path.splitext(fs.path.basename(path))
 
         with open(path) as f:
@@ -27,10 +29,13 @@ class JoltLoader(object):
         
         module = imp.load_source("joltfile_{}".format(name), path)
         for name in module.__dict__:
-            if inspect.isclass(module.__dict__[name]):
-                classes.append(module.__dict__[name])
+            obj = module.__dict__[name]
+            if inspect.isclass(obj):
+                classes.append(obj)
 
         tasks = [cls for cls in classes if issubclass(cls, Task) and cls is not Task]
+        for task in tasks:
+            task.joltdir = directory
         self._tasks += tasks
 
         log.verbose("Loaded: {}", path)
@@ -49,8 +54,6 @@ class JoltLoader(object):
             if path == root:
                 break
         return self._tasks
-
-    
     
     def get_sources(self):
         return "".join(self._source)

@@ -1,6 +1,7 @@
 import hashlib
 import utils   
 import inspect
+from cache import *
 from copy import copy
 
 
@@ -71,6 +72,8 @@ class TaskRegistry(object):
 
     
 class Task(object):
+    joltdir = "."
+
     classes = {}
     instances = {}
 
@@ -110,11 +113,14 @@ class Task(object):
     def _get_source(self, func):
         source, lines = inspect.getsourcelines(func)
         return "\n".join(source)
-            
+
+    def _get_source_functions(self):
+        return [self.run, self.publish]
+
     def _get_source_hash(self):
         sha = hashlib.sha1()
-        sha.update(self._get_source(self.run))
-        sha.update(self._get_source(self.publish))
+        for func in self._get_source_functions():
+            sha.update(self._get_source(func))
         return sha.hexdigest()
 
     def _get_requires(self):
@@ -151,11 +157,52 @@ class Task(object):
                 if isinstance(param, Parameter) and \
                  (unset or not param.is_unset()) }
 
+    def is_cacheable(self):
+        return True
+
+    def is_runnable(self):
+        return True
+
     def run(self, env, tools):
         pass
 
     def publish(self, artifact):
         pass
 
-    def cleanup(self):
+
+class Resource(Task):
+    def _get_source_functions(self):
+        return super(Resource, self)._get_source_functions() + \
+            [self.acquire, self.release]
+
+    def is_cacheable(self):
+        return False
+
+    def is_runnable(self):
+        return False
+
+    def acquire(self, artifact):
         pass
+
+    def release(self, artifact):
+        pass
+
+
+@ArtifactAttributeSetProvider.Register
+class ResourceAttributeSetProvider(ArtifactAttributeSetProvider):
+    def create(self, artifact):
+        pass
+
+    def parse(self, artifact, content):
+        pass
+
+    def format(self, artifact, content):
+        pass
+
+    def apply(self, artifact):
+        if isinstance(artifact.get_task(), Resource):
+            artifact.get_task().acquire(artifact)
+
+    def unapply(self, artifact):
+        if isinstance(artifact.get_task(), Resource):
+            artifact.get_task().release(artifact)

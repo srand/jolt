@@ -263,6 +263,9 @@ class Artifact(object):
     def get_archive_path(self):
         return fs.get_archive(self._path)
 
+    def get_task(self):
+        return self._node.task
+
 
 class Context(object):
     def __init__(self, cache, node):
@@ -322,6 +325,8 @@ class ArtifactCache(StorageProvider):
         return fs.path.exists(self.get_path(node))
 
     def is_available_remotely(self, node):
+        if not node.task.is_cacheable():
+            return False
         for provider in self.storage_providers:
             if provider.contains(node):
                 return True
@@ -331,6 +336,8 @@ class ArtifactCache(StorageProvider):
         return self.is_available_locally(node) or self.is_available_remotely(node)
     
     def download(self, node):
+        if not node.task.is_cacheable():
+            return True
         assert not self.is_available_locally(node), "can't download task, exists in the local cache"
         for provider in self.storage_providers:
             if provider.download(node):
@@ -338,6 +345,8 @@ class ArtifactCache(StorageProvider):
         return len(self.storage_providers) == 0
 
     def upload(self, node):
+        if not node.task.is_cacheable():
+            return True
         assert self.is_available_locally(node), "can't upload task, not in the local cache"
         if self.storage_providers:
             with self.get_artifact(node) as artifact:

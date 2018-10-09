@@ -45,7 +45,9 @@ class TaskProxy(object):
     @cached.instance
     def identity(self):
         sha = hashlib.sha1()
-        HashInfluenceRegistry.get().apply_all(self.task, sha)
+
+        with tools.cwd(self.task.joltdir):
+            HashInfluenceRegistry.get().apply_all(self.task, sha)
 
         for node in self.children:
             sha.update(node.identity)
@@ -73,7 +75,8 @@ class TaskProxy(object):
         if not cache.is_available_locally(self):
             with cache.get_context(self) as context:
                 t = TaskTools(self)
-                self.task.run(context, t)
+                with t.cwd(self.task.joltdir):
+                    self.task.run(context, t)
 
             with cache.get_artifact(self) as artifact:
                 self.task.publish(artifact)

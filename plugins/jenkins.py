@@ -53,7 +53,7 @@ class JenkinsExecutor(scheduler.Executor):
         while not queue_info.get("executable"):
             queue_info = self.server.get_queue_item(queue_id)
         
-        log.info("[JENKINS] Executing {}", task.name)
+        log.info("[JENKINS] Executing {}", task.qualified_name)
 
         build_id = queue_info["executable"]["number"]
         
