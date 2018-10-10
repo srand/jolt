@@ -177,6 +177,10 @@ class Artifact(object):
     def __exit__(self, type, value, tb):
         self.discard()
         
+    def __getattr__(self, name):
+        assert False, "no attribute '{}' in artifact for '{}'".format(
+            name, self._node.qualified_name)
+
     def _write_manifest(self):
         content = {}
         content["task"] = self._node.name
@@ -197,8 +201,10 @@ class Artifact(object):
         with open(manifest, "rb") as f:
             content = json.loads(f.read())
             ArtifactAttributeSetRegistry.parse_all(self, content)
-            
+
     def commit(self):
+        if not self._node.task.is_cacheable():
+            return
         if self._temp:
             self._write_manifest()
             fs.rename(self._temp, self._path)
@@ -322,6 +328,8 @@ class ArtifactCache(StorageProvider):
         return path
 
     def is_available_locally(self, node):
+        if not node.task.is_cacheable():
+            return False
         return fs.path.exists(self.get_path(node))
 
     def is_available_remotely(self, node):

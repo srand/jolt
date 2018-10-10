@@ -1,3 +1,4 @@
+import time
 
 
 def as_list(t):
@@ -45,6 +46,16 @@ def format_task_name(name, params):
 def expand_macros(string, **kwargs):
     return string.format(**kwargs)
 
+
+class duration(object):
+    def __init__(self):
+        self._time = time.time()
+
+    def __str__(self):
+        elapsed = time.time() - self._time
+        if elapsed >= 60:
+            return time.strftime("%Mmin %-Ss", time.gmtime(elapsed))
+        return time.strftime("%-Ss", time.gmtime(elapsed))
 
 class cached:
     @staticmethod

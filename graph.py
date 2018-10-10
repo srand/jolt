@@ -1,4 +1,4 @@
-import tasks
+from tasks import *
 from utils import *
 from influence import *
 from copy import copy
@@ -7,20 +7,6 @@ import tools
 import networkx as nx
 import log
 import utils
-
-
-class TaskTools(object):
-    cwd = tools.cwd
-    tmpdir = tools.tmpdir
-    
-    def __init__(self, node):
-        self._node = node
-
-    def builddir(self, *args, **kwargs):
-        return tools.builddir(self._node)
-
-    def run(self, cmd, *args, **kwargs):
-        return tools.run(cmd, *args, **kwargs)
 
 
 class TaskProxy(object):
@@ -57,11 +43,20 @@ class TaskProxy(object):
     def __str__(self):
         return "{} [{}]".format(self.task.name, ", ".join([node.task.name for node in self.children]))
 
+    def info(self, fmt, *args, **kwargs):
+        self.task.info(fmt + " (" + self.qualified_name + ")", *args, **kwargs)
+
+    def error(self, fmt, *args, **kwargs):
+        self.task.error(fmt + " (" + self.qualified_name + ")", *args, **kwargs)
+
     def has_children(self):
         return len(self.children) > 0
 
     def has_ancestors(self):
         return len(self.ancestors) > 0
+
+    def is_cacheable(self):
+        return self.task.is_cacheable()
 
     def finalize(self, dag):
         self.children = nx.descendants(dag, self)
@@ -73,13 +68,14 @@ class TaskProxy(object):
             cache.download(self)
 
         if not cache.is_available_locally(self):
+            t = TaskTools(self)
+
             with cache.get_context(self) as context:
-                t = TaskTools(self)
                 with t.cwd(self.task.joltdir):
                     self.task.run(context, t)
 
             with cache.get_artifact(self) as artifact:
-                self.task.publish(artifact)
+                self.task.publish(artifact, t)
                 artifact.commit()
 
             assert cache.upload(self), \

@@ -16,12 +16,7 @@ class LocalExecutor(Executor):
         self.cache = cache
         
     def run(self, task):
-        try:
-            log.info("Executing {}", task.qualified_name)
-            task.run(self.cache)
-        except:
-            log.error("Execution failed: {}", task.name)
-            raise
+        task.run(self.cache)
 
 
 class ExecutorRegistry(object):
@@ -33,6 +28,8 @@ class ExecutorRegistry(object):
     
     def create(self, cache, task):
         for factory in self._factories:
+            if not task.is_cacheable() and factory.is_network():
+                continue
             if not self._network and factory.is_network():
                 continue
             if factory.is_eligable(cache, task):

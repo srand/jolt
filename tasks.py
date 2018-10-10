@@ -163,14 +163,37 @@ class Task(object):
     def is_runnable(self):
         return True
 
+    def info(self, fmt, *args, **kwargs):
+        log.info(fmt, *args, **kwargs)
+
+    def error(self, fmt, *args, **kwargs):
+        log.error(fmt, *args, **kwargs)
+
     def run(self, env, tools):
         pass
 
-    def publish(self, artifact):
+    def publish(self, artifact, tools):
         pass
 
 
+class TaskTools(object):
+    cwd = tools.cwd
+    tmpdir = tools.tmpdir
+
+    def __init__(self, node):
+        self._node = node
+
+    def builddir(self, *args, **kwargs):
+        return tools.builddir(self._node)
+
+    def run(self, cmd, *args, **kwargs):
+        return tools.run(cmd, *args, **kwargs)
+
+
 class Resource(Task):
+    def __init__(self):
+        super(Resource, self).__init__()
+
     def _get_source_functions(self):
         return super(Resource, self)._get_source_functions() + \
             [self.acquire, self.release]
@@ -181,11 +204,17 @@ class Resource(Task):
     def is_runnable(self):
         return False
 
-    def acquire(self, artifact):
+    def info(self, fmt, *args, **kwargs):
         pass
 
-    def release(self, artifact):
+    def acquire(self, artifact, env, tools):
         pass
+
+    def release(self, artifact, env, tools):
+        pass
+
+    def run(self, env, tools):
+        self._run_env = env
 
 
 @ArtifactAttributeSetProvider.Register
@@ -200,9 +229,13 @@ class ResourceAttributeSetProvider(ArtifactAttributeSetProvider):
         pass
 
     def apply(self, artifact):
-        if isinstance(artifact.get_task(), Resource):
-            artifact.get_task().acquire(artifact)
+        task = artifact.get_task()
+        if isinstance(task, Resource):
+            env = task._run_env
+            task.acquire(artifact, env, TaskTools(task))
 
     def unapply(self, artifact):
-        if isinstance(artifact.get_task(), Resource):
-            artifact.get_task().release(artifact)
+        task = artifact.get_task()
+        if isinstance(task, Resource):
+            env = task._run_env
+            task.release(artifact, env, TaskTools(task))

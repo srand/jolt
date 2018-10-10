@@ -47,13 +47,13 @@ class JenkinsExecutor(scheduler.Executor):
             "buildfile": loader.JoltLoader.get().get_sources(),
             "task": task.qualified_name})
 
-        log.info("[JENKINS] Queued {}", task.name)
+        log.verbose("[JENKINS] Queued {}", task.qualified_name)
 
         queue_info = self.server.get_queue_item(queue_id)
         while not queue_info.get("executable"):
             queue_info = self.server.get_queue_item(queue_id)
         
-        log.info("[JENKINS] Executing {}", task.qualified_name)
+        log.verbose("[JENKINS] Executing {}", task.qualified_name)
 
         build_id = queue_info["executable"]["number"]
         
@@ -61,9 +61,9 @@ class JenkinsExecutor(scheduler.Executor):
         while build_info["result"] not in ["SUCCESS", "FAILURE"]:
             build_info = self.server.get_build_info(self.job, build_id)
 
-        log.info("[JENKINS] Executed {}: {}", task.name, build_info["result"])
+        log.verbose("[JENKINS] Finished {}", task.qualified_name)
         assert build_info["result"] == "SUCCESS", \
-            "Execution failed: {}".format(task.name)
+            "[JENKINS] {}: {}".format(build_info["result"], task.qualified_name)
 
         assert self.cache.is_available_remotely(task), \
             "[JENKINS] no artifact produced for {}, check configuration".format(task.name)

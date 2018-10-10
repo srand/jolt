@@ -16,6 +16,7 @@ import plugins
 import plugins.environ
 import plugins.strings
 import loader
+import utils
 
 
 @click.group()
@@ -44,9 +45,9 @@ def cli(verbose, extra_verbose, config_file):
 
 @cli.command()
 @click.argument("task")
-@click.option("--local", is_flag=True, default=False, help="Build local.")
-def build(task, local):
-    executor = scheduler.ExecutorRegistry(network=not local)
+@click.option("-n", "--network", is_flag=True, default=False, help="Build on network.")
+def build(task, network):
+    executor = scheduler.ExecutorRegistry(network=network)
     acache = cache.ArtifactCache()
 
     tasks = [TaskRegistry.get().get_task(task)]
@@ -60,7 +61,16 @@ def build(task, local):
             dag.remove_node(task)
         
             worker = executor.create(acache, task)
-            worker.run(task)
+            duration = utils.duration()
+
+            try:
+                task.info("Execution started")
+                worker.run(task)
+                task.info("Execution finished after {}", duration)
+            except:
+                task.error("Execution failed after {}", duration)
+                raise
+
         leafs = dag.select(lambda graph, task: graph.is_leaf(task))
 
 
