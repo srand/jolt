@@ -7,17 +7,24 @@ import log
 import getpass
 import inspect
 import loader
+import filesystem as fs
+import hashlib
+from jinja2 import Template
+import utils
 
 NAME = "jenkins"
 
 
-class JenkinsExecutor(scheduler.Executor):
-    def __init__(self, cache):
-        super(JenkinsExecutor, self).__init__()
-        self.cache = cache
-        self.job = config.get(NAME, "job")
+@utils.Singleton
+class JenkinsServer(object):
+    def __init__(self):
         username, password = self._get_auth()
-        self.server = Jenkins(config.get(NAME, "uri"), username, password)
+        self._server = Jenkins(config.get(NAME, "uri"), username, password)
+        self.get_job_info = self._server.get_job_info
+        self.get_build_info = self._server.get_build_info
+        self.get_queue_item = self._server.get_queue_item
+        self.build_job = self._server.build_job
+        self._check_job()
 
     def _get_auth(self):
         service = config.get(NAME, "keyring.service")
@@ -42,6 +49,49 @@ class JenkinsExecutor(scheduler.Executor):
             keyring.set_password(service, username, password)
         return username, password
 
+    def _get_sha(self, data):
+        sha = hashlib.sha1()
+        sha.update(data)
+        return sha.hexdigest()
+
+    def _get_job_template_path(self):
+        default = fs.path.join(fs.path.dirname(__file__), "jenkins.job")
+        return config.get(NAME, "template", default)
+    
+    def _load_job_template(self):
+        with open(self._get_job_template_path()) as f:
+            xml = f.read()
+        return xml, self._get_sha(xml)
+
+    def _check_job(self):
+        template_xml, template_sha = self._load_job_template()
+        self.job_name = "{}-{}".format(config.get(NAME, "job", "Jolt"), template_sha[:6])
+
+        try:
+            job_xml = self._server.get_job_config(self.job_name)
+        except:
+            self._create_job(self.job_name, template_xml, self._server.create_job)
+            return
+        if self._get_sha(job_xml) != template_sha:
+            assert self._create_job(
+                self.job_name, template_xml, self._server.reconfig_job), \
+                "[JENKINS] failed to change misconfigured job"
+
+    def _create_job(self, name, job_template, func):
+        template = Template(job_template)
+        network_config = config.get("network", "config", "")
+        xml = template.render(config=network_config)
+        func(name, xml)
+        return True
+
+
+class JenkinsExecutor(scheduler.Executor):
+    def __init__(self, server, cache):
+        super(JenkinsExecutor, self).__init__()
+        self.cache = cache
+        self.job = server.job_name
+        self.server = server
+
     def run(self, task):
         queue_id = self.server.build_job(self.job, {
             "buildfile": loader.JoltLoader.get().get_sources(),
@@ -56,7 +106,7 @@ class JenkinsExecutor(scheduler.Executor):
         log.verbose("[JENKINS] Executing {}", task.qualified_name)
 
         build_id = queue_info["executable"]["number"]
-        
+
         build_info = self.server.get_build_info(self.job, build_id)
         while build_info["result"] not in ["SUCCESS", "FAILURE"]:
             build_info = self.server.get_build_info(self.job, build_id)
@@ -81,6 +131,6 @@ class JenkinsExecutorFactory(object):
         return True
 
     def create(self, cache):
-        return JenkinsExecutor(cache)
+        return JenkinsExecutor(JenkinsServer().get(), cache)
 
 log.verbose("Jenkins loaded")
