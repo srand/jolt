@@ -78,7 +78,7 @@ def build(task, network):
 def clean():
     cache_provider = cache.ArtifactCache()
     fs.rmtree(cache_provider.root)
-    
+
 
 @cli.command()
 @click.argument("task", required=False)

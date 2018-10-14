@@ -25,12 +25,14 @@ class ExecutorRegistry(object):
     def __init__(self, network=True):
         self._factories = [factory() for factory in self.__class__.executor_factories]
         self._network = network
-    
+
     def create(self, cache, task):
         for factory in self._factories:
             if not task.is_cacheable() and factory.is_network():
                 continue
             if not self._network and factory.is_network():
+                continue
+            if self._network and not factory.is_network():
                 continue
             if factory.is_eligable(cache, task):
                 return factory.create(cache)

@@ -189,6 +189,12 @@ class TaskTools(object):
     def run(self, cmd, *args, **kwargs):
         return tools.run(cmd, *args, **kwargs)
 
+    def map_consecutive(self, callable, iterable):
+        return utils.map_consecutive(callable, iterable)
+
+    def map_concurrent(self, callable, iterable):
+        return utils.map_concurrent(callable, iterable)
+
 
 class Resource(Task):
     def __init__(self):

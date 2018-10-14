@@ -1,4 +1,6 @@
 import time
+from concurrent.futures import ThreadPoolExecutor, Future, as_completed
+from functools import partial
 
 
 def as_list(t):
@@ -76,3 +78,28 @@ def Singleton(cls):
         return cls._instance
     cls.get = get
     return cls
+
+
+def run_consecutive(callables, *args, **kwargs):
+    return [call(*args, **kwargs) for call in callables]
+
+def run_concurrent(callables, *args, **kwargs):
+    results = []
+    futures = []
+    with ThreadPoolExecutor() as executor:
+        for call in callables:
+            futures.append(executor.submit(call, *args, **kwargs))
+        for future in as_completed(futures):
+            try:
+                future.result()
+            except Exception as exc:
+                map(Future.cancel, futures)
+    return [future.result() for future in futures]
+                
+
+def map_consecutive(method, iterable):
+    return map(method, iterable)
+
+def map_concurrent(method, iterable):
+    return run_concurrent([partial(method, item) for item in iterable])
+
