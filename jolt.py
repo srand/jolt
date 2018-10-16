@@ -1,6 +1,5 @@
 #!/usr/bin/python
 
-#import jenkins
 import click
 import imp
 from tasks import Task, TaskRegistry
@@ -36,8 +35,7 @@ def cli(verbose, extra_verbose, config_file):
         path = fs.path.dirname(__file__)
         path = fs.path.join(path, "plugins", section + ".py")
         if fs.path.exists(path):
-            with open(path) as fd:
-                imp.load_module("plugins." + section, fd, path, ('.py', 'r', imp.PY_SOURCE))
+            imp.load_source("plugins." + section, path)
 
     for cls in loader.JoltLoader().get().load():
         TaskRegistry.get().add_task_class(cls)
@@ -47,9 +45,8 @@ def cli(verbose, extra_verbose, config_file):
 @click.argument("task")
 @click.option("-n", "--network", is_flag=True, default=False, help="Build on network.")
 def build(task, network):
-    executor = scheduler.ExecutorRegistry(network=network)
+    executor = scheduler.ExecutorRegistry.get(network=network)
     acache = cache.ArtifactCache()
-
     tasks = [TaskRegistry.get().get_task(task)]
     dag = graph.GraphBuilder.build(tasks)
     dag.prune(lambda graph, task: acache.is_available_locally(task))

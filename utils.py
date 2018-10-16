@@ -69,12 +69,22 @@ class cached:
             return getattr(self, attr)
         return _f
 
+    @staticmethod
+    def method(f):
+        def _f(*args, **kwargs):
+            attr = "__cached_result_" + f.__name__
+            if not hasattr(f, attr):
+                setattr(f, attr, f(*args, **kwargs))
+            return getattr(f, attr)
+        return _f
+
+
 def Singleton(cls):
     cls._instance = None
     @staticmethod
-    def get():
+    def get(*args, **kwargs):
         if not cls._instance:
-            cls._instance = cls()
+            cls._instance = cls(*args, **kwargs)
         return cls._instance
     cls.get = get
     return cls

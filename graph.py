@@ -63,7 +63,7 @@ class TaskProxy(object):
         self.anestors = nx.ancestors(dag, self)
         return self.identity
 
-    def run(self, cache):
+    def run(self, cache, force_upload=False):
         if cache.is_available_remotely(self):
             cache.download(self)
 
@@ -75,10 +75,11 @@ class TaskProxy(object):
                     self.task.run(context, t)
 
             with cache.get_artifact(self) as artifact:
-                self.task.publish(artifact, t)
+                with t.cwd(self.task.joltdir):
+                    self.task.publish(artifact, t)
                 artifact.commit()
 
-            assert cache.upload(self), \
+            assert cache.upload(self, force=force_upload), \
                 "Failed to upload artifact for {}".format(self.name)
                 
 

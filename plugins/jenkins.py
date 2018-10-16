@@ -85,7 +85,7 @@ class JenkinsServer(object):
         return True
 
 
-class JenkinsExecutor(scheduler.Executor):
+class JenkinsExecutor(scheduler.NetworkExecutor):
     def __init__(self, server, cache):
         super(JenkinsExecutor, self).__init__()
         self.cache = cache
@@ -93,10 +93,14 @@ class JenkinsExecutor(scheduler.Executor):
         self.server = server
 
     def run(self, task):
-        queue_id = self.server.build_job(self.job, {
-            "buildfile": loader.JoltLoader.get().get_sources(),
-            "task": task.qualified_name})
+        parameters = {
+            "joltfile": loader.JoltLoader.get().get_sources(),
+            "task": task.qualified_name,
+            "task_identity": task.identity[:8]
+        }
+        parameters.update(scheduler.ExecutorRegistry.get().get_network_parameters(task))
 
+        queue_id = self.server.build_job(self.job, parameters)
         log.verbose("[JENKINS] Queued {}", task.qualified_name)
 
         queue_info = self.server.get_queue_item(queue_id)
@@ -122,14 +126,8 @@ class JenkinsExecutor(scheduler.Executor):
             "[JENKINS] failed to download artifact for {}".format(task.name)
 
 
-@scheduler.RegisterExecutor
-class JenkinsExecutorFactory(object):
-    def is_network(self):
-        return True
-
-    def is_eligable(self, cache, task):
-        return True
-
+@scheduler.ExecutorFactory.Register
+class JenkinsExecutorFactory(scheduler.NetworkExecutorFactory):
     def create(self, cache):
         return JenkinsExecutor(JenkinsServer().get(), cache)
 

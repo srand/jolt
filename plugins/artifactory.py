@@ -53,8 +53,8 @@ class Artifactory(cache.StorageProvider):
             name=node.name,
             file=fs.path.basename(artifact.get_archive_path()))
         
-    def download(self, node):
-        if not self._download:
+    def download(self, node, force=False):
+        if not self._download and not force:
             return False
         with self._cache.get_artifact(node) as artifact:
             url = self._get_url(node, artifact)
@@ -62,13 +62,13 @@ class Artifactory(cache.StorageProvider):
             with open(artifact.get_archive_path(), 'wb') as out_file:
                 shutil.copyfileobj(response.raw, out_file)
                 log.hysterical("[ARTIFACTORY] Download {} => {}", url, response.status_code)
-                return response.status_code == 200
-            artifact.decompress()
-            return True
+            if response.status_code == 200:
+                artifact.decompress()
+            return response.status_code == 200
         return False
 
-    def upload(self, node):
-        if not self._upload:
+    def upload(self, node, force=False):
+        if not self._upload and not force:
             return False
         with self._cache.get_artifact(node) as artifact:
             url = self._get_url(node, artifact)
@@ -78,14 +78,14 @@ class Artifactory(cache.StorageProvider):
                 return response.status_code == 201
         return False
 
-    def contains(self, node):
+    def location(self, node):
         if not self._download:
             return False
         with self._cache.get_artifact(node) as artifact:
             url = self._get_url(node, artifact)
             response = requests.head(url, stream=True)
             log.hysterical("[ARTIFACTORY] Head {} => {}", url, response.status_code)
-            return response.status_code == 200
+            return url if response.status_code == 200 else ''
         return False
 
 

@@ -10,14 +10,14 @@ import tools
 
 
 class StorageProvider(object):
-    def download(self, node):
+    def download(self, node, force=False):
         return False
 
-    def upload(self, node):
+    def upload(self, node, force=False):
         return False
 
-    def contains(self, node):
-        return False
+    def location(self, node):
+        return ''  # URL
 
 
 class StorageProviderFactory(StorageProvider):
@@ -336,31 +336,40 @@ class ArtifactCache(StorageProvider):
         if not node.task.is_cacheable():
             return False
         for provider in self.storage_providers:
-            if provider.contains(node):
+            if provider.location(node):
                 return True
         return False
 
     def is_available(self, node):
         return self.is_available_locally(node) or self.is_available_remotely(node)
     
-    def download(self, node):
+    def download(self, node, force=False):
         if not node.task.is_cacheable():
             return True
         assert not self.is_available_locally(node), "can't download task, exists in the local cache"
         for provider in self.storage_providers:
-            if provider.download(node):
+            if provider.download(node, force):
                 return True
         return len(self.storage_providers) == 0
 
-    def upload(self, node):
+    def upload(self, node, force=False):
         if not node.task.is_cacheable():
             return True
         assert self.is_available_locally(node), "can't upload task, not in the local cache"
         if self.storage_providers:
             with self.get_artifact(node) as artifact:
                 artifact.compress()
-                return all([provider.upload(node) for provider in self.storage_providers])
+                return all([provider.upload(node, force) for provider in self.storage_providers])
         return len(self.storage_providers) == 0
+
+    def location(self, node):
+        if not node.task.is_cacheable():
+            return False
+        for provider in self.storage_providers:
+            url = provider.location(node)
+            if url:
+                return url
+        return ''
 
     def get_context(self, node):
         return Context(self, node)

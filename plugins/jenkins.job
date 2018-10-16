@@ -7,13 +7,25 @@
     <hudson.model.ParametersDefinitionProperty>
       <parameterDefinitions>
         <hudson.model.TextParameterDefinition>
-          <name>buildfile</name>
+          <name>joltfile</name>
           <description></description>
           <defaultValue></defaultValue>
           <trim>false</trim>
         </hudson.model.TextParameterDefinition>
         <hudson.model.StringParameterDefinition>
           <name>task</name>
+          <description></description>
+          <defaultValue></defaultValue>
+          <trim>false</trim>
+        </hudson.model.StringParameterDefinition>
+        <hudson.model.StringParameterDefinition>
+          <name>task_identity</name>
+          <description></description>
+          <defaultValue></defaultValue>
+          <trim>false</trim>
+        </hudson.model.StringParameterDefinition>
+        <hudson.model.StringParameterDefinition>
+          <name>jolt_url</name>
           <description></description>
           <defaultValue></defaultValue>
           <trim>false</trim>
@@ -35,13 +47,26 @@
   <triggers/>
   <concurrentBuild>false</concurrentBuild>
   <builders>
+    <hudson.plugins.descriptionsetter.DescriptionSetterBuilder plugin="description-setter@1.10">
+      <regexp></regexp>
+      <description>$task ($task_identity)</description>
+    </hudson.plugins.descriptionsetter.DescriptionSetterBuilder>
     <hudson.tasks.Shell>
       <command>
-echo &quot;$config&quot; &gt; jolt.conf
+if [ -n "$jolt_url" ]; then
+  curl -o jolt.zip $jolt_url
+  unzip -d jolt jolt.zip
+  rm -f jolt.zip
+  virtualenv jolt-python
+  . jolt-python/bin/activate
+  pip install -e jolt
+fi
 
-echo &quot;$buildfile&quot; &gt; task.jolt
-jolt clean
+echo &quot;$config&quot; &gt; jolt.conf
+echo &quot;$joltfile&quot; &gt; tasks.jolt
+
 jolt -vv -c jolt.conf build $task</command>
+jolt clean
     </hudson.tasks.Shell>
   </builders>
   <publishers>
