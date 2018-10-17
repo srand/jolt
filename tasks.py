@@ -6,9 +6,10 @@ from copy import copy
 
 
 class Parameter(object):
-    def __init__(self, default=None):
+    def __init__(self, default=None, help=None):
         self._default = default
         self._value = default
+        self.__doc__ = help
 
     def __str__(self):
         return str(self._value)

@@ -2,7 +2,7 @@
 
 import click
 import imp
-from tasks import Task, TaskRegistry
+from tasks import Task, TaskRegistry, Parameter
 import scheduler
 import graph
 import cache
@@ -100,6 +100,34 @@ def list(task=None, reverse=False, all=False):
 
     for task in sorted(successors):
         print(task.qualified_name)
+
+@cli.command()
+@click.argument("task")
+def info(task):
+    task_registry = TaskRegistry.get()
+    task = task_registry.get_task(task)
+
+    click.echo()
+    click.echo("  {}".format(task.name))
+    click.echo()
+    click.echo("  {}".format((task.__doc__ or "").strip()))
+    click.echo()
+    click.echo("  Parameters")
+    has_param = False
+    for item, param in task.__dict__.iteritems():
+        if isinstance(param, Parameter):
+            has_param = True
+            click.echo("    {:<15}   {}".format(item, param.__doc__ or ""))
+    if not has_param:
+        click.echo("    None")
+
+    click.echo()
+    click.echo("  Requirements")
+    for req in task.requires:
+        click.echo("    {}".format(req))
+    if not task.requires:
+        click.echo("    None")
+    click.echo()
 
 
 def main():
