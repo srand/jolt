@@ -62,7 +62,7 @@ from requests.packages.urllib3.exceptions import InsecureRequestWarning
 from six.moves.http_client import BadStatusLine
 from six.moves.urllib.error import URLError
 from six.moves.urllib.parse import quote, urlencode, urljoin, urlparse
-
+from copy import copy
 from jenkins import plugins
 
 try:
@@ -1191,8 +1191,7 @@ class Jenkins(object):
                                            'like {"param_key": "param_value", ...} '
                                            'or a list of two membered tuples '
                                            'like [("param_key", "param_value",), ...]')
-            return (self._build_url(BUILD_WITH_PARAMS_JOB, locals()) +
-                    '?' + urlencode(parameters))
+            return (self._build_url(BUILD_WITH_PARAMS_JOB, locals()))
         elif token:
             return (self._build_url(BUILD_JOB, locals()) +
                     '?' + urlencode({'token': token}))
@@ -1213,10 +1212,15 @@ class Jenkins(object):
         :param token: Jenkins API token
         :returns: ``int`` queue item
         '''
-        
+
+        url = self.build_job_url(name, parameters, token)
+        parameter_list = [{"name": name, "value": value}
+                          for name, value in parameters.iteritems()]
+        headers = {"Content-Type": "application/x-www-form-urlencoded"}
         response = self.jenkins_request(requests.Request(
             'POST',
-            self.build_job_url(name, parameters, token)))
+            url, data={"json": json.dumps({"parameter": parameter_list})},
+            headers=headers))
         location = response.headers['Location']
         # location is a queue item, eg. "http://jenkins/queue/item/25/"
         if location.endswith('/'):
