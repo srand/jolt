@@ -49,26 +49,26 @@ def build(task, network):
     acache = cache.ArtifactCache()
     tasks = [TaskRegistry.get().get_task(task)]
     dag = graph.GraphBuilder.build(tasks)
-    dag.prune(lambda graph, task: acache.is_available_locally(task))
+    dag.prune(lambda graph, task: acache.is_available(task, network))
 
-    leafs = dag.select(lambda graph, task: graph.is_leaf(task))
-    while leafs:
+    queue = scheduler.TaskQueue(executor)
+    while dag.nodes:
+        leafs = dag.select(lambda graph, task: graph.is_leaf(task) and not queue.in_progress(task))
         while leafs:
             task = leafs.pop()
-            dag.remove_node(task)
-        
-            worker = executor.create(acache, task)
-            duration = utils.duration()
+            task.info("Execution requested")
+            queue.submit(acache, task)
 
-            try:
-                task.info("Execution started")
-                worker.run(task)
-                task.info("Execution finished after {}", duration)
-            except:
-                task.error("Execution failed after {}", duration)
-                raise
+        task, error = queue.wait()
+        if error:
+            task.error("Execution failed after {}", task.duration)
+            queue.abort()
+            raise error
+        else: 
+            task.info("Execution finished after {}", task.duration)
+        dag.remove_node(task)
 
-        leafs = dag.select(lambda graph, task: graph.is_leaf(task))
+    #queue.shutdown()
 
 
 @cli.command()
@@ -110,8 +110,9 @@ def info(task):
     click.echo()
     click.echo("  {}".format(task.name))
     click.echo()
-    click.echo("  {}".format((task.__doc__ or "").strip()))
-    click.echo()
+    if task.__doc__:
+        click.echo("  {}".format(task.__doc__.strip()))
+        click.echo()
     click.echo("  Parameters")
     has_param = False
     for item, param in task.__dict__.iteritems():

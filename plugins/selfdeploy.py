@@ -16,6 +16,9 @@ _path = fs.path.dirname(_path)
 class Jolt(Task):
     name = "jolt"
 
+    def info(self, fmt, *args, **kwargs):
+        log.verbose(fmt, *args, **kwargs)
+
     def publish(self, artifact, tools):
         with tools.cwd(_path):
             artifact.collect('README.rst')
@@ -35,8 +38,10 @@ class SelfDeployExtension(NetworkExecutorExtension):
         if not acache.is_available_remotely(task):
             duration = utils.duration()
             try:
+                factory = LocalExecutorFactory()
                 task.info("Execution started")
-                LocalExecutor(acache, force_upload=True).run(task)
+                executor = LocalExecutor(factory, acache, task, force_upload=True)
+                executor.run()
                 task.info("Execution finished after {}", duration)
             except:
                 task.error("Execution failed after {}", duration)

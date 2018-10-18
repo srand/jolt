@@ -26,6 +26,10 @@ class TaskProxy(object):
     @property
     def qualified_name(self):
         return utils.format_task_name(self.task.name, self.task._get_parameters())
+
+    @property
+    def log_name(self):
+        return "({} {})".format(self.qualified_name, self.identity[:8])
     
     @property
     @cached.instance
@@ -44,10 +48,10 @@ class TaskProxy(object):
         return "{} [{}]".format(self.task.name, ", ".join([node.task.name for node in self.children]))
 
     def info(self, fmt, *args, **kwargs):
-        self.task.info(fmt + " (" + self.qualified_name + ")", *args, **kwargs)
+        self.task.info(fmt + " " + self.log_name, *args, **kwargs)
 
     def error(self, fmt, *args, **kwargs):
-        self.task.error(fmt + " (" + self.qualified_name + ")", *args, **kwargs)
+        self.task.error(fmt + " " + self.log_name, *args, **kwargs)
 
     def has_children(self):
         return len(self.children) > 0
@@ -62,6 +66,10 @@ class TaskProxy(object):
         self.children = nx.descendants(dag, self)
         self.anestors = nx.ancestors(dag, self)
         return self.identity
+
+    def started(self):
+        self.info("Execution started")
+        self.duration = utils.duration()
 
     def run(self, cache, force_upload=False):
         if cache.is_available_remotely(self):

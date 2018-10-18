@@ -1219,7 +1219,7 @@ class Jenkins(object):
         headers = {"Content-Type": "application/x-www-form-urlencoded"}
         response = self.jenkins_request(requests.Request(
             'POST',
-            url, data={"json": json.dumps({"parameter": parameter_list})},
+            url, data=urlencode(parameters),
             headers=headers))
         location = response.headers['Location']
         # location is a queue item, eg. "http://jenkins/queue/item/25/"

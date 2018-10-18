@@ -86,28 +86,31 @@ class JenkinsServer(object):
 
 
 class JenkinsExecutor(scheduler.NetworkExecutor):
-    def __init__(self, server, cache):
-        super(JenkinsExecutor, self).__init__()
+    def __init__(self, factory, cache, task):
+        super(JenkinsExecutor, self).__init__(factory)
+        self.server = JenkinsServer().get()
         self.cache = cache
-        self.job = server.job_name
-        self.server = server
+        self.task = task
+        self.job = self.server.job_name
 
-    def run(self, task):
+    def run(self):
+        self.task.started()
+        
         parameters = {
             "joltfile": loader.JoltLoader.get().get_sources(),
-            "task": task.qualified_name,
-            "task_identity": task.identity[:8]
+            "task": self.task.qualified_name,
+            "task_identity": self.task.identity[:8]
         }
-        parameters.update(scheduler.ExecutorRegistry.get().get_network_parameters(task))
+        parameters.update(scheduler.ExecutorRegistry.get().get_network_parameters(self.task))
 
         queue_id = self.server.build_job(self.job, parameters)
-        log.verbose("[JENKINS] Queued {}", task.qualified_name)
+        log.verbose("[JENKINS] Queued {}", self.task.qualified_name)
 
         queue_info = self.server.get_queue_item(queue_id)
         while not queue_info.get("executable"):
             queue_info = self.server.get_queue_item(queue_id)
         
-        log.verbose("[JENKINS] Executing {}", task.qualified_name)
+        log.verbose("[JENKINS] Executing {}", self.task.qualified_name)
 
         build_id = queue_info["executable"]["number"]
 
@@ -115,20 +118,22 @@ class JenkinsExecutor(scheduler.NetworkExecutor):
         while build_info["result"] not in ["SUCCESS", "FAILURE"]:
             build_info = self.server.get_build_info(self.job, build_id)
 
-        log.verbose("[JENKINS] Finished {}", task.qualified_name)
+        log.verbose("[JENKINS] Finished {}", self.task.qualified_name)
         assert build_info["result"] == "SUCCESS", \
-            "[JENKINS] {}: {}".format(build_info["result"], task.qualified_name)
+            "[JENKINS] {}: {}".format(build_info["result"], self.task.qualified_name)
 
-        assert self.cache.is_available_remotely(task), \
-            "[JENKINS] no artifact produced for {}, check configuration".format(task.name)
+        assert self.cache.is_available_remotely(self.task), \
+            "[JENKINS] no artifact produced for {}, check configuration".format(self.task.name)
 
-        assert self.cache.download(task), \
-            "[JENKINS] failed to download artifact for {}".format(task.name)
+        assert self.cache.download(self.task), \
+            "[JENKINS] failed to download artifact for {}".format(self.task.name)
+
+        return self.task
 
 
 @scheduler.ExecutorFactory.Register
 class JenkinsExecutorFactory(scheduler.NetworkExecutorFactory):
-    def create(self, cache):
-        return JenkinsExecutor(JenkinsServer().get(), cache)
+    def create(self, cache, task):
+        return JenkinsExecutor(self, cache, task)
 
 log.verbose("Jenkins loaded")

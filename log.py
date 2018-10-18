@@ -17,7 +17,7 @@ def set_level(level):
 
 def info(fmt, *args, **kwargs):
     if _loglevel >= NORMAL:
-        sys.stdout.write("[INFO] " + fmt.format(*args, **kwargs) + "\n")
+        sys.stdout.write("[INFO]  " + fmt.format(*args, **kwargs) + "\n")
         sys.stdout.flush()
 
 def verbose(fmt, *args, **kwargs):

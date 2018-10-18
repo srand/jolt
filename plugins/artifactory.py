@@ -60,7 +60,9 @@ class Artifactory(cache.StorageProvider):
             url = self._get_url(node, artifact)
             response = requests.get(url, stream=True)
             with open(artifact.get_archive_path(), 'wb') as out_file:
+                node.info("Download started")
                 shutil.copyfileobj(response.raw, out_file)
+                node.info("Download completed")
                 log.hysterical("[ARTIFACTORY] Download {} => {}", url, response.status_code)
             if response.status_code == 200:
                 artifact.decompress()
@@ -73,7 +75,9 @@ class Artifactory(cache.StorageProvider):
         with self._cache.get_artifact(node) as artifact:
             url = self._get_url(node, artifact)
             with open(artifact.get_archive(), 'rb') as archive:
+                node.info("Upload started")
                 response = requests.put(url, data=archive, auth=self._get_auth())
+                node.info("Upload completed")
                 log.hysterical("[ARTIFACTORY] Upload {} => {}", url, response.status_code)
                 return response.status_code == 201
         return False
