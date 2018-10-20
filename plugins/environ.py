@@ -28,9 +28,9 @@ class PathEnvironmentVariable(EnvironmentVariable):
         else:
             self.set_value(value)
 
-    def apply(self, value):
+    def apply(self, artifact):
         self._old_value = os.environ.get(self.get_name())
-        new_val = self.get_value()
+        new_val = fs.path.join(artifact.path, self.get_value())
         if self._old_value:
             new_val = new_val + fs.pathsep + os.environ[self.get_name()]
         os.environ[self.get_name()] = new_val
@@ -42,6 +42,8 @@ class EnvironmentVariableSet(ArtifactAttributeSet):
 
     def create(self, name):
         if name == "PATH":
+            return PathEnvironmentVariable(name)
+        if name == "LD_LIBRARY_PATH":
             return PathEnvironmentVariable(name)
         return EnvironmentVariable(name)
 

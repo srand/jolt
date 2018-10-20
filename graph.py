@@ -63,7 +63,7 @@ class TaskProxy(object):
         return self.task.is_cacheable()
 
     def finalize(self, dag):
-        self.children = nx.descendants(dag, self)
+        self.children = sorted(nx.descendants(dag, self), key=lambda t: t.qualified_name)
         self.anestors = nx.ancestors(dag, self)
         return self.identity
 

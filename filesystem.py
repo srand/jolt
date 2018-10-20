@@ -3,6 +3,7 @@ import errno
 import shutil
 import zipfile
 import tempfile
+import tarfile
 
 
 path = os.path
@@ -42,7 +43,7 @@ def copy(src, dest):
     if path.isdir(src):
         shutil.copytree(src, dest)
     else:
-        shutil.copyfile(src, dest)
+        shutil.copy2(src, dest)
 
 
 def scandir(scanpath):
@@ -53,7 +54,7 @@ def scandir(scanpath):
 make_archive = shutil.make_archive
 
 def make_archive(file, path, remove=False):
-    shutil.make_archive(file, "zip", root_dir=path)
+    shutil.make_archive(file, "gztar", root_dir=path)
     if remove:
         rmtree(path)
     return get_archive(path)
@@ -61,12 +62,12 @@ def make_archive(file, path, remove=False):
 def extract_archive(file, path, remove=False):
     name, ext = os.path.splitext(file)
     if not ext:
-        ext = ".zip"
+        ext = ".tar.gz"
         file += ext
-    if ext == ".zip":
-        with zipfile.ZipFile(file) as zip:
+    if ext == ".tar.gz":
+        with tarfile.open(file, 'r:gz') as tar:
             makedirs(path)
-            zip.extractall(path)
+            tar.extractall(path)
         if remove:
             os.unlink(file)
         return
@@ -74,4 +75,4 @@ def extract_archive(file, path, remove=False):
 
 
 def get_archive(path):
-    return path + ".zip"
+    return path + ".tar.gz"

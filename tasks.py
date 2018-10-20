@@ -178,7 +178,6 @@ class Task(object):
 
 
 class TaskTools(object):
-    cwd = tools.cwd
     tmpdir = tools.tmpdir
 
     def __init__(self, node):
@@ -187,7 +186,12 @@ class TaskTools(object):
     def builddir(self, *args, **kwargs):
         return tools.builddir(self._node)
 
+    def cwd(self, path):
+        path = self._node.task._get_expansion(path)
+        return tools.cwd(path)
+
     def run(self, cmd, *args, **kwargs):
+        cmd = self._node.task._get_expansion(cmd)
         return tools.run(cmd, *args, **kwargs)
 
     def map_consecutive(self, callable, iterable):
@@ -239,6 +243,7 @@ class ResourceAttributeSetProvider(ArtifactAttributeSetProvider):
         task = artifact.get_task()
         if isinstance(task, Resource):
             env = task._run_env
+            env.__enter__()
             task.acquire(artifact, env, TaskTools(task))
 
     def unapply(self, artifact):
@@ -246,3 +251,4 @@ class ResourceAttributeSetProvider(ArtifactAttributeSetProvider):
         if isinstance(task, Resource):
             env = task._run_env
             task.release(artifact, env, TaskTools(task))
+            env.__exit__(None, None, None)

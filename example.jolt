@@ -1,0 +1,41 @@
+from tasks import *
+from plugins import git
+
+
+class HelloWorld(Task):
+      """ Builds the classic Hello World! application """
+      
+      name = "hello"
+      requires = "git:url=https://github.com/gideont/hello_world.git"
+      flavor = Parameter(default="hello_01", help="Flavor of the hello world application")
+      
+      def run(self, deps, tools):
+            with tools.cwd("hello_world/{flavor}"):
+                  tools.run("make")
+
+      def publish(self, artifact, tools):
+            with tools.cwd("hello_world"):
+                  artifact.collect("{flavor}/hello", "bin/", flatten=True)
+                  artifact.collect("{flavor}/*.so", "bin/", flatten=True)
+            artifact.environ.PATH.append("bin")
+            artifact.environ.LD_LIBRARY_PATH.append("bin")
+            artifact.strings.executable = "hello"
+
+
+class Test(Task):
+      """ Runs the Hello World! application """
+
+      name = "test"
+      requires = "hello:flavor={flavor}"
+      flavor = Parameter(default="hello_01", help="Flavor of the hello world application")
+      
+      def run(self, deps, tools):
+            hello = deps[self.requires[0]]
+            tools.run(hello.strings.executable.get_value())
+
+
+class Example(Task):
+      """ Example task which builds and tests two flavors of Hello world! """
+      
+      name = "example"
+      requires = "test:flavor=hello_01", "test:flavor=hello_02_shared_lib"

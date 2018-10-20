@@ -54,9 +54,12 @@
     <hudson.tasks.Shell>
       <command>
 if [ -n "$jolt_url" ]; then
-  curl -o jolt.zip $jolt_url
-  unzip -d jolt jolt.zip
-  rm -f jolt.zip
+  mkdir -p jolt
+  cd jolt
+  curl -o jolt.tgz $jolt_url
+  tar -xzvf jolt.tgz
+  rm -f jolt.tgz
+  cd ..
   virtualenv jolt-python
   . jolt-python/bin/activate
   pip install -e jolt
@@ -65,8 +68,8 @@ fi
 echo &quot;$config&quot; &gt; jolt.conf
 echo &quot;$joltfile&quot; &gt; tasks.jolt
 
-jolt -vv -c jolt.conf build $task</command>
 jolt clean
+jolt -vv -c jolt.conf build $task</command>
     </hudson.tasks.Shell>
   </builders>
   <publishers>
