@@ -7,7 +7,7 @@ import copy
 import os
 from tempfile import mkdtemp
 import tools
-
+import influence
 
 class StorageProvider(object):
     def download(self, node, force=False):
@@ -188,6 +188,7 @@ class Artifact(object):
         content["identity"] = self._node.identity
         content["requires"] = self._node.task._get_requires()
         content["parameters"] = self._node.task._get_parameters()
+        content["influence"] = influence.HashInfluenceRegistry.get().get_strings(self._node.task)
         ArtifactAttributeSetRegistry.format_all(self, content)
 
         manifest = fs.path.join(self._temp, ".manifest.json")

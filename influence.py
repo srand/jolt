@@ -17,10 +17,15 @@ class HashInfluenceRegistry(object):
         self._providers.append(provider)
         
     def apply_all(self, task, sha):
+        for influence in self.get_strings(task):
+            sha.update(influence)
+            log.hysterical("{}: {}", task.name, influence)
+
+    def get_strings(self, task):
+        content = []
         for provider in self._providers + task.influence:
-            content = "Influence-{}: {}".format(provider.name, provider.influence(task))
-            sha.update(content)
-            log.hysterical("{}: {}", task.name, content)
+            content.append("Influence-{}: {}".format(provider.name, provider.influence(task)))
+        return content
 
 
 class HashInfluenceProvider(object):

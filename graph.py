@@ -139,7 +139,10 @@ class GraphBuilder(object):
         #print([(n1.name, n2.name) for n1, n2 in graph.edges])
         assert nx.is_directed_acyclic_graph(graph), "cyclic graph"
 
-        map(lambda x: x.finalize(graph), graph.nodes)
+        # Stabilize the identity of tasks
+        nodes = [node for node in nx.topological_sort(graph)]
+        map(lambda x: x.finalize(graph), reversed(nodes))
+
         return graph
 
 
