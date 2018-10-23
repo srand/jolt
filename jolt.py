@@ -44,12 +44,21 @@ def cli(verbose, extra_verbose, config_file):
 @cli.command()
 @click.argument("task")
 @click.option("-n", "--network", is_flag=True, default=False, help="Build on network.")
-def build(task, network):
+@click.option("-i", "--identity", type=str, help="Expected hash identity")
+def build(task, network, identity):
     executor = scheduler.ExecutorRegistry.get(network=network)
     acache = cache.ArtifactCache()
     tasks = [TaskRegistry.get().get_task(task)]
     dag = graph.GraphBuilder.build(tasks)
     dag.prune(lambda graph, task: acache.is_available(task, network))
+
+    if identity:
+        root = dag.select(lambda graph, task: graph.is_root(task))
+        assert len(root) == 1, "unexpected graph generated"
+        root = root[0]
+        assert root.identity == identity, \
+            "unexpected hash identity; actual {} vs expected {}"\
+            .format(root.identity, identity)
 
     queue = scheduler.TaskQueue(executor)
     while dag.nodes:
@@ -130,6 +139,18 @@ def info(task):
         click.echo("    None")
     click.echo()
 
+    acache = cache.ArtifactCache()
+    dag = graph.GraphBuilder.build([task])
+    tasks = dag.select(lambda graph, node: graph.is_root(node))
+    assert len(tasks) == 1, "unexpected graph generated"
+    proxy = tasks[0]
+
+    click.echo("  Cache")
+    click.echo("    Identity          {}".format(proxy.identity))
+    click.echo("    Local             {}".format(acache.is_available_locally(proxy)))
+    click.echo("    Remote            {}".format(acache.is_available_remotely(proxy)))
+
+    click.echo()
 
 def main():
     try:

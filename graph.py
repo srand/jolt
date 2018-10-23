@@ -109,7 +109,9 @@ class Graph(nx.DiGraph):
     def is_leaf(self, node):
         return self.out_degree(node) == 0
     
-    
+    def is_root(self, node):
+        return self.in_degree(node) == 0
+
 
 class GraphBuilder(object):
     @staticmethod
