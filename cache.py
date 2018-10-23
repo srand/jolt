@@ -301,7 +301,7 @@ class Context(object):
 
 
 class ArtifactCache(StorageProvider):
-    root = fs.path.join(fs.path.expanduser("~"), ".cache", "build")
+    root = fs.path.join(fs.path.expanduser("~"), ".cache", "jolt")
     storage_provider_factories = []
 
     def __init__(self):

@@ -131,9 +131,10 @@ class Task(object):
             assert False, "invalid macro expansion used in task {}: {} - "\
                 "forgot to set the parameter?".format(self.name, e)
 
-    def _get_expansion(self, string):
+    def _get_expansion(self, string, *args, **kwargs):
         try:
-            return utils.expand_macros(string, **self._get_parameters())
+            kwargs.update(**self._get_parameters())
+            return utils.expand_macros(string, *args, **kwargs)
         except KeyError as e:
             assert False, "invalid macro expansion used in task {}: {} - "\
                 "forgot to set the parameter?".format(self.name, e)
@@ -183,15 +184,12 @@ class TaskTools(object):
     def __init__(self, node):
         self._node = node
 
-    def builddir(self, *args, **kwargs):
-        return tools.builddir(self._node)
-
-    def cwd(self, path):
-        path = self._node.task._get_expansion(path)
+    def cwd(self, path, *args, **kwargs):
+        path = self._node.task._get_expansion(path, *args, **kwargs)
         return tools.cwd(path)
 
     def run(self, cmd, *args, **kwargs):
-        cmd = self._node.task._get_expansion(cmd)
+        cmd = self._node.task._get_expansion(cmd, *args, **kwargs)
         return tools.run(cmd, *args, **kwargs)
 
     def map_consecutive(self, callable, iterable):
@@ -244,11 +242,13 @@ class ResourceAttributeSetProvider(ArtifactAttributeSetProvider):
         if isinstance(task, Resource):
             env = task._run_env
             env.__enter__()
-            task.acquire(artifact, env, TaskTools(task))
+            with tools.cwd(task.joltdir):
+                task.acquire(artifact, env, TaskTools(task))
 
     def unapply(self, artifact):
         task = artifact.get_task()
         if isinstance(task, Resource):
             env = task._run_env
-            task.release(artifact, env, TaskTools(task))
+            with tools.cwd(task.joltdir):
+                task.release(artifact, env, TaskTools(task))
             env.__exit__(None, None, None)

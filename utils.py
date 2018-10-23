@@ -45,8 +45,8 @@ def format_task_name(name, params):
     return "{}:{}".format(name, ",".join([_param(key, value) for key, value in params.iteritems()]))
 
 
-def expand_macros(string, **kwargs):
-    return string.format(**kwargs)
+def expand_macros(string, *args, **kwargs):
+    return string.format(*args, **kwargs)
 
 
 class duration(object):

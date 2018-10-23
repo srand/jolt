@@ -2,7 +2,7 @@ import filesystem as fs
 from ConfigParser import SafeConfigParser, NoOptionError
 
 
-location = fs.path.join(fs.path.expanduser("~"), ".config", "build", "default")
+location = fs.path.join(fs.path.expanduser("~"), ".config", "jolt", "config")
 
 _file = SafeConfigParser()
 _file.read(location)

@@ -4,6 +4,7 @@ import cache
 import log
 import utils
 from concurrent.futures import ThreadPoolExecutor, Future, as_completed
+import traceback
 
 
 class TaskQueue(object):
@@ -13,6 +14,9 @@ class TaskQueue(object):
     
     def submit(self, cache, task):
         executor = self.execregistry.create(cache, task)
+        assert executor, "no executor can execute the task; "\
+            "requesting a network build without proper configuration?"
+
         future = executor.submit()
         self.futures[future] = task
         return future
@@ -23,8 +27,10 @@ class TaskQueue(object):
             error = None
             try:
                 future.result()
+            except AssertionError as e:
+                error = str(e)
             except Exception as e:
-                error = e
+                error = traceback.format_exc()
             del self.futures[future]
             return task, error
         return None, None

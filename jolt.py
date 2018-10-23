@@ -63,7 +63,7 @@ def build(task, network):
         if error:
             task.error("Execution failed after {}", task.duration)
             queue.abort()
-            raise error
+            raise Exception(error)
         else: 
             task.info("Execution finished after {}", task.duration)
         dag.remove_node(task)
@@ -135,6 +135,9 @@ def main():
     try:
         cli()
     except AssertionError as e:
+        log.error(str(e))
+        sys.exit(1)
+    except Exception as e:
         log.error(str(e))
         sys.exit(1)
 
