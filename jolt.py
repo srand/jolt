@@ -16,6 +16,7 @@ import plugins.environ
 import plugins.strings
 import loader
 import utils
+import influence
 
 
 @click.group()
@@ -56,7 +57,7 @@ def build(task, network, identity):
         root = dag.select(lambda graph, task: graph.is_root(task))
         assert len(root) == 1, "unexpected graph generated"
         root = root[0]
-        assert root.identity == identity, \
+        assert root.identity.startswith(identity), \
             "unexpected hash identity; actual {} vs expected {}"\
             .format(root.identity, identity)
 
@@ -112,7 +113,8 @@ def list(task=None, reverse=False, all=False):
 
 @cli.command()
 @click.argument("task")
-def info(task):
+@click.option("-i", "--influence", is_flag=True, help="Print task influence.")
+def info(task, influence=False):
     task_registry = TaskRegistry.get()
     task = task_registry.get_task(task)
 
@@ -149,8 +151,13 @@ def info(task):
     click.echo("    Identity          {}".format(proxy.identity))
     click.echo("    Local             {}".format(acache.is_available_locally(proxy)))
     click.echo("    Remote            {}".format(acache.is_available_remotely(proxy)))
-
     click.echo()
+
+    if influence:
+        click.echo("  Influence")
+        for string in influence.HashInfluenceRegistry.get().get_strings(task):
+            click.echo("    " + string)
+        click.echo()
 
 def main():
     try:

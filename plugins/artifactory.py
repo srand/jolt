@@ -83,8 +83,6 @@ class Artifactory(cache.StorageProvider):
         return False
 
     def location(self, node):
-        if not self._download:
-            return False
         with self._cache.get_artifact(node) as artifact:
             url = self._get_url(node, artifact)
             response = requests.head(url, stream=True)

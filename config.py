@@ -6,6 +6,8 @@ location = fs.path.join(fs.path.expanduser("~"), ".config", "jolt", "config")
 
 _file = SafeConfigParser()
 _file.read(location)
+if not _file.has_section("jolt"):
+    _file.add_section("jolt")
 
 def get(section, key, default=None):
     try:

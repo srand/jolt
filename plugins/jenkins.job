@@ -69,7 +69,7 @@ echo &quot;$config&quot; &gt; jolt.conf
 echo &quot;$joltfile&quot; &gt; tasks.jolt
 
 jolt -c jolt.conf clean
-jolt -vv -c jolt.conf build $task</command>
+jolt -vv -c jolt.conf build -i $task_identity $task</command>
     </hudson.tasks.Shell>
   </builders>
   <publishers>

@@ -8,6 +8,8 @@ import os
 from tempfile import mkdtemp
 import tools
 import influence
+import config
+
 
 class StorageProvider(object):
     def download(self, node, force=False):
@@ -350,6 +352,8 @@ class ArtifactCache(StorageProvider):
             (on_network and self.is_available_remotely(node))
     
     def download(self, node, force=False):
+        if not config.getboolean("jolt", "download", True):
+            return True
         if not node.task.is_cacheable():
             return True
         assert not self.is_available_locally(node), "can't download task, exists in the local cache"
@@ -359,6 +363,8 @@ class ArtifactCache(StorageProvider):
         return len(self.storage_providers) == 0
 
     def upload(self, node, force=False):
+        if not config.getboolean("jolt", "upload", True):
+            return True
         if not node.task.is_cacheable():
             return True
         assert self.is_available_locally(node), "can't upload task, not in the local cache"
