@@ -32,7 +32,7 @@ class SelfDeployExtension(NetworkExecutorExtension):
     @utils.cached.instance
     def get_parameters(self, task):
         acache = ArtifactCache()
-        dag = GraphBuilder.build([Jolt()])
+        dag = GraphBuilder().build([Jolt()])
         tasks = dag.select(lambda graph, task: graph.is_leaf(task))
         task = tasks[0]
         if not acache.is_available_remotely(task):

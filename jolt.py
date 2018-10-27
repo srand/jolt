@@ -50,7 +50,8 @@ def build(task, network, identity):
     executor = scheduler.ExecutorRegistry.get(network=network)
     acache = cache.ArtifactCache()
     tasks = [TaskRegistry.get().get_task(task)]
-    dag = graph.GraphBuilder.build(tasks)
+    gb = graph.GraphBuilder()
+    dag = gb.build(tasks)
     dag.prune(lambda graph, task: acache.is_available(task, network))
 
     if identity:
@@ -63,20 +64,23 @@ def build(task, network, identity):
 
     queue = scheduler.TaskQueue(executor)
     while dag.nodes:
-        leafs = dag.select(lambda graph, task: graph.is_leaf(task) and not queue.in_progress(task))
+        leafs = dag.select(lambda graph, task: task.is_ready(graph))
         while leafs:
             task = leafs.pop()
-            task.info("Execution requested")
+            task.set_in_progress()
+            #task.info("Execution requested")
             queue.submit(acache, task)
 
         task, error = queue.wait()
+        assert task, "blocked tasks remain and could not be unblocked, no more tasks in progress"
         if error:
             task.error("Execution failed after {}", task.duration)
             queue.abort()
             raise Exception(error)
         else: 
             task.info("Execution finished after {}", task.duration)
-        dag.remove_node(task)
+
+        task.set_completed(dag)
 
     #queue.shutdown()
 
@@ -85,6 +89,14 @@ def build(task, network, identity):
 def clean():
     cache_provider = cache.ArtifactCache()
     fs.rmtree(cache_provider.root)
+
+
+@cli.command()
+@click.argument("task")
+def display(task):
+    gb = graph.GraphBuilder()
+    gb.build([TaskRegistry.get().get_task(task)])
+    gb.display()
 
 
 @cli.command()
@@ -102,7 +114,7 @@ def list(task=None, reverse=False, all=False):
     task_registry = TaskRegistry.get()
 
     tasks = [task_registry.get_task(task)]
-    dag = graph.GraphBuilder.build(tasks)
+    dag = graph.GraphBuilder().build(tasks)
     tasks = dag.select(lambda graph, node: node.name == task)
     successors = set()
     for task in tasks:
@@ -142,7 +154,7 @@ def info(task, influence=False):
     click.echo()
 
     acache = cache.ArtifactCache()
-    dag = graph.GraphBuilder.build([task])
+    dag = graph.GraphBuilder().build([task])
     tasks = dag.select(lambda graph, node: graph.is_root(node))
     assert len(tasks) == 1, "unexpected graph generated"
     proxy = tasks[0]

@@ -13,40 +13,71 @@ class TestResource(Resource):
 
 
 class HelloWorld(Task):
-      """ Builds the classic Hello World! application """
+    """ Builds the classic Hello World! application """
       
-      name = "hello"
-      requires = "git:url=https://github.com/gideont/hello_world.git,sha=d80bb20", "resource"
-      flavor = Parameter(default="hello_01", help="Flavor of the hello world application")
+    name = "hello"
+    requires = "git:url=https://github.com/gideont/hello_world.git,sha=d80bb20", "resource"
+    flavor = Parameter(default="hello_01", help="Flavor of the hello world application")
       
-      def run(self, deps, tools):
-            with tools.cwd("hello_world/{flavor}"):
-                  tools.run("make")
+    def run(self, deps, tools):
+        with tools.cwd("hello_world/{flavor}"):
+            tools.run("make")
 
-      def publish(self, artifact, tools):
-            with tools.cwd("hello_world"):
-                  artifact.collect("{flavor}/hello", "bin/", flatten=True)
-                  artifact.collect("{flavor}/*.so", "bin/", flatten=True)
-            artifact.environ.PATH.append("bin")
-            artifact.environ.LD_LIBRARY_PATH.append("bin")
-            artifact.strings.executable = "hello"
+    def publish(self, artifact, tools):
+        with tools.cwd("hello_world"):
+            artifact.collect("{flavor}/hello", "bin/", flatten=True)
+            artifact.collect("{flavor}/*.so", "bin/", flatten=True)
+        artifact.environ.PATH.append("bin")
+        artifact.environ.LD_LIBRARY_PATH.append("bin")
+        artifact.strings.executable = "hello"
 
 
 class Test(Task):
-      """ Runs the Hello World! application """
+    """ Runs the Hello World! application """
 
-      name = "test"
-      requires = "hello:flavor={flavor}"
-      flavor = Parameter(default="hello_01", help="Flavor of the hello world application")
+    name = "test"
+    requires = "hello:flavor={flavor}"
+    flavor = Parameter(default="hello_01", help="Flavor of the hello world application")
       
-      def run(self, deps, tools):
-            hello = deps[self.requires[0]]
-            tools.run(hello.strings.executable.get_value())
+    def run(self, deps, tools):
+        hello = deps[self.requires[0]]
+        tools.run(hello.strings.executable.get_value())
 
 
 class Example(Task):
-      """ Example task which builds and tests two flavors of Hello world! """
+    """ Example task which builds and tests two flavors of Hello world! """
       
-      name = "example"
-      requires = "test:flavor=hello_01", "test:flavor=hello_02_shared_lib"
+    name = "example"
+    requires = "test:flavor=hello_01", "test:flavor=hello_02_shared_lib"
 
+    def run(self, deps, tools):
+        log.info
+
+
+class Extension(Task):
+    name = "extension"
+    extends = "example"
+
+    def run(self, deps, tools):
+        log.info("Running extension example")
+
+
+class SecondExtension(Task):
+    name = "second-extension"
+    extends = "example"
+
+    def run(self, deps, tools):
+        log.info("Running second extension example")
+
+
+class Intermediate(Task):
+    name = "intermediate"
+    requires = "example"
+
+
+class All(Task):
+    name = "all"
+    requires = "extension", "intermediate", "second-extension"
+
+    def run(self, deps, tools):
+        log.info("Running task requiring extended example")

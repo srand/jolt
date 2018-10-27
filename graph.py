@@ -5,6 +5,7 @@ from copy import copy
 import hashlib
 import tools
 import networkx as nx
+from networkx.drawing.nx_agraph import write_dot
 import log
 import utils
 
@@ -14,6 +15,12 @@ class TaskProxy(object):
         self.task = task
         self.children = []
         self.ancestors = []
+        self.extends = []
+
+        self._extended_by = 0
+        self._completed_by = 0
+        self._in_progress = False
+        self._completed = False
 
     @property
     def name(self):
@@ -30,7 +37,7 @@ class TaskProxy(object):
     @property
     def log_name(self):
         return "({} {})".format(self.qualified_name, self.identity[:8])
-    
+
     @property
     @cached.instance
     def identity(self):
@@ -45,7 +52,10 @@ class TaskProxy(object):
         return sha.hexdigest()
 
     def __str__(self):
-        return "{} [{}]".format(self.task.name, ", ".join([node.task.name for node in self.children]))
+        return "{}{}".format(self.qualified_name, "*" if self.is_extended() else '')
+
+    def __hash__(self):
+        return hash(self.qualified_name)
 
     def info(self, fmt, *args, **kwargs):
         self.task.info(fmt + " " + self.log_name, *args, **kwargs)
@@ -65,6 +75,50 @@ class TaskProxy(object):
     def is_resource(self):
         return isinstance(self.task, Resource)
 
+    def is_extended(self):
+        return self._extended_by > 0
+
+    def add_extends(self, task):
+        return self.extends.append(task)
+
+    def in_progress(self):
+        return self._in_progress
+
+    def is_ready(self, dag):
+        if self.is_extended():
+            return False
+
+        if self.in_progress():
+            return False
+
+        neighbors = set([n for n in dag.neighbors(self)])
+        if neighbors:
+            if all([n in self.extends for n in neighbors]):
+                return all([dag.is_leaf(n) for n in self.extends])
+            return False
+        return True
+
+    def is_completed(self):
+        return self._completed
+
+    def set_extended(self):
+        self._extended_by += 1
+
+    def set_in_progress(self):
+        self._in_progress = True
+
+    def set_completed(self, dag):
+        if self.is_extended():
+            self._completed_by += 1
+        if self._extended_by > self._completed_by:
+            return
+
+        self._completed = True
+        dag.remove_node(self)
+        for extended in self.extends:
+            if not extended.is_completed():
+                extended.set_completed(dag)
+
     def finalize(self, dag):
         # Find all direct and transitive dependencies
         self.children = sorted(nx.descendants(dag, self), key=lambda t: t.qualified_name)
@@ -81,16 +135,23 @@ class TaskProxy(object):
         self.info("Execution started")
         self.duration = utils.duration()
 
-    def run(self, cache, force_upload=False):
+    def run(self, cache, force_upload=False, force_build=False):
         if cache.is_available_remotely(self):
             cache.download(self)
 
-        if not cache.is_available_locally(self):
+        if not cache.is_available_locally(self) or force_build:
             t = TaskTools(self)
+
+            for extended in self.extends:
+                extended.run(cache, force_upload, force_build=True)
 
             with cache.get_context(self) as context:
                 with t.cwd(self.task.joltdir):
                     self.task.run(context, t)
+
+            if force_build and cache.is_available_locally(self):
+                with cache.get_artifact(self) as artifact:
+                    artifact.discard()
 
             with cache.get_artifact(self) as artifact:
                 with t.cwd(self.task.joltdir):
@@ -127,56 +188,51 @@ class Graph(nx.DiGraph):
 
 
 class GraphBuilder(object):
-    @staticmethod
-    def build(task_list):
-        nodes = [TaskProxy(task) for task in task_list]
-        nodes = {node.name: node for node in nodes}
+    def __init__(self):
+        self.graph = Graph()
+        self.nodes = {}
+        self.registry = tasks.TaskRegistry.get()
 
-        task_registry = tasks.TaskRegistry.get()
+    def _get_node(self, name):
+        node = self.nodes.get(name)
+        if not node:
+            task = self.registry.get_task(name)
+            node = self._build_node(TaskProxy(task))
+            self.nodes[name] = node
+        return node
         
-        graph = Graph()
-        queue = copy(nodes.values())
-        while queue:
-            parent = queue.pop()
+    def _build_node(self, node):
+        self.graph.add_node(node)
 
-            if not graph.has_node(parent):
-                graph.add_node(parent)
+        for requirement in node.task._get_requires():
+            child = self._get_node(requirement)
+            self.graph.add_edges_from([(node, child)])
 
-            for requirement in as_list(parent.task._get_requires()):
-                child = nodes.get(requirement) or TaskProxy(task_registry.get_task(requirement))
-                nodes[requirement] = child
-                queue.append(child)
-                
-                graph.add_node(child)
-                graph.add_edges_from([(parent, child)])
+        for extend in node.task._get_extends():
+            extend_node = self._get_node(extend)
+            for requirement in extend_node.task._get_requires():
+                child = self._get_node(requirement)
+                self.graph.add_edges_from([(node, child)])
+            self.graph.add_edges_from([(node, extend_node)])
+            extend_node.set_extended()
+            node.add_extends(extend_node)
 
-        #print([n.name for n in graph.nodes])
-        #print([(n1.name, n2.name) for n1, n2 in graph.edges])
-        assert nx.is_directed_acyclic_graph(graph), "cyclic graph"
+        node.finalize(self.graph)
+        return node
 
-        # Stabilize the identity of tasks
-        nodes = [node for node in nx.topological_sort(graph)]
-        map(lambda x: x.finalize(graph), reversed(nodes))
+    def build(self, task_list):
+        proxies = [TaskProxy(task) for task in task_list]
+        self.nodes = {node.qualified_name: node for node in proxies}
 
-        return graph
+        for node in copy(self.nodes.values()):
+            node = self._build_node(node)
 
+        assert nx.is_directed_acyclic_graph(self.graph), "cyclic graph"
+        return self.graph
 
-class GraphDFIterator(object):
-    @staticmethod
-    def as_list(graph):
-        done = set()
-        l = []
-        q = copy(graph) if type(graph) == list else [graph]
-        while q:
-            n = q.pop()
-            if n not in done:
-                l.append(n)
-            done.add(n)
-            q.extend(n.children)
-        return l
-    
-    @staticmethod
-    def iterate(graph, predicate):
-        for node in reversed(GraphDFIterator.as_list(graph)):
-            predicate(node)
-
+    def display(self):
+        with tools.tmpdir("dot") as t:
+            with tools.cwd(t.get_path()):
+                write_dot(self.graph, 'graph.dot')
+                tools.run('dot -Tsvg graph.dot -o graph.svg')
+                tools.run('eog graph.svg')

@@ -177,8 +177,9 @@ class Artifact(object):
         return self
 
     def __exit__(self, type, value, tb):
-        self.discard()
-        
+        if value:
+            self.discard()
+
     def __getattr__(self, name):
         assert False, "no attribute '{}' in artifact for '{}'".format(
             name, self._node.qualified_name)
@@ -206,6 +207,9 @@ class Artifact(object):
             ArtifactAttributeSetRegistry.parse_all(self, content)
 
     def commit(self):
+        if self._node.name == "example":
+            import pdb
+            pdb.set_trace()
         if not self._node.task.is_cacheable():
             return
         if self._temp:
@@ -218,6 +222,8 @@ class Artifact(object):
             fs.unlink(self._archive)
         if self._temp:
             fs.rmtree(self._temp)
+        if self._path:
+            fs.rmtree(self._path)
 
     @property
     def path(self):

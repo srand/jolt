@@ -81,6 +81,7 @@ class Task(object):
     attributes = []
     name = None
     requires = []
+    extends = []
     influence = []
         
     def __init__(self, name=None):
@@ -88,6 +89,7 @@ class Task(object):
         self.attributes = utils.as_list(self.__class__.attributes)
         self.influence = utils.as_list(self.__class__.influence)
         self.requires = utils.as_list(utils.call_or_return(self, self.__class__.requires))
+        self.extends = utils.as_list(utils.call_or_return(self, self.__class__.extends))
         self.name = self.__class__.name
         self._create_parameters()
 
@@ -127,6 +129,13 @@ class Task(object):
     def _get_requires(self):
         try:
             return [utils.expand_macros(req, **self._get_parameters()) for req in self.requires]
+        except KeyError as e:
+            assert False, "invalid macro expansion used in task {}: {} - "\
+                "forgot to set the parameter?".format(self.name, e)
+
+    def _get_extends(self):
+        try:
+            return [utils.expand_macros(req, **self._get_parameters()) for req in self.extends]
         except KeyError as e:
             assert False, "invalid macro expansion used in task {}: {} - "\
                 "forgot to set the parameter?".format(self.name, e)
