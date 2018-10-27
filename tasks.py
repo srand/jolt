@@ -128,14 +128,14 @@ class Task(object):
 
     def _get_requires(self):
         try:
-            return [utils.expand_macros(req, **self._get_parameters()) for req in self.requires]
+            return [self._get_expansion(req) for req in self.requires]
         except KeyError as e:
             assert False, "invalid macro expansion used in task {}: {} - "\
                 "forgot to set the parameter?".format(self.name, e)
 
     def _get_extends(self):
         try:
-            return [utils.expand_macros(req, **self._get_parameters()) for req in self.extends]
+            return [self._get_expansion(req) for req in self.extends]
         except KeyError as e:
             assert False, "invalid macro expansion used in task {}: {} - "\
                 "forgot to set the parameter?".format(self.name, e)
@@ -143,6 +143,7 @@ class Task(object):
     def _get_expansion(self, string, *args, **kwargs):
         try:
             kwargs.update(**self._get_parameters())
+            kwargs.update(**self._get_properties())
             return utils.expand_macros(string, *args, **kwargs)
         except KeyError as e:
             assert False, "invalid macro expansion used in task {}: {} - "\
@@ -167,6 +168,11 @@ class Task(object):
                 for key, param in self.__dict__.iteritems()
                 if isinstance(param, Parameter) and \
                  (unset or not param.is_unset()) }
+
+    def _get_properties(self):
+        return {key: prop.__get__(self)
+                for key, prop in self.__class__.__dict__.iteritems()
+                if type(prop) == property }
 
     def is_cacheable(self):
         return True

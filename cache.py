@@ -207,9 +207,6 @@ class Artifact(object):
             ArtifactAttributeSetRegistry.parse_all(self, content)
 
     def commit(self):
-        if self._node.name == "example":
-            import pdb
-            pdb.set_trace()
         if not self._node.task.is_cacheable():
             return
         if self._temp:

@@ -36,9 +36,13 @@ class Test(Task):
     """ Runs the Hello World! application """
 
     name = "test"
-    requires = "hello:flavor={flavor}"
+    requires = "hello:flavor={property_example}"
     flavor = Parameter(default="hello_01", help="Flavor of the hello world application")
-      
+
+    @property
+    def property_example(self):
+        return self.flavor.get_value()
+    
     def run(self, deps, tools):
         hello = deps[self.requires[0]]
         tools.run(hello.strings.executable.get_value())

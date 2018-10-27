@@ -10,7 +10,6 @@ import filesystem as fs
 import log
 import config
 import sys
-import pdb
 import plugins
 import plugins.environ
 import plugins.strings
