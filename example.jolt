@@ -2,11 +2,21 @@ from tasks import *
 from plugins import git
 
 
+class TestResource(Resource):
+    name = "resource"
+
+    def acquire(self, artifact, env, tools):
+        log.info("Acquiring resource")
+
+    def release(self, artifact, env, tools):
+        log.info("Releasing resource")
+
+
 class HelloWorld(Task):
       """ Builds the classic Hello World! application """
       
       name = "hello"
-      requires = "git:url=https://github.com/gideont/hello_world.git,sha=d80bb20"
+      requires = "git:url=https://github.com/gideont/hello_world.git,sha=d80bb20", "resource"
       flavor = Parameter(default="hello_01", help="Flavor of the hello world application")
       
       def run(self, deps, tools):
@@ -39,3 +49,4 @@ class Example(Task):
       
       name = "example"
       requires = "test:flavor=hello_01", "test:flavor=hello_02_shared_lib"
+

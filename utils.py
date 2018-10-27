@@ -1,6 +1,7 @@
 import time
 from concurrent.futures import ThreadPoolExecutor, Future, as_completed
 from functools import partial
+from threading import RLock
 
 
 def as_list(t):
@@ -60,12 +61,15 @@ class duration(object):
         return time.strftime("%-Ss", time.gmtime(elapsed))
 
 class cached:
+    mutex = RLock()
+
     @staticmethod
     def instance(f):
         def _f(self, *args, **kwargs):
             attr = "__cached_result_" + f.__name__
-            if not hasattr(self, attr):
-                setattr(self, attr, f(self, *args, **kwargs))
+            with cached.mutex:
+                if not hasattr(self, attr):
+                    setattr(self, attr, f(self, *args, **kwargs))
             return getattr(self, attr)
         return _f
 
@@ -73,8 +77,9 @@ class cached:
     def method(f):
         def _f(*args, **kwargs):
             attr = "__cached_result_" + f.__name__
-            if not hasattr(f, attr):
-                setattr(f, attr, f(*args, **kwargs))
+            with cached.mutex:
+                if not hasattr(f, attr):
+                    setattr(f, attr, f(*args, **kwargs))
             return getattr(f, attr)
         return _f
 

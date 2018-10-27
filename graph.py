@@ -62,8 +62,18 @@ class TaskProxy(object):
     def is_cacheable(self):
         return self.task.is_cacheable()
 
+    def is_resource(self):
+        return isinstance(self.task, Resource)
+
     def finalize(self, dag):
+        # Find all direct and transitive dependencies
         self.children = sorted(nx.descendants(dag, self), key=lambda t: t.qualified_name)
+
+        # Exclude transitive resources dependencies
+        self.children = filter(
+            lambda n: not n.is_resource() or dag.are_neighbors(self, n),
+            self.children)
+
         self.anestors = nx.ancestors(dag, self)
         return self.identity
 
@@ -111,6 +121,9 @@ class Graph(nx.DiGraph):
     
     def is_root(self, node):
         return self.in_degree(node) == 0
+
+    def are_neighbors(self, n1, n2):
+        return n2 in self[n1]
 
 
 class GraphBuilder(object):
