@@ -49,6 +49,9 @@ class TaskProxy(object):
         for node in self.children:
             sha.update(node.identity)
 
+        if self._extended_task:
+            sha.update(self._extended_task.identity)
+            
         return sha.hexdigest()
 
     def __str__(self):
