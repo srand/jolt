@@ -95,10 +95,13 @@ class JenkinsExecutor(scheduler.NetworkExecutor):
 
     def run(self):
         self.task.started()
+
+        task = [self.task.qualified_name]
+        task += [t.qualified_name for t in self.task.extensions]
         
         parameters = {
             "joltfile": loader.JoltLoader.get().get_sources(),
-            "task": self.task.qualified_name,
+            "task": " ".join(task),
             "task_identity": self.task.identity[:8]
         }
         parameters.update(scheduler.ExecutorRegistry.get().get_network_parameters(self.task))
@@ -123,11 +126,18 @@ class JenkinsExecutor(scheduler.NetworkExecutor):
             "[JENKINS] {}: {}".format(build_info["result"], self.task.qualified_name)
 
         assert self.cache.is_available_remotely(self.task), \
-            "[JENKINS] no artifact produced for {}, check configuration".format(self.task.name)
+            "[JENKINS] no artifact produced for {}, check configuration"\
+            .format(self.task.qualified_name)
 
         assert self.cache.download(self.task), \
-            "[JENKINS] failed to download artifact for {}".format(self.task.name)
+            "[JENKINS] failed to download artifact for {}"\
+            .format(self.task.qualified_name)
 
+        for extension in self.task.extensions:
+            assert self.cache.download(extension), \
+                "[JENKINS] failed to download artifact for {}"\
+                .format(extension.qualified_name)
+        
         return self.task
 
 

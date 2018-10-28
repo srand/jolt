@@ -15,7 +15,8 @@ import plugins.environ
 import plugins.strings
 import loader
 import utils
-import influence
+from influence import *
+import traceback
 
 
 @click.group()
@@ -42,24 +43,19 @@ def cli(verbose, extra_verbose, config_file):
 
 
 @cli.command()
-@click.argument("task")
+@click.argument("task", type=str, nargs=-1, required=True)
 @click.option("-n", "--network", is_flag=True, default=False, help="Build on network.")
 @click.option("-i", "--identity", type=str, help="Expected hash identity")
 def build(task, network, identity):
     executor = scheduler.ExecutorRegistry.get(network=network)
     acache = cache.ArtifactCache()
-    tasks = [TaskRegistry.get().get_task(task)]
     gb = graph.GraphBuilder()
-    dag = gb.build(tasks)
-    dag.prune(lambda graph, task: acache.is_available(task, network))
+    dag = gb.build(task)
+    dag.prune(lambda graph, task: task.is_cached(acache, network))
 
     if identity:
-        root = dag.select(lambda graph, task: graph.is_root(task))
-        assert len(root) == 1, "unexpected graph generated"
-        root = root[0]
-        assert root.identity.startswith(identity), \
-            "unexpected hash identity; actual {} vs expected {}"\
-            .format(root.identity, identity)
+        root = dag.select(lambda graph, task: task.identity.startswith(identity))
+        assert len(root) >= 1, "unknown hash identity, no such task: {}".format(identity)
 
     queue = scheduler.TaskQueue(executor)
     while dag.nodes:
@@ -94,7 +90,7 @@ def clean():
 @click.argument("task")
 def display(task):
     gb = graph.GraphBuilder()
-    gb.build([TaskRegistry.get().get_task(task)])
+    gb.build([task])
     gb.display()
 
 
@@ -111,9 +107,7 @@ def list(task=None, reverse=False, all=False):
         return
 
     task_registry = TaskRegistry.get()
-
-    tasks = [task_registry.get_task(task)]
-    dag = graph.GraphBuilder().build(tasks)
+    dag = graph.GraphBuilder().build(task)
     tasks = dag.select(lambda graph, node: node.name == task)
     successors = set()
     for task in tasks:
@@ -166,7 +160,7 @@ def info(task, influence=False):
 
     if influence:
         click.echo("  Influence")
-        for string in influence.HashInfluenceRegistry.get().get_strings(task):
+        for string in HashInfluenceRegistry.get().get_strings(task):
             click.echo("    " + string)
         click.echo()
 
@@ -174,6 +168,7 @@ def main():
     try:
         cli()
     except AssertionError as e:
+        # traceback.print_exc()
         log.error(str(e))
         sys.exit(1)
     except Exception as e:

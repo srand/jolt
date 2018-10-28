@@ -15,10 +15,9 @@ class TaskProxy(object):
         self.task = task
         self.children = []
         self.ancestors = []
-        self.extends = []
+        self.extensions = []
 
-        self._extended_by = 0
-        self._completed_by = 0
+        self._extended_task = None
         self._in_progress = False
         self._completed = False
 
@@ -46,13 +45,14 @@ class TaskProxy(object):
         with tools.cwd(self.task.joltdir):
             HashInfluenceRegistry.get().apply_all(self.task, sha)
 
+        # print("{}: {}".format(self.name, [n.name for n in self.children]))
         for node in self.children:
             sha.update(node.identity)
 
         return sha.hexdigest()
 
     def __str__(self):
-        return "{}{}".format(self.qualified_name, "*" if self.is_extended() else '')
+        return "{}{}".format(self.qualified_name, "*" if self.is_extension() else '')
 
     def __hash__(self):
         return hash(self.qualified_name)
@@ -75,49 +75,55 @@ class TaskProxy(object):
     def is_resource(self):
         return isinstance(self.task, Resource)
 
-    def is_extended(self):
-        return self._extended_by > 0
+    def has_extensions(self):
+        return len(self.extensions) > 0
 
-    def add_extends(self, task):
-        return self.extends.append(task)
+    def add_extension(self, task):
+        if self.is_extension():
+            self._extended_task.add_extension(task)
+        else:
+            self.extensions.append(task)
+
+    def is_extension(self):
+        return self._extended_task is not None
+
+    def set_extended_task(self, task):
+        self._extended_task = task
+
+    def get_extended_task(self):
+        if self.is_extension():
+            return self._extended_task.get_extended_task()
+        return self
 
     def in_progress(self):
         return self._in_progress
 
     def is_ready(self, dag):
-        if self.is_extended():
-            return False
-
         if self.in_progress():
             return False
 
-        neighbors = set([n for n in dag.neighbors(self)])
-        if neighbors:
-            if all([n in self.extends for n in neighbors]):
-                return all([dag.is_leaf(n) for n in self.extends])
+        if self.is_extension():
             return False
-        return True
+
+        return dag.is_leaf(self)
 
     def is_completed(self):
         return self._completed
 
-    def set_extended(self):
-        self._extended_by += 1
-
+    def is_cached(self, cache, network):
+        for extension in self.extensions:
+            if not cache.is_available(extension, network):
+                return False
+        return cache.is_available(self, network)
+    
     def set_in_progress(self):
         self._in_progress = True
 
     def set_completed(self, dag):
-        if self.is_extended():
-            self._completed_by += 1
-        if self._extended_by > self._completed_by:
-            return
-
         self._completed = True
         dag.remove_node(self)
-        for extended in self.extends:
-            if not extended.is_completed():
-                extended.set_completed(dag)
+        for extension in self.extensions:
+            extension.set_completed(dag)
 
     def finalize(self, dag):
         # Find all direct and transitive dependencies
@@ -136,20 +142,17 @@ class TaskProxy(object):
         self.duration = utils.duration()
 
     def run(self, cache, force_upload=False, force_build=False):
-        if cache.is_available_remotely(self):
+        if not force_build and cache.is_available_remotely(self):
             cache.download(self)
 
-        if not cache.is_available_locally(self) or force_build:
+        if force_build or not cache.is_available_locally(self) or self.has_extensions():
             t = TaskTools(self)
-
-            for extended in self.extends:
-                extended.run(cache, force_upload, force_build=True)
 
             with cache.get_context(self) as context:
                 with t.cwd(self.task.joltdir):
                     self.task.run(context, t)
 
-            if force_build and cache.is_available_locally(self):
+            if cache.is_available_locally(self):
                 with cache.get_artifact(self) as artifact:
                     artifact.discard()
 
@@ -160,7 +163,9 @@ class TaskProxy(object):
 
             assert cache.upload(self, force=force_upload), \
                 "Failed to upload artifact for {}".format(self.name)
-                
+
+            for extension in self.extensions:
+                extension.run(cache, force_upload, force_build=True)
 
 
 class Graph(nx.DiGraph):
@@ -204,29 +209,25 @@ class GraphBuilder(object):
     def _build_node(self, node):
         self.graph.add_node(node)
 
+        extended = node.task._get_extends()
+        if extended:
+            extended_node = self._get_node(extended)
+            self.graph.add_edges_from([(node, extended_node)])
+            node.set_extended_task(extended_node)
+            extended_node.add_extension(node)
+            parent = extended_node.get_extended_task()
+        else:
+            parent = node
+
         for requirement in node.task._get_requires():
             child = self._get_node(requirement)
-            self.graph.add_edges_from([(node, child)])
-
-        for extend in node.task._get_extends():
-            extend_node = self._get_node(extend)
-            for requirement in extend_node.task._get_requires():
-                child = self._get_node(requirement)
-                self.graph.add_edges_from([(node, child)])
-            self.graph.add_edges_from([(node, extend_node)])
-            extend_node.set_extended()
-            node.add_extends(extend_node)
+            self.graph.add_edges_from([(parent, child)])
 
         node.finalize(self.graph)
         return node
 
     def build(self, task_list):
-        proxies = [TaskProxy(task) for task in task_list]
-        self.nodes = {node.qualified_name: node for node in proxies}
-
-        for node in copy(self.nodes.values()):
-            node = self._build_node(node)
-
+        proxies = [self._get_node(task) for task in task_list]
         assert nx.is_directed_acyclic_graph(self.graph), "cyclic graph"
         return self.graph
 

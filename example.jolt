@@ -74,6 +74,19 @@ class SecondExtension(Task):
         log.info("Running second extension example")
 
 
+class ExtensionRequirement(Task):
+    name = "extension-req"
+    
+
+class ExtensionExtension(Task):
+    name = "extension-extension"
+    extends = "extension"
+    requires = "extension-req"
+
+    def run(self, deps, tools):
+        log.info("Running extension extension")
+
+
 class Intermediate(Task):
     name = "intermediate"
     requires = "example"

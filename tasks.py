@@ -81,7 +81,7 @@ class Task(object):
     attributes = []
     name = None
     requires = []
-    extends = []
+    extends = ""
     influence = []
         
     def __init__(self, name=None):
@@ -90,6 +90,8 @@ class Task(object):
         self.influence = utils.as_list(self.__class__.influence)
         self.requires = utils.as_list(utils.call_or_return(self, self.__class__.requires))
         self.extends = utils.as_list(utils.call_or_return(self, self.__class__.extends))
+        assert len(self.extends) == 1, "{} extends multiple tasks, only one allowed".format(self.name)
+        self.extends = self.extends[0]
         self.name = self.__class__.name
         self._create_parameters()
 
@@ -135,7 +137,7 @@ class Task(object):
 
     def _get_extends(self):
         try:
-            return [self._get_expansion(req) for req in self.extends]
+            return self._get_expansion(self.extends)
         except KeyError as e:
             assert False, "invalid macro expansion used in task {}: {} - "\
                 "forgot to set the parameter?".format(self.name, e)
