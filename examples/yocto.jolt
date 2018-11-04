@@ -1,0 +1,30 @@
+from tasks import *
+from glob import glob
+import filesystem as fs
+
+
+class Sdk(Task):
+    """ 
+    Builds the default Poky SDK.
+
+    Clone the Poky repository and source the oe-environment script
+    before attempting to run these tasks. 
+    """
+
+    def run(self, deps, tools):
+        tools.run("bitbake meta-toolchain")
+
+    def publish(self, artifact, tools):
+        artifact.collect("build/tmp/deploy/sdk/*.sh", flatten=True)
+
+    def unpack(self, artifact, tools):
+        with tools.cwd(artifact.path):
+            scripts = glob("*.sh")
+            assert scripts and len(scripts) == 1, "didn't find the installer script"
+            tools.run("./{} -d . -y", scripts[0])
+            for script in scripts:
+                fs.unlink(script)
+
+
+class Test(Task):
+    requires = "sdk"
