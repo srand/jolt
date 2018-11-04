@@ -169,10 +169,11 @@ def main():
     try:
         cli()
     except AssertionError as e:
-        # traceback.print_exc()
+        traceback.print_exc()
         log.error(str(e))
         sys.exit(1)
     except Exception as e:
+        traceback.print_exc()
         log.error(str(e))
         sys.exit(1)
 

@@ -4,6 +4,7 @@ from functools import partial
 from threading import RLock
 from string import *
 import os
+import hashlib
 
 
 def as_list(t):
@@ -139,3 +140,7 @@ def map_consecutive(method, iterable):
 def map_concurrent(method, iterable):
     return run_concurrent([partial(method, item) for item in iterable])
 
+def sha1(string):
+    sha = hashlib.sha1()
+    sha.update(string)
+    return sha.hexdigest()

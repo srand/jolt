@@ -24,27 +24,27 @@ class HashInfluenceRegistry(object):
     def get_strings(self, task):
         content = []
         for provider in self._providers + task.influence:
-            content.append("Influence-{}: {}".format(provider.name, provider.influence(task)))
+            content.append("Influence-{}: {}".format(provider.name, provider.get_influence(task)))
         return content
 
 
 class HashInfluenceProvider(object):
     name = "X"
-    def influence(self, task):
+    def get_influence(self, task):
         raise NotImplemented()
 
 
 @HashInfluenceRegistry.Register
 class TaskNameInfluence(HashInfluenceProvider):
     name = "Name"
-    def influence(self, task):
+    def get_influence(self, task):
         return task.name
 
 
 @HashInfluenceRegistry.Register
 class TaskParameterInfluence(HashInfluenceProvider):
     name = "Parameters"
-    def influence(self, task):
+    def get_influence(self, task):
         return ",".join(["{}={}".format(key, value)
                          for key, value in task._get_parameters().iteritems()])
 
@@ -52,6 +52,6 @@ class TaskParameterInfluence(HashInfluenceProvider):
 @HashInfluenceRegistry.Register
 class TaskSourceInfluence(HashInfluenceProvider):
     name = "Source"
-    def influence(self, task):
+    def get_influence(self, task):
         return task._get_source_hash()
 

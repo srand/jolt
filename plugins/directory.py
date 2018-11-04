@@ -13,7 +13,7 @@ class DirectoryInfluenceProvider(HashInfluenceProvider):
         self.path = path or self.__class__.path
         self.pattern = pattern or self.__class__.pattern
 
-    def influence(self, task):
+    def get_influence(self, task):
         try:
             path = task._get_expansion(self.path)
             with tools.cwd(path):

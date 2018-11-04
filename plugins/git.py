@@ -8,20 +8,37 @@ import filesystem as fs
 
 
 class GitInfluenceProvider(HashInfluenceProvider):
-    name = "Git"
+    name = "Tree"
     path = "."
 
     def __init__(self, path=None):
+        super(GitInfluenceProvider, self).__init__()
         self.path = path or self.__class__.path
 
-    def influence(self, task):
-        try:
-            with cwd(task._get_expansion(self.path)):
-                return tools.run("git rev-parse HEAD: && git diff HEAD",
-                                 output_on_error=True)
-        except KeyError as e:
-            pass
-        assert False, "failed to change directory to {}".format(self.path)
+    def _get_path(self, task):
+        return task._get_expansion(self.path)
+
+    @utils.cached.instance
+    def _get_tree_hash(self, task, sha="HEAD"):
+        with cwd(self._get_path(task)):
+            return run("git rev-parse {}:".format(sha), output_on_error=True)
+        return ""
+
+    @utils.cached.instance
+    def _get_diff(self, task):
+        with cwd(self._get_path(task)):
+            return run("git diff HEAD", output_on_error=True)
+        return ""
+
+    @utils.cached.instance
+    def _get_diff_hash(self, task):
+        return utils.sha1(self._get_diff(task))
+
+    def get_influence(self, task):
+        return "{}:{}:{}".format(
+            self._get_path(task),
+            self._get_tree_hash(task),
+            self._get_diff_hash(task))
 
 
 def global_influence(path, cls=GitInfluenceProvider):
@@ -32,13 +49,14 @@ def influence(path, cls=GitInfluenceProvider):
     def _decorate(taskcls):
         if "influence" not in taskcls.__dict__:
             taskcls.influence = copy(taskcls.influence)
-        provider = cls(path)
+        provider = cls()
+        cls.path = path
         taskcls.influence.append(provider)
         return taskcls
     return _decorate
 
 
-class Git(Resource):
+class Git(Resource, GitInfluenceProvider):
     """ Clones a Git repo.
 
     Also influences the hash of consuming tasks, causing tasks to
@@ -50,43 +68,29 @@ class Git(Resource):
     url = Parameter(help="URL to the git repo to clone. Required.")
     sha = Parameter(help="Specific commit sha to be checked out. Optional.")
 
-    def __init__(self):
-        super(Git, self).__init__()
-        class GitInfluence(HashInfluenceProvider):
-            name = "Tree"
+    def __init__(self, *args, **kwargs):
+        super(Git, self).__init__(*args, **kwargs)
+        self.path = self._get_name()
+        self.influence.append(self)
 
-            def influence(self, task):
-                if not task._is_cloned():
-                    assert not fs.path.exists(task._get_name()), \
-                        "destination folder '{}' already exists but is not a git repo"\
-                        .format(task._get_name())
-                    run("git clone --depth 1 {}", task.url, output_on_error=True)
-                    assert fs.path.exists(task._get_git_folder()),\
-                        "failed to clone git repo '{}'".format(self._get_name())
-                if not task.sha.is_unset():
-                    return task._get_tree_hash(task.sha.get_value())
-                return task._get_tree_hash() + task._get_diff()
-        self.influence.append(GitInfluence())
-
+    @utils.cached.instance
     def _get_name(self):
         repo = fs.path.basename(self.url.get_value())
         name, _ = fs.path.splitext(repo)
         return name
 
+    @utils.cached.instance
     def _get_git_folder(self):
         return fs.path.join(self._get_name(), ".git")
 
-    @utils.cached.instance
-    def _get_tree_hash(self, sha="HEAD"):
-        with cwd(self._get_name()):
-            return run("git rev-parse {}:".format(sha), output_on_error=True)
-        return ""
-
-    @utils.cached.instance
-    def _get_diff(self):
-        with cwd(self._get_name()):
-            return run("git diff HEAD", output_on_error=True)
-        return ""
+    def _clone(self):
+        assert not fs.path.exists(self._get_name()), \
+            "destination folder '{}' already exists but is not a git repo"\
+            .format(self._get_name())
+        depth = "--depth 1" if self.sha.is_unset() else ""
+        run("git clone {} {}", depth, self.url, output_on_error=True)
+        assert fs.path.exists(self._get_git_folder()),\
+            "failed to clone git repo '{}'".format(self._get_name())
 
     @utils.cached.instance
     def _is_synced(self):
@@ -103,13 +107,21 @@ class Git(Resource):
             assert self._is_synced(),\
                 "explicit sha requested but git repo '{}' has local commits"\
                 .format(self._get_name())
-            assert not self._get_diff(), \
+            assert not self._get_diff(self), \
                 "explicit sha requested but git repo '{}' has local changes"\
                 .format(self._get_name())
             # Should be safe to do this now
             with cwd(self._get_name()):
                 run("git checkout {}", self.sha, output_on_error=True)
 
+    def get_influence(self, task):
+        if isinstance(task, Git):
+            if not self._is_cloned():
+                self._clone()
+            if not self.sha.is_unset():
+                return self._get_tree_hash(self, self.sha.get_value())
+        return super(Git, self).get_influence(task)
+                
 TaskRegistry.get().add_task_class(Git)
 
 
@@ -125,7 +137,7 @@ class GitNetworkExecutorExtension(NetworkExecutorExtension):
                         "local commit found in git repo '{}'; "\
                         "push before building remotely"\
                         .format(task._get_name())
-                    assert not task._get_diff(),\
+                    assert not task._get_diff(task),\
                         "local changes found in git repo '{}'; "\
                         "commit and push before building remotely"\
                         .format(task._get_name())

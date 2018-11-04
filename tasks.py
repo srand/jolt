@@ -63,14 +63,26 @@ class TaskRegistry(object):
 
         cls = self.classes.get(name)
         if cls:
-            task = cls()
-            task._set_parameters(params)
-
+            task = cls(parameters=params)
             self.instances[full_name] = task
             return task
 
         assert task, "no such task: {}".format(full_name)
 
+    def _create_parents(self, name):
+        names = name.split("/")
+
+        if len(names) <= 1:
+            return
+
+        prev = None
+        for i in reversed(range(0, len(names))):
+            name = "/".join(names[:i + 1])
+            task = self.instances.get(name) or Task(name)
+            if prev:
+                task.requires += [prev.name]
+            prev = task
+        
     
 class Task(object):
     joltdir = "."
@@ -84,7 +96,7 @@ class Task(object):
     extends = ""
     influence = []
         
-    def __init__(self, name=None):
+    def __init__(self, parameters=None):
         super(Task, self).__init__()
         self.attributes = utils.as_list(self.__class__.attributes)
         self.influence = utils.as_list(self.__class__.influence)
@@ -94,26 +106,7 @@ class Task(object):
         self.extends = self.extends[0]
         self.name = self.__class__.name
         self._create_parameters()
-
-        if name:
-            self.name = name
-        Task.instances[self.name] = self
-        Task._create_parents(self.name)
-
-    @staticmethod
-    def _create_parents(name):
-        names = name.split("/")
-
-        if len(names) <= 1:
-            return
-
-        prev = None
-        for i in reversed(range(0, len(names))):
-            name = "/".join(names[:i + 1])
-            task = Task.instances.get(name) or Task(name)
-            if prev:
-                task.requires += [prev.name]
-            prev = task
+        self._set_parameters(parameters)
 
     def _get_source(self, func):
         source, lines = inspect.getsourcelines(func)
@@ -217,8 +210,8 @@ class TaskTools(object):
 
 
 class Resource(Task):
-    def __init__(self):
-        super(Resource, self).__init__()
+    def __init__(self, *args, **kwargs):
+        super(Resource, self).__init__(*args, **kwargs)
 
     def _get_source_functions(self):
         return super(Resource, self)._get_source_functions() + \
