@@ -171,7 +171,8 @@ class Artifact(object):
                      if not cache.is_available_locally(node) \
                      else None
         self._archive = None
-        self.size = 0
+        self._unpacked = False
+        self._size = 0
         ArtifactAttributeSetRegistry.create_all(self)
         self._read_manifest()
 
@@ -191,7 +192,8 @@ class Artifact(object):
     def _write_manifest(self):
         content = {}
         content["task"] = self._node.name
-        content["size"] = self.size
+        content["size"] = self._get_size()
+        content["unpacked"] = self._unpacked
         content["attributes"] = self._node.task.attributes
         content["identity"] = self._node.identity
         content["requires"] = self._node.task._get_requires()
@@ -209,7 +211,8 @@ class Artifact(object):
         manifest = fs.path.join(self._path, ".manifest.json")
         with open(manifest, "rb") as f:
             content = json.loads(f.read())
-            self.size = content["size"]
+            self._size = content["size"]
+            self._unpacked = content["unpacked"]
             ArtifactAttributeSetRegistry.parse_all(self, content)
 
     def _get_size(self):
@@ -259,6 +262,13 @@ class Artifact(object):
             fs.rmtree(self._temp)
         if self._path:
             fs.rmtree(self._path)
+
+    def modify(self):
+        assert not self._temp, "artifact is not published"
+        #self._temp = self._cache.get_path(self._node) + ".unpack"
+        #fs.move(self._path, self._temp)
+        self._temp = self._path
+        self._unpacked = True
 
     @property
     def path(self):
@@ -313,6 +323,9 @@ class Artifact(object):
     def get_archive_path(self):
         return fs.get_archive(self._path)
 
+    def get_size(self):
+        return self._size
+
     def get_task(self):
         return self._node.task
 
@@ -321,6 +334,9 @@ class Artifact(object):
 
     def is_temporary(self):
         return self._temp is not None
+
+    def is_unpacked(self):
+        return self._unpacked
 
 
 class Context(object):
@@ -331,6 +347,7 @@ class Context(object):
 
     def __enter__(self):
         for dep in self._node.children:
+            self._cache.unpack(dep)
             with self._cache.get_artifact(dep) as artifact:
                 self._artifacts[dep.qualified_name] = artifact
                 ArtifactAttributeSetRegistry.apply_all(artifact)
@@ -384,7 +401,7 @@ class CacheStats(object):
         stats = {}
         stats["name"] = artifact.get_task().name
         stats["used"] = time.time()
-        stats["size"] = artifact.size
+        stats["size"] = artifact.get_size()
         self.stats[artifact.get_identity()] = stats
         self.active.add(artifact.get_identity())
         self.save()
@@ -478,6 +495,8 @@ class ArtifactCache(StorageProvider):
         assert not self.is_available_locally(node), "can't download task, exists in the local cache"
         for provider in self.storage_providers:
             if provider.download(node, force):
+                with self.get_artifact(node) as artifact:
+                    artifact.decompress()
                 self.evict()
                 return True
         return len(self.storage_providers) == 0
@@ -503,8 +522,20 @@ class ArtifactCache(StorageProvider):
                 return url
         return ''
 
+    def unpack(self, node):
+        if not node.task.is_cacheable():
+            return False
+        with self.get_artifact(node) as artifact:
+            if artifact.is_unpacked():
+                return True
+            artifact.modify()
+            task = artifact.get_task()
+            task.unpack(artifact, tasks.TaskTools(task))
+            artifact.commit()
+        return True
+    
     def commit(self, artifact):
-	self.stats.update(artifact)
+        self.stats.update(artifact)
         self.evict()
 
     def get_context(self, node):

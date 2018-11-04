@@ -23,12 +23,15 @@ mkdtemp = tempfile.mkdtemp
 def rename(old, new):
     return os.rename(old, new)
 
+def move(src, dst):
+    return shutil.move(src, dst)
+
 def rmtree(path):
     shutil.rmtree(path)
 
 def unlink(path):
     os.unlink(path)
-    
+
 def copy(src, dest):
     if not path.exists(dest):
         if dest[-1] == os.sep:

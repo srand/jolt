@@ -68,7 +68,7 @@ def build(task, network, identity):
 
         task, error = queue.wait()
         assert task, "blocked tasks remain and could not be unblocked, no more tasks in progress"
-        if error:
+        if error is not None:
             task.error("Execution failed after {}", task.duration)
             queue.abort()
             raise Exception(error)
@@ -155,7 +155,7 @@ def info(task, influence=False):
     click.echo("  Cache")
     click.echo("    Identity          {}".format(proxy.identity))
     if acache.is_available_locally(proxy):
-        click.echo("    Local             {} ({} bytes)".format(True, acache.get_artifact(proxy).size))
+        click.echo("    Local             {} ({} bytes)".format(True, acache.get_artifact(proxy).get_size()))
     click.echo("    Remote            {}".format(acache.is_available_remotely(proxy)))
     click.echo()
 

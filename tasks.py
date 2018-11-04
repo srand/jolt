@@ -113,7 +113,7 @@ class Task(object):
         return "\n".join(source)
 
     def _get_source_functions(self):
-        return [self.run, self.publish]
+        return [self.run, self.publish, self.unpack]
 
     def _get_source_hash(self):
         sha = hashlib.sha1()
@@ -181,25 +181,67 @@ class Task(object):
     def error(self, fmt, *args, **kwargs):
         log.error(fmt, *args, **kwargs)
 
-    def run(self, env, tools):
+    def run(self, deps, tools):
+        """ 
+        Performs the work of the task. 
+
+        Dependencies specified with "requires" are passed as the
+        deps dictionary. The tools argument provides a set of low 
+        level tool functions that may be useful.
+
+        with tools.cwd("path/to/subdir"):
+            tools.run("make {target}")
+        
+        When using methods from the toolbox, task parameters, such 
+        as 'target' above,  are automatically expanded to their values.
+        """
         pass
 
     def publish(self, artifact, tools):
+        """ 
+        Publishes files produced by run(). 
+
+        Files can be collected in to the artifact by calling 
+        artifact.collect().
+
+        Additional metadata can be provided, such as environment 
+        variables that should be set whenever the task artifact is
+        consumed. Example:
+
+          # Append <artifact-path>/bin to the PATH
+          artifact.environ.PATH.append("bin")
+
+          # Pass an arbitrary string to a consumer
+          artifact.strings.foo = "bar"
+        """
+        pass
+
+    def unpack(self, artifact, tools):
+        """ 
+        Unpacks files published by publish() .
+
+        The intention of this hook is to make necessary adjustments
+        to artifact files and directories once they have been downloaded
+        into the local cache on a different machine. For example, 
+        paths may have to be adjusted or an installer executed.
+
+        This hook is executed in the context of a consuming task.
+        """
         pass
 
 
 class TaskTools(object):
     tmpdir = tools.tmpdir
 
-    def __init__(self, node):
-        self._node = node
+    def __init__(self, task):
+        self._task = task
 
     def cwd(self, path, *args, **kwargs):
-        path = self._node.task._get_expansion(path, *args, **kwargs)
+        path = self._task._get_expansion(path, *args, **kwargs)
         return tools.cwd(path)
 
     def run(self, cmd, *args, **kwargs):
-        cmd = self._node.task._get_expansion(cmd, *args, **kwargs)
+        cmd = self._task._get_expansion(cmd, *args, **kwargs)
         return tools.run(cmd, *args, **kwargs)
 
     def map_consecutive(self, callable, iterable):

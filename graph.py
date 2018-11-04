@@ -149,7 +149,7 @@ class TaskProxy(object):
             cache.download(self)
 
         if force_build or not cache.is_available_locally(self) or self.has_extensions():
-            t = TaskTools(self)
+            t = TaskTools(self.task)
 
             with cache.get_context(self) as context:
                 with t.cwd(self.task.joltdir):

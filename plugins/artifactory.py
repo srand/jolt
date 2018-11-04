@@ -65,8 +65,6 @@ class Artifactory(cache.StorageProvider):
                 shutil.copyfileobj(response.raw, out_file)
                 node.info("Download completed")
                 log.hysterical("[ARTIFACTORY] Download {} => {}", url, response.status_code)
-            if response.status_code == 200:
-                artifact.decompress()
             return response.status_code == 200
         return False
 

@@ -35,6 +35,7 @@ class JoltLoader(object):
 
         tasks = [cls for cls in classes if issubclass(cls, Task) and cls is not Task]
         for task in tasks:
+            task.name = task.name or task.__name__.lower()
             task.joltdir = directory
         self._tasks += tasks
 
