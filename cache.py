@@ -530,7 +530,8 @@ class ArtifactCache(StorageProvider):
                 return True
             artifact.modify()
             task = artifact.get_task()
-            task.unpack(artifact, tasks.TaskTools(task))
+            with tasks.TaskTools(task) as t:
+                task.unpack(artifact, t)
             artifact.commit()
         return True
     

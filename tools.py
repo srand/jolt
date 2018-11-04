@@ -11,6 +11,22 @@ def run(cmd, *args, **kwargs):
         assert e.returncode == 0, "command failed: {}".format(cmd)
 
 
+class environ(object):
+    def __init__(self, **kwargs):
+        self._kwargs = kwargs
+
+    def __enter__(self):
+        self._restore = {key: value for key, value in os.environ.iteritems()}
+        for key, value in self._kwargs.iteritems():
+            os.environ[key] = value
+
+    def __exit__(self, type, value, tb):
+        for key, value in self._kwargs.iteritems():
+            if key not in self._restore:
+                del os.environ[key]
+        os.environ.update(self._restore)
+
+
 class tmpdir(object):
     def __init__(self, name):
         self._name = name
@@ -72,3 +88,32 @@ class cwd(object):
             os.chdir(self._prev)
         except:
             pass
+
+
+class CMake(object):
+    def __init__(self, deps, tools):
+        self.deps = deps
+        self.tools = tools
+        self.builddir = self.tools.builddir()
+        self.installdir = self.tools.builddir("install")
+
+    def configure(self, sourcedir, *args, **kwargs):
+        sourcedir = sourcedir \
+                    if fs.path.isabs(sourcedir) \
+                    else fs.path.join(os.getcwd(), sourcedir)
+
+        with self.tools.cwd(self.builddir):
+            self.tools.run("cmake {} -DCMAKE_INSTALL_PREFIX={}",
+                      sourcedir, self.installdir)
+
+    def build(self, *args, **kwargs):
+        with self.tools.cwd(self.builddir):
+            self.tools.run("cmake --build .")
+
+    def install(self, *args, **kwargs):
+        with self.tools.cwd(self.builddir):
+            self.tools.run("cmake --build . --target install")
+
+    def publish(self, artifact, files='*', *args, **kwargs):
+        with self.tools.cwd(self.installdir):
+            artifact.collect(files, *args, **kwargs)

@@ -3,6 +3,7 @@ import utils
 import inspect
 from cache import *
 from copy import copy
+from contextlib import contextmanager
 
 
 class Parameter(object):
@@ -235,10 +236,33 @@ class TaskTools(object):
 
     def __init__(self, task):
         self._task = task
+        self._builddir = {}
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, type, value, tb):
+        for dir in self._builddir.values():
+            fs.rmtree(dir)
+
+    def builddir(self, name="build", *args, **kwargs):
+        if name not in self._builddir:
+            dirname = os.getcwd()
+            fs.makedirs(dirname)
+            self._builddir[name] = fs.mkdtemp(prefix=name+"-", dir=dirname)
+        return self._builddir[name]
+
+    def cmake(self, deps=None):
+        return tools.CMake(deps, self)
 
     def cwd(self, path, *args, **kwargs):
         path = self._task._get_expansion(path, *args, **kwargs)
         return tools.cwd(path)
+
+    def environ(self, **kwargs):
+        for key, value in kwargs.iteritems():
+            kwargs[key] = self._task._get_expansion(value)
+        return tools.environ(**kwargs)
 
     def run(self, cmd, *args, **kwargs):
         cmd = self._task._get_expansion(cmd, *args, **kwargs)
@@ -292,15 +316,15 @@ class ResourceAttributeSetProvider(ArtifactAttributeSetProvider):
     def apply(self, artifact):
         task = artifact.get_task()
         if isinstance(task, Resource):
-            env = task._run_env
-            env.__enter__()
-            with tools.cwd(task.joltdir):
-                task.acquire(artifact, env, TaskTools(task))
+            deps = task._run_env
+            deps.__enter__()
+            with tools.cwd(task.joltdir), TaskTools(task) as t:
+                task.acquire(artifact, deps, t)
 
     def unapply(self, artifact):
         task = artifact.get_task()
         if isinstance(task, Resource):
             env = task._run_env
-            with tools.cwd(task.joltdir):
-                task.release(artifact, env, TaskTools(task))
+            with tools.cwd(task.joltdir), TaskTools(task) as t:
+                task.release(artifact, env, t)
             env.__exit__(None, None, None)

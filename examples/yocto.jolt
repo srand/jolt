@@ -1,6 +1,7 @@
 from tasks import *
 from glob import glob
 import filesystem as fs
+from plugins import git
 
 
 class Sdk(Task):
@@ -26,5 +27,30 @@ class Sdk(Task):
                 fs.unlink(script)
 
 
-class Test(Task):
-    requires = "sdk"
+class JsonCPP(Task):
+    requires = "git:url=https://github.com/open-source-parsers/jsoncpp.git", "sdk"
+
+    def run(self, deps, tools):
+        cmake = tools.cmake()
+        cmake.configure("jsoncpp")
+        cmake.build()
+        cmake.install()
+
+    def publish(self, artifact, tools):
+        cmake = tools.cmake()
+        cmake.publish(artifact)
+
+
+class GoogleTest(Task):
+    requires = "git:url=https://github.com/google/googletest.git", "sdk"
+
+    def run(self, deps, tools):
+        cmake = tools.cmake()
+        cmake.configure("googletest")
+        cmake.build()
+        cmake.install()
+
+    def publish(self, artifact, tools):
+        cmake = tools.cmake()
+        cmake.publish(artifact)
+

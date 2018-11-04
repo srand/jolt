@@ -149,20 +149,19 @@ class TaskProxy(object):
             cache.download(self)
 
         if force_build or not cache.is_available_locally(self) or self.has_extensions():
-            t = TaskTools(self.task)
+            with TaskTools(self.task) as t:
+                with cache.get_context(self) as context:
+                    with t.cwd(self.task.joltdir):
+                        self.task.run(context, t)
 
-            with cache.get_context(self) as context:
-                with t.cwd(self.task.joltdir):
-                    self.task.run(context, t)
+                if cache.is_available_locally(self):
+                    with cache.get_artifact(self) as artifact:
+                        artifact.discard()
 
-            if cache.is_available_locally(self):
                 with cache.get_artifact(self) as artifact:
-                    artifact.discard()
-
-            with cache.get_artifact(self) as artifact:
-                with t.cwd(self.task.joltdir):
-                    self.task.publish(artifact, t)
-                artifact.commit()
+                    with t.cwd(self.task.joltdir):
+                        self.task.publish(artifact, t)
+                    artifact.commit()
 
             assert cache.upload(self, force=force_upload), \
                 "Failed to upload artifact for {}".format(self.name)
