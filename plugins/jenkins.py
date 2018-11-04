@@ -79,7 +79,7 @@ class JenkinsServer(object):
 
     def _create_job(self, name, job_template, func):
         template = Template(job_template)
-        network_config = config.get("network", "config", "")
+        network_config = config.get("network", "config", "", expand=False)
         xml = template.render(config=network_config)
         func(name, xml)
         return True

@@ -9,6 +9,7 @@ from tempfile import mkdtemp
 import tools
 import influence
 import config
+import time
 
 
 class StorageProvider(object):
@@ -170,15 +171,18 @@ class Artifact(object):
                      if not cache.is_available_locally(node) \
                      else None
         self._archive = None
+        self.size = 0
         ArtifactAttributeSetRegistry.create_all(self)
+        self._read_manifest()
 
     def __enter__(self):
-        self._read_manifest()
         return self
 
     def __exit__(self, type, value, tb):
-        if value:
-            self.discard()
+        if self._archive:
+            fs.unlink(self._archive)
+        if self._temp:
+            fs.rmtree(self._temp)
 
     def __getattr__(self, name):
         assert False, "no attribute '{}' in artifact for '{}'".format(
@@ -187,6 +191,7 @@ class Artifact(object):
     def _write_manifest(self):
         content = {}
         content["task"] = self._node.name
+        content["size"] = self.size
         content["attributes"] = self._node.task.attributes
         content["identity"] = self._node.identity
         content["requires"] = self._node.task._get_requires()
@@ -204,15 +209,48 @@ class Artifact(object):
         manifest = fs.path.join(self._path, ".manifest.json")
         with open(manifest, "rb") as f:
             content = json.loads(f.read())
+            self.size = content["size"]
             ArtifactAttributeSetRegistry.parse_all(self, content)
+
+    def _get_size(self):
+        counted_inodes = {}
+        size = 0
+        for path, dirs, files in os.walk(self.path):
+            for file in files:
+                fp = os.path.join(path, file)
+                try:
+                    stat = os.lstat(fp)
+                except OSError:
+                    continue
+
+                try:
+                    counted_inodes[stat.st_ino]
+                except KeyError:
+                    counted_inodes[stat.st_ino] = True
+                else:
+                    continue
+
+                size += stat.st_size
+        
+            for dir in dirs:
+                fp = os.path.join(path, dir)
+                try:
+                    stat = os.lstat(fp)
+                except OSError:
+                    continue
+
+                size += stat.st_size
+        return size
 
     def commit(self):
         if not self._node.task.is_cacheable():
             return
         if self._temp:
+            self.size = self._get_size()
             self._write_manifest()
             fs.rename(self._temp, self._path)
             self._temp = None
+            self._cache.commit(self)
 
     def discard(self):
         if self._archive:
@@ -278,6 +316,12 @@ class Artifact(object):
     def get_task(self):
         return self._node.task
 
+    def get_identity(self):
+        return self._node.identity
+
+    def is_temporary(self):
+        return self._temp is not None
+
 
 class Context(object):
     def __init__(self, cache, node):
@@ -305,22 +349,94 @@ class Context(object):
         return self._artifacts.iteritems()
 
 
+class CacheStats(object):
+    def __init__(self, cache):
+        self.cache = cache
+        self.path = fs.path.join(cache.root, ".stats.json")
+        try:
+            self.load()
+        except:
+            self.stats = {}
+        self.active = set()
+        log.verbose("Cache size is {} bytes".format(self.get_size()))
+
+    def load(self):
+        with open(self.path) as f:
+            self.stats = json.loads(f.read())
+
+        deleted = []
+        for artifact, stats in self.stats.iteritems():
+            path = fs.path.join(self.cache.root, stats["name"], artifact)
+            if not os.path.exists(path):
+                deleted.append(artifact)
+        for deleted in deleted:
+            del self.stats[deleted]
+
+        self.save()
+
+    def save(self):
+        with open(self.path, "wb") as f:
+            f.write(json.dumps(self.stats, indent=3))
+
+    def update(self, artifact):
+        if artifact.is_temporary():
+            return
+        stats = {}
+        stats["name"] = artifact.get_task().name
+        stats["used"] = time.time()
+        stats["size"] = artifact.size
+        self.stats[artifact.get_identity()] = stats
+        self.active.add(artifact.get_identity())
+        self.save()
+
+    def remove(self, artifact):
+        del self.stats[artifact["identity"]]
+        self.save()
+        
+    def get_size(self):
+        size = 0
+        for artifact, stats in self.stats.iteritems():
+            size += stats["size"]
+        return size
+
+    def get_lru(self):
+        assert self.stats, "no artifacts in cache"
+        nt = [dict(identity=artifact, **stats) for artifact, stats in self.stats.iteritems()]
+        nt = sorted(nt, key=lambda x: x["used"])
+        # Don't evict artifacts in the current working set
+        nt = filter(lambda x: x["identity"] not in self.active, nt)
+        return nt[0] if len(nt) > 0 else None
+        
+
 class ArtifactCache(StorageProvider):
     root = fs.path.join(fs.path.expanduser("~"), ".cache", "jolt")
     storage_provider_factories = []
 
     def __init__(self):
         try:
+            self.root = config.get("jolt", "cachedir") or ArtifactCache.root
             fs.makedirs(self.root)
         except:
-            pass
+            assert False, "failed to create cache directory"
 
+        self.max_size = config.getsize("jolt", "cachesize", 0)
+        self.stats = CacheStats(self)
         self.storage_providers = [
             factory.create(self)
             for factory in ArtifactCache.storage_provider_factories]
 
     def get_path(self, node):
         return fs.path.join(self.root, node.canonical_name, node.identity)
+
+    def evict(self):
+        while self.stats.get_size() > self.max_size:
+            artifact = self.stats.get_lru()
+            if artifact is None:
+                return
+            log.verbose("Evicting artifact '{name}:{identity}'".format(**artifact))
+            path = fs.path.join(self.root, artifact["name"], artifact["identity"])
+            self.stats.remove(artifact)
+            fs.rmtree(path)
 
     def create_path(self, node):
         path = None
@@ -362,6 +478,7 @@ class ArtifactCache(StorageProvider):
         assert not self.is_available_locally(node), "can't download task, exists in the local cache"
         for provider in self.storage_providers:
             if provider.download(node, force):
+                self.evict()
                 return True
         return len(self.storage_providers) == 0
 
@@ -386,11 +503,17 @@ class ArtifactCache(StorageProvider):
                 return url
         return ''
 
+    def commit(self, artifact):
+	self.stats.update(artifact)
+        self.evict()
+
     def get_context(self, node):
         return Context(self, node)
 
     def get_artifact(self, node):
-        return Artifact(self, node)
+        artifact = Artifact(self, node)
+        self.stats.update(artifact)
+        return artifact
 
     def get_archive_path(self, node):
         return fs.get_archive(self.get_path(node))

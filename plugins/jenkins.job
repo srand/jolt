@@ -46,6 +46,7 @@
   <blockBuildWhenUpstreamBuilding>false</blockBuildWhenUpstreamBuilding>
   <triggers/>
   <concurrentBuild>true</concurrentBuild>
+  <customWorkspace>w/$JOB_NAME/$EXECUTOR_NUMBER</customWorkspace>
   <builders>
     <hudson.plugins.descriptionsetter.DescriptionSetterBuilder plugin="description-setter@1.10">
       <regexp></regexp>
@@ -68,7 +69,6 @@ fi
 echo &quot;$config&quot; &gt; jolt.conf
 echo &quot;$joltfile&quot; &gt; tasks.jolt
 
-jolt -c jolt.conf clean
 jolt -vv -c jolt.conf build -i $task_identity $task</command>
     </hudson.tasks.Shell>
   </builders>

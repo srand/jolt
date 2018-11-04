@@ -39,7 +39,8 @@ class Artifactory(cache.StorageProvider):
             config.set(NAME, "keyring.username", username)
             config.save()
 
-        password = keyring.get_password(NAME, username)
+        password = config.get(NAME, "keyring.password") or \
+                   keyring.get_password(NAME, username)
         if not password:
             password = getpass.getpass(NAME + " password: ")
             assert password, "no password in keyring for " + NAME

@@ -2,6 +2,8 @@ import time
 from concurrent.futures import ThreadPoolExecutor, Future, as_completed
 from functools import partial
 from threading import RLock
+from string import *
+import os
 
 
 def as_list(t):
@@ -46,8 +48,27 @@ def format_task_name(name, params):
     return "{}:{}".format(name, ",".join([_param(key, value) for key, value in params.iteritems()]))
 
 
-def expand_macros(string, *args, **kwargs):
-    return string.format(*args, **kwargs)
+class _SafeDict(object):
+    def __init__(self, values, ignore_errors=False):
+        self.values = values
+        self.errors = not ignore_errors
+
+    def _envget(self, key):
+        if key.startswith("ENV|"):
+            return os.environ.get(key[4:])
+        return None
+        
+    def __getitem__(self, key):
+        value = self.values.get(key) or self._envget(key)
+        if value is not None:
+            return value
+        if self.errors:
+            raise KeyError(key)
+        return "{" + key + "}"
+
+
+def expand_macros(string, ignore_errors=False, *args, **kwargs):
+    return Formatter().vformat(string, args, _SafeDict(kwargs, ignore_errors))
 
 
 class duration(object):

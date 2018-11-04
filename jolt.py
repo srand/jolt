@@ -147,14 +147,15 @@ def info(task, influence=False):
     click.echo()
 
     acache = cache.ArtifactCache()
-    dag = graph.GraphBuilder().build([task])
+    dag = graph.GraphBuilder().build([task.name])
     tasks = dag.select(lambda graph, node: graph.is_root(node))
     assert len(tasks) == 1, "unexpected graph generated"
     proxy = tasks[0]
 
     click.echo("  Cache")
     click.echo("    Identity          {}".format(proxy.identity))
-    click.echo("    Local             {}".format(acache.is_available_locally(proxy)))
+    if acache.is_available_locally(proxy):
+        click.echo("    Local             {} ({} bytes)".format(True, acache.get_artifact(proxy).size))
     click.echo("    Remote            {}".format(acache.is_available_remotely(proxy)))
     click.echo()
 
