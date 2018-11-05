@@ -27,6 +27,49 @@ class Sdk(Task):
                 fs.unlink(script)
 
 
+            scripts = glob("environment-setup-*")
+            assert scripts and len(scripts) == 1, "didn't find the environment script"
+            env = tools.run(". {}; python -c 'import os;print(os.environ)'",
+                            fs.path.join(artifact.path, scripts[0]))
+            env = eval(env)
+            artifact.environ.SDKTARGETSYSROOT = env["SDKTARGETSYSROOT"]
+            artifact.environ.PKG_CONFIG_SYSROOT_DIR = env["PKG_CONFIG_SYSROOT_DIR"]
+            artifact.environ.PKG_CONFIG_PATH = env["PKG_CONFIG_SYSROOT_DIR"]
+            artifact.environ.CONFIG_SITE = env["CONFIG_SITE"]
+            artifact.environ.OECORE_NATIVE_SYSROOT = env["OECORE_NATIVE_SYSROOT"]
+            artifact.environ.OECORE_TARGET_SYSROOT = env["OECORE_TARGET_SYSROOT"]
+            artifact.environ.OECORE_ACLOCAL_OPTS = env["OECORE_ACLOCAL_OPTS"]
+            artifact.environ.OECORE_BASELIB = env["OECORE_BASELIB"]
+            artifact.environ.OECORE_TARGET_ARCH = env["OECORE_TARGET_ARCH"]
+            artifact.environ.OECORE_TARGET_OS = env["OECORE_TARGET_OS"]
+            artifact.environ.CC = env["CC"]
+            artifact.environ.CXX = env["CXX"]
+            artifact.environ.CPP = env["CPP"]
+            artifact.environ.AS = env["AS"]
+            artifact.environ.LD = env["LD"]
+            artifact.environ.GDB = env["GDB"]
+            artifact.environ.STRIP = env["STRIP"]
+            artifact.environ.RANLIB = env["RANLIB"]
+            artifact.environ.OBJCOPY = env["OBJCOPY"]
+            artifact.environ.OBJDUMP = env["OBJDUMP"]
+            artifact.environ.AR = env["AR"]
+            artifact.environ.NM = env["NM"]
+            artifact.environ.M4 = env["M4"]
+            artifact.environ.TARGET_PREFIX = env["TARGET_PREFIX"]
+            artifact.environ.CONFIGURE_FLAGS = env["CONFIGURE_FLAGS"]
+            artifact.environ.CFLAGS = env["CFLAGS"]
+            artifact.environ.CXXFLAGS = env["CXXFLAGS"]
+            artifact.environ.LDFLAGS = env["LDFLAGS"]
+            artifact.environ.CPPFLAGS = env["CPPFLAGS"]
+            artifact.environ.KCFLAGS = env["KCFLAGS"]
+            artifact.environ.OECORE_DISTRO_VERSION = env["OECORE_DISTRO_VERSION"]
+            artifact.environ.OECORE_SDK_VERSION = env["OECORE_SDK_VERSION"]
+            artifact.environ.ARCH = env["ARCH"]
+            artifact.environ.CROSS_COMPILE = env["CROSS_COMPILE"]
+            path = env["PATH"].replace(fs.pathsep + os.environ["PATH"], "")
+            artifact.environ.PATH.append(path)
+
+
 class JsonCPP(Task):
     requires = "git:url=https://github.com/open-source-parsers/jsoncpp.git", "sdk"
 
@@ -54,3 +97,46 @@ class GoogleTest(Task):
         cmake = tools.cmake()
         cmake.publish(artifact)
 
+
+class LibUev(Task):
+    requires = "git:url=https://github.com/troglobit/libuev.git", "sdk"
+
+    def run(self, deps, tools):
+        at = tools.autotools()
+        at.configure("libuev")
+        at.build()
+        at.install()
+
+    def publish(self, artifact, tools):
+        at = tools.autotools()
+        at.publish(artifact)
+        artifact.environ.PKG_CONFIG_PATH.append("lib/pkgconfig")
+
+
+class LibIte(Task):
+    requires = "git:url=https://github.com/troglobit/libite.git", "sdk"
+
+    def run(self, deps, tools):
+        at = tools.autotools()
+        at.configure("libite")
+        at.build()
+        at.install()
+
+    def publish(self, artifact, tools):
+        at = tools.autotools()
+        at.publish(artifact)
+        artifact.environ.PKG_CONFIG_PATH.append("lib/pkgconfig")
+
+
+class Finit(Task):
+    requires = "git:url=https://github.com/troglobit/finit.git", "sdk", "libuev", "libite"
+
+    def run(self, deps, tools):
+        at = tools.autotools()
+        at.configure("finit")
+        at.build()
+        at.install()
+
+    def publish(self, artifact, tools):
+        at = tools.autotools()
+        at.publish(artifact)

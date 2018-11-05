@@ -117,3 +117,36 @@ class CMake(object):
     def publish(self, artifact, files='*', *args, **kwargs):
         with self.tools.cwd(self.installdir):
             artifact.collect(files, *args, **kwargs)
+
+
+class AutoTools(object):
+    def __init__(self, deps, tools):
+        self.deps = deps
+        self.tools = tools
+        self.builddir = self.tools.builddir()
+        self.installdir = self.tools.builddir("install")
+
+    def configure(self, sourcedir, *args, **kwargs):
+        sourcedir = sourcedir \
+                    if fs.path.isabs(sourcedir) \
+                    else fs.path.join(os.getcwd(), sourcedir)
+
+        if not fs.path.exists(fs.path.join(sourcedir, "configure")):
+            with self.tools.cwd(sourcedir):
+                self.tools.run("autoreconf -visf")
+
+        with self.tools.cwd(self.builddir):
+            self.tools.run("{}/configure --prefix={}",
+                           sourcedir, self.installdir)
+
+    def build(self, *args, **kwargs):
+        with self.tools.cwd(self.builddir):
+            self.tools.run("make")
+
+    def install(self, *args, **kwargs):
+        with self.tools.cwd(self.builddir):
+            self.tools.run("make install")
+
+    def publish(self, artifact, files='*', *args, **kwargs):
+        with self.tools.cwd(self.installdir):
+            artifact.collect(files, *args, **kwargs)

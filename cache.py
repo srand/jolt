@@ -168,7 +168,7 @@ class Artifact(object):
         self._node = node
         self._path = cache.get_path(node)
         self._temp = cache.create_path(node) \
-                     if not cache.is_available_locally(node) \
+                     if not fs.path.exists(cache.get_path(node)) \
                      else None
         self._archive = None
         self._unpacked = False
@@ -469,7 +469,11 @@ class ArtifactCache(StorageProvider):
     def is_available_locally(self, node):
         if not node.task.is_cacheable():
             return False
-        return fs.path.exists(self.get_path(node))
+        if fs.path.exists(self.get_path(node)):
+            with self.get_artifact(node) as a:
+                self.stats.update(a)
+            return True
+        return False
 
     def is_available_remotely(self, node):
         if not node.task.is_cacheable():

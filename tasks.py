@@ -244,6 +244,10 @@ class TaskTools(object):
     def __exit__(self, type, value, tb):
         for dir in self._builddir.values():
             fs.rmtree(dir)
+        return False
+
+    def autotools(self, deps=None):
+        return tools.AutoTools(deps, self)
 
     def builddir(self, name="build", *args, **kwargs):
         if name not in self._builddir:

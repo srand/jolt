@@ -45,6 +45,8 @@ class EnvironmentVariableSet(ArtifactAttributeSet):
             return PathEnvironmentVariable(name)
         if name == "LD_LIBRARY_PATH":
             return PathEnvironmentVariable(name)
+        if name == "PKG_CONFIG_PATH":
+            return PathEnvironmentVariable(name)
         return EnvironmentVariable(name)
 
 
