@@ -16,12 +16,12 @@ class Artifactory(cache.StorageProvider):
         super(Artifactory, self).__init__()
         self._cache = cache
         self._uri = config.get(NAME, "uri")
+        assert self._uri, "artifactory URI not configured"
         if self._uri[-1] != "/":
             self._uri += "/"
-        self._repository = config.get(NAME, "repository", "build")
+        self._repository = config.get(NAME, "repository", "jolt")
         self._upload = config.getboolean(NAME, "upload", False)
         self._download = config.getboolean(NAME, "download", True)
-        assert self._uri, "artifactory URI not configured"
 
     def _get_auth(self):
         service = config.get(NAME, "keyring.service")
@@ -70,7 +70,7 @@ class Artifactory(cache.StorageProvider):
 
     def upload(self, node, force=False):
         if not self._upload and not force:
-            return False
+            return True
         with self._cache.get_artifact(node) as artifact:
             url = self._get_url(node, artifact)
             with open(artifact.get_archive(), 'rb') as archive:

@@ -13,7 +13,7 @@ class Parameter(object):
         self.__doc__ = help
 
     def __str__(self):
-        return str(self._value)
+        return str(self._value) if self._value is not None else ''
 
     def get_default(self):
         return self._default
@@ -152,6 +152,7 @@ class Task(object):
                 setattr(self, key, param)
     
     def _set_parameters(self, params):
+        params = params or {}
         for key, value in params.iteritems():
             param = self.__dict__.get(key)
             if isinstance(param, Parameter):
@@ -267,6 +268,16 @@ class TaskTools(object):
         for key, value in kwargs.iteritems():
             kwargs[key] = self._task._get_expansion(value)
         return tools.environ(**kwargs)
+
+    def glob(self, path, *args, **kwargs):
+        path = self._task._get_expansion(path, *args, **kwargs)
+        return glob.glob(path)
+
+    def replace_in_file(self, path, search, replace):
+        path = self._task._get_expansion(path)
+        search = self._task._get_expansion(search)
+        replace = self._task._get_expansion(replace)
+        return tools.replace_in_file(path, search, replace)
 
     def run(self, cmd, *args, **kwargs):
         cmd = self._task._get_expansion(cmd, *args, **kwargs)

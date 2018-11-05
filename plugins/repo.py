@@ -34,17 +34,17 @@ class RepoProject(SubElement):
 
     def get_diff(self):
         with tools.cwd(self.path):
-            return tools.run("git diff HEAD")
+            return tools.run("git diff HEAD", output_on_error=True)
         assert False, "git command failed"
 
     def get_head(self):
         with tools.cwd(self.path):
-            return tools.run("git rev-parse HEAD").strip()
+            return tools.run("git rev-parse HEAD", output_on_error=True).strip()
         assert False, "git command failed"
 
     def get_remote_branches(self, commit):
         with tools.cwd(self.path):
-            result = tools.run("git branch -r --contains {}", commit)
+            result = tools.run("git branch -r --contains {}", commit, output_on_error=True)
             if not result:
                 return []
             result = result.strip().splitlines()
@@ -54,7 +54,7 @@ class RepoProject(SubElement):
 
     def get_local_commits(self):
         with tools.cwd(self.path):
-            result = tools.run("git rev-list HEAD ^@{{upstream}}")
+            result = tools.run("git rev-list HEAD ^@{{upstream}}", output_on_error=True)
             if not result:
                 return []
             result = result.strip("\r\n ")
@@ -65,7 +65,9 @@ class RepoProject(SubElement):
         with tools.cwd(self.path):
             result = tools.run(
                 "git ls-remote {}{}",
-                remote, " {}".format(pattern) if pattern else "")
+                remote,
+                " {}".format(pattern) if pattern else "",
+                output_on_error=True)
             if not result:
                 return None
             result = result.strip().splitlines()
@@ -158,7 +160,7 @@ class RepoInfluenceProvider(HashInfluenceProvider):
 
                 with tools.cwd(manifest_path):
                     gip = git.GitInfluenceProvider(project.path_or_name)
-                    result.append(gip.influence(task))
+                    result.append(gip.get_influence(task))
 
             return "\n".join(result)
 

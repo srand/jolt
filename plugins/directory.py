@@ -15,9 +15,12 @@ class DirectoryInfluenceProvider(HashInfluenceProvider):
 
     def get_influence(self, task):
         try:
-            path = task._get_expansion(self.path)
-            with tools.cwd(path):
-                return tools.run("find -type f -name '{}' | xargs md5sum".format(self.pattern))
+            with tools.cwd(task.joltdir):
+                path = task._get_expansion(self.path)
+                with tools.cwd(path):
+                    return tools.run("find -type f -name '{}' | LC_ALL=C sort | xargs -n1 md5sum"
+                                     .format(self.pattern),
+                                     output=False, output_on_error=True)
         except KeyError as e:
             pass
         assert False, "failed to change directory to {}".format(self.path)

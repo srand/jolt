@@ -33,3 +33,15 @@ def error(fmt, *args, **kwargs):
 
 def eprint(fmt, *args, **kwargs):
     print("error: " + fmt.format(*args, **kwargs), file=sys.stderr)
+
+def stdout(fmt, *args, **kwargs):
+    try:
+        print(fmt.format(*args, **kwargs))
+    except:
+        print(fmt)
+
+def stderr(fmt, *args, **kwargs):
+    try:
+        print(fmt.format(*args, **kwargs), file=sys.stderr)
+    except:
+        print(fmt, file=sys.stderr)

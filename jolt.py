@@ -155,7 +155,8 @@ def info(task, influence=False):
     click.echo("  Cache")
     click.echo("    Identity          {}".format(proxy.identity))
     if acache.is_available_locally(proxy):
-        click.echo("    Local             {} ({} bytes)".format(True, acache.get_artifact(proxy).get_size()))
+        click.echo("    Local             {} ({})".format(
+            True, utils.as_human_size(acache.get_artifact(proxy).get_size())))
     click.echo("    Remote            {}".format(acache.is_available_remotely(proxy)))
     click.echo()
 

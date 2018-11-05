@@ -34,7 +34,7 @@ class Sdk(Task):
             env = eval(env)
             artifact.environ.SDKTARGETSYSROOT = env["SDKTARGETSYSROOT"]
             artifact.environ.PKG_CONFIG_SYSROOT_DIR = env["PKG_CONFIG_SYSROOT_DIR"]
-            artifact.environ.PKG_CONFIG_PATH = env["PKG_CONFIG_SYSROOT_DIR"]
+            artifact.environ.PKG_CONFIG_PATH = env["PKG_CONFIG_PATH"]
             artifact.environ.CONFIG_SITE = env["CONFIG_SITE"]
             artifact.environ.OECORE_NATIVE_SYSROOT = env["OECORE_NATIVE_SYSROOT"]
             artifact.environ.OECORE_TARGET_SYSROOT = env["OECORE_TARGET_SYSROOT"]
@@ -110,7 +110,16 @@ class LibUev(Task):
     def publish(self, artifact, tools):
         at = tools.autotools()
         at.publish(artifact)
+
         artifact.environ.PKG_CONFIG_PATH.append("lib/pkgconfig")
+        artifact.strings.installdir = at.installdir
+
+    def unpack(self, artifact, tools):
+        with tools.cwd(artifact.path):
+            tools.replace_in_file(
+                "lib/pkgconfig/libuev.pc",
+                artifact.strings.installdir,
+                artifact.path)
 
 
 class LibIte(Task):
@@ -125,16 +134,26 @@ class LibIte(Task):
     def publish(self, artifact, tools):
         at = tools.autotools()
         at.publish(artifact)
-        artifact.environ.PKG_CONFIG_PATH.append("lib/pkgconfig")
 
+        artifact.environ.PKG_CONFIG_PATH.append("lib/pkgconfig")
+        artifact.strings.installdir = at.installdir
+
+    def unpack(self, artifact, tools):
+        with tools.cwd(artifact.path):
+            tools.replace_in_file(
+                "lib/pkgconfig/libite.pc",
+                artifact.strings.installdir,
+                artifact.path)
+            
 
 class Finit(Task):
     requires = "git:url=https://github.com/troglobit/finit.git", "sdk", "libuev", "libite"
 
     def run(self, deps, tools):
         at = tools.autotools()
-        at.configure("finit")
-        at.build()
+        with tools.environ(PKG_CONFIG_SYSROOT_DIR=''):
+            at.configure("finit")
+        at.build(VERBOSE="yes")
         at.install()
 
     def publish(self, artifact, tools):

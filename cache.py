@@ -329,6 +329,9 @@ class Artifact(object):
     def get_task(self):
         return self._node.task
 
+    def get_cache(self):
+        return self._cache
+
     def get_identity(self):
         return self._node.identity
 
@@ -497,6 +500,9 @@ class ArtifactCache(StorageProvider):
         if not node.task.is_cacheable():
             return True
         assert not self.is_available_locally(node), "can't download task, exists in the local cache"
+        if self.is_available_locally(node):
+            node.info("Download skipped, already in local cache")
+            return True
         for provider in self.storage_providers:
             if provider.download(node, force):
                 with self.get_artifact(node) as artifact:
@@ -519,7 +525,7 @@ class ArtifactCache(StorageProvider):
 
     def location(self, node):
         if not node.task.is_cacheable():
-            return False
+            return ''
         for provider in self.storage_providers:
             url = provider.location(node)
             if url:

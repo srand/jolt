@@ -12,7 +12,7 @@ _path = fs.path.dirname(__file__)
 _path = fs.path.dirname(_path)
 
 
-@directory.influence(_path)
+@directory.influence(_path, pattern="*.py")
 class Jolt(Task):
     name = "jolt"
 
@@ -45,7 +45,9 @@ class SelfDeployExtension(NetworkExecutorExtension):
             except:
                 task.error("Execution failed after {}", duration)
                 raise
-        return { "jolt_url": acache.location(task) }
+        jolt_url = acache.location(task)
+        assert jolt_url, "failed to selfdeploy jolt to remote cache"
+        return { "jolt_url":  jolt_url}
 
 
 @NetworkExecutorExtensionFactory.Register

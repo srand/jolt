@@ -23,7 +23,15 @@ def as_stable_tuple_list(o):
     assert type(o) == dict, "as_stable_tuple_list: argument is not a dict"
     l = [(key, value) for key, value in o.iteritems()]
     return sorted(l, key=lambda x: x[0])
-    
+
+def as_human_size(size):
+    unit_precision = [("B", 0), ("KB", 0), ("MB", 1), ("GB", 2), ("TB", 2), ("PB", 2)]
+    index = 0
+    while size > 1024:
+        size /= 1024
+        index += 1
+    return "{} {}".format(round(size, ndigits=unit_precision[index][1]), unit_precision[index][0])
+
 def call_or_return(obj, t):
     return t(obj) if callable(t) else t
 
@@ -69,7 +77,7 @@ class _SafeDict(object):
 
 
 def expand_macros(string, ignore_errors=False, *args, **kwargs):
-    return Formatter().vformat(string, args, _SafeDict(kwargs, ignore_errors))
+    return Formatter().vformat(str(string), args, _SafeDict(kwargs, ignore_errors))
 
 
 class duration(object):
