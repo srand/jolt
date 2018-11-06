@@ -7,9 +7,10 @@ from contextlib import contextmanager
 
 
 class Parameter(object):
-    def __init__(self, default=None, help=None):
+    def __init__(self, default=None, values=None, help=None):
         self._default = default
         self._value = default
+        self._accepted_values = values
         self.__doc__ = help
 
     def __str__(self):
@@ -28,6 +29,9 @@ class Parameter(object):
         return self._value
 
     def set_value(self, value):
+        assert self._accepted_values is None or value in self._accepted_values, \
+            "illegal value '{}' assigned to parameter"\
+            .format(value)
         self._value = value
 
 
@@ -161,15 +165,15 @@ class Task(object):
             assert False, "no such parameter for task {}: {}".format(self.name, key)
     
     def _get_parameters(self, unset=False):
-        return {key: param.get_value()
-                for key, param in self.__dict__.iteritems()
-                if isinstance(param, Parameter) and \
-                 (unset or not param.is_unset()) }
+        return {key: getattr(self, key).get_value()
+                for key in dir(self)
+                if isinstance(getattr(self, key), Parameter) and \
+                 (unset or not getattr(self, key).is_unset()) }
 
     def _get_properties(self):
-        return {key: prop.__get__(self)
-                for key, prop in self.__class__.__dict__.iteritems()
-                if type(prop) == property }
+        return {key: getattr(self, key)
+                for key in dir(self)
+                if type(getattr(self, key)) == str }
 
     def is_cacheable(self):
         return True
