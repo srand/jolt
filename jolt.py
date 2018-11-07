@@ -38,8 +38,11 @@ def cli(verbose, extra_verbose, config_file):
         if fs.path.exists(path):
             imp.load_source("plugins." + section, path)
 
-    for cls in loader.JoltLoader().get().load():
+    tasks, tests = loader.JoltLoader().get().load()
+    for cls in tasks:
         TaskRegistry.get().add_task_class(cls)
+    for cls in tests:
+        TaskRegistry.get().add_test_class(cls)
 
 
 @cli.command()

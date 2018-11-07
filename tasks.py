@@ -4,6 +4,9 @@ import inspect
 from cache import *
 from copy import copy
 from contextlib import contextmanager
+import unittest as ut
+import functools as ft
+import types
 
 
 class Parameter(object):
@@ -39,7 +42,8 @@ class TaskRegistry(object):
     _instance = None
 
     def __init__(self):
-        self.classes = {}
+        self.tasks = {}
+        self.tests = {}
         self.instances = {}
     
     @staticmethod
@@ -49,13 +53,22 @@ class TaskRegistry(object):
         return TaskRegistry._instance
 
     def add_task_class(self, cls):
-        self.classes[cls.name] = cls
+        self.tasks[cls.name] = cls
+
+    def add_test_class(self, cls):
+        self.tests[cls.name] = cls
 
     def get_task_class(self, name):
-        return self.classes.get(name)
+        return self.tasks.get(name)
+
+    def get_test_class(self, name):
+        return self.tests.get(name)
 
     def get_task_classes(self):
-        return self.classes.values()
+        return self.tasks.values()
+
+    def get_test_classes(self):
+        return self.tests.values()
     
     def get_task(self, name, extra_params=None):
         name, params = utils.parse_task_name(name)
@@ -66,9 +79,15 @@ class TaskRegistry(object):
         if task:
             return task
 
-        cls = self.classes.get(name)
+        cls = self.tasks.get(name)
         if cls:
             task = cls(parameters=params)
+            self.instances[full_name] = task
+            return task
+
+        cls = self.tests.get(name)
+        if cls:
+            task = _Test(cls, parameters=params)
             self.instances[full_name] = task
             return task
 
@@ -89,13 +108,40 @@ class TaskRegistry(object):
             prev = task
         
     
-class Task(object):
+
+class TaskBase(object):
+    def __init__(self, *args, **kwargs):
+        super(TaskBase, self).__init__(*args, **kwargs)
+
+    def _create_parameters(self):
+        for key, param in self.__class__.__dict__.iteritems():
+            if isinstance(param, Parameter):
+                param = copy(param)
+                setattr(self, key, param)
+
+    def _set_parameters(self, params):
+        params = params or {}
+        for key, value in params.iteritems():
+            param = self.__dict__.get(key)
+            if isinstance(param, Parameter):
+                param.set_value(value)
+                continue
+            assert False, "no such parameter for task {}: {}".format(self.name, key)
+
+    def _get_parameters(self, unset=False):
+        return {key: getattr(self, key).get_value()
+                for key in dir(self)
+                if isinstance(getattr(self, key), Parameter) and \
+                 (unset or not getattr(self, key).is_unset()) }
+
+    def _get_properties(self):
+        return {key: getattr(self, key)
+                for key in dir(self)
+                if type(getattr(self, key)) == str }
+
+
+class Task(TaskBase):
     joltdir = "."
-
-    classes = {}
-    instances = {}
-
-    attributes = []
     name = None
     requires = []
     extends = ""
@@ -103,7 +149,6 @@ class Task(object):
         
     def __init__(self, parameters=None):
         super(Task, self).__init__()
-        self.attributes = utils.as_list(self.__class__.attributes)
         self.influence = utils.as_list(self.__class__.influence)
         self.requires = utils.as_list(utils.call_or_return(self, self.__class__.requires))
         self.extends = utils.as_list(utils.call_or_return(self, self.__class__.extends))
@@ -148,32 +193,6 @@ class Task(object):
         except KeyError as e:
             assert False, "invalid macro expansion used in task {}: {} - "\
                 "forgot to set the parameter?".format(self.name, e)
-
-    def _create_parameters(self):
-        for key, param in self.__class__.__dict__.iteritems():
-            if isinstance(param, Parameter):
-                param = copy(param)
-                setattr(self, key, param)
-    
-    def _set_parameters(self, params):
-        params = params or {}
-        for key, value in params.iteritems():
-            param = self.__dict__.get(key)
-            if isinstance(param, Parameter):
-                param.set_value(value)
-                continue
-            assert False, "no such parameter for task {}: {}".format(self.name, key)
-    
-    def _get_parameters(self, unset=False):
-        return {key: getattr(self, key).get_value()
-                for key in dir(self)
-                if isinstance(getattr(self, key), Parameter) and \
-                 (unset or not getattr(self, key).is_unset()) }
-
-    def _get_properties(self):
-        return {key: getattr(self, key)
-                for key in dir(self)
-                if type(getattr(self, key)) == str }
 
     def is_cacheable(self):
         return True
@@ -319,6 +338,76 @@ class Resource(Task):
 
     def run(self, env, tools):
         self._run_env = env
+
+
+class _Test(Task):
+    def __init__(self, test_cls, *args, **kwargs):
+        self.test_cls = test_cls
+        self.__class__.name = test_cls.name
+        self.__class__.joltdir = test_cls.joltdir
+        self.__class__.requires = test_cls.requires
+        self.__class__.influence = test_cls.influence
+        super(_Test, self).__init__(*args, **kwargs)
+
+    def _create_parameters(self):
+        for key, param in self.test_cls.__dict__.iteritems():
+            if isinstance(param, Parameter):
+                param = copy(param)
+                setattr(self, key, param)
+
+    def _get_test_names(self):
+        return [attrib for attrib in dir(self.test_cls)
+                if attrib.startswith("test_")]
+
+    def _get_test_funcs(self):
+        return [getattr(self.test_cls, func)
+                for func in self._get_test_names()]
+
+    def _get_source_functions(self):
+        funcs = super(_Test, self)._get_source_functions()
+        return funcs + self._get_test_funcs() + [self.test_cls.setup, self.test_cls.cleanup]
+
+    def run(self, deps, tools):
+        testsuite = ut.TestSuite()
+        for test in self._get_test_names():
+            testsuite.addTest(self.test_cls(
+                test, parameters=self._get_parameters(), deps=deps, tools=tools))
+        self.testresult = ut.TextTestRunner(verbosity=2).run(testsuite)
+        assert self.testresult.wasSuccessful(), "tests failed"
+
+
+class Test(ut.TestCase, TaskBase):
+    joltdir = "."
+    name = None
+    requires = []
+    extends = ""
+    influence = []
+
+    def __init__(self, method="runTest", parameters=None, deps=None, tools=None, *args, **kwargs):
+        ut.TestCase.__init__(self, method)
+        TaskBase.__init__(self)
+        self.deps = deps
+        self.tools = tools
+        self.influence = utils.as_list(self.__class__.influence)
+        self.requires = utils.as_list(utils.call_or_return(self, self.__class__.requires))
+        self.extends = utils.as_list(utils.call_or_return(self, self.__class__.extends))
+        assert len(self.extends) == 1, "{} extends multiple tasks, only one allowed".format(self.name)
+        self.extends = self.extends[0]
+        self.name = self.__class__.name
+        self._create_parameters()
+        self._set_parameters(parameters)
+
+    def setUp(self):
+        self.setup(self.deps, self.tools)
+
+    def tearDown(self):
+        self.cleanup()
+
+    def setup(self, deps, tools):
+        """ Implement this method to make preparations before a test """
+
+    def cleanup(self):
+        """ Implement this method to clean up after a test """
 
 
 @ArtifactAttributeSetProvider.Register

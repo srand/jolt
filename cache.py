@@ -194,7 +194,6 @@ class Artifact(object):
         content["task"] = self._node.name
         content["size"] = self._get_size()
         content["unpacked"] = self._unpacked
-        content["attributes"] = self._node.task.attributes
         content["identity"] = self._node.identity
         content["requires"] = self._node.task._get_requires()
         content["parameters"] = self._node.task._get_parameters()

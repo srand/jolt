@@ -1,6 +1,6 @@
 import inspect
 import imp
-from tasks import Task
+from tasks import Task, Test
 import copy
 import glob
 import filesystem as fs
@@ -15,6 +15,7 @@ class JoltLoader(object):
     
     def __init__(self):
         self._tasks = []
+        self._tests = []
         self._source = []
         self._path = None
 
@@ -39,6 +40,12 @@ class JoltLoader(object):
             task.joltdir = directory
         self._tasks += tasks
 
+        tests = [cls for cls in classes if issubclass(cls, Test) and cls is not Test]
+        for test in tests:
+            test.name = test.name or test.__name__.lower()
+            test.joltdir = directory
+        self._tests += tests
+
         log.verbose("Loaded: {}", path)
         
         return tasks
@@ -54,7 +61,7 @@ class JoltLoader(object):
             path = fs.path.dirname(path)
             if path == root:
                 break
-        return self._tasks
-    
+        return self._tasks, self._tests
+
     def get_sources(self):
         return "".join(self._source)

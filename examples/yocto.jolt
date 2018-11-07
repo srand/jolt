@@ -2,6 +2,7 @@ from tasks import *
 from glob import glob
 import filesystem as fs
 from plugins import git
+import unittest
 
 
 class Sdk(Task):
@@ -159,3 +160,23 @@ class Finit(Task):
     def publish(self, artifact, tools):
         at = tools.autotools()
         at.publish(artifact)
+
+
+class FinitTest(Test):
+    name = "test/finit"
+    requires = "finit"
+    test = Parameter("foobar")
+
+    def setup(self, deps, tools):
+        self.tools = tools
+        self.finit = deps[self.requires[0]]
+
+    def test_hello(self):
+        self.tools.run("ls {}", self.finit.path, output=False)
+
+    def test_world(self):
+        self.tools.run("echo {test}")
+
+    @unittest.skip("testing skip")
+    def test_skipped(self):
+        self.assertFalse(True)
