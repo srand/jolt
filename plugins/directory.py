@@ -15,7 +15,7 @@ class DirectoryInfluenceProvider(HashInfluenceProvider):
 
     def get_influence(self, task):
         try:
-            with tools.cwd(task.joltdir):
+            with tools.Tools(task, task.joltdir):
                 path = task._get_expansion(self.path)
                 with tools.cwd(path):
                     return tools.run("find -type f -name '{}' | LC_ALL=C sort | xargs -n1 md5sum"

@@ -65,8 +65,13 @@ class LocalExecutor(Executor):
         self.force_upload = force_upload
 
     def run(self):
-        self.task.started()
-        self.task.run(self.cache, self.force_upload)
+        try:
+            self.task.started()
+            self.task.run(self.cache, self.force_upload)
+        except:
+            self.task.failed()
+        else:
+            self.task.finished()
         return self.task
 
 

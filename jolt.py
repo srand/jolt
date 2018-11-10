@@ -62,7 +62,7 @@ def build(task, network, identity):
 
     queue = scheduler.TaskQueue(executor)
     while dag.nodes:
-        leafs = dag.select(lambda graph, task: task.is_ready(graph))
+        leafs = dag.select(lambda graph, task: task.is_ready())
         while leafs:
             task = leafs.pop()
             task.set_in_progress()
@@ -70,15 +70,10 @@ def build(task, network, identity):
             queue.submit(acache, task)
 
         task, error = queue.wait()
-        assert task, "blocked tasks remain and could not be unblocked, no more tasks in progress"
+        assert task, "no more tasks in progress, only blocked tasks remain"
         if error is not None:
-            task.error("Execution failed after {}", task.duration)
             queue.abort()
             raise Exception(error)
-        else: 
-            task.info("Execution finished after {}", task.duration)
-
-        task.set_completed(dag)
 
     #queue.shutdown()
 

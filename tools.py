@@ -3,9 +3,12 @@ import os
 import filesystem as fs
 import log
 import threading
+import utils
+import glob
+from contextlib import contextmanager
 
 
-def run(cmd, *args, **kwargs):
+def _run(cmd, cwd, *args, **kwargs):
     output = kwargs.get("output")
     output_on_error = kwargs.get("output_on_error")
     output = output if output is not None else True
@@ -15,7 +18,8 @@ def run(cmd, *args, **kwargs):
         cmd.format(*args, **kwargs),
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
-        shell=True)
+        shell=True,
+        cwd=cwd)
 
     class Reader(threading.Thread):
         def __init__(self, stream, output=None):
@@ -28,8 +32,7 @@ def run(cmd, *args, **kwargs):
         def run(self):
             try:
                 for line in iter(self.stream.readline, b''):
-                    line = line.rstrip("\r")
-                    line = line.rstrip("\n")
+                    line = line.rstrip()
                     if self.output:
                         self.output(line)
                     self.buffer.append(line)
@@ -68,7 +71,7 @@ def replace_in_file(path, search, replace):
         assert False, "failed to replace string in file: {}".format(path)
 
 
-class environ(object):
+class _environ(object):
     def __init__(self, **kwargs):
         self._kwargs = kwargs
 
@@ -84,14 +87,15 @@ class environ(object):
         os.environ.update(self._restore)
 
 
-class tmpdir(object):
-    def __init__(self, name):
+class _tmpdir(object):
+    def __init__(self, name, cwd=None):
         self._name = name
         self._path = None
+        self._cwd = cwd or os.getcwd()
 
     def __enter__(self):
         try:
-            dirname = os.getcwd()
+            dirname = self._cwd
             fs.makedirs(dirname)
             self._path = fs.mkdtemp(prefix=self._name + "-", dir=dirname)
         except:
@@ -128,26 +132,7 @@ class builddir(object):
         return self._path
 
 
-class cwd(object):
-    def __init__(self, path):
-        self._path = path
-        self._prev = os.getcwd()
-
-    def __enter__(self):
-        try:
-            os.chdir(self._path)
-        except:
-            assert False, "failed to change directory to {}".format(self._path)
-        return self
-
-    def __exit__(self, type, value, tb):
-        try:
-            os.chdir(self._prev)
-        except:
-            pass
-
-
-class CMake(object):
+class _CMake(object):
     def __init__(self, deps, tools):
         self.deps = deps
         self.tools = tools
@@ -160,7 +145,7 @@ class CMake(object):
                     else fs.path.join(os.getcwd(), sourcedir)
 
         with self.tools.cwd(self.builddir):
-            self.tools.run("cmake {} -DCMAKE_INSTALL_PREFIX={}",
+            self.tools.run("cmake {0} -DCMAKE_INSTALL_PREFIX={1}",
                            sourcedir, self.installdir,
                            output=True)
 
@@ -177,7 +162,7 @@ class CMake(object):
             artifact.collect(files, *args, **kwargs)
 
 
-class AutoTools(object):
+class _AutoTools(object):
     def __init__(self, deps, tools):
         self.deps = deps
         self.tools = tools
@@ -194,7 +179,7 @@ class AutoTools(object):
                 self.tools.run("autoreconf -visf", output=True)
 
         with self.tools.cwd(self.builddir):
-            self.tools.run("{}/configure --prefix={}",
+            self.tools.run("{0}/configure --prefix={1}",
                            sourcedir, self.installdir,
                            output=True)
 
@@ -209,3 +194,92 @@ class AutoTools(object):
     def publish(self, artifact, files='*', *args, **kwargs):
         with self.tools.cwd(self.installdir):
             artifact.collect(files, *args, **kwargs)
+
+
+class Tools(object):
+    def __init__(self, task=None, cwd=None):
+        self._cwd = cwd or os.getcwd()
+        self._task = task
+        self._builddir = {}
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, type, value, tb):
+        for dir in self._builddir.values():
+            fs.rmtree(dir)
+        return False
+
+    def _get_expansion(self, string, *args, **kwargs):
+        return self._task._get_expansion(string, *args, **kwargs) \
+            if self._task is not None \
+            else utils.expand_macros(string, *args, **kwargs)
+
+    def autotools(self, deps=None):
+        return _AutoTools(deps, self)
+
+    def builddir(self, name="build", *args, **kwargs):
+        if name not in self._builddir:
+            dirname = self._cwd
+            fs.makedirs(dirname)
+            self._builddir[name] = fs.mkdtemp(prefix=name+"-", dir=dirname)
+        return self._builddir[name]
+
+    def cmake(self, deps=None):
+        return _CMake(deps, self)
+
+    def copy(self, src, dest):
+        return fs.copy(
+            fs.path.join(self.getcwd(), src),
+            fs.path.join(self.getcwd(), dest))
+
+    @contextmanager
+    def cwd(self, path, *args, **kwargs):
+        path = self._get_expansion(path, *args, **kwargs)
+        prev = self._cwd
+        self._cwd = fs.path.join(self._cwd, path)
+        try:
+            assert fs.path.exists(self._cwd) and fs.path.isdir(self._cwd), \
+                "failed to change directory to {}" \
+                .format(self._cwd)
+            yield self._cwd
+        finally:
+            self._cwd = prev
+
+    def environ(self, **kwargs):
+        for key, value in kwargs.iteritems():
+            kwargs[key] = self._get_expansion(value)
+        return _environ(**kwargs)
+
+    def getcwd(self):
+        return fs.path.normpath(self._cwd)
+
+    def glob(self, path, *args, **kwargs):
+        path = self._get_expansion(path, *args, **kwargs)
+        files = utils.as_list(glob.glob(fs.path.join(self._cwd, path)))
+        if not fs.path.isabs(path):
+            files = [file[len(self.getcwd())+1:] for file in files]
+        return files
+
+    def map_consecutive(self, callable, iterable):
+        return utils.map_consecutive(callable, iterable)
+
+    def map_concurrent(self, callable, iterable):
+        return utils.map_concurrent(callable, iterable)
+
+    def replace_in_file(self, path, search, replace):
+        path = self._get_expansion(path)
+        search = self._get_expansion(search)
+        replace = self._get_expansion(replace)
+        return replace_in_file(fs.path.join(self._cwd, path), search, replace)
+
+    def run(self, cmd, *args, **kwargs):
+        cmd = self._get_expansion(cmd, *args, **kwargs)
+        return _run(cmd, self._cwd, *args, **kwargs)
+
+    def tmpdir(self, name, *args, **kwargs):
+        return _tmpdir(name, cwd=self._cwd)
+
+    def unlink(self, path, *args, **kwargs):
+        cmd = self._get_expansion(path, *args, **kwargs)
+        return fs.unlink(fs.path.join(self._cwd, path))

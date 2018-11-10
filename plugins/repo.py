@@ -1,5 +1,5 @@
 from influence import *
-import tools
+from tools import Tools
 import utils
 import filesystem as fs
 from copy import copy
@@ -33,18 +33,18 @@ class RepoProject(SubElement):
         super(RepoDefault, self).__init__('project')
 
     def get_diff(self):
-        with tools.cwd(self.path):
-            return tools.run("git diff HEAD", output_on_error=True)
+        with self.tools.cwd(self.path_or_name):
+            return self.tools.run("git diff HEAD", output_on_error=True)
         assert False, "git command failed"
 
     def get_head(self):
-        with tools.cwd(self.path):
-            return tools.run("git rev-parse HEAD", output_on_error=True).strip()
+        with self.tools.cwd(self.path_or_name):
+            return self.tools.run("git rev-parse HEAD", output_on_error=True).strip()
         assert False, "git command failed"
 
     def get_remote_branches(self, commit):
-        with tools.cwd(self.path):
-            result = tools.run("git branch -r --contains {}", commit, output_on_error=True)
+        with self.tools.cwd(self.path_or_name):
+            result = self.tools.run("git branch -r --contains {0}", commit, output_on_error=True)
             if not result:
                 return []
             result = result.strip().splitlines()
@@ -53,8 +53,8 @@ class RepoProject(SubElement):
         assert False, "git command failed"
 
     def get_local_commits(self):
-        with tools.cwd(self.path):
-            result = tools.run("git rev-list HEAD ^@{{upstream}}", output_on_error=True)
+        with self.tools.cwd(self.path_or_name):
+            result = self.tools.run("git rev-list HEAD ^@{{upstream}}", output_on_error=True)
             if not result:
                 return []
             result = result.strip("\r\n ")
@@ -62,9 +62,9 @@ class RepoProject(SubElement):
         assert False, "git command failed"
 
     def get_remote_ref(self, commit, remote, pattern=None):
-        with tools.cwd(self.path):
-            result = tools.run(
-                "git ls-remote {}{}",
+        with self.tools.cwd(self.path_or_name):
+            result = self.tools.run(
+                "git ls-remote {0}{1}",
                 remote,
                 " {}".format(pattern) if pattern else "",
                 output_on_error=True)
@@ -85,8 +85,10 @@ class RepoProject(SubElement):
 @Composition(RepoDefault, "default")
 @Composition(RepoProject, "project")
 class RepoManifest(ElementTree):
-    def __init__(self):
+    def __init__(self, task, path):
         super(RepoManifest, self).__init__(element=Element('manifest'))
+        self.path = path
+        self.tools = task.tools
 
     def append(self, element):
         self.getroot().append(element)
@@ -97,10 +99,12 @@ class RepoManifest(ElementTree):
     def set(self, key, value):
         self.getroot().set(key, value)
 
-    def parse(self, filename):
-        with open(filename) as f:
+    def parse(self, filename=".repo/manifest.xml"):
+        with open(fs.path.join(self.tools.getcwd(), filename)) as f:
             root = ET.fromstring(f.read())
             self._setroot(root)
+            for project in self.projects:
+                project.tools = self.tools
             return self
         raise Exception("failed to parse xml file")
 
@@ -146,9 +150,10 @@ class RepoInfluenceProvider(HashInfluenceProvider):
         self.network = network
 
     def get_influence(self, task):
+        self.tools = Tools(task, task.joltdir)
         try:
             manifest_path = fs.path.join(task.joltdir, task._get_expansion(self.path))
-            manifest = RepoManifest()
+            manifest = RepoManifest(task, manifest_path)
             manifest.parse(fs.path.join(manifest_path, ".repo", "manifest.xml"))
 
             result = []
@@ -158,9 +163,8 @@ class RepoInfluenceProvider(HashInfluenceProvider):
                 if self.exclude is not None and project.path_or_name in self.exclude:
                     continue
 
-                with tools.cwd(manifest_path):
-                    gip = git.GitInfluenceProvider(project.path_or_name)
-                    result.append(gip.get_influence(task))
+                gip = git.GitInfluenceProvider(project.path_or_name)
+                result.append(gip.get_influence(task))
 
             return "\n".join(result)
 
@@ -170,8 +174,7 @@ class RepoInfluenceProvider(HashInfluenceProvider):
 
     def get_manifest(self, task):
         manifest_path = fs.path.join(task.joltdir, task._get_expansion(self.path))
-        manifest = RepoManifest()
-        manifest.parse(fs.path.join(manifest_path, ".repo", "manifest.xml"))
+        manifest = RepoManifest(task, manifest_path)
         return manifest
 
 
@@ -183,9 +186,8 @@ class RepoNetworkExecutorExtension(NetworkExecutorExtension):
             rip = rip[0]
             if rip.network:
                 manifest = rip.get_manifest(task.task)
-                with tools.cwd(fs.path.join(task.task.joltdir, rip.path)):
-                    manifest.assert_clean()
-                    manifest.lock_revisions()
+                manifest.assert_clean()
+                manifest.lock_revisions()
                 return {"repo_manifest": manifest.format()}
         return {}
 

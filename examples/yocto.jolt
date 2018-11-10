@@ -21,16 +21,16 @@ class Sdk(Task):
 
     def unpack(self, artifact, tools):
         with tools.cwd(artifact.path):
-            scripts = glob("*.sh")
+            scripts = tools.glob("*.sh")
             assert scripts and len(scripts) == 1, "didn't find the installer script"
-            tools.run("./{} -d . -y", scripts[0])
+            tools.run("./{0} -d . -y", scripts[0])
             for script in scripts:
-                fs.unlink(script)
+                tools.unlink(script)
 
 
-            scripts = glob("environment-setup-*")
+            scripts = tools.glob("environment-setup-*")
             assert scripts and len(scripts) == 1, "didn't find the environment script"
-            env = tools.run(". {}; python -c 'import os;print(os.environ)'",
+            env = tools.run(". {0}; python -c 'import os;print(os.environ)'",
                             fs.path.join(artifact.path, scripts[0]))
             env = eval(env)
             artifact.environ.SDKTARGETSYSROOT = env["SDKTARGETSYSROOT"]
@@ -172,7 +172,7 @@ class FinitTest(Test):
         self.finit = deps[self.requires[0]]
 
     def test_hello(self):
-        self.tools.run("ls {}", self.finit.path, output=False)
+        self.tools.run("ls {0}", self.finit.path, output=False)
 
     def test_world(self):
         self.tools.run("echo {test}")

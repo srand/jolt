@@ -3,7 +3,7 @@ from utils import *
 from influence import *
 from copy import copy
 import hashlib
-import tools
+from tools import Tools
 import networkx as nx
 from networkx.drawing.nx_agraph import write_dot
 import log
@@ -11,8 +11,9 @@ import utils
 
 
 class TaskProxy(object):
-    def __init__(self, task):
+    def __init__(self, task, graph):
         self.task = task
+        self.graph = graph
         self.children = []
         self.ancestors = []
         self.extensions = []
@@ -20,6 +21,13 @@ class TaskProxy(object):
         self._extended_task = None
         self._in_progress = False
         self._completed = False
+
+    def __hash__(self):
+        return id(self)
+
+    @property
+    def tools(self):
+        return self.task.tools
 
     @property
     def name(self):
@@ -42,8 +50,7 @@ class TaskProxy(object):
     def identity(self):
         sha = hashlib.sha1()
 
-        with tools.cwd(self.task.joltdir):
-            HashInfluenceRegistry.get().apply_all(self.task, sha)
+        HashInfluenceRegistry.get().apply_all(self.task, sha)
 
         # print("{}: {}".format(self.name, [n.name for n in self.children]))
         for node in self.children:
@@ -51,14 +58,11 @@ class TaskProxy(object):
 
         if self._extended_task:
             sha.update(self._extended_task.identity)
-            
+
         return sha.hexdigest()
 
     def __str__(self):
         return "{}{}".format(self.qualified_name, "*" if self.is_extension() else '')
-
-    def __hash__(self):
-        return hash(self.qualified_name)
 
     def info(self, fmt, *args, **kwargs):
         self.task.info(fmt + " " + self.log_name, *args, **kwargs)
@@ -101,14 +105,14 @@ class TaskProxy(object):
     def in_progress(self):
         return self._in_progress
 
-    def is_ready(self, dag):
+    def is_ready(self):
         if self.in_progress():
             return False
 
         if self.is_extension():
             return False
 
-        return dag.is_leaf(self)
+        return self.graph.is_leaf(self)
 
     def is_completed(self):
         return self._completed
@@ -121,12 +125,6 @@ class TaskProxy(object):
     
     def set_in_progress(self):
         self._in_progress = True
-
-    def set_completed(self, dag):
-        self._completed = True
-        dag.remove_node(self)
-        for extension in self.extensions:
-            extension.set_completed(dag)
 
     def finalize(self, dag):
         # Find all direct and transitive dependencies
@@ -144,30 +142,50 @@ class TaskProxy(object):
         self.info("Execution started")
         self.duration = utils.duration()
 
+    def failed(self):
+        self.error("Execution failed after {}", self.duration)
+        import traceback
+        traceback.print_exc()
+
+    def finished(self):
+        assert not self._completed, "task has already been completed"
+        self._completed = True
+        self.graph.remove_node(self)
+        for extension in self.extensions:
+            extension.finished()
+        if not self.is_extension():
+            self.info("Execution finished after {}", self.duration)
+
     def run(self, cache, force_upload=False, force_build=False):
         if not force_build and cache.is_available_remotely(self):
             cache.download(self)
 
         if force_build or not cache.is_available_locally(self) or self.has_extensions():
-            with TaskTools(self.task) as t:
-                with cache.get_context(self) as context:
-                    with t.cwd(self.task.joltdir):
-                        self.task.run(context, t)
+            with cache.get_context(self) as context:
+                with self.tools.cwd(self.task.joltdir):
+                    self.task.run(context, self.tools)
 
-                if cache.is_available_locally(self):
-                    with cache.get_artifact(self) as artifact:
-                        artifact.discard()
-
+            if cache.is_available_locally(self):
                 with cache.get_artifact(self) as artifact:
-                    with t.cwd(self.task.joltdir):
-                        self.task.publish(artifact, t)
-                    artifact.commit()
+                    artifact.discard()
+
+            with cache.get_artifact(self) as artifact:
+                with self.tools.cwd(self.task.joltdir):
+                    self.task.publish(artifact, self.tools)
+                artifact.commit()
 
             assert cache.upload(self, force=force_upload), \
                 "Failed to upload artifact for {}".format(self.name)
 
             for extension in self.extensions:
-                extension.run(cache, force_upload, force_build=True)
+                try:
+                    extension.started()
+                    extension.run(cache, force_upload, force_build=True)
+                except:
+                    extension.failed()
+                    raise
+                else:
+                    extension.finished()
 
 
 class Graph(nx.DiGraph):
@@ -204,7 +222,7 @@ class GraphBuilder(object):
         node = self.nodes.get(name)
         if not node:
             task = self.registry.get_task(name)
-            node = self._build_node(TaskProxy(task))
+            node = self._build_node(TaskProxy(task, self.graph))
             self.nodes[name] = node
         return node
         
@@ -234,8 +252,8 @@ class GraphBuilder(object):
         return self.graph
 
     def display(self):
-        with tools.tmpdir("dot") as t:
-            with tools.cwd(t.get_path()):
-                write_dot(self.graph, 'graph.dot')
-                tools.run('dot -Tsvg graph.dot -o graph.svg')
-                tools.run('eog graph.svg')
+        t = tools.Tools()
+        with t.tmpdir("dot") as tmpdir, t.cwd(tmpdir.get_path()):
+            write_dot(self.graph, fs.path.join(t.getcwd(), 'graph.dot'))
+            t.run('dot -Tsvg graph.dot -o graph.svg')
+            t.run('eog graph.svg')

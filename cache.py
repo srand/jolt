@@ -273,12 +273,16 @@ class Artifact(object):
     def path(self):
         return self._temp or self._path
 
+    @property
+    def tools(self):
+        return self._node.tools
+
     def collect(self, files, dest=None, flatten=False):
         assert self._temp, "artifact is already published"
         files = self._node.task._get_expansion(files)
         dest = self._node.task._get_expansion(dest) if dest is not None else None
 
-        files = glob.glob(files)
+        files = self.tools.glob(files)
         dirname = fs.path.join(self._temp, dest) if dest else self._temp + fs.sep
         for src in files:
             srcs = fs.scandir(src) if fs.path.isdir(src) and flatten else [src]
@@ -286,7 +290,7 @@ class Artifact(object):
                 dest = fs.path.join(dirname, src) \
                        if not flatten else \
                           fs.path.join(dirname, fs.path.basename(src))
-                fs.copy(src, dest)
+                self.tools.copy(src, dest)
                 log.verbose("Collected {} -> {}", src, dest[len(self._temp):])
 
     def copy(self, pattern, dest, flatten=False):
@@ -295,15 +299,15 @@ class Artifact(object):
         dest = self._node.task._get_expansion(dest)
 
         files = []
-        with tools.cwd(self._path):
-            files = glob.glob(pattern)
+        with self.tools.cwd(self._path):
+            files = self.tools.glob(pattern)
         for src in files:
             srcs = fs.scandir(src) if fs.path.isdir(src) and flatten else [src]
             for src in srcs:
                 destfile = fs.path.join(dest, src) \
                            if not flatten else \
                               fs.path.join(dest, fs.path.basename(src))
-                fs.copy(fs.path.join(self._path, src), destfile)
+                self.tools.copy(fs.path.join(self._path, src), destfile)
                 log.verbose("Copied {} -> {}", src, destfile)
 
     def compress(self):
@@ -539,7 +543,7 @@ class ArtifactCache(StorageProvider):
                 return True
             artifact.modify()
             task = artifact.get_task()
-            with tasks.TaskTools(task) as t:
+            with tools.Tools(task) as t:
                 task.unpack(artifact, t)
             artifact.commit()
         return True

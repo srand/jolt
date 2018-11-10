@@ -7,6 +7,9 @@ import os
 import hashlib
 
 
+def is_str(s):
+    return type(s) == str or type(s) == unicode
+
 def as_list(t):
     return [t] if type(t) == str else list(t)
 
@@ -76,7 +79,8 @@ class _SafeDict(object):
         return "{" + key + "}"
 
 
-def expand_macros(string, ignore_errors=False, *args, **kwargs):
+def expand_macros(string, *args, **kwargs):
+    ignore_errors = kwargs.get("ignore_errors") or False
     return Formatter().vformat(str(string), args, _SafeDict(kwargs, ignore_errors))
 
 

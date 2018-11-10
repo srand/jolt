@@ -7,6 +7,7 @@ from contextlib import contextmanager
 import unittest as ut
 import functools as ft
 import types
+from tools import Tools
 
 
 class Parameter(object):
@@ -135,9 +136,9 @@ class TaskBase(object):
                  (unset or not getattr(self, key).is_unset()) }
 
     def _get_properties(self):
-        return {key: getattr(self, key)
+        return {key: str(getattr(self, key))
                 for key in dir(self)
-                if type(getattr(self, key)) == str }
+                if utils.is_str(getattr(self, key)) }
 
 
 class Task(TaskBase):
@@ -149,14 +150,15 @@ class Task(TaskBase):
         
     def __init__(self, parameters=None):
         super(Task, self).__init__()
+        self.tools = Tools(self, self.joltdir)
+        self._create_parameters()
+        self._set_parameters(parameters)
         self.influence = utils.as_list(self.__class__.influence)
         self.requires = utils.as_list(utils.call_or_return(self, self.__class__.requires))
         self.extends = utils.as_list(utils.call_or_return(self, self.__class__.extends))
         assert len(self.extends) == 1, "{} extends multiple tasks, only one allowed".format(self.name)
         self.extends = self.extends[0]
         self.name = self.__class__.name
-        self._create_parameters()
-        self._set_parameters(parameters)
 
     def _get_source(self, func):
         source, lines = inspect.getsourcelines(func)
@@ -253,64 +255,6 @@ class Task(TaskBase):
         This hook is executed in the context of a consuming task.
         """
         pass
-
-
-class TaskTools(object):
-    tmpdir = tools.tmpdir
-
-    def __init__(self, task):
-        self._task = task
-        self._builddir = {}
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, type, value, tb):
-        for dir in self._builddir.values():
-            fs.rmtree(dir)
-        return False
-
-    def autotools(self, deps=None):
-        return tools.AutoTools(deps, self)
-
-    def builddir(self, name="build", *args, **kwargs):
-        if name not in self._builddir:
-            dirname = os.getcwd()
-            fs.makedirs(dirname)
-            self._builddir[name] = fs.mkdtemp(prefix=name+"-", dir=dirname)
-        return self._builddir[name]
-
-    def cmake(self, deps=None):
-        return tools.CMake(deps, self)
-
-    def cwd(self, path, *args, **kwargs):
-        path = self._task._get_expansion(path, *args, **kwargs)
-        return tools.cwd(path)
-
-    def environ(self, **kwargs):
-        for key, value in kwargs.iteritems():
-            kwargs[key] = self._task._get_expansion(value)
-        return tools.environ(**kwargs)
-
-    def glob(self, path, *args, **kwargs):
-        path = self._task._get_expansion(path, *args, **kwargs)
-        return glob.glob(path)
-
-    def replace_in_file(self, path, search, replace):
-        path = self._task._get_expansion(path)
-        search = self._task._get_expansion(search)
-        replace = self._task._get_expansion(replace)
-        return tools.replace_in_file(path, search, replace)
-
-    def run(self, cmd, *args, **kwargs):
-        cmd = self._task._get_expansion(cmd, *args, **kwargs)
-        return tools.run(cmd, *args, **kwargs)
-
-    def map_consecutive(self, callable, iterable):
-        return utils.map_consecutive(callable, iterable)
-
-    def map_concurrent(self, callable, iterable):
-        return utils.map_concurrent(callable, iterable)
 
 
 class Resource(Task):
@@ -426,13 +370,11 @@ class ResourceAttributeSetProvider(ArtifactAttributeSetProvider):
         if isinstance(task, Resource):
             deps = task._run_env
             deps.__enter__()
-            with tools.cwd(task.joltdir), TaskTools(task) as t:
-                task.acquire(artifact, deps, t)
+            task.acquire(artifact, deps, artifact.tools)
 
     def unapply(self, artifact):
         task = artifact.get_task()
         if isinstance(task, Resource):
             env = task._run_env
-            with tools.cwd(task.joltdir), TaskTools(task) as t:
-                task.release(artifact, env, t)
+            task.release(artifact, env, artifact.tools)
             env.__exit__(None, None, None)
