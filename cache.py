@@ -56,13 +56,13 @@ class ArtifactAttributeSet(object):
     def iteritems(self):
         return self._get_attributes().iteritems()
 
-    def apply(self, artifact):
+    def apply(self, task, artifact):
         for _, value in self.iteritems():
-            value.apply(artifact)
+            value.apply(task, artifact)
 
-    def unapply(self, artifact):
+    def unapply(self, task, artifact):
         for _, value in self.iteritems():
-            value.unapply(artifact)
+            value.unapply(task, artifact)
 
 
 class ArtifactAttributeSetRegistry(object):
@@ -84,14 +84,14 @@ class ArtifactAttributeSetRegistry(object):
             provider().format(artifact, content)
 
     @staticmethod
-    def apply_all(artifact):
+    def apply_all(task, artifact):
         for provider in ArtifactAttributeSetRegistry.providers:
-            provider().apply(artifact)
+            provider().apply(task, artifact)
 
     @staticmethod
-    def unapply_all(artifact):
+    def unapply_all(task, artifact):
         for provider in ArtifactAttributeSetRegistry.providers:
-            provider().unapply(artifact)
+            provider().unapply(task, artifact)
 
             
 class ArtifactAttributeSetProvider(object):
@@ -108,10 +108,10 @@ class ArtifactAttributeSetProvider(object):
     def format(self, artifact, content):
         raise NotImplemented()
 
-    def apply(self, artifact):
+    def apply(self, task, artifact):
         raise NotImplemented()
 
-    def unapply(self, artifact):
+    def unapply(self, task, artifact):
         raise NotImplemented()
         
 
@@ -128,10 +128,10 @@ class ArtifactAttribute(object):
     def get_value(self):
         raise NotImplemented()
 
-    def apply(self, artifact):
+    def apply(self, task, artifact):
         pass
         
-    def unapply(self, artifact):
+    def unapply(self, task, artifact):
         pass
 
     def __str__(self):
@@ -152,10 +152,10 @@ class ArtifactStringAttribute(ArtifactAttribute):
     def get_value(self):
         return self._value
 
-    def apply(self, artifact):
+    def apply(self, task, artifact):
         pass
         
-    def unapply(self, artifact):
+    def unapply(self, task, artifact):
         pass
 
     def __str__(self):
@@ -356,12 +356,12 @@ class Context(object):
             self._cache.unpack(dep)
             with self._cache.get_artifact(dep) as artifact:
                 self._artifacts[dep.qualified_name] = artifact
-                ArtifactAttributeSetRegistry.apply_all(artifact)
+                ArtifactAttributeSetRegistry.apply_all(self._node.task, artifact)
         return self
 
     def __exit__(self, type, value, tb):
         for name, artifact in self._artifacts.iteritems():
-            ArtifactAttributeSetRegistry.unapply_all(artifact)
+            ArtifactAttributeSetRegistry.unapply_all(self._node.task, artifact)
 
     def __getitem__(self, key):
         key = self._node.task._get_expansion(key)

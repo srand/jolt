@@ -8,6 +8,7 @@ import graph
 import cache
 import filesystem as fs
 import log
+from log import path as log_path
 import config
 import sys
 import plugins
@@ -17,6 +18,7 @@ import loader
 import utils
 from influence import *
 import traceback
+import subprocess
 
 
 @click.group()
@@ -75,8 +77,6 @@ def build(task, network, identity):
             queue.abort()
             raise Exception(error)
 
-    #queue.shutdown()
-
 
 @cli.command()
 def clean():
@@ -113,6 +113,19 @@ def list(task=None, reverse=False, all=False):
 
     for task in sorted(successors):
         print(task.qualified_name)
+
+
+@cli.command()
+@click.option("-f", "--follow", is_flag=True, help="Display log output as it appears")
+@click.option("-D", "--delete", is_flag=True, help="Delete the log file")
+def log(follow, delete):
+    if follow:
+        subprocess.call("tail -f {}".format(log_path), shell=True)
+    elif delete:
+        fs.unlink(log_path)
+    else:
+        subprocess.call("less {}".format(log_path), shell=True)
+
 
 @cli.command()
 @click.argument("task")
@@ -167,12 +180,7 @@ def info(task, influence=False):
 def main():
     try:
         cli()
-    except AssertionError as e:
-        traceback.print_exc()
-        log.error(str(e))
-        sys.exit(1)
     except Exception as e:
-        traceback.print_exc()
         log.error(str(e))
         sys.exit(1)
 

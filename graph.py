@@ -67,6 +67,9 @@ class TaskProxy(object):
     def info(self, fmt, *args, **kwargs):
         self.task.info(fmt + " " + self.log_name, *args, **kwargs)
 
+    def warn(self, fmt, *args, **kwargs):
+        self.task.warn(fmt + " " + self.log_name, *args, **kwargs)
+
     def error(self, fmt, *args, **kwargs):
         self.task.error(fmt + " " + self.log_name, *args, **kwargs)
 
@@ -150,42 +153,43 @@ class TaskProxy(object):
     def finished(self):
         assert not self._completed, "task has already been completed"
         self._completed = True
-        self.graph.remove_node(self)
-        for extension in self.extensions:
-            extension.finished()
-        if not self.is_extension():
-            self.info("Execution finished after {}", self.duration)
+        try:
+            self.graph.remove_node(self)
+        except:
+            self.warn("Pruned task was executed")
+        self.info("Execution finished after {}", self.duration)
 
     def run(self, cache, force_upload=False, force_build=False):
-        if not force_build and cache.is_available_remotely(self):
-            cache.download(self)
+        with self.tools:
+            if not force_build and cache.is_available_remotely(self):
+                cache.download(self)
 
-        if force_build or not cache.is_available_locally(self) or self.has_extensions():
-            with cache.get_context(self) as context:
-                with self.tools.cwd(self.task.joltdir):
-                    self.task.run(context, self.tools)
+            if force_build or not cache.is_available_locally(self) or self.has_extensions():
+                with cache.get_context(self) as context:
+                    with self.tools.cwd(self.task.joltdir):
+                        self.task.run(context, self.tools)
 
-            if cache.is_available_locally(self):
+                if cache.is_available_locally(self):
+                    with cache.get_artifact(self) as artifact:
+                        artifact.discard()
+
                 with cache.get_artifact(self) as artifact:
-                    artifact.discard()
+                    with self.tools.cwd(self.task.joltdir):
+                        self.task.publish(artifact, self.tools)
+                    artifact.commit()
 
-            with cache.get_artifact(self) as artifact:
-                with self.tools.cwd(self.task.joltdir):
-                    self.task.publish(artifact, self.tools)
-                artifact.commit()
+                assert cache.upload(self, force=force_upload), \
+                    "Failed to upload artifact for {}".format(self.name)
 
-            assert cache.upload(self, force=force_upload), \
-                "Failed to upload artifact for {}".format(self.name)
-
-            for extension in self.extensions:
-                try:
-                    extension.started()
-                    extension.run(cache, force_upload, force_build=True)
-                except:
-                    extension.failed()
-                    raise
-                else:
-                    extension.finished()
+                for extension in self.extensions:
+                    try:
+                        extension.started()
+                        extension.run(cache, force_upload, force_build=True)
+                    except:
+                        extension.failed()
+                        raise
+                    else:
+                        extension.finished()
 
 
 class Graph(nx.DiGraph):

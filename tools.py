@@ -8,7 +8,7 @@ import glob
 from contextlib import contextmanager
 
 
-def _run(cmd, cwd, *args, **kwargs):
+def _run(cmd, cwd, env, *args, **kwargs):
     output = kwargs.get("output")
     output_on_error = kwargs.get("output_on_error")
     output = output if output is not None else True
@@ -19,7 +19,8 @@ def _run(cmd, cwd, *args, **kwargs):
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         shell=True,
-        cwd=cwd)
+        cwd=cwd,
+        env=env)
 
     class Reader(threading.Thread):
         def __init__(self, stream, output=None):
@@ -69,22 +70,6 @@ def replace_in_file(path, search, replace):
             f.write(data)
     except:
         assert False, "failed to replace string in file: {}".format(path)
-
-
-class _environ(object):
-    def __init__(self, **kwargs):
-        self._kwargs = kwargs
-
-    def __enter__(self):
-        self._restore = {key: value for key, value in os.environ.iteritems()}
-        for key, value in self._kwargs.iteritems():
-            os.environ[key] = value
-
-    def __exit__(self, type, value, tb):
-        for key, value in self._kwargs.iteritems():
-            if key not in self._restore:
-                del os.environ[key]
-        os.environ.update(self._restore)
 
 
 class _tmpdir(object):
@@ -199,6 +184,7 @@ class _AutoTools(object):
 class Tools(object):
     def __init__(self, task=None, cwd=None):
         self._cwd = cwd or os.getcwd()
+        self._env = {key: value for key, value in os.environ.iteritems()}
         self._task = task
         self._builddir = {}
 
@@ -210,7 +196,7 @@ class Tools(object):
             fs.rmtree(dir)
         return False
 
-    def _get_expansion(self, string, *args, **kwargs):
+    def expand(self, string, *args, **kwargs):
         return self._task._get_expansion(string, *args, **kwargs) \
             if self._task is not None \
             else utils.expand_macros(string, *args, **kwargs)
@@ -235,7 +221,7 @@ class Tools(object):
 
     @contextmanager
     def cwd(self, path, *args, **kwargs):
-        path = self._get_expansion(path, *args, **kwargs)
+        path = self.expand(path, *args, **kwargs)
         prev = self._cwd
         self._cwd = fs.path.join(self._cwd, path)
         try:
@@ -246,16 +232,27 @@ class Tools(object):
         finally:
             self._cwd = prev
 
+    @contextmanager
     def environ(self, **kwargs):
         for key, value in kwargs.iteritems():
-            kwargs[key] = self._get_expansion(value)
-        return _environ(**kwargs)
+            kwargs[key] = self.expand(value)
+
+        restore = {key: value for key, value in self._env.iteritems()}
+        self._env.update(kwargs)
+        yield self._env
+        for key, value in kwargs.iteritems():
+            if key not in restore:
+                del self._env[key]
+        self._env.update(restore)
 
     def getcwd(self):
         return fs.path.normpath(self._cwd)
 
+    def getenv(self, key):
+        return self._env.get(key)
+
     def glob(self, path, *args, **kwargs):
-        path = self._get_expansion(path, *args, **kwargs)
+        path = self.expand(path, *args, **kwargs)
         files = utils.as_list(glob.glob(fs.path.join(self._cwd, path)))
         if not fs.path.isabs(path):
             files = [file[len(self.getcwd())+1:] for file in files]
@@ -268,18 +265,27 @@ class Tools(object):
         return utils.map_concurrent(callable, iterable)
 
     def replace_in_file(self, path, search, replace):
-        path = self._get_expansion(path)
-        search = self._get_expansion(search)
-        replace = self._get_expansion(replace)
+        path = self.expand(path)
+        search = self.expand(search)
+        replace = self.expand(replace)
         return replace_in_file(fs.path.join(self._cwd, path), search, replace)
 
     def run(self, cmd, *args, **kwargs):
-        cmd = self._get_expansion(cmd, *args, **kwargs)
-        return _run(cmd, self._cwd, *args, **kwargs)
+        cmd = self.expand(cmd, *args, **kwargs)
+        return _run(cmd, self._cwd, self._env, *args, **kwargs)
+
+    def setenv(self, key, value=None):
+        if value is None:
+            try:
+                del self._env[key]
+            except:
+                pass
+        else:
+            self._env[key] = self.expand(value)
 
     def tmpdir(self, name, *args, **kwargs):
         return _tmpdir(name, cwd=self._cwd)
 
     def unlink(self, path, *args, **kwargs):
-        cmd = self._get_expansion(path, *args, **kwargs)
+        cmd = self.expand(path, *args, **kwargs)
         return fs.unlink(fs.path.join(self._cwd, path))

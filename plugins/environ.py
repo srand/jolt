@@ -6,15 +6,15 @@ class EnvironmentVariable(ArtifactStringAttribute):
         super(EnvironmentVariable, self).__init__(name)
         self._old_value = None
         
-    def apply(self, artifact):
-        self._old_value = os.environ.get(self.get_name())
-        os.environ[self.get_name()] = self.get_value()
+    def apply(self, task, artifact):
+        self._old_value = task.tools.getenv(self.get_name())
+        task.tools.setenv(self.get_name(), self.get_value())
         
-    def unapply(self, artifact):
+    def unapply(self, task, artifact):
         if self._old_value:
-            os.environ[self.get_name()] = self._old_value
+            task.tools.setenv(self.get_name(), self._old_value)
         else:
-            del os.environ[self.get_name()]
+            task.tools.setenv(self.get_name())
         self._old_value = None
 
 
@@ -28,12 +28,12 @@ class PathEnvironmentVariable(EnvironmentVariable):
         else:
             self.set_value(value)
 
-    def apply(self, artifact):
-        self._old_value = os.environ.get(self.get_name())
+    def apply(self, task, artifact):
+        self._old_value = task.tools.getenv(self.get_name())
         new_val = fs.path.join(artifact.path, self.get_value())
         if self._old_value:
-            new_val = new_val + fs.pathsep + os.environ[self.get_name()]
-        os.environ[self.get_name()] = new_val
+            new_val = new_val + fs.pathsep + task.tools.getenv(self.get_name())
+        task.tools.setenv(self.get_name(), new_val)
 
 
 class EnvironmentVariableSet(ArtifactAttributeSet):
@@ -69,8 +69,8 @@ class EnvironmentVariableSetProvider(ArtifactAttributeSetProvider):
         for key, value in artifact.environ.iteritems():
             content["environ"][key] = str(value)
 
-    def apply(self, artifact):
-        artifact.environ.apply(artifact)
+    def apply(self, task, artifact):
+        artifact.environ.apply(task, artifact)
         
-    def unapply(self, artifact):
-        artifact.environ.unapply(artifact)
+    def unapply(self, task, artifact):
+        artifact.environ.unapply(task, artifact)

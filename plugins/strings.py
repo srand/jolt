@@ -6,10 +6,10 @@ class StringVariable(ArtifactStringAttribute):
         super(StringVariable, self).__init__(name)
         self._old_value = None
         
-    def apply(self, artifact):
+    def apply(self, task, artifact):
         pass
         
-    def unapply(self, artifact):
+    def unapply(self, task, artifact):
         pass
 
 
@@ -40,8 +40,8 @@ class StringVariableSetProvider(ArtifactAttributeSetProvider):
         for key, value in artifact.strings.iteritems():
             content["strings"][key] = str(value)
 
-    def apply(self, artifact):
-        artifact.strings.apply(artifact)
+    def apply(self, task, artifact):
+        artifact.strings.apply(task, artifact)
         
-    def unapply(self, artifact):
-        artifact.strings.unapply(artifact)
+    def unapply(self, task, artifact):
+        artifact.strings.unapply(task, artifact)

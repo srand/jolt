@@ -28,9 +28,11 @@ class TaskQueue(object):
             try:
                 result = future.result()
             except AssertionError as e:
+                log.verbose(traceback.format_exc())
                 error = str(e) or ''
             except Exception as e:
                 error = traceback.format_exc()
+                log.verbose(error)
             del self.futures[future]
             return task, error
         return None, None

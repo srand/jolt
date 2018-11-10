@@ -205,6 +205,9 @@ class Task(TaskBase):
     def info(self, fmt, *args, **kwargs):
         log.info(fmt, *args, **kwargs)
 
+    def warn(self, fmt, *args, **kwargs):
+        log.warn(fmt, *args, **kwargs)
+
     def error(self, fmt, *args, **kwargs):
         log.error(fmt, *args, **kwargs)
 
@@ -282,6 +285,11 @@ class Resource(Task):
 
     def run(self, env, tools):
         self._run_env = env
+
+
+class TaskException(Exception):
+    def __init__(self, *args, **kwargs):
+        super(TaskException, self).__init__(*args, **kwargs)
 
 
 class _Test(Task):
@@ -365,14 +373,14 @@ class ResourceAttributeSetProvider(ArtifactAttributeSetProvider):
     def format(self, artifact, content):
         pass
 
-    def apply(self, artifact):
+    def apply(self, task, artifact):
         task = artifact.get_task()
         if isinstance(task, Resource):
             deps = task._run_env
             deps.__enter__()
             task.acquire(artifact, deps, artifact.tools)
 
-    def unapply(self, artifact):
+    def unapply(self, task, artifact):
         task = artifact.get_task()
         if isinstance(task, Resource):
             env = task._run_env

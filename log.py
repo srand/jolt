@@ -1,47 +1,70 @@
 from __future__ import print_function
 import sys
+import config
+import filesystem as fs
 
 
 ERROR = 0
-NORMAL = 1
-VERBOSE = 2
-HYSTERICAL = 3
+WARN = 1
+NORMAL = 2
+VERBOSE = 3
+HYSTERICAL = 4
 
+path = config.get("jolt", "logfile", fs.path.join(fs.path.dirname(__file__), "jolt.log"))
 
 _loglevel = NORMAL
+_file = open(path, "a")
 
+def _line(level, fmt, *args, **kwargs):
+    levelstr = ["ERROR", "WARNING", "INFO", "VERBOSE", "HYSTERICAL"]
+    return "[{}] ".format(levelstr[level]) + fmt.format(*args, **kwargs)
+
+def _streamwrite(stream, line):
+    stream.write(line + "\n")
+    stream.flush()
+
+def _log(level, stream, fmt, *args, **kwargs):
+    line = _line(level, fmt, *args, **kwargs)
+    if level <= _loglevel:
+        _streamwrite(stream, line)
+    _streamwrite(_file, line)
 
 def set_level(level):
     global _loglevel
     _loglevel = level
 
 def info(fmt, *args, **kwargs):
-    if _loglevel >= NORMAL:
-        sys.stdout.write("[INFO]  " + fmt.format(*args, **kwargs) + "\n")
-        sys.stdout.flush()
+    _log(NORMAL, sys.stdout, fmt, *args, **kwargs)
+
+def warn(fmt, *args, **kwargs):
+    _log(WARN, sys.stdout, fmt, *args, **kwargs)
 
 def verbose(fmt, *args, **kwargs):
-    if _loglevel >= VERBOSE:
-        print("[VERBOSE] "+ fmt.format(*args, **kwargs))
+    _log(VERBOSE, sys.stdout, fmt, *args, **kwargs)
 
 def hysterical(fmt, *args, **kwargs):
-    if _loglevel >= HYSTERICAL:
-        print("[HYSTERICAL] "+ fmt.format(*args, **kwargs))
+    _log(HYSTERICAL, sys.stdout, fmt, *args, **kwargs)
 
 def error(fmt, *args, **kwargs):
-    print("[ERROR] "+ fmt.format(*args, **kwargs))
-
-def eprint(fmt, *args, **kwargs):
-    print("error: " + fmt.format(*args, **kwargs), file=sys.stderr)
+    _log(ERROR, sys.stdout, fmt, *args, **kwargs)
 
 def stdout(fmt, *args, **kwargs):
     try:
-        print(fmt.format(*args, **kwargs))
+        line = fmt.format(*args, **kwargs)
     except:
-        print(fmt)
+        line = fmt
+    _streamwrite(sys.stdout, line)
+    _streamwrite(_file, "[STDOUT] " + line)
 
 def stderr(fmt, *args, **kwargs):
     try:
-        print(fmt.format(*args, **kwargs), file=sys.stderr)
+        line = fmt.format(*args, **kwargs)
     except:
-        print(fmt, file=sys.stderr)
+        line = fmt
+    _streamwrite(sys.stderr, line)
+    _streamwrite(_file, "[STDERR] " + line)
+
+
+_file.write("================================================================================\n")
+_file.flush()
+
