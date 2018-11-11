@@ -39,7 +39,7 @@ class ArtifactAttributeSet(object):
 
     def _get_attributes(self):
         return self._attributes
-        
+
     def __getattr__(self, name):
         attributes = self._get_attributes()
         if name not in attributes:
@@ -96,7 +96,7 @@ class ArtifactAttributeSetRegistry(object):
         for provider in ArtifactAttributeSetRegistry.providers:
             provider().unapply(task, artifact)
 
-            
+
 class ArtifactAttributeSetProvider(object):
     @staticmethod
     def Register(cls):
@@ -116,7 +116,7 @@ class ArtifactAttributeSetProvider(object):
 
     def unapply(self, task, artifact):
         raise NotImplemented()
-        
+
 
 class ArtifactAttribute(object):
     def __init__(self, name):
@@ -133,7 +133,7 @@ class ArtifactAttribute(object):
 
     def apply(self, task, artifact):
         pass
-        
+
     def unapply(self, task, artifact):
         pass
 
@@ -157,14 +157,14 @@ class ArtifactStringAttribute(ArtifactAttribute):
 
     def apply(self, task, artifact):
         pass
-        
+
     def unapply(self, task, artifact):
         pass
 
     def __str__(self):
         return str(self._value)
 
-        
+
 class Artifact(object):
     def __init__(self, cache, node):
         self._cache = cache
@@ -236,7 +236,7 @@ class Artifact(object):
                     continue
 
                 size += stat.st_size
-        
+
             for dir in dirs:
                 fp = os.path.join(path, dir)
                 try:
@@ -421,7 +421,7 @@ class CacheStats(object):
     def remove(self, artifact):
         del self.stats[artifact["identity"]]
         self.save()
-        
+
     def get_size(self):
         size = 0
         for artifact, stats in self.stats.iteritems():
@@ -435,7 +435,7 @@ class CacheStats(object):
         # Don't evict artifacts in the current working set
         nt = filter(lambda x: x["identity"] not in self.active, nt)
         return nt[0] if len(nt) > 0 else None
-        
+
 
 class ArtifactCache(StorageProvider):
     root = fs.path.join(fs.path.expanduser("~"), ".cache", "jolt")
@@ -502,7 +502,7 @@ class ArtifactCache(StorageProvider):
         return \
             (not on_network and self.is_available_locally(node)) or \
             (on_network and self.is_available_remotely(node))
-    
+
     def download(self, node, force=False):
         if not config.getboolean("jolt", "download", True):
             return True
@@ -553,10 +553,18 @@ class ArtifactCache(StorageProvider):
                 task.unpack(artifact, t)
             artifact.commit()
         return True
-    
+
     def commit(self, artifact):
         self.stats.update(artifact)
         self.evict()
+
+    def discard(self, node):
+        if not self.is_available_locally(node):
+            return False
+        with self.get_artifact(node) as artifact:
+            self.stats.remove(dict(identity=node.identity))
+            artifact.discard()
+        return True
 
     def get_context(self, node):
         return Context(self, node)

@@ -32,7 +32,7 @@ def cli(verbose, extra_verbose, config_file):
         log.set_level(log.HYSTERICAL)
     if config_file:
         config.load(config_file)
-        
+
     # Load configured plugins
     for section in config.sections():
         path = fs.path.dirname(__file__)
@@ -79,9 +79,16 @@ def build(task, network, identity):
 
 
 @cli.command()
-def clean():
-    cache_provider = cache.ArtifactCache()
-    fs.rmtree(cache_provider.root)
+@click.argument("task", type=str, nargs=-1, required=False)
+def clean(task):
+    acache = cache.ArtifactCache()
+    if task:
+        dag = graph.GraphBuilder().build(task)
+        tasks = dag.select(lambda graph, node: node.name in task)
+        for task in tasks:
+            acache.discard(task)
+    else:
+        fs.rmtree(acache.root)
 
 
 @cli.command()
@@ -184,6 +191,6 @@ def main():
         log.error(str(e))
         sys.exit(1)
 
-        
+
 if __name__ == "__main__":
     main()
