@@ -27,7 +27,7 @@ class GitInfluenceProvider(HashInfluenceProvider):
     @utils.cached.instance
     def _get_diff(self, task):
         with task.tools.cwd(self._get_path(task)):
-            return self.tools.run("git diff HEAD", output_on_error=True)
+            return task.tools.run("git diff HEAD", output_on_error=True)
         return ""
 
     @utils.cached.instance
@@ -121,7 +121,7 @@ class Git(Resource, GitInfluenceProvider):
             if not self.sha.is_unset():
                 return self._get_tree_hash(self, self.sha.get_value())
         return super(Git, self).get_influence(task)
-                
+
 TaskRegistry.get().add_task_class(Git)
 
 
