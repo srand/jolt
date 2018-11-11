@@ -59,13 +59,15 @@ class Artifactory(cache.StorageProvider):
             return False
         with self._cache.get_artifact(node) as artifact:
             url = self._get_url(node, artifact)
-            response = requests.get(url, stream=True)
-            with open(artifact.get_archive_path(), 'wb') as out_file:
-                node.info("Download started")
-                shutil.copyfileobj(response.raw, out_file)
+            node.info("Download started")
+            try:
+                node.tools.download(url, artifact.get_archive_path())
+            except:
+                node.info("Download failed")
+                return False
+            else:
                 node.info("Download completed")
-                log.hysterical("[ARTIFACTORY] Download {} => {}", url, response.status_code)
-            return response.status_code == 200
+            return True
         return False
 
     def upload(self, node, force=False):

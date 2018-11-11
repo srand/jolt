@@ -8,6 +8,7 @@ import networkx as nx
 from networkx.drawing.nx_agraph import write_dot
 import log
 import utils
+import traceback
 
 
 class TaskProxy(object):
@@ -147,8 +148,7 @@ class TaskProxy(object):
 
     def failed(self):
         self.error("Execution failed after {}", self.duration)
-        import traceback
-        traceback.print_exc()
+        log.verbose(traceback.format_exc())
 
     def finished(self):
         assert not self._completed, "task has already been completed"

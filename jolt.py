@@ -115,10 +115,10 @@ def list(task=None, reverse=False, all=False):
         print(task.qualified_name)
 
 
-@cli.command()
+@cli.command(name="log")
 @click.option("-f", "--follow", is_flag=True, help="Display log output as it appears")
 @click.option("-D", "--delete", is_flag=True, help="Delete the log file")
-def log(follow, delete):
+def _log(follow, delete):
     if follow:
         subprocess.call("tail -f {}".format(log_path), shell=True)
     elif delete:

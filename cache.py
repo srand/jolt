@@ -12,6 +12,9 @@ import config
 import time
 
 
+DEFAULT_ARCHIVE_TYPE = ".tar.gz"
+
+
 class StorageProvider(object):
     def download(self, node, force=False):
         return False
@@ -313,10 +316,13 @@ class Artifact(object):
     def compress(self):
         assert not self._temp, "artifact is not published, can't compress"
         if not self.get_archive():
-            self._archive = fs.make_archive(self._path, self._path, remove=False)
+            self._archive = self.tools.archive(
+                self._path, self._path + DEFAULT_ARCHIVE_TYPE)
 
     def decompress(self):
-        fs.extract_archive(self._path, self._path, remove=True)
+        archive = self._path + DEFAULT_ARCHIVE_TYPE
+        self.tools.extract(archive, self._path)
+        self.tools.unlink(archive)
         self._read_manifest()
 
     def get_archive(self):

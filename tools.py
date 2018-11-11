@@ -5,6 +5,11 @@ import log
 import threading
 import utils
 import glob
+import multiprocessing
+import shutil
+import requests
+import tarfile
+import zipfile
 from contextlib import contextmanager
 
 
@@ -196,10 +201,36 @@ class Tools(object):
             fs.rmtree(dir)
         return False
 
-    def expand(self, string, *args, **kwargs):
-        return self._task._get_expansion(string, *args, **kwargs) \
-            if self._task is not None \
-            else utils.expand_macros(string, *args, **kwargs)
+    def archive(self, filepath, filename):
+        filename = self.expand(filename)
+        filepath = self.expand(filepath)
+        filename = fs.path.join(self.getcwd(), filename)
+        filepath = fs.path.join(self.getcwd(), filepath)
+        fmt = None
+        if filename.endswith(".zip"):
+            fmt = "zip"
+            basename = filename[:-4]
+        elif filename.endswith(".tar"):
+            fmt = "tar"
+            basename = filename[:-4]
+        elif filename.endswith(".tar.gz"):
+            fmt = "gztar"
+            basename = filename[:-7]
+        elif filename.endswith(".tgz"):
+            fmt = "gztar"
+            basename = filename[:-4]
+        elif filename.endswith(".tar.bz2"):
+            fmt = "bztar"
+            basename = filename[:-8]
+        elif filename.endswith(".tar.xz"):
+            fmt = "xztar"
+            basename = filename[:-8]
+        assert fmt, "unknown filetype '{}': {}".format(ext, fs.path.basename(filename))
+        try:
+            shutil.make_archive(basename, fmt, root_dir=filepath)
+            return filename
+        except Exception as e:
+            assert False, "failed to archive directory: {}".format(filepath)
 
     def autotools(self, deps=None):
         return _AutoTools(deps, self)
@@ -219,6 +250,9 @@ class Tools(object):
             fs.path.join(self.getcwd(), src),
             fs.path.join(self.getcwd(), dest))
 
+    def cpu_count(self):
+        return multiprocessing.cpu_count()
+
     @contextmanager
     def cwd(self, path, *args, **kwargs):
         path = self.expand(path, *args, **kwargs)
@@ -232,6 +266,18 @@ class Tools(object):
         finally:
             self._cwd = prev
 
+    def download(self, url, filename):
+        url = self.expand(url)
+        filename = self.expand(filename)
+        filepath = fs.path.join(self.getcwd(), filename)
+        response = requests.get(url, stream=True)
+        try:
+            with open(filepath, 'wb') as out_file:
+                shutil.copyfileobj(response.raw, out_file)
+        except:
+            return False
+        return response.status_code == 200
+
     @contextmanager
     def environ(self, **kwargs):
         for key, value in kwargs.iteritems():
@@ -244,6 +290,38 @@ class Tools(object):
             if key not in restore:
                 del self._env[key]
         self._env.update(restore)
+
+    def expand(self, string, *args, **kwargs):
+        return self._task._get_expansion(string, *args, **kwargs) \
+            if self._task is not None \
+            else utils.expand_macros(string, *args, **kwargs)
+
+    def extract(self, filename, filepath):
+        filename = self.expand(filename)
+        filepath = self.expand(filepath)
+        filename = fs.path.join(self.getcwd(), filename)
+        filepath = fs.path.join(self.getcwd(), filepath)
+        try:
+            fs.makedirs(filepath)
+            if filename.endswith(".zip"):
+                with zipfile.ZipFile(filename, 'r') as zip:
+                    zip.extractall(filepath)
+            elif filename.endswith(".tar"):
+                with tarfile.open(filename, 'r') as tar:
+                    tar.extractall(filepath)
+            elif filename.endswith(".tar.gz") or filename.endswith(".tgz"):
+                with tarfile.open(filename, 'r:gz') as tar:
+                    tar.extractall(filepath)
+            elif filename.endswith(".tar.bz2"):
+                with tarfile.open(filename, 'r:bz2') as tar:
+                    tar.extractall(filepath)
+            elif filename.endswith(".tar.xz"):
+                with tarfile.open(filename, 'r:xz') as tar:
+                    tar.extractall(filepath)
+            else:
+                assert False, "unknown filetype: {}".format(fs.path.basename(filename))
+        except Exception as e:
+            assert False, "failed to extract archive: {}".format(filename)
 
     def getcwd(self):
         return fs.path.normpath(self._cwd)
