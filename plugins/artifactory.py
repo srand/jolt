@@ -53,21 +53,14 @@ class Artifactory(cache.StorageProvider):
             repository=self._repository,
             name=node.name,
             file=fs.path.basename(artifact.get_archive_path()))
-        
+
     def download(self, node, force=False):
         if not self._download and not force:
             return False
         with self._cache.get_artifact(node) as artifact:
             url = self._get_url(node, artifact)
-            node.info("Download started")
-            try:
-                node.tools.download(url, artifact.get_archive_path())
-            except:
-                node.info("Download failed")
-                return False
-            else:
-                node.info("Download completed")
-            return True
+            if node.tools.download(url, artifact.get_archive_path()):
+                return True
         return False
 
     def upload(self, node, force=False):
@@ -75,19 +68,16 @@ class Artifactory(cache.StorageProvider):
             return True
         with self._cache.get_artifact(node) as artifact:
             url = self._get_url(node, artifact)
-            with open(artifact.get_archive(), 'rb') as archive:
-                node.info("Upload started")
-                response = requests.put(url, data=archive, auth=self._get_auth())
-                node.info("Upload completed")
-                log.hysterical("[ARTIFACTORY] Upload {} => {}", url, response.status_code)
-                return response.status_code == 201
+            archive = artifact.get_archive()
+            return node.tools.upload(archive, url, auth=self._get_auth())
         return False
 
     def location(self, node):
         with self._cache.get_artifact(node) as artifact:
             url = self._get_url(node, artifact)
             response = requests.head(url, stream=True)
-            log.hysterical("[ARTIFACTORY] Head {} => {}", url, response.status_code)
+            log.hysterical("[ARTIFACTORY] Head: {}", url)
+            log.hysterical("[ARTIFACTORY] Response: {}", response.status_code)
             return url if response.status_code == 200 else ''
         return False
 
@@ -98,4 +88,3 @@ class ArtifactoryFactory(cache.StorageProviderFactory):
     def create(cache):
         log.verbose("Artifactory loaded")
         return Artifactory(cache)
-

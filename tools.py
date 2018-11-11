@@ -66,7 +66,7 @@ def _run(cmd, cwd, env, *args, **kwargs):
     return "\n".join(stdout.buffer)
 
 
-def replace_in_file(path, search, replace):
+def _replace_in_file(path, search, replace):
     try:
         with open(path) as f:
             data = f.read()
@@ -270,13 +270,19 @@ class Tools(object):
         url = self.expand(url)
         filename = self.expand(filename)
         filepath = fs.path.join(self.getcwd(), filename)
-        response = requests.get(url, stream=True)
         try:
-            with open(filepath, 'wb') as out_file:
-                shutil.copyfileobj(response.raw, out_file)
+            response = requests.get(url, stream=True)
+            name = fs.path.basename(filename)
+            size = int(response.headers['content-length'])/1024
+            with log.progress("Downloading {}".format(name), size, "B") as pbar:
+                with open(filepath, 'wb') as out_file:
+                    chunk_size = 4096
+                    for data in response.iter_content(chunk_size=chunk_size):
+                        out_file.write(data)
+                        pbar.update(len(data))
+            return response.status_code == 200
         except:
             return False
-        return response.status_code == 200
 
     @contextmanager
     def environ(self, **kwargs):
@@ -323,6 +329,16 @@ class Tools(object):
         except Exception as e:
             assert False, "failed to extract archive: {}".format(filename)
 
+    def file_size(self, filepath):
+        filepath = self.expand(filepath)
+        filepath = fs.path.join(self.getcwd(), filepath)
+        try:
+            stat = os.stat(filepath)
+        except:
+            assert False, "file not found: {}".format(filepath)
+        else:
+            return stat.st_size
+
     def getcwd(self):
         return fs.path.normpath(self._cwd)
 
@@ -346,7 +362,7 @@ class Tools(object):
         path = self.expand(path)
         search = self.expand(search)
         replace = self.expand(replace)
-        return replace_in_file(fs.path.join(self._cwd, path), search, replace)
+        return _replace_in_file(fs.path.join(self._cwd, path), search, replace)
 
     def run(self, cmd, *args, **kwargs):
         cmd = self.expand(cmd, *args, **kwargs)
@@ -367,3 +383,21 @@ class Tools(object):
     def unlink(self, path, *args, **kwargs):
         cmd = self.expand(path, *args, **kwargs)
         return fs.unlink(fs.path.join(self._cwd, path))
+
+    def upload(self, filename, url, auth=None):
+        filename = self.expand(filename)
+        filename = fs.path.join(self.getcwd(), filename)
+        try:
+            name = fs.path.basename(filename)
+            size = self.file_size(filename)
+            with log.progress("Uploading " + name, size, "B") as pbar, \
+                 open(filename, 'rb') as fileobj:
+                def read():
+                    data = fileobj.read(4096)
+                    pbar.update(len(data))
+                    return data
+                response = requests.put(url, data=iter(read, ''), auth=auth)
+                return response.status_code == 201
+        except:
+            pass
+        return False

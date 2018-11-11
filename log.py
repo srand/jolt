@@ -2,6 +2,7 @@ from __future__ import print_function
 import sys
 import config
 import filesystem as fs
+import tqdm
 
 
 ERROR = 0
@@ -64,7 +65,12 @@ def stderr(fmt, *args, **kwargs):
     _streamwrite(sys.stderr, line)
     _streamwrite(_file, "[STDERR] " + line)
 
+def progress(desc, count, unit):
+    _streamwrite(_file, "[INFO] " + desc)
+    p = tqdm.tqdm(total=count, unit=unit, unit_scale=True)
+    p.set_description(desc)
+    return p
+
 
 _file.write("================================================================================\n")
 _file.flush()
-
