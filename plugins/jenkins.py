@@ -57,7 +57,7 @@ class JenkinsServer(object):
     def _get_job_template_path(self):
         default = fs.path.join(fs.path.dirname(__file__), "jenkins.job")
         return config.get(NAME, "template", default)
-    
+
     def _load_job_template(self):
         with open(self._get_job_template_path()) as f:
             xml = f.read()
@@ -65,7 +65,7 @@ class JenkinsServer(object):
 
     def _check_job(self):
         template_xml, template_sha = self._load_job_template()
-        self.job_name = "{}-{}".format(config.get(NAME, "job", "Jolt"), template_sha[:6])
+        self.job_name = "{0}-{1}".format(config.get(NAME, "job", "Jolt"), template_sha[:6])
 
         try:
             job_xml = self._server.get_job_config(self.job_name)
@@ -98,7 +98,7 @@ class JenkinsExecutor(scheduler.NetworkExecutor):
 
         task = [self.task.qualified_name]
         task += [t.qualified_name for t in self.task.extensions]
-        
+
         parameters = {
             "joltfile": loader.JoltLoader.get().get_sources(),
             "task": " ".join(task),
@@ -107,13 +107,13 @@ class JenkinsExecutor(scheduler.NetworkExecutor):
         parameters.update(scheduler.ExecutorRegistry.get().get_network_parameters(self.task))
 
         queue_id = self.server.build_job(self.job, parameters)
-        log.verbose("[JENKINS] Queued {}", self.task.qualified_name)
+        log.verbose("[JENKINS] Queued {0}", self.task.qualified_name)
 
         queue_info = self.server.get_queue_item(queue_id)
         while not queue_info.get("executable"):
             queue_info = self.server.get_queue_item(queue_id)
-        
-        log.verbose("[JENKINS] Executing {}", self.task.qualified_name)
+
+        log.verbose("[JENKINS] Executing {0}", self.task.qualified_name)
 
         build_id = queue_info["executable"]["number"]
 
@@ -121,23 +121,23 @@ class JenkinsExecutor(scheduler.NetworkExecutor):
         while build_info["result"] not in ["SUCCESS", "FAILURE"]:
             build_info = self.server.get_build_info(self.job, build_id)
 
-        log.verbose("[JENKINS] Finished {}", self.task.qualified_name)
+        log.verbose("[JENKINS] Finished {0}", self.task.qualified_name)
         assert build_info["result"] == "SUCCESS", \
-            "[JENKINS] {}: {}".format(build_info["result"], self.task.qualified_name)
+            "[JENKINS] {0}: {1}".format(build_info["result"], self.task.qualified_name)
 
         assert self.cache.is_available_remotely(self.task), \
-            "[JENKINS] no artifact produced for {}, check configuration"\
+            "[JENKINS] no artifact produced for {0}, check configuration"\
             .format(self.task.qualified_name)
 
         assert self.cache.download(self.task), \
-            "[JENKINS] failed to download artifact for {}"\
+            "[JENKINS] failed to download artifact for {0}"\
             .format(self.task.qualified_name)
 
         for extension in self.task.extensions:
             assert self.cache.download(extension), \
-                "[JENKINS] failed to download artifact for {}"\
+                "[JENKINS] failed to download artifact for {0}"\
                 .format(extension.qualified_name)
-        
+
         return self.task
 
 

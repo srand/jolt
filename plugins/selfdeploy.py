@@ -26,7 +26,7 @@ class Jolt(Task):
             artifact.collect('*/*.py')
             artifact.collect('*/*.job')
             artifact.collect('*/*/*.py')
-        
+
 
 class SelfDeployExtension(NetworkExecutorExtension):
     @utils.cached.instance
@@ -41,9 +41,9 @@ class SelfDeployExtension(NetworkExecutorExtension):
                 task.info("Execution started")
                 executor = LocalExecutor(factory, acache, task, force_upload=True)
                 executor.run()
-                task.info("Execution finished after {}", duration)
+                task.info("Execution finished after {0}", duration)
             except:
-                task.error("Execution failed after {}", duration)
+                task.error("Execution failed after {1}", duration)
                 raise
         jolt_url = acache.location(task)
         assert jolt_url, "failed to selfdeploy jolt to remote cache"

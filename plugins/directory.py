@@ -18,12 +18,12 @@ class DirectoryInfluenceProvider(HashInfluenceProvider):
             with tools.Tools(task, task.joltdir):
                 path = task._get_expansion(self.path)
                 with tools.cwd(path):
-                    return tools.run("find -type f -name '{}' | LC_ALL=C sort | xargs -n1 md5sum"
+                    return tools.run("find -type f -name '{0}' | LC_ALL=C sort | xargs -n1 md5sum"
                                      .format(self.pattern),
                                      output=False, output_on_error=True)
         except KeyError as e:
             pass
-        assert False, "failed to change directory to {}".format(self.path)
+        assert False, "failed to change directory to {0}".format(self.path)
 
 
 def global_influence(path, pattern=None, cls=DirectoryInfluenceProvider):

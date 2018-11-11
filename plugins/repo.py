@@ -66,7 +66,7 @@ class RepoProject(SubElement):
             result = self.tools.run(
                 "git ls-remote {0}{1}",
                 remote,
-                " {}".format(pattern) if pattern else "",
+                " {0}".format(pattern) if pattern else "",
                 output_on_error=True)
             if not result:
                 return None
@@ -123,7 +123,7 @@ class RepoManifest(ElementTree):
     def assert_clean(self):
         for project in self.projects:
             assert not project.get_diff(), \
-                "repo project '{}' has local changes"\
+                "repo project '{0}' has local changes"\
                 .format(project.path_or_name)
 
     def lock_revisions(self):
@@ -133,7 +133,7 @@ class RepoManifest(ElementTree):
                 remote_ref = project.get_remote_ref(
                     head, self.get_remote(project))
                 assert remote_ref, \
-                    "repo project '{}' has unpublished commits"\
+                    "repo project '{0}' has unpublished commits"\
                     .format(project.path_or_name)
                 head = remote_ref
             project.revision = head
@@ -170,7 +170,7 @@ class RepoInfluenceProvider(HashInfluenceProvider):
 
         except KeyError as e:
             pass
-        assert False, "failed to calculate hash influence for repo manifest at {}".format(self.path)
+        assert False, "failed to calculate hash influence for repo manifest at {0}".format(self.path)
 
     def get_manifest(self, task):
         manifest_path = fs.path.join(task.joltdir, task._get_expansion(self.path))

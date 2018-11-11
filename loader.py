@@ -12,7 +12,7 @@ import os
 @utils.Singleton
 class JoltLoader(object):
     filename = "*.jolt"
-    
+
     def __init__(self):
         self._tasks = []
         self._tests = []
@@ -27,8 +27,8 @@ class JoltLoader(object):
 
         with open(path) as f:
             self._source.append(f.read())
-        
-        module = imp.load_source("joltfile_{}".format(name), path)
+
+        module = imp.load_source("joltfile_{0}".format(name), path)
         for name in module.__dict__:
             obj = module.__dict__[name]
             if inspect.isclass(obj):
@@ -46,8 +46,8 @@ class JoltLoader(object):
             test.joltdir = directory
         self._tests += tests
 
-        log.verbose("Loaded: {}", path)
-        
+        log.verbose("Loaded: {0}", path)
+
         return tasks
 
     def load(self, recursive=False):

@@ -35,7 +35,7 @@ class GitInfluenceProvider(HashInfluenceProvider):
         return utils.sha1(self._get_diff(task))
 
     def get_influence(self, task):
-        return "{}:{}:{}".format(
+        return "{0}:{1}:{2}".format(
             self._get_path(task),
             self._get_tree_hash(task),
             self._get_diff_hash(task))
@@ -85,12 +85,12 @@ class Git(Resource, GitInfluenceProvider):
 
     def _clone(self):
         assert not fs.path.exists(self._get_name()), \
-            "destination folder '{}' already exists but is not a git repo"\
+            "destination folder '{0}' already exists but is not a git repo"\
             .format(self._get_name())
         depth = "--depth 1" if self.sha.is_unset() else ""
         self.tools.run("git clone {0} {1}", depth, self.url, output_on_error=True)
         assert fs.path.exists(self._get_git_folder()),\
-            "failed to clone git repo '{}'".format(self._get_name())
+            "failed to clone git repo '{0}'".format(self._get_name())
 
     @utils.cached.instance
     def _is_synced(self):
@@ -105,10 +105,10 @@ class Git(Resource, GitInfluenceProvider):
     def acquire(self, artifact, env, tools):
         if not self.sha.is_unset():
             assert self._is_synced(),\
-                "explicit sha requested but git repo '{}' has local commits"\
+                "explicit sha requested but git repo '{0}' has local commits"\
                 .format(self._get_name())
             assert not self._get_diff(self), \
-                "explicit sha requested but git repo '{}' has local changes"\
+                "explicit sha requested but git repo '{0}' has local changes"\
                 .format(self._get_name())
             # Should be safe to do this now
             with self.tools.cwd(self._get_name()):
@@ -134,11 +134,11 @@ class GitNetworkExecutorExtension(NetworkExecutorExtension):
                 task = child.task
                 if task._is_cloned() and task.sha.is_unset():
                     assert task._is_synced(),\
-                        "local commit found in git repo '{}'; "\
+                        "local commit found in git repo '{0}'; "\
                         "push before building remotely"\
                         .format(task._get_name())
                     assert not task._get_diff(task),\
-                        "local changes found in git repo '{}'; "\
+                        "local changes found in git repo '{0}'; "\
                         "commit and push before building remotely"\
                         .format(task._get_name())
         return {}

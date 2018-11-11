@@ -1,5 +1,5 @@
 import hashlib
-import utils   
+import utils
 import inspect
 from cache import *
 from copy import copy
@@ -28,13 +28,13 @@ class Parameter(object):
 
     def is_unset(self):
         return self._value is None
-    
+
     def get_value(self):
         return self._value
 
     def set_value(self, value):
         assert self._accepted_values is None or value in self._accepted_values, \
-            "illegal value '{}' assigned to parameter"\
+            "illegal value '{0}' assigned to parameter"\
             .format(value)
         self._value = value
 
@@ -46,7 +46,7 @@ class TaskRegistry(object):
         self.tasks = {}
         self.tests = {}
         self.instances = {}
-    
+
     @staticmethod
     def get():
         if not TaskRegistry._instance:
@@ -70,7 +70,7 @@ class TaskRegistry(object):
 
     def get_test_classes(self):
         return self.tests.values()
-    
+
     def get_task(self, name, extra_params=None):
         name, params = utils.parse_task_name(name)
         params.update(extra_params or {})
@@ -92,7 +92,7 @@ class TaskRegistry(object):
             self.instances[full_name] = task
             return task
 
-        assert task, "no such task: {}".format(full_name)
+        assert task, "no such task: {0}".format(full_name)
 
     def _create_parents(self, name):
         names = name.split("/")
@@ -107,8 +107,8 @@ class TaskRegistry(object):
             if prev:
                 task.requires += [prev.name]
             prev = task
-        
-    
+
+
 
 class TaskBase(object):
     def __init__(self, *args, **kwargs):
@@ -127,7 +127,7 @@ class TaskBase(object):
             if isinstance(param, Parameter):
                 param.set_value(value)
                 continue
-            assert False, "no such parameter for task {}: {}".format(self.name, key)
+            assert False, "no such parameter for task {0}: {1}".format(self.name, key)
 
     def _get_parameters(self, unset=False):
         return {key: getattr(self, key).get_value()
@@ -147,7 +147,7 @@ class Task(TaskBase):
     requires = []
     extends = ""
     influence = []
-        
+
     def __init__(self, parameters=None):
         super(Task, self).__init__()
         self.tools = Tools(self, self.joltdir)
@@ -156,7 +156,7 @@ class Task(TaskBase):
         self.influence = utils.as_list(self.__class__.influence)
         self.requires = utils.as_list(utils.call_or_return(self, self.__class__.requires))
         self.extends = utils.as_list(utils.call_or_return(self, self.__class__.extends))
-        assert len(self.extends) == 1, "{} extends multiple tasks, only one allowed".format(self.name)
+        assert len(self.extends) == 1, "{0} extends multiple tasks, only one allowed".format(self.name)
         self.extends = self.extends[0]
         self.name = self.__class__.name
 
@@ -177,23 +177,23 @@ class Task(TaskBase):
         try:
             return [self._get_expansion(req) for req in self.requires]
         except KeyError as e:
-            assert False, "invalid macro expansion used in task {}: {} - "\
+            assert False, "invalid macro expansion used in task {0}: {1} - "\
                 "forgot to set the parameter?".format(self.name, e)
 
     def _get_extends(self):
         try:
             return self._get_expansion(self.extends)
         except KeyError as e:
-            assert False, "invalid macro expansion used in task {}: {} - "\
+            assert False, "invalid macro expansion used in task {0}: {1} - "\
                 "forgot to set the parameter?".format(self.name, e)
 
     def _get_expansion(self, string, *args, **kwargs):
         try:
             kwargs.update(**self._get_parameters())
             kwargs.update(**self._get_properties())
-            return utils.expand_macros(string, *args, **kwargs)
+            return utils.expand(string, *args, **kwargs)
         except KeyError as e:
-            assert False, "invalid macro expansion used in task {}: {} - "\
+            assert False, "invalid macro expansion used in task {0}: {1} - "\
                 "forgot to set the parameter?".format(self.name, e)
 
     def is_cacheable(self):
@@ -212,29 +212,29 @@ class Task(TaskBase):
         log.error(fmt, *args, **kwargs)
 
     def run(self, deps, tools):
-        """ 
-        Performs the work of the task. 
+        """
+        Performs the work of the task.
 
         Dependencies specified with "requires" are passed as the
-        deps dictionary. The tools argument provides a set of low 
+        deps dictionary. The tools argument provides a set of low
         level tool functions that may be useful.
 
         with tools.cwd("path/to/subdir"):
             tools.run("make {target}")
-        
-        When using methods from the toolbox, task parameters, such 
+
+        When using methods from the toolbox, task parameters, such
         as 'target' above,  are automatically expanded to their values.
         """
         pass
 
     def publish(self, artifact, tools):
-        """ 
-        Publishes files produced by run(). 
+        """
+        Publishes files produced by run().
 
-        Files can be collected in to the artifact by calling 
+        Files can be collected in to the artifact by calling
         artifact.collect().
 
-        Additional metadata can be provided, such as environment 
+        Additional metadata can be provided, such as environment
         variables that should be set whenever the task artifact is
         consumed. Example:
 
@@ -247,12 +247,12 @@ class Task(TaskBase):
         pass
 
     def unpack(self, artifact, tools):
-        """ 
+        """
         Unpacks files published by publish() .
 
         The intention of this hook is to make necessary adjustments
         to artifact files and directories once they have been downloaded
-        into the local cache on a different machine. For example, 
+        into the local cache on a different machine. For example,
         paths may have to be adjusted or an installer executed.
 
         This hook is executed in the context of a consuming task.
@@ -343,7 +343,7 @@ class Test(ut.TestCase, TaskBase):
         self.influence = utils.as_list(self.__class__.influence)
         self.requires = utils.as_list(utils.call_or_return(self, self.__class__.requires))
         self.extends = utils.as_list(utils.call_or_return(self, self.__class__.extends))
-        assert len(self.extends) == 1, "{} extends multiple tasks, only one allowed".format(self.name)
+        assert len(self.extends) == 1, "{0} extends multiple tasks, only one allowed".format(self.name)
         self.extends = self.extends[0]
         self.name = self.__class__.name
         self._create_parameters()

@@ -6,11 +6,11 @@ import unittest
 
 
 class Sdk(Task):
-    """ 
+    """
     Builds the default Poky SDK.
 
     Clone the Poky repository and source the oe-environment script
-    before attempting to run these tasks. 
+    before attempting to run these tasks.
     """
 
     def run(self, deps, tools):
@@ -31,7 +31,8 @@ class Sdk(Task):
             scripts = tools.glob("environment-setup-*")
             assert scripts and len(scripts) == 1, "didn't find the environment script"
             env = tools.run(". {0}; python -c 'import os;print(os.environ)'",
-                            fs.path.join(artifact.path, scripts[0]))
+                            fs.path.join(artifact.path, scripts[0]),
+			    output=False)
             env = eval(env)
             artifact.environ.SDKTARGETSYSROOT = env["SDKTARGETSYSROOT"]
             artifact.environ.PKG_CONFIG_SYSROOT_DIR = env["PKG_CONFIG_SYSROOT_DIR"]
@@ -145,7 +146,7 @@ class LibIte(Task):
                 "lib/pkgconfig/libite.pc",
                 artifact.strings.installdir,
                 artifact.path)
-            
+
 
 class Finit(Task):
     requires = "git:url=https://github.com/troglobit/finit.git", "sdk", "libuev", "libite"

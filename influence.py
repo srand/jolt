@@ -15,16 +15,16 @@ class HashInfluenceRegistry(object):
 
     def register(self, provider):
         self._providers.append(provider)
-        
+
     def apply_all(self, task, sha):
         for influence in self.get_strings(task):
             sha.update(influence)
-            log.hysterical("{}: {}", task.name, influence)
+            log.hysterical("{0}: {1}", task.name, influence)
 
     def get_strings(self, task):
         content = []
         for provider in self._providers + task.influence:
-            content.append("Influence-{}: {}".format(provider.name, provider.get_influence(task)))
+            content.append("Influence-{0}: {1}".format(provider.name, provider.get_influence(task)))
         return content
 
 
@@ -45,13 +45,12 @@ class TaskNameInfluence(HashInfluenceProvider):
 class TaskParameterInfluence(HashInfluenceProvider):
     name = "Parameters"
     def get_influence(self, task):
-        return ",".join(["{}={}".format(key, value)
+        return ",".join(["{0}={1}".format(key, value)
                          for key, value in task._get_parameters().iteritems()])
 
-    
+
 @HashInfluenceRegistry.Register
 class TaskSourceInfluence(HashInfluenceProvider):
     name = "Source"
     def get_influence(self, task):
         return task._get_source_hash()
-

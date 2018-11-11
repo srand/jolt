@@ -1,5 +1,5 @@
 from xml.etree import ElementTree as ET
-from xml.etree.ElementTree import Element 
+from xml.etree.ElementTree import Element
 from xml.etree.ElementTree import ElementTree
 from xml.dom import minidom
 
@@ -15,13 +15,13 @@ class Attribute(object):
         self.varname = varname if varname is not None else attribute.lower()
         self.child = child
         self.values = values
-    
+
     def __call__(self, cls):
         def decorate(cls, attribute, varname, child, values):
             def _check_value(value, values):
                 if values and value not in values:
-                    raise ValueError('{} is not one of {}'.format(value, values))
-            
+                    raise ValueError('{0} is not one of {1}'.format(value, values))
+
             def attr_get(self):
                 if attribute not in self.attrib:
                     return ''
@@ -37,21 +37,21 @@ class Attribute(object):
                         return
                 _check_value(value, values)
                 return self.set(attribute, value)
-                
+
             def child_get(self):
                 if not hasattr(self, '_'+varname):
                     return ''
-                return getattr(self, '_'+varname).text        
-    
+                return getattr(self, '_'+varname).text
+
             def child_set(self, value):
                 _check_value(value, values)
                 if not value: return
                 if not hasattr(self, '_'+varname):
                     e = SubElement(attribute)
-                    self.append(e)            
+                    self.append(e)
                     setattr(self, '_'+varname, e)
                 getattr(self,'_'+varname).text = value
-            
+
             if not child:
                 setattr(cls, varname, property(attr_get, attr_set))
             else:
@@ -64,7 +64,7 @@ class Composition(object):
     def __init__(self, cls, name):
         self.cls = cls
         self.name = name if name is not None else attribute.lower()
-    
+
     def __call__(self, cls):
         def decorate(cls, comp_cls, name):
             def create(self, *args, **kwargs):

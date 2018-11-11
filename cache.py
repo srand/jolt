@@ -189,7 +189,7 @@ class Artifact(object):
             fs.rmtree(self._temp)
 
     def __getattr__(self, name):
-        assert False, "no attribute '{}' in artifact for '{}'".format(
+        assert False, "no attribute '{0}' in artifact for '{1}'".format(
             name, self._node.qualified_name)
 
     def _write_manifest(self):
@@ -294,7 +294,7 @@ class Artifact(object):
                        if not flatten else \
                           fs.path.join(dirname, fs.path.basename(src))
                 self.tools.copy(src, dest)
-                log.verbose("Collected {} -> {}", src, dest[len(self._temp):])
+                log.verbose("Collected {0} -> {1}", src, dest[len(self._temp):])
 
     def copy(self, pattern, dest, flatten=False):
         assert not self._temp, "artifact is not published"
@@ -311,7 +311,7 @@ class Artifact(object):
                            if not flatten else \
                               fs.path.join(dest, fs.path.basename(src))
                 self.tools.copy(fs.path.join(self._path, src), destfile)
-                log.verbose("Copied {} -> {}", src, destfile)
+                log.verbose("Copied {0} -> {1}", src, destfile)
 
     def compress(self):
         assert not self._temp, "artifact is not published, can't compress"
@@ -371,7 +371,7 @@ class Context(object):
 
     def __getitem__(self, key):
         key = self._node.task._get_expansion(key)
-        assert key in self._artifacts, "no such dependency: {}".format(key)
+        assert key in self._artifacts, "no such dependency: {0}".format(key)
         return self._artifacts[key]
 
     def iteritems(self):
@@ -387,7 +387,7 @@ class CacheStats(object):
         except:
             self.stats = {}
         self.active = set()
-        log.verbose("Cache size is {} bytes".format(self.get_size()))
+        log.verbose("Cache size is {0} bytes", self.get_size())
 
     def load(self):
         with open(self.path) as f:
@@ -508,7 +508,6 @@ class ArtifactCache(StorageProvider):
             return True
         if not node.task.is_cacheable():
             return True
-        assert not self.is_available_locally(node), "can't download task, exists in the local cache"
         if self.is_available_locally(node):
             node.info("Download skipped, already in local cache")
             return True

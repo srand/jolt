@@ -44,7 +44,7 @@ class TaskProxy(object):
 
     @property
     def log_name(self):
-        return "({} {})".format(self.qualified_name, self.identity[:8])
+        return "({0} {1})".format(self.qualified_name, self.identity[:8])
 
     @property
     @cached.instance
@@ -63,7 +63,7 @@ class TaskProxy(object):
         return sha.hexdigest()
 
     def __str__(self):
-        return "{}{}".format(self.qualified_name, "*" if self.is_extension() else '')
+        return "{0}{1}".format(self.qualified_name, "*" if self.is_extension() else '')
 
     def info(self, fmt, *args, **kwargs):
         self.task.info(fmt + " " + self.log_name, *args, **kwargs)
@@ -125,8 +125,9 @@ class TaskProxy(object):
         for extension in self.extensions:
             if not cache.is_available(extension, network):
                 return False
-        return cache.is_available(self, network)
-    
+        return cache.is_available(self, network) or \
+            (self.graph.is_orphan(self) and isinstance(self.task, Resource))
+
     def set_in_progress(self):
         self._in_progress = True
 
@@ -147,7 +148,7 @@ class TaskProxy(object):
         self.duration = utils.duration()
 
     def failed(self):
-        self.error("Execution failed after {}", self.duration)
+        self.error("Execution failed after {0}", self.duration)
         log.verbose(traceback.format_exc())
 
     def finished(self):
@@ -157,7 +158,7 @@ class TaskProxy(object):
             self.graph.remove_node(self)
         except:
             self.warn("Pruned task was executed")
-        self.info("Execution finished after {}", self.duration)
+        self.info("Execution finished after {0}", self.duration)
 
     def run(self, cache, force_upload=False, force_build=False):
         with self.tools:
@@ -179,7 +180,7 @@ class TaskProxy(object):
                     artifact.commit()
 
                 assert cache.upload(self, force=force_upload), \
-                    "Failed to upload artifact for {}".format(self.name)
+                    "Failed to upload artifact for {0}".format(self.name)
 
                 for extension in self.extensions:
                     try:
@@ -197,20 +198,25 @@ class Graph(nx.DiGraph):
         super(Graph, self).__init__()
 
     def prune(self, func):
-        for node in [n for n in self.nodes]:
-            log.hysterical("[GRAPH] Checking {} ({})", node.name, node.identity)
+        for node in nx.topological_sort(self):
             if func(self, node):
-                log.hysterical("[GRAPH] Pruned {}", node.name)
+                log.hysterical("[GRAPH] Pruned {0} ({1})", node.name, node.identity)
                 self.remove_node(node)
+
+        for node in self.nodes:
+            log.hysterical("[GRAPH] Keeping {0} ({1})", node.qualified_name, node.identity)
 
     def select(self, func):
         return [n for n in self.nodes if func(self, n)]
 
     def is_leaf(self, node):
         return self.out_degree(node) == 0
-    
+
     def is_root(self, node):
         return self.in_degree(node) == 0
+
+    def is_orphan(self, node):
+        return self.is_root(node) and self.is_leaf(node)
 
     def are_neighbors(self, n1, n2):
         return n2 in self[n1]
@@ -229,7 +235,7 @@ class GraphBuilder(object):
             node = self._build_node(TaskProxy(task, self.graph))
             self.nodes[name] = node
         return node
-        
+
     def _build_node(self, node):
         self.graph.add_node(node)
 

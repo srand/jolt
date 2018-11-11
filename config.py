@@ -13,7 +13,7 @@ if not _file.has_section("jolt"):
 def get(section, key, default=None, expand=True):
     try:
         value = _file.get(section, key)
-        return utils.expand_macros(value) if expand else value
+        return utils.expand(value) if expand else value
     except NoOptionError:
         return default
 
@@ -32,11 +32,11 @@ def getsize(section, key, default=None):
         if len(value) == 1 and value[0][-1] in units:
             size, unit = value[0][:-1], value[0][-1]
         else:
-            assert len(value) == 2, "invalid size format for {}.{}, "\
+            assert len(value) == 2, "invalid size format for {0}.{1}, "\
                 "expected '<size> <unit>'"\
                 .format(section, key)
             size, unit = value[0], value[1]
-        assert unit in units, "invalid unit requested for {}.{}"\
+        assert unit in units, "invalid unit requested for {0}.{1}"\
             .format(section, key)
         return int(size)*units[unit]
     except NoOptionError:
@@ -61,7 +61,7 @@ def set(section, key, value):
 
 def load(file):
     _file.read(file)
-    
+
 def save():
     fs.makedirs(fs.path.dirname(location))
     with open(location, 'wb') as configfile:

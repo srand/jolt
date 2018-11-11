@@ -26,6 +26,8 @@ import subprocess
 @click.option("-vv", "--extra-verbose", is_flag=True, help="Verbose.")
 @click.option("-c", "--config-file", type=str, help="Configuration file")
 def cli(verbose, extra_verbose, config_file):
+    """ Jolt - a task execution tool. """
+
     if verbose:
         log.set_level(log.VERBOSE)
     if extra_verbose:
@@ -51,7 +53,22 @@ def cli(verbose, extra_verbose, config_file):
 @click.argument("task", type=str, nargs=-1, required=True)
 @click.option("-n", "--network", is_flag=True, default=False, help="Build on network.")
 @click.option("-i", "--identity", type=str, help="Expected hash identity")
-def build(task, network, identity):
+@click.option("--no-download", is_flag=True, default=False,
+              help="Don't download artifacts from remote storage")
+@click.option("--no-upload", is_flag=True, default=False,
+              help="Don't upload artifacts to remote storage")
+def build(task, network, identity, no_download, no_upload):
+    """
+    Execute specified task.
+
+    <WIP>
+    """
+
+    if no_download:
+        config.set("jolt", "download", "false")
+    if no_upload:
+        config.set("jolt", "upload", "false")
+
     executor = scheduler.ExecutorRegistry.get(network=network)
     acache = cache.ArtifactCache()
     gb = graph.GraphBuilder()
@@ -60,7 +77,7 @@ def build(task, network, identity):
 
     if identity:
         root = dag.select(lambda graph, task: task.identity.startswith(identity))
-        assert len(root) >= 1, "unknown hash identity, no such task: {}".format(identity)
+        assert len(root) >= 1, "unknown hash identity, no such task: {0}".format(identity)
 
     queue = scheduler.TaskQueue(executor)
     while dag.nodes:
@@ -81,6 +98,11 @@ def build(task, network, identity):
 @cli.command()
 @click.argument("task", type=str, nargs=-1, required=False)
 def clean(task):
+    """
+    Remove (task artifact from) local cache.
+
+    <WIP>
+    """
     acache = cache.ArtifactCache()
     if task:
         dag = graph.GraphBuilder().build(task)
@@ -92,17 +114,34 @@ def clean(task):
 
 
 @cli.command()
-@click.argument("task")
-def display(task):
+@click.argument("task", type=str, nargs=-1, required=False)
+@click.option("-p", "--prune", is_flag=True, help="Omit tasks with cached artifacts.")
+def display(task, prune):
+    """
+    Display a task and its dependencies visually.
+
+    <WIP>
+    """
     gb = graph.GraphBuilder()
-    gb.build([task])
-    gb.display()
+    dag = gb.build(task)
+    if prune:
+        acache = cache.ArtifactCache()
+        dag.prune(lambda graph, task: task.is_cached(acache, network=False))
+    if len(dag.nodes) > 0:
+        gb.display()
+    else:
+        log.info("No tasks to display")
 
 
 @cli.command()
-@click.argument("task", required=False)
+@click.argument("task", type=str, nargs=-1, required=False)
 @click.option("-a", "--all", is_flag=True, help="Print all tasks recursively")
 def list(task=None, reverse=False, all=False):
+    """
+    List all tasks, or dependencies of a specific task.
+
+    <WIP>
+    """
     result = []
 
     if not task:
@@ -113,7 +152,7 @@ def list(task=None, reverse=False, all=False):
 
     task_registry = TaskRegistry.get()
     dag = graph.GraphBuilder().build(task)
-    tasks = dag.select(lambda graph, node: node.name == task)
+    tasks = dag.select(lambda graph, node: node.qualified_name in task)
     successors = set()
     for task in tasks:
         map(successors.add, dag.successors(task))
@@ -126,40 +165,50 @@ def list(task=None, reverse=False, all=False):
 @click.option("-f", "--follow", is_flag=True, help="Display log output as it appears")
 @click.option("-D", "--delete", is_flag=True, help="Delete the log file")
 def _log(follow, delete):
+    """
+    Access the Jolt log file.
+
+    <WIP>
+    """
     if follow:
-        subprocess.call("tail -f {}".format(log_path), shell=True)
+        subprocess.call("tail -f {0}".format(log_path), shell=True)
     elif delete:
         fs.unlink(log_path)
     else:
-        subprocess.call("less {}".format(log_path), shell=True)
+        subprocess.call("less {0}".format(log_path), shell=True)
 
 
 @cli.command()
 @click.argument("task")
 @click.option("-i", "--influence", is_flag=True, help="Print task influence.")
 def info(task, influence=False):
+    """
+    View information about a task, including its documentation.
+
+    <WIP>
+    """
     task_registry = TaskRegistry.get()
     task = task_registry.get_task(task)
 
     click.echo()
-    click.echo("  {}".format(task.name))
+    click.echo("  {0}".format(task.name))
     click.echo()
     if task.__doc__:
-        click.echo("  {}".format(task.__doc__.strip()))
+        click.echo("  {0}".format(task.__doc__.strip()))
         click.echo()
     click.echo("  Parameters")
     has_param = False
     for item, param in task.__dict__.iteritems():
         if isinstance(param, Parameter):
             has_param = True
-            click.echo("    {:<15}   {}".format(item, param.__doc__ or ""))
+            click.echo("    {0:<15}   {1}".format(item, param.__doc__ or ""))
     if not has_param:
         click.echo("    None")
 
     click.echo()
     click.echo("  Requirements")
     for req in task.requires:
-        click.echo("    {}".format(req))
+        click.echo("    {0}".format(req))
     if not task.requires:
         click.echo("    None")
     click.echo()
@@ -171,11 +220,11 @@ def info(task, influence=False):
     proxy = tasks[0]
 
     click.echo("  Cache")
-    click.echo("    Identity          {}".format(proxy.identity))
+    click.echo("    Identity          {0}".format(proxy.identity))
     if acache.is_available_locally(proxy):
-        click.echo("    Local             {} ({})".format(
+        click.echo("    Local             {0} ({1})".format(
             True, utils.as_human_size(acache.get_artifact(proxy).get_size())))
-    click.echo("    Remote            {}".format(acache.is_available_remotely(proxy)))
+    click.echo("    Remote            {0}".format(acache.is_available_remotely(proxy)))
     click.echo()
 
     if influence:
@@ -188,6 +237,7 @@ def main():
     try:
         cli()
     except Exception as e:
+        log.verbose(traceback.format_exc())
         log.error(str(e))
         sys.exit(1)
 

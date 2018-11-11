@@ -76,8 +76,8 @@ class Artifactory(cache.StorageProvider):
         with self._cache.get_artifact(node) as artifact:
             url = self._get_url(node, artifact)
             response = requests.head(url, stream=True)
-            log.hysterical("[ARTIFACTORY] Head: {}", url)
-            log.hysterical("[ARTIFACTORY] Response: {}", response.status_code)
+            log.hysterical("[ARTIFACTORY] Head: {0}", url)
+            log.hysterical("[ARTIFACTORY] Response: {0}", response.status_code)
             return url if response.status_code == 200 else ''
         return False
 

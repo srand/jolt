@@ -43,7 +43,7 @@ def _run(cmd, cwd, env, *args, **kwargs):
                         self.output(line)
                     self.buffer.append(line)
             except Exception as e:
-                self.output("{}", str(e))
+                self.output("{0}", str(e))
                 if output:
                     self.output(line)
                 self.buffer.append(line)
@@ -62,7 +62,7 @@ def _run(cmd, cwd, env, *args, **kwargs):
         for line in stderr.buffer:
             log.stderr(line)
 
-    assert p.returncode == 0, "command failed: {}".format(cmd.format(*args, **kwargs))
+    assert p.returncode == 0, "command failed: {0}".format(cmd.format(*args, **kwargs))
     return "\n".join(stdout.buffer)
 
 
@@ -74,7 +74,7 @@ def _replace_in_file(path, search, replace):
         with open(path, "wb") as f:
             f.write(data)
     except:
-        assert False, "failed to replace string in file: {}".format(path)
+        assert False, "failed to replace string in file: {0}".format(path)
 
 
 class _tmpdir(object):
@@ -103,7 +103,7 @@ class _tmpdir(object):
 
 class builddir(object):
     def __init__(self, task, remove=False):
-        self._path = "build/{}".format(task.qualified_name)
+        self._path = "build/{0}".format(task.qualified_name)
         self._remove = remove
 
     def __enter__(self):
@@ -175,7 +175,8 @@ class _AutoTools(object):
 
     def build(self, *args, **kwargs):
         with self.tools.cwd(self.builddir):
-            self.tools.run("make VERBOSE=yes Q= V=1", output=True)
+            self.tools.run("make VERBOSE=yes Q= V=1 -j{0}",
+                           self.tools.cpu_count(), output=True)
 
     def install(self, *args, **kwargs):
         with self.tools.cwd(self.builddir):
@@ -225,12 +226,12 @@ class Tools(object):
         elif filename.endswith(".tar.xz"):
             fmt = "xztar"
             basename = filename[:-8]
-        assert fmt, "unknown filetype '{}': {}".format(ext, fs.path.basename(filename))
+        assert fmt, "unknown filetype '{0}': {1}".format(ext, fs.path.basename(filename))
         try:
             shutil.make_archive(basename, fmt, root_dir=filepath)
             return filename
         except Exception as e:
-            assert False, "failed to archive directory: {}".format(filepath)
+            assert False, "failed to archive directory: {0}".format(filepath)
 
     def autotools(self, deps=None):
         return _AutoTools(deps, self)
@@ -260,7 +261,7 @@ class Tools(object):
         self._cwd = fs.path.join(self._cwd, path)
         try:
             assert fs.path.exists(self._cwd) and fs.path.isdir(self._cwd), \
-                "failed to change directory to {}" \
+                "failed to change directory to {0}" \
                 .format(self._cwd)
             yield self._cwd
         finally:
@@ -274,7 +275,7 @@ class Tools(object):
             response = requests.get(url, stream=True)
             name = fs.path.basename(filename)
             size = int(response.headers['content-length'])/1024
-            with log.progress("Downloading {}".format(name), size, "B") as pbar:
+            with log.progress("Downloading {0}".format(name), size, "B") as pbar:
                 with open(filepath, 'wb') as out_file:
                     chunk_size = 4096
                     for data in response.iter_content(chunk_size=chunk_size):
@@ -300,7 +301,7 @@ class Tools(object):
     def expand(self, string, *args, **kwargs):
         return self._task._get_expansion(string, *args, **kwargs) \
             if self._task is not None \
-            else utils.expand_macros(string, *args, **kwargs)
+            else utils.expand(string, *args, **kwargs)
 
     def extract(self, filename, filepath):
         filename = self.expand(filename)
@@ -325,9 +326,9 @@ class Tools(object):
                 with tarfile.open(filename, 'r:xz') as tar:
                     tar.extractall(filepath)
             else:
-                assert False, "unknown filetype: {}".format(fs.path.basename(filename))
+                assert False, "unknown filetype: {0}".format(fs.path.basename(filename))
         except Exception as e:
-            assert False, "failed to extract archive: {}".format(filename)
+            assert False, "failed to extract archive: {0}".format(filename)
 
     def file_size(self, filepath):
         filepath = self.expand(filepath)
@@ -335,7 +336,7 @@ class Tools(object):
         try:
             stat = os.stat(filepath)
         except:
-            assert False, "file not found: {}".format(filepath)
+            assert False, "file not found: {0}".format(filepath)
         else:
             return stat.st_size
 

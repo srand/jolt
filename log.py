@@ -3,6 +3,7 @@ import sys
 import config
 import filesystem as fs
 import tqdm
+import utils
 
 
 ERROR = 0
@@ -18,7 +19,8 @@ _file = open(path, "a")
 
 def _line(level, fmt, *args, **kwargs):
     levelstr = ["ERROR", "WARNING", "INFO", "VERBOSE", "HYSTERICAL"]
-    return "[{}] ".format(levelstr[level]) + fmt.format(*args, **kwargs)
+    return "[{}] ".format(levelstr[level]) + \
+        utils.expand(fmt, *args, ignore_errors=True, **kwargs)
 
 def _streamwrite(stream, line):
     stream.write(line + "\n")
@@ -51,7 +53,7 @@ def error(fmt, *args, **kwargs):
 
 def stdout(fmt, *args, **kwargs):
     try:
-        line = fmt.format(*args, **kwargs)
+        line = utils.expand(fmt, *args, ignore_errors=True, **kwargs)
     except:
         line = fmt
     _streamwrite(sys.stdout, line)
@@ -59,7 +61,7 @@ def stdout(fmt, *args, **kwargs):
 
 def stderr(fmt, *args, **kwargs):
     try:
-        line = fmt.format(*args, **kwargs)
+        line = utils.expand(fmt, *args, ignore_errors=True, **kwargs)
     except:
         line = fmt
     _streamwrite(sys.stderr, line)

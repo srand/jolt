@@ -17,7 +17,7 @@ def as_stable_string_list(o):
     if type(o) == list or type(o) == tuple:
         return sorted([str(item) for item in o])
     elif type(o) == dict:
-        return sorted(["{}={}".format(key, as_stable_string_list(val))
+        return sorted(["{0}={1}".format(key, as_stable_string_list(val))
                        for key, val in o.itervalues()])
     else:
         return [str(o)]
@@ -33,7 +33,7 @@ def as_human_size(size):
     while size > 1024:
         size /= 1024
         index += 1
-    return "{} {}".format(round(size, ndigits=unit_precision[index][1]), unit_precision[index][0])
+    return "{0} {1}".format(round(size, ndigits=unit_precision[index][1]), unit_precision[index][0])
 
 def call_or_return(obj, t):
     return t(obj) if callable(t) else t
@@ -56,8 +56,8 @@ def format_task_name(name, params):
     if not params:
         return name
     def _param(key, value):
-        return "{}={}".format(key, value) if value else key
-    return "{}:{}".format(name, ",".join([_param(key, value) for key, value in params.iteritems()]))
+        return "{0}={1}".format(key, value) if value else key
+    return "{0}:{1}".format(name, ",".join([_param(key, value) for key, value in params.iteritems()]))
 
 
 class _SafeDict(object):
@@ -69,7 +69,7 @@ class _SafeDict(object):
         if key.startswith("ENV|"):
             return os.environ.get(key[4:])
         return None
-        
+
     def __getitem__(self, key):
         value = self.values.get(key) or self._envget(key)
         if value is not None:
@@ -79,7 +79,7 @@ class _SafeDict(object):
         return "{" + key + "}"
 
 
-def expand_macros(string, *args, **kwargs):
+def expand(string, *args, **kwargs):
     ignore_errors = kwargs.get("ignore_errors") or False
     return Formatter().vformat(str(string), args, _SafeDict(kwargs, ignore_errors))
 
@@ -144,7 +144,7 @@ def run_concurrent(callables, *args, **kwargs):
             except Exception as exc:
                 map(Future.cancel, futures)
     return [future.result() for future in futures]
-                
+
 
 def map_consecutive(method, iterable):
     return map(method, iterable)

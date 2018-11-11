@@ -74,7 +74,7 @@ def extract_archive(file, path, remove=False):
         if remove:
             os.unlink(file)
         return
-    assert False, "unsupported file extension: {}".format(ext)
+    assert False, "unsupported file extension: {0}".format(ext)
 
 
 def get_archive(path):
