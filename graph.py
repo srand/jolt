@@ -149,7 +149,6 @@ class TaskProxy(object):
 
     def failed(self):
         self.error("Execution failed after {0}", self.duration)
-        log.verbose(traceback.format_exc())
 
     def finished(self):
         assert not self._completed, "task has already been completed"

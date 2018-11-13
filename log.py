@@ -4,6 +4,7 @@ import config
 import filesystem as fs
 import tqdm
 import utils
+import traceback
 
 
 ERROR = 0
@@ -50,6 +51,14 @@ def hysterical(fmt, *args, **kwargs):
 
 def error(fmt, *args, **kwargs):
     _log(ERROR, sys.stdout, fmt, *args, **kwargs)
+
+def exception(exc=None):
+    if exc:
+        _streamwrite(sys.stderr, "[ERROR] " + str(exc))
+        _streamwrite(_file, "[ERROR] " + str(exc))
+    backtrace = traceback.format_exc()
+    for line in backtrace.splitlines():
+        _streamwrite(_file, "[ERROR] " + line)
 
 def stdout(fmt, *args, **kwargs):
     try:

@@ -85,14 +85,13 @@ def build(task, network, identity, no_download, no_upload):
         while leafs:
             task = leafs.pop()
             task.set_in_progress()
-            #task.info("Execution requested")
             queue.submit(acache, task)
 
         task, error = queue.wait()
         assert task, "no more tasks in progress, only blocked tasks remain"
         if error is not None:
             queue.abort()
-            raise Exception(error)
+            raise error
 
 
 @cli.command()
@@ -237,8 +236,7 @@ def main():
     try:
         cli()
     except Exception as e:
-        log.verbose(traceback.format_exc())
-        log.error(str(e))
+        log.exception(e)
         sys.exit(1)
 
 

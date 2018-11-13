@@ -11,7 +11,7 @@ class TaskQueue(object):
     def __init__(self, execregistry):
         self.futures = {}
         self.execregistry = execregistry
-    
+
     def submit(self, cache, task):
         executor = self.execregistry.create(cache, task)
         assert executor, "no executor can execute the task; "\
@@ -24,24 +24,22 @@ class TaskQueue(object):
     def wait(self):
         for future in as_completed(self.futures):
             task = self.futures[future]
-            error = None
             try:
                 result = future.result()
-            except AssertionError as e:
-                log.verbose(traceback.format_exc())
-                error = str(e) or ''
-            except Exception as e:
-                error = traceback.format_exc()
-                log.verbose(error)
-            del self.futures[future]
-            return task, error
+            except Exception as error:
+                log.exception()
+                return task, error
+            finally:
+                del self.futures[future]
+            return task, None
         return None, None
 
     def abort(self):
         for future, task in self.futures.iteritems():
             task.info("Execution cancelled")
             future.cancel()
-        log.info("Waiting for tasks to finish")
+        if len(self.futures):
+            log.info("Waiting for tasks to finish")
         self.execregistry.shutdown()
 
     def in_progress(self, task):
@@ -54,7 +52,7 @@ class Executor(object):
 
     def submit(self):
         return self.factory.submit(self)
-        
+
     def run(self, task):
         pass
 
@@ -70,8 +68,10 @@ class LocalExecutor(Executor):
         try:
             self.task.started()
             self.task.run(self.cache, self.force_upload)
-        except:
+        except Exception as e:
             self.task.failed()
+            log.exception()
+            raise e
         else:
             self.task.finished()
         return self.task
@@ -94,7 +94,7 @@ class ExecutorRegistry(object):
     def shutdown(self):
         for factory in self._factories:
             factory.shutdown()
-        
+
     def create(self, cache, task):
         for factory in self._factories:
             if not task.is_cacheable() and factory.is_network():
@@ -123,7 +123,7 @@ class NetworkExecutorExtensionFactory(object):
 
     def create(self):
         raise NotImplemented()
-    
+
 
 class NetworkExecutorExtension(object):
     def get_parameters(self, task):
@@ -141,10 +141,10 @@ class ExecutorFactory(object):
 
     def shutdown(self):
         self.pool.shutdown()
-        
+
     def is_network(self):
         return False
-    
+
     def is_eligable(self, cache, task):
         raise NotImplemented()
 
@@ -154,12 +154,12 @@ class ExecutorFactory(object):
     def submit(self, executor):
         return self.pool.submit(executor.run)
 
-    
-    
+
+
 class LocalExecutorFactory(ExecutorFactory):
     def __init__(self):
         super(LocalExecutorFactory, self).__init__(num_workers=1)
-    
+
     def is_network(self):
         return False
 
@@ -178,4 +178,3 @@ class NetworkExecutorFactory(ExecutorFactory):
 
     def is_eligable(self, cache, task):
         return True
-
