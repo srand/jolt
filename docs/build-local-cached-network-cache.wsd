@@ -1,0 +1,15 @@
+title Local Build - Artifact in Network Cache
+
+User->Jolt: "build example"
+Jolt->Jolt: Build Directed Asyclic Graph
+Jolt->Jolt: Calculate Task Identity
+Jolt->Local Cache: Lookup Task Artifact
+Local Cache->Jolt: Not Found
+Jolt->Network Cache: Lookup Task Artifact
+Network Cache->Jolt: Found
+Jolt->Network Cache: Download Task Artifact
+Network Cache->Jolt: Compressed Archive
+Jolt->Jolt: Extract Archive
+Jolt->Local Cache: Commit Task Artifact
+Local Cache->Jolt: Ok
+Jolt->User: Done

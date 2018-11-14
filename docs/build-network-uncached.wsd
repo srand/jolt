@@ -1,0 +1,40 @@
+title Uncached Network Build
+
+participant User
+participant Jolt
+participant Local Cache
+participant Network Cache
+participant Network Executor
+participant Jolt 2
+participant Local Cache 2
+
+
+User->Jolt: "build example on network"
+Jolt->Jolt: Build Directed Asyclic Graph
+Jolt->Jolt: Calculate Task Identity
+Jolt->Network Cache: Lookup Task Artifact
+Network Cache->Jolt: Not Found
+Jolt->Network Executor: Request Build
+Network Executor->Jolt 2:"build example"
+Jolt 2->Jolt 2: Build Directed Asyclic Graph
+Jolt 2->Jolt 2: Calculate Task Identity
+Jolt 2->Local Cache 2: Lookup Task Artifact
+Local Cache 2->Jolt 2: Not Found
+Jolt 2->Network Cache: Lookup Task Artifact
+Network Cache->Jolt 2: Not Found
+Jolt 2->Jolt 2: Execute Task
+Jolt 2->Local Cache 2: Commit Task Artifact
+Local Cache 2->Jolt 2: Ok
+Jolt 2->Jolt 2: Compress Archive
+Jolt 2->Network Cache: Upload Archive
+Network Cache->Jolt 2: Ok
+Jolt 2->Network Executor: Done
+Network Executor->Jolt: Done
+Jolt->Network Cache: Lookup Task Artifact
+Network Cache->Jolt: Found
+Jolt->Network Cache: Download Task Artifact
+Network Cache->Jolt: Compressed Archive
+Jolt->Jolt: Extract Archive
+Jolt->Local Cache: Commit Task Artifact
+Local Cache->Jolt: Ok
+Jolt->User: Done

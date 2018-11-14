@@ -1,0 +1,8 @@
+title Cached Local Build
+
+User->Jolt: "build example"
+Jolt->Jolt: Build Directed Asyclic Graph
+Jolt->Jolt: Calculate Task Identity
+Jolt->Local Cache: Lookup Task Artifact
+Local Cache->Jolt: Found
+Jolt->User: Done
