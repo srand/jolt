@@ -88,7 +88,10 @@ def build(task, network, identity, no_download, no_upload):
             queue.submit(acache, task)
 
         task, error = queue.wait()
-        assert task, "no more tasks in progress, only blocked tasks remain"
+        if not task:
+            dag.debug()
+            assert task, "no more tasks in progress, only blocked tasks remain"
+
         if error is not None:
             queue.abort()
             raise error

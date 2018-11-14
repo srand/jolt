@@ -93,9 +93,7 @@ class JenkinsExecutor(scheduler.NetworkExecutor):
         self.task = task
         self.job = self.server.job_name
 
-    def run(self):
-        self.task.started()
-
+    def _run(self):
         task = [self.task.qualified_name]
         task += [t.qualified_name for t in self.task.extensions]
 
@@ -138,6 +136,21 @@ class JenkinsExecutor(scheduler.NetworkExecutor):
                 "[JENKINS] failed to download artifact for {0}"\
                 .format(extension.qualified_name)
 
+        return self.task
+
+    def run(self):
+        try:
+            self.task.started()
+            for extension in self.task.extensions:
+                extension.started()
+            self._run()
+            for extension in self.task.extensions:
+                extension.finished()
+            self.task.finished()
+        except Exception as e:
+            log.exception()
+            self.task.failed()
+            raise e
         return self.task
 
 

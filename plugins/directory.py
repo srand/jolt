@@ -1,5 +1,5 @@
 from influence import *
-import tools
+from tools import Tools
 import utils
 from copy import copy
 
@@ -15,7 +15,7 @@ class DirectoryInfluenceProvider(HashInfluenceProvider):
 
     def get_influence(self, task):
         try:
-            with tools.Tools(task, task.joltdir):
+            with Tools(task, task.joltdir) as tools:
                 path = task._get_expansion(self.path)
                 with tools.cwd(path):
                     return tools.run("find -type f -name '{0}' | LC_ALL=C sort | xargs -n1 md5sum"

@@ -208,6 +208,11 @@ class Graph(nx.DiGraph):
     def select(self, func):
         return [n for n in self.nodes if func(self, n)]
 
+    def debug(self):
+        log.verbose("[GRAPH] Listing all nodes")
+        for node in nx.topological_sort(self):
+            log.verbose("[GRAPH]   " + node.qualified_name)
+
     def is_leaf(self, node):
         return self.out_degree(node) == 0
 
@@ -222,10 +227,10 @@ class Graph(nx.DiGraph):
 
 
 class GraphBuilder(object):
-    def __init__(self):
+    def __init__(self, registry=None):
         self.graph = Graph()
         self.nodes = {}
-        self.registry = tasks.TaskRegistry.get()
+        self.registry = registry or tasks.TaskRegistry.get()
 
     def _get_node(self, name):
         node = self.nodes.get(name)

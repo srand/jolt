@@ -465,7 +465,7 @@ class ArtifactCache(StorageProvider):
             log.verbose("Evicting artifact '{name}:{identity}'".format(**artifact))
             path = fs.path.join(self.root, artifact["name"], artifact["identity"])
             self.stats.remove(artifact)
-            fs.rmtree(path)
+            fs.rmtree(path, ignore_errors=True)
 
     def create_path(self, node):
         path = None

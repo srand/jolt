@@ -26,8 +26,8 @@ def rename(old, new):
 def move(src, dst):
     return shutil.move(src, dst)
 
-def rmtree(path):
-    shutil.rmtree(path)
+def rmtree(path, ignore_errors=False):
+    shutil.rmtree(path, ignore_errors)
 
 def unlink(path):
     os.unlink(path)
