@@ -503,11 +503,14 @@ class ArtifactCache(StorageProvider):
             (not on_network and self.is_available_locally(node)) or \
             (on_network and self.is_available_remotely(node))
 
+    def download_enabled(self):
+        return config.getboolean("jolt", "download", True)
+
     def download(self, node, force=False):
-        if not config.getboolean("jolt", "download", True):
-            return True
+        if not self.download_enabled():
+            return False
         if not node.task.is_cacheable():
-            return True
+            return False
         if self.is_available_locally(node):
             node.info("Download skipped, already in local cache")
             return True
@@ -519,9 +522,12 @@ class ArtifactCache(StorageProvider):
                 return True
         return len(self.storage_providers) == 0
 
+    def upload_enabled(self):
+        return config.getboolean("jolt", "upload", True)
+
     def upload(self, node, force=False):
-        if not config.getboolean("jolt", "upload", True):
-            return True
+        if not self.upload_enabled():
+            return False
         if not node.task.is_cacheable():
             return True
         assert self.is_available_locally(node), "can't upload task, not in the local cache"

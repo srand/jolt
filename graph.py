@@ -161,10 +161,18 @@ class TaskProxy(object):
 
     def run(self, cache, force_upload=False, force_build=False):
         with self.tools:
-            if not force_build and cache.is_available_remotely(self):
-                cache.download(self)
+            tasks = [self] + self.extensions
+            available_locally = available_remotely = False, False
 
-            if force_build or not cache.is_available_locally(self) or self.has_extensions():
+            if not force_build:
+                available_locally = all(map(cache.is_available_locally, tasks))
+                if available_locally and not force_upload:
+                    return
+                available_remotely = all(map(cache.is_available_remotely, tasks))
+                if not available_locally and available_remotely:
+                    available_locally = cache.download(self)
+
+            if force_build or not available_locally:
                 with cache.get_context(self) as context:
                     with self.tools.cwd(self.task.joltdir):
                         self.task.run(context, self.tools)
@@ -178,18 +186,20 @@ class TaskProxy(object):
                         self.task.publish(artifact, self.tools)
                     artifact.commit()
 
-                assert cache.upload(self, force=force_upload), \
+            if force_build or force_upload or not available_remotely:
+                assert not cache.upload_enabled() or \
+                    cache.upload(self, force=force_upload), \
                     "Failed to upload artifact for {0}".format(self.name)
 
-                for extension in self.extensions:
-                    try:
-                        extension.started()
-                        extension.run(cache, force_upload, force_build=True)
-                    except:
-                        extension.failed()
-                        raise
-                    else:
-                        extension.finished()
+            for extension in self.extensions:
+                try:
+                    extension.started()
+                    extension.run(cache, force_upload, force_build)
+                except Exception as e:
+                    extension.failed()
+                    raise e
+                else:
+                    extension.finished()
 
 
 class Graph(nx.DiGraph):

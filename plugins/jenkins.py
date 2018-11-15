@@ -127,12 +127,14 @@ class JenkinsExecutor(scheduler.NetworkExecutor):
             "[JENKINS] no artifact produced for {0}, check configuration"\
             .format(self.task.qualified_name)
 
-        assert self.cache.download(self.task), \
+        assert not self.cache.download_enabled() or \
+            self.cache.download(self.task), \
             "[JENKINS] failed to download artifact for {0}"\
             .format(self.task.qualified_name)
 
         for extension in self.task.extensions:
-            assert self.cache.download(extension), \
+            assert not self.cache.download_enabled() or \
+                self.cache.download(extension), \
                 "[JENKINS] failed to download artifact for {0}"\
                 .format(extension.qualified_name)
 
