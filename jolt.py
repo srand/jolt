@@ -57,7 +57,11 @@ def cli(verbose, extra_verbose, config_file):
               help="Don't download artifacts from remote storage")
 @click.option("--no-upload", is_flag=True, default=False,
               help="Don't upload artifacts to remote storage")
-def build(task, network, identity, no_download, no_upload):
+@click.option("--download", is_flag=True, default=False,
+              help="Do download artifacts from remote storage")
+@click.option("--upload", is_flag=True, default=False,
+              help="Do upload artifacts to remote storage")
+def build(task, network, identity, no_download, no_upload, download, upload):
     """
     Execute specified task.
 
@@ -68,6 +72,10 @@ def build(task, network, identity, no_download, no_upload):
         config.set("jolt", "download", "false")
     if no_upload:
         config.set("jolt", "upload", "false")
+    if download:
+        config.set("jolt", "download", "true")
+    if upload:
+        config.set("jolt", "upload", "true")
 
     executor = scheduler.ExecutorRegistry.get(network=network)
     acache = cache.ArtifactCache()
