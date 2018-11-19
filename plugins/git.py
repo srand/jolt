@@ -67,10 +67,11 @@ class Git(Resource, GitInfluenceProvider):
     name = "git"
     url = Parameter(help="URL to the git repo to clone. Required.")
     sha = Parameter(help="Specific commit sha to be checked out. Optional.")
+    path = Parameter(help="Local path where repo should be cloned.")
 
     def __init__(self, *args, **kwargs):
         super(Git, self).__init__(*args, **kwargs)
-        self.path = self._get_name()
+        self.path = str(self.path) or self._get_name()
         self.influence.append(self)
 
     @utils.cached.instance
@@ -81,20 +82,20 @@ class Git(Resource, GitInfluenceProvider):
 
     @utils.cached.instance
     def _get_git_folder(self):
-        return fs.path.join(self._get_name(), ".git")
+        return fs.path.join(self.path, ".git")
 
     def _clone(self):
-        assert not fs.path.exists(self._get_name()), \
+        assert not fs.path.exists(self.path), \
             "destination folder '{0}' already exists but is not a git repo"\
-            .format(self._get_name())
+            .format(self.path)
         depth = "--depth 1" if self.sha.is_unset() else ""
-        self.tools.run("git clone {0} {1}", depth, self.url, output_on_error=True)
+        self.tools.run("git clone {0} {1} {2}", depth, self.url, self.path, output_on_error=True)
         assert fs.path.exists(self._get_git_folder()),\
             "failed to clone git repo '{0}'".format(self._get_name())
 
     @utils.cached.instance
     def _is_synced(self):
-        with self.tools.cwd(self._get_name()):
+        with self.tools.cwd(self.path):
             return True if self.tools.run("git branch -r --contains HEAD", output_on_error=True) else False
         return True
 
@@ -111,7 +112,7 @@ class Git(Resource, GitInfluenceProvider):
                 "explicit sha requested but git repo '{0}' has local changes"\
                 .format(self._get_name())
             # Should be safe to do this now
-            with self.tools.cwd(self._get_name()):
+            with self.tools.cwd(self.path):
                 self.tools.run("git checkout {0}", self.sha, output_on_error=True)
 
     def get_influence(self, task):

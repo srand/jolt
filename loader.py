@@ -1,6 +1,6 @@
 import inspect
 import imp
-from tasks import Task, Test
+from tasks import Task, Test, Resource
 import copy
 import glob
 import filesystem as fs
@@ -34,7 +34,10 @@ class JoltLoader(object):
             if inspect.isclass(obj):
                 classes.append(obj)
 
-        tasks = [cls for cls in classes if issubclass(cls, Task) and cls is not Task]
+        cls_exclude_list = [Task, Resource]
+
+        tasks = [cls for cls in classes
+                 if issubclass(cls, Task) and cls not in cls_exclude_list]
         for task in tasks:
             task.name = task.name or task.__name__.lower()
             task.joltdir = directory
