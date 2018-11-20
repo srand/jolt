@@ -267,12 +267,12 @@ class Tools(object):
         finally:
             self._cwd = prev
 
-    def download(self, url, filename):
+    def download(self, url, filename, **kwargs):
         url = self.expand(url)
         filename = self.expand(filename)
         filepath = fs.path.join(self.getcwd(), filename)
         try:
-            response = requests.get(url, stream=True)
+            response = requests.get(url, stream=True, **kwargs)
             name = fs.path.basename(filename)
             size = int(response.headers['content-length'])/1024
             with log.progress("Downloading {0}".format(name), size, "B") as pbar:
@@ -385,7 +385,7 @@ class Tools(object):
         cmd = self.expand(path, *args, **kwargs)
         return fs.unlink(fs.path.join(self._cwd, path))
 
-    def upload(self, filename, url, auth=None):
+    def upload(self, filename, url, auth=None, **kwargs):
         filename = self.expand(filename)
         filename = fs.path.join(self.getcwd(), filename)
         try:
@@ -397,7 +397,7 @@ class Tools(object):
                     data = fileobj.read(4096)
                     pbar.update(len(data))
                     return data
-                response = requests.put(url, data=iter(read, ''), auth=auth)
+                response = requests.put(url, data=iter(read, ''), auth=auth, **kwargs)
                 return response.status_code == 201
         except:
             pass
