@@ -507,7 +507,7 @@ class ArtifactCache(StorageProvider):
         return config.getboolean("jolt", "download", True)
 
     def download(self, node, force=False):
-        if not self.download_enabled():
+        if not force and not self.download_enabled():
             return False
         if not node.task.is_cacheable():
             return False
@@ -526,7 +526,7 @@ class ArtifactCache(StorageProvider):
         return config.getboolean("jolt", "upload", True)
 
     def upload(self, node, force=False):
-        if not self.upload_enabled():
+        if not force and not self.upload_enabled():
             return False
         if not node.task.is_cacheable():
             return True

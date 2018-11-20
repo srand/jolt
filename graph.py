@@ -187,8 +187,8 @@ class TaskProxy(object):
                     artifact.commit()
 
             if force_build or force_upload or not available_remotely:
-                assert not cache.upload_enabled() or \
-                    cache.upload(self, force=force_upload), \
+                assert cache.upload(self, force=force_upload) or \
+                    not cache.upload_enabled(), \
                     "Failed to upload artifact for {0}".format(self.name)
 
             for extension in self.extensions:
