@@ -16,9 +16,16 @@ class Parameter(object):
         self._value = default
         self._accepted_values = values
         self.__doc__ = help
+        if default:
+            self._validate(default)
 
     def __str__(self):
         return str(self._value) if self._value is not None else ''
+
+    def _validate(self, value):
+        assert self._accepted_values is None or value in self._accepted_values, \
+            "illegal value '{0}' assigned to parameter"\
+            .format(value)
 
     def get_default(self):
         return self._default
@@ -33,9 +40,7 @@ class Parameter(object):
         return self._value
 
     def set_value(self, value):
-        assert self._accepted_values is None or value in self._accepted_values, \
-            "illegal value '{0}' assigned to parameter"\
-            .format(value)
+        self._validate(value)
         self._value = value
 
 
