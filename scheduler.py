@@ -5,6 +5,10 @@ import log
 import utils
 from concurrent.futures import ThreadPoolExecutor, Future, as_completed
 import traceback
+try:
+    import asyncio
+except:
+    pass
 
 
 class TaskQueue(object):
@@ -35,7 +39,7 @@ class TaskQueue(object):
         return None, None
 
     def abort(self):
-        for future, task in self.futures.iteritems():
+        for future, task in self.futures.items():
             task.info("Execution cancelled")
             future.cancel()
         if len(self.futures):
@@ -65,6 +69,12 @@ class LocalExecutor(Executor):
         self.force_upload = force_upload
 
     def run(self):
+        try:
+            loop = asyncio.SelectorEventLoop()
+            asyncio.set_event_loop(loop)
+        except:
+            pass
+
         try:
             self.task.started()
             self.task.run(self.cache, self.force_upload)

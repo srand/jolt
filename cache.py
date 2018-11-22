@@ -33,6 +33,7 @@ class StorageProviderFactory(StorageProvider):
 def RegisterStorage(cls):
     ArtifactCache.storage_provider_factories.append(cls)
 
+
 class ArtifactAttributeSet(object):
     def __init__(self):
         super(ArtifactAttributeSet, self).__setattr__("_attributes", {})
@@ -54,17 +55,17 @@ class ArtifactAttributeSet(object):
         return attributes[name]
 
     def __dict__(self):
-        return {key: str(value) for key, value in self.iteritems()}
+        return {key: str(value) for key, value in self.items()}
 
-    def iteritems(self):
-        return self._get_attributes().iteritems()
+    def items(self):
+        return self._get_attributes().items()
 
     def apply(self, task, artifact):
-        for _, value in self.iteritems():
+        for _, value in self.items():
             value.apply(task, artifact)
 
     def unapply(self, task, artifact):
-        for _, value in self.iteritems():
+        for _, value in self.items():
             value.unapply(task, artifact)
 
 
@@ -205,14 +206,14 @@ class Artifact(object):
 
         manifest = fs.path.join(self._temp, ".manifest.json")
         with open(manifest, "wb") as f:
-            f.write(json.dumps(content, indent=3))
+            f.write(json.dumps(content, indent=3).encode())
 
     def _read_manifest(self):
         if self._temp:
             return
         manifest = fs.path.join(self._path, ".manifest.json")
         with open(manifest, "rb") as f:
-            content = json.loads(f.read())
+            content = json.loads(f.read().decode())
             self._size = content["size"]
             self._unpacked = content["unpacked"]
             ArtifactAttributeSetRegistry.parse_all(self, content)
@@ -366,7 +367,7 @@ class Context(object):
         return self
 
     def __exit__(self, type, value, tb):
-        for name, artifact in self._artifacts.iteritems():
+        for name, artifact in self._artifacts.items():
             ArtifactAttributeSetRegistry.unapply_all(self._node.task, artifact)
 
     def __getitem__(self, key):
@@ -374,8 +375,8 @@ class Context(object):
         assert key in self._artifacts, "no such dependency: {0}".format(key)
         return self._artifacts[key]
 
-    def iteritems(self):
-        return self._artifacts.iteritems()
+    def items(self):
+        return self._artifacts.items()
 
 
 class CacheStats(object):
@@ -391,10 +392,10 @@ class CacheStats(object):
 
     def load(self):
         with open(self.path) as f:
-            self.stats = json.loads(f.read())
+            self.stats = json.loads(f.read().decode())
 
         deleted = []
-        for artifact, stats in self.stats.iteritems():
+        for artifact, stats in self.stats.items():
             path = fs.path.join(self.cache.root, stats["name"], artifact)
             if not os.path.exists(path):
                 deleted.append(artifact)
@@ -405,7 +406,7 @@ class CacheStats(object):
 
     def save(self):
         with open(self.path, "wb") as f:
-            f.write(json.dumps(self.stats, indent=3))
+            f.write(json.dumps(self.stats, indent=3).encode())
 
     def update(self, artifact):
         if artifact.is_temporary():
@@ -424,16 +425,16 @@ class CacheStats(object):
 
     def get_size(self):
         size = 0
-        for artifact, stats in self.stats.iteritems():
+        for artifact, stats in self.stats.items():
             size += stats["size"]
         return size
 
     def get_lru(self):
         assert self.stats, "no artifacts in cache"
-        nt = [dict(identity=artifact, **stats) for artifact, stats in self.stats.iteritems()]
+        nt = [dict(identity=artifact, **stats) for artifact, stats in self.stats.items()]
         nt = sorted(nt, key=lambda x: x["used"])
         # Don't evict artifacts in the current working set
-        nt = filter(lambda x: x["identity"] not in self.active, nt)
+        nt = list(filter(lambda x: x["identity"] not in self.active, nt))
         return nt[0] if len(nt) > 0 else None
 
 

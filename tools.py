@@ -39,6 +39,7 @@ def _run(cmd, cwd, env, *args, **kwargs):
             try:
                 for line in iter(self.stream.readline, b''):
                     line = line.rstrip()
+                    line = line.decode()
                     if self.output:
                         self.output(line)
                     self.buffer.append(line)
@@ -190,7 +191,7 @@ class _AutoTools(object):
 class Tools(object):
     def __init__(self, task=None, cwd=None):
         self._cwd = cwd or os.getcwd()
-        self._env = {key: value for key, value in os.environ.iteritems()}
+        self._env = {key: value for key, value in os.environ.items()}
         self._task = task
         self._builddir = {}
 
@@ -283,17 +284,18 @@ class Tools(object):
                         pbar.update(len(data))
             return response.status_code == 200
         except:
+            log.exception()
             return False
 
     @contextmanager
     def environ(self, **kwargs):
-        for key, value in kwargs.iteritems():
+        for key, value in kwargs.items():
             kwargs[key] = self.expand(value)
 
-        restore = {key: value for key, value in self._env.iteritems()}
+        restore = {key: value for key, value in self._env.items()}
         self._env.update(kwargs)
         yield self._env
-        for key, value in kwargs.iteritems():
+        for key, value in kwargs.items():
             if key not in restore:
                 del self._env[key]
         self._env.update(restore)
@@ -397,8 +399,9 @@ class Tools(object):
                     data = fileobj.read(4096)
                     pbar.update(len(data))
                     return data
-                response = requests.put(url, data=iter(read, ''), auth=auth, **kwargs)
+                response = requests.put(url, data=iter(read, b''), auth=auth, **kwargs)
                 return response.status_code == 201
         except:
+            log.exception()
             pass
         return False

@@ -120,14 +120,14 @@ class TaskBase(object):
         super(TaskBase, self).__init__(*args, **kwargs)
 
     def _create_parameters(self):
-        for key, param in self.__class__.__dict__.iteritems():
+        for key, param in self.__class__.__dict__.items():
             if isinstance(param, Parameter):
                 param = copy(param)
                 setattr(self, key, param)
 
     def _set_parameters(self, params):
         params = params or {}
-        for key, value in params.iteritems():
+        for key, value in params.items():
             param = self.__dict__.get(key)
             if isinstance(param, Parameter):
                 param.set_value(value)
@@ -175,7 +175,7 @@ class Task(TaskBase):
     def _get_source_hash(self):
         sha = hashlib.sha1()
         for func in self._get_source_functions():
-            sha.update(self._get_source(func))
+            sha.update(self._get_source(func).encode())
         return sha.hexdigest()
 
     def _get_requires(self):
@@ -307,7 +307,7 @@ class _Test(Task):
         super(_Test, self).__init__(*args, **kwargs)
 
     def _create_parameters(self):
-        for key, param in self.test_cls.__dict__.iteritems():
+        for key, param in self.test_cls.__dict__.items():
             if isinstance(param, Parameter):
                 param = copy(param)
                 setattr(self, key, param)

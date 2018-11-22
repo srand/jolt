@@ -1,5 +1,5 @@
 import filesystem as fs
-from ConfigParser import SafeConfigParser, NoOptionError
+from configparser import SafeConfigParser, NoOptionError
 import utils
 
 

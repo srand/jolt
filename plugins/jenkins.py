@@ -51,7 +51,7 @@ class JenkinsServer(object):
 
     def _get_sha(self, data):
         sha = hashlib.sha1()
-        sha.update(data)
+        sha.update(data.encode())
         return sha.hexdigest()
 
     def _get_job_template_path(self):

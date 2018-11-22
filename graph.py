@@ -55,10 +55,10 @@ class TaskProxy(object):
 
         # print("{}: {}".format(self.name, [n.name for n in self.children]))
         for node in self.children:
-            sha.update(node.identity)
+            sha.update(node.identity.encode())
 
         if self._extended_task:
-            sha.update(self._extended_task.identity)
+            sha.update(self._extended_task.identity.encode())
 
         return sha.hexdigest()
 
@@ -132,13 +132,18 @@ class TaskProxy(object):
         self._in_progress = True
 
     def finalize(self, dag):
+        log.verbose("Finalizing: " + self.qualified_name)
+
         # Find all direct and transitive dependencies
-        self.children = sorted(nx.descendants(dag, self), key=lambda t: t.qualified_name)
+        self.children = sorted(
+            nx.descendants(dag, self),
+            key=lambda t: t.qualified_name)
 
         # Exclude transitive resources dependencies
-        self.children = filter(
-            lambda n: not n.is_resource() or dag.are_neighbors(self, n),
-            self.children)
+        self.children = list(
+            filter(lambda n: not n.is_resource() or \
+                   dag.are_neighbors(self, n),
+                   self.children))
 
         self.anestors = nx.ancestors(dag, self)
         return self.identity

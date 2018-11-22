@@ -180,7 +180,9 @@ class RepoInfluenceProvider(HashInfluenceProvider):
 
 class RepoNetworkExecutorExtension(NetworkExecutorExtension):
     def get_parameters(self, task):
-        rip = filter(lambda n: isinstance(n, RepoInfluenceProvider), task.task.influence)
+        rip = list(filter(
+            lambda n: isinstance(n, RepoInfluenceProvider),
+            task.task.influence))
         if rip:
             assert len(rip) == 1, "task influenced by multiple repo manifests"
             rip = rip[0]

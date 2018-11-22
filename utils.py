@@ -8,7 +8,10 @@ import hashlib
 
 
 def is_str(s):
-    return type(s) == str or type(s) == unicode
+    try:
+        return type(s) == str or type(s) == unicode
+    except NameError:
+        return type(s) == str
 
 def as_list(t):
     return [t] if type(t) == str else list(t)
@@ -24,7 +27,7 @@ def as_stable_string_list(o):
 
 def as_stable_tuple_list(o):
     assert type(o) == dict, "as_stable_tuple_list: argument is not a dict"
-    l = [(key, value) for key, value in o.iteritems()]
+    l = [(key, value) for key, value in o.items()]
     return sorted(l, key=lambda x: x[0])
 
 def as_human_size(size):
@@ -57,7 +60,7 @@ def format_task_name(name, params):
         return name
     def _param(key, value):
         return "{0}={1}".format(key, value) if value else key
-    return "{0}:{1}".format(name, ",".join([_param(key, value) for key, value in params.iteritems()]))
+    return "{0}:{1}".format(name, ",".join([_param(key, value) for key, value in params.items()]))
 
 
 class _SafeDict(object):
@@ -147,12 +150,12 @@ def run_concurrent(callables, *args, **kwargs):
 
 
 def map_consecutive(method, iterable):
-    return map(method, iterable)
+    return list(map(method, iterable))
 
 def map_concurrent(method, iterable):
     return run_concurrent([partial(method, item) for item in iterable])
 
 def sha1(string):
     sha = hashlib.sha1()
-    sha.update(string)
+    sha.update(string.encode())
     return sha.hexdigest()

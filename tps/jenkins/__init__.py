@@ -1215,7 +1215,7 @@ class Jenkins(object):
 
         url = self.build_job_url(name, parameters, token)
         parameter_list = [{"name": name, "value": value}
-                          for name, value in parameters.iteritems()]
+                          for name, value in parameters.items()]
         headers = {"Content-Type": "application/x-www-form-urlencoded"}
         response = self.jenkins_request(requests.Request(
             'POST',

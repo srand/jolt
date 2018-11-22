@@ -5,11 +5,11 @@ class EnvironmentVariable(ArtifactStringAttribute):
     def __init__(self, name):
         super(EnvironmentVariable, self).__init__(name)
         self._old_value = None
-        
+
     def apply(self, task, artifact):
         self._old_value = task.tools.getenv(self.get_name())
         task.tools.setenv(self.get_name(), self.get_value())
-        
+
     def unapply(self, task, artifact):
         if self._old_value:
             task.tools.setenv(self.get_name(), self._old_value)
@@ -59,18 +59,18 @@ class EnvironmentVariableSetProvider(ArtifactAttributeSetProvider):
         if "environ" not in content:
             return
 
-        for key, value in content["environ"].iteritems():
+        for key, value in content["environ"].items():
             setattr(artifact.environ, key, value)
 
     def format(self, artifact, content):
         if "environ" not in content:
             content["environ"] = {}
 
-        for key, value in artifact.environ.iteritems():
+        for key, value in artifact.environ.items():
             content["environ"][key] = str(value)
 
     def apply(self, task, artifact):
         artifact.environ.apply(task, artifact)
-        
+
     def unapply(self, task, artifact):
         artifact.environ.unapply(task, artifact)

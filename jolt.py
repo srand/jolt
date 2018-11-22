@@ -208,7 +208,7 @@ def info(task, influence=False):
         click.echo()
     click.echo("  Parameters")
     has_param = False
-    for item, param in task.__dict__.iteritems():
+    for item, param in task.__dict__.items():
         if isinstance(param, Parameter):
             has_param = True
             click.echo("    {0:<15}   {1}".format(item, param.__doc__ or ""))
