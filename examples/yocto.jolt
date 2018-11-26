@@ -3,7 +3,7 @@ from glob import glob
 import filesystem as fs
 from plugins import git
 import unittest
-
+from os import environ
 
 class Sdk(Task):
     """
@@ -17,7 +17,7 @@ class Sdk(Task):
         tools.run("bitbake meta-toolchain")
 
     def publish(self, artifact, tools):
-        artifact.collect("build/tmp/deploy/sdk/*.sh", flatten=True)
+        artifact.collect(environ["BUILDDIR"] + "/tmp/deploy/sdk/*.sh", flatten=True)
 
     def unpack(self, artifact, tools):
         with tools.cwd(artifact.path):
