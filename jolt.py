@@ -155,7 +155,9 @@ def list(task=None, reverse=False, all=False):
     result = []
 
     if not task:
-        for task in sorted(TaskRegistry().get().get_task_classes(), key=lambda x: x.name):
+        classes = TaskRegistry().get().get_task_classes()
+        classes += TaskRegistry().get().get_test_classes()
+        for task in sorted(classes, key=lambda x: x.name):
             if task.name:
                 print(task.name)
         return

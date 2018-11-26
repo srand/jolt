@@ -32,7 +32,7 @@ class HelloWorld(Task):
         artifact.strings.executable = "hello"
 
 
-class Test(Task):
+class TestTask(Task):
     """ Runs the Hello World! application """
 
     name = "test"
@@ -105,3 +105,10 @@ class Exception(Task):
 
     def run(self, deps, tools):
         assert False, "{0} {} {abc}"
+
+
+class TestExample(Test):
+    requires = "hello:flavor=hello_01"
+
+    def test_hello(self):
+        self.assertEqual(self.tools.run("hello"), "Hello world!")
