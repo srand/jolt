@@ -170,8 +170,9 @@ class _AutoTools(object):
                 self.tools.run("autoreconf -visf", output=True)
 
         with self.tools.cwd(self.builddir):
-            self.tools.run("{0}/configure --prefix={1}",
+            self.tools.run("{0}/configure --prefix={1} {2}",
                            sourcedir, self.installdir,
+                           self.tools._env["CONFIGURE_FLAGS"],
                            output=True)
 
     def build(self, *args, **kwargs):
