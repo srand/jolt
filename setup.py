@@ -68,7 +68,11 @@ setup(
     # https://packaging.python.org/en/latest/requirements.html
     install_requires=["requests", "click", "networkx", "keyring", "keyrings.alt",
                       "jinja2", "futures", "python-jenkins", "multi_key_dict",
-                      "tqdm"],
+                      "tqdm", "pam"],
+
+    dependency_links=[
+        "git+https://bitbucket.org/rand_r/pam.git#egg=Package"
+    ],
 
     # List additional groups of dependencies here (e.g. development
     # dependencies). You can install these using the following syntax,
