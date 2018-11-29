@@ -131,14 +131,14 @@ def Singleton(cls):
     cls.get = get
     return cls
 
+def map_consecutive(method, iterable):
+    return list(map(method, iterable))
 
-def run_consecutive(callables, *args, **kwargs):
-    return [call(*args, **kwargs) for call in callables]
-
-def run_concurrent(callables, *args, **kwargs):
+def map_concurrent(method, iterable, max_workers=None):
+    callables = [partial(method, item) for item in iterable]
     results = []
     futures = []
-    with ThreadPoolExecutor() as executor:
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
         for call in callables:
             futures.append(executor.submit(call, *args, **kwargs))
         for future in as_completed(futures):
@@ -147,13 +147,6 @@ def run_concurrent(callables, *args, **kwargs):
             except Exception as exc:
                 map(Future.cancel, futures)
     return [future.result() for future in futures]
-
-
-def map_consecutive(method, iterable):
-    return list(map(method, iterable))
-
-def map_concurrent(method, iterable):
-    return run_concurrent([partial(method, item) for item in iterable])
 
 def sha1(string):
     sha = hashlib.sha1()

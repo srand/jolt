@@ -375,8 +375,8 @@ class Tools(object):
     def map_consecutive(self, callable, iterable):
         return utils.map_consecutive(callable, iterable)
 
-    def map_concurrent(self, callable, iterable):
-        return utils.map_concurrent(callable, iterable)
+    def map_concurrent(self, callable, iterable, max_workers=None):
+        return utils.map_concurrent(callable, iterable, max_workers)
 
     def replace_in_file(self, path, search, replace):
         path = self.expand(path)

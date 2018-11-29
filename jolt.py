@@ -19,6 +19,7 @@ import utils
 from influence import *
 import traceback
 import subprocess
+import signal
 
 
 @click.group()
@@ -88,6 +89,12 @@ def build(task, network, identity, no_download, no_upload, download, upload):
         assert len(root) >= 1, "unknown hash identity, no such task: {0}".format(identity)
 
     queue = scheduler.TaskQueue(executor)
+
+    def signal_handle(_signal, frame):
+        print('You pressed Ctrl+C!')
+        queue.abort()
+    signal.signal(signal.SIGINT, signal_handle)
+
     while dag.nodes:
         leafs = dag.select(lambda graph, task: task.is_ready())
         while leafs:

@@ -1,0 +1,12 @@
+from tasks import *
+import threading
+
+
+class Sigint(Task):
+    def run(self, deps, tools):
+        try:
+            cond = threading.Condition(threading.Lock())
+            cond.acquire()
+            cond.wait(1000)
+        except KeyboardInterrupt:
+            pass
