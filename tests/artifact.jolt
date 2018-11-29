@@ -1,0 +1,28 @@
+from tasks import *
+
+
+class ArtifactPathAppend(Task):
+    name = "test/artifact/pathappend"
+
+    def publish(self, artifact, tools):
+        with tools.tmpdir("tmp") as tmp, tools.cwd(tmp.path):
+            tools.write_file("bin.sh", "#!/bin/sh\necho $0")
+            tools.write_file("sbin.sh", "#!/bin/sh\necho $0")
+            tools.chmod("bin.sh", 0o755)
+            tools.chmod("sbin.sh", 0o755)
+            artifact.collect("bin.sh", "bin/")
+            artifact.collect("sbin.sh", "sbin/")
+            artifact.environ.PATH.append("bin")
+            artifact.environ.PATH.append("sbin")
+
+
+class Artifact(Test):
+    name = "test/artifact"
+    requires = "test/artifact/pathappend"
+
+    def setup(self, deps, tools):
+        self.deps = deps
+
+    def test_path_append(self):
+        self.assertTrue(self.tools.run("bin.sh"))
+        self.assertTrue(self.tools.run("sbin.sh"))

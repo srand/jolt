@@ -30,7 +30,9 @@ class PathEnvironmentVariable(EnvironmentVariable):
 
     def apply(self, task, artifact):
         self._old_value = task.tools.getenv(self.get_name())
-        new_val = fs.path.join(artifact.path, self.get_value())
+        paths = self.get_value().split(fs.pathsep)
+        paths = [fs.path.join(artifact.path, path) for path in paths]
+        new_val = fs.pathsep.join(paths)
         if self._old_value:
             new_val = new_val + fs.pathsep + task.tools.getenv(self.get_name())
         task.tools.setenv(self.get_name(), new_val)

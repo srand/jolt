@@ -98,6 +98,10 @@ class _tmpdir(object):
         if self._path:
             fs.rmtree(self._path)
 
+    @property
+    def path(self):
+        return self.get_path()
+
     def get_path(self):
         return self._path
 
@@ -204,6 +208,13 @@ class Tools(object):
             fs.rmtree(dir)
         return False
 
+    def append_file(self, filepath, content):
+        filepath = self.expand(filepath)
+        filepath = fs.path.join(self.getcwd(), filepath)
+        content = self.expand(content)
+        with open(path, "ab") as f:
+            f.write(content)
+
     def archive(self, filepath, filename):
         filename = self.expand(filename)
         filepath = self.expand(filepath)
@@ -244,6 +255,11 @@ class Tools(object):
             fs.makedirs(dirname)
             self._builddir[name] = fs.mkdtemp(prefix=name+"-", dir=dirname)
         return self._builddir[name]
+
+    def chmod(self, filepath, mode):
+        filepath = self.expand(filepath)
+        filepath = fs.path.join(self.getcwd(), filepath)
+        return os.chmod(filepath, mode)
 
     def cmake(self, deps=None):
         return _CMake(deps, self)
@@ -406,3 +422,10 @@ class Tools(object):
             log.exception()
             pass
         return False
+
+    def write_file(self, filepath, content):
+        filepath = self.expand(filepath)
+        filepath = fs.path.join(self.getcwd(), filepath)
+        content = self.expand(content)
+        with open(filepath, "wb") as f:
+            f.write(content)

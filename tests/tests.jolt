@@ -1,8 +1,15 @@
 from tasks import *
+from plugins import directory
+
+
+directory.global_influence("..", "*.py")
+directory.global_influence("../plugins", "*.py")
 
 
 class Tests(Task):
-    requires = "test/tools"
+    requires = \
+        "test/artifact", \
+        "test/tools"
 
 
 class Tools(Test):
