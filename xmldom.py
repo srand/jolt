@@ -2,11 +2,25 @@ from xml.etree import ElementTree as ET
 from xml.etree.ElementTree import Element
 from xml.etree.ElementTree import ElementTree
 from xml.dom import minidom
+from utils import cached
 
 
-class SubElement(Element):
-    def __init__(self, tag=''):
-        super(SubElement, self).__init__(tag)
+
+class SubElement(object):
+    def __init__(self, tag='', elem=None):
+        super(SubElement, self).__init__()
+        self._elem = elem if elem is not None else Element(tag)
+
+    @property
+    def attrib(self):
+        return self._elem.attrib
+
+    def get(self, *args, **kwargs):
+        return self._elem.get(*args, **kwargs)
+
+    def set(self, *args, **kwargs):
+        return self._elem.set(*args, **kwargs)
+
 
 
 class Attribute(object):
@@ -73,12 +87,11 @@ class Composition(object):
                 return child
 
             @property
+            @cached.instance
             def get(self):
                 children = list(self.getroot()) if isinstance(self, ElementTree) else list(self)
                 children = [n for n in children if n.tag == name]
-                for child in children:
-                    child.__class__ = comp_cls
-                return children
+                return [comp_cls(elem=child) for child in children]
 
             setattr(cls, 'create_' + name, create)
             setattr(cls, name + 's', get)

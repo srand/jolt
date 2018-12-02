@@ -77,10 +77,10 @@ class TaskRegistry(object):
         return self.tests.get(name)
 
     def get_task_classes(self):
-        return self.tasks.values()
+        return list(self.tasks.values())
 
     def get_test_classes(self):
-        return self.tests.values()
+        return list(self.tests.values())
 
     def get_task(self, name, extra_params=None):
         name, params = utils.parse_task_name(name)

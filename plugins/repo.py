@@ -11,16 +11,16 @@ from scheduler import *
 @Attribute('name')
 @Attribute('fetch')
 class RepoRemote(SubElement):
-    def __init__(self):
-        super(RepoRemote, self).__init__('remote')
+    def __init__(self, elem=None):
+        super(RepoRemote, self).__init__('remote', elem=elem)
 
 
 @Attribute('revision')
 @Attribute('remote')
 @Attribute('sync-j')
 class RepoDefault(SubElement):
-    def __init__(self):
-        super(RepoDefault, self).__init__('default')
+    def __init__(self, elem=None):
+        super(RepoDefault, self).__init__('default', elem=elem)
 
 
 @Attribute('path')
@@ -29,8 +29,8 @@ class RepoDefault(SubElement):
 @Attribute('upstream')
 @Attribute('remote')
 class RepoProject(SubElement):
-    def __init__(self):
-        super(RepoDefault, self).__init__('project')
+    def __init__(self, elem=None):
+        super(RepoProject, self).__init__('project', elem=elem)
 
     def get_diff(self):
         with self.tools.cwd(self.path_or_name):
