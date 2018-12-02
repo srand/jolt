@@ -10,3 +10,7 @@ class Sigint(Task):
             cond.wait(1000)
         except KeyboardInterrupt:
             pass
+
+class Sigint2(Task):
+    def run(self, deps, tools):
+        tools.run("sleep 1000")
