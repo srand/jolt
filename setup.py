@@ -68,7 +68,7 @@ setup(
     # https://packaging.python.org/en/latest/requirements.html
     install_requires=["requests", "click", "networkx", "keyring", "keyrings.alt",
                       "jinja2", "futures", "python-jenkins", "multi_key_dict",
-                      "tqdm", "pam"],
+                      "tqdm", "bz2file"],
 
     dependency_links=[
         "git+https://bitbucket.org/rand_r/pam.git#egg=Package"
@@ -81,6 +81,7 @@ setup(
     extras_require={
         'dev': ['check-manifest'],
         'test': ['coverage'],
+        'plugin-pam': ['pam']
     },
 
     # If there are data files included in your packages that need to be

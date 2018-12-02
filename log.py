@@ -24,7 +24,7 @@ def _line(level, fmt, *args, **kwargs):
         utils.expand(fmt, *args, ignore_errors=True, **kwargs)
 
 def _streamwrite(stream, line):
-    stream.write(line + "\n")
+    stream.write(line + "\r\n")
     stream.flush()
 
 def _log(level, stream, fmt, *args, **kwargs):

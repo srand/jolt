@@ -32,7 +32,10 @@ def rmtree(path, ignore_errors=False):
 def unlink(path):
     os.unlink(path)
 
-def copy(src, dest):
+def symlink(src, dest, *args, **kwargs):
+    os.symlink(src, dest, *args, **kwargs)
+
+def copy(src, dest, symlinks=False):
     if not path.exists(dest):
         if dest[-1] == os.sep:
             makedirs(dest)
@@ -44,7 +47,7 @@ def copy(src, dest):
             dest = path.join(dest, path.basename(src))
 
     if path.isdir(src):
-        shutil.copytree(src, dest)
+        shutil.copytree(src, dest, symlinks=symlinks)
     else:
         shutil.copy2(src, dest)
 

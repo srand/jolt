@@ -159,7 +159,6 @@ def list(task=None, reverse=False, all=False):
 
     <WIP>
     """
-    result = []
 
     if not task:
         classes = TaskRegistry().get().get_task_classes()
@@ -169,7 +168,6 @@ def list(task=None, reverse=False, all=False):
                 print(task.name)
         return
 
-    task_registry = TaskRegistry.get()
     dag = graph.GraphBuilder().build(task)
     tasks = dag.select(lambda graph, node: node.qualified_name in task)
     successors = set()
@@ -233,7 +231,7 @@ def info(task, influence=False):
     click.echo()
 
     acache = cache.ArtifactCache()
-    dag = graph.GraphBuilder().build([task.name])
+    dag = graph.GraphBuilder().build([utils.format_task_name(task.name, task._get_parameters())])
     tasks = dag.select(lambda graph, node: graph.is_root(node))
     assert len(tasks) == 1, "unexpected graph generated"
     proxy = tasks[0]

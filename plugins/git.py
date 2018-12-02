@@ -49,8 +49,7 @@ def influence(path, cls=GitInfluenceProvider):
     def _decorate(taskcls):
         if "influence" not in taskcls.__dict__:
             taskcls.influence = copy(taskcls.influence)
-        provider = cls()
-        cls.path = path
+        provider = cls(path=path)
         taskcls.influence.append(provider)
         return taskcls
     return _decorate

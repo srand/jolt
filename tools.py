@@ -1,8 +1,11 @@
 import subprocess
 import os
+import threading
+import sys
 import filesystem as fs
 import log
 import threading
+import termios
 import utils
 import glob
 import multiprocessing
@@ -10,6 +13,7 @@ import shutil
 import requests
 import tarfile
 import zipfile
+import bz2file
 from contextlib import contextmanager
 
 
@@ -18,9 +22,8 @@ def _run(cmd, cwd, env, *args, **kwargs):
     output_on_error = kwargs.get("output_on_error")
     output = output if output is not None else True
     output = False if output_on_error else output
-
     p = subprocess.Popen(
-        cmd.format(*args, **kwargs),
+        cmd,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         shell=True,
@@ -39,7 +42,7 @@ def _run(cmd, cwd, env, *args, **kwargs):
             try:
                 for line in iter(self.stream.readline, b''):
                     line = line.rstrip()
-                    line = line.decode()
+                    line = line.decode(errors='ignore')
                     if self.output:
                         self.output(line)
                     self.buffer.append(line)
@@ -264,10 +267,17 @@ class Tools(object):
     def cmake(self, deps=None):
         return _CMake(deps, self)
 
-    def copy(self, src, dest):
+    def copy(self, src, dest, symlinks=False):
         return fs.copy(
             fs.path.join(self.getcwd(), src),
-            fs.path.join(self.getcwd(), dest))
+            fs.path.join(self.getcwd(), dest),
+            symlinks=symlinks)
+
+    def symlink(self, src, dest, symlinks=False):
+        return fs.copy(
+            fs.path.join(self.getcwd(), src),
+            fs.path.join(self.getcwd(), dest),
+            symlinks=symlinks)
 
     def cpu_count(self):
         return multiprocessing.cpu_count()
@@ -322,7 +332,7 @@ class Tools(object):
             if self._task is not None \
             else utils.expand(string, *args, **kwargs)
 
-    def extract(self, filename, filepath):
+    def extract(self, filename, filepath, files=None):
         filename = self.expand(filename)
         filepath = self.expand(filepath)
         filename = fs.path.join(self.getcwd(), filename)
@@ -331,22 +341,40 @@ class Tools(object):
             fs.makedirs(filepath)
             if filename.endswith(".zip"):
                 with zipfile.ZipFile(filename, 'r') as zip:
-                    zip.extractall(filepath)
+                    if files:
+                        zip.extract(files, filepath)
+                    else:
+                        zip.extractall(filepath)
             elif filename.endswith(".tar"):
                 with tarfile.open(filename, 'r') as tar:
-                    tar.extractall(filepath)
+                    if files:
+                        tar.extract(files, filepath)
+                    else:
+                        tar.extractall(filepath)
             elif filename.endswith(".tar.gz") or filename.endswith(".tgz"):
                 with tarfile.open(filename, 'r:gz') as tar:
-                    tar.extractall(filepath)
+                    if files:
+                        tar.extract(files, filepath)
+                    else:
+                        tar.extractall(filepath)
             elif filename.endswith(".tar.bz2"):
-                with tarfile.open(filename, 'r:bz2') as tar:
-                    tar.extractall(filepath)
+                # bz2file module for multistream support
+                with bz2file.open(filename) as bz2:
+                    with tarfile.open(fileobj=bz2) as tar:
+                        if files:
+                            tar.extract(files, filepath)
+                        else:
+                            tar.extractall(filepath)
             elif filename.endswith(".tar.xz"):
                 with tarfile.open(filename, 'r:xz') as tar:
-                    tar.extractall(filepath)
+                    if files:
+                        tar.extract(files, filepath)
+                    else:
+                        tar.extractall(filepath)
             else:
                 assert False, "unknown filetype: {0}".format(fs.path.basename(filename))
         except Exception as e:
+            log.exception()
             assert False, "failed to extract archive: {0}".format(filename)
 
     def file_size(self, filepath):
@@ -386,7 +414,21 @@ class Tools(object):
 
     def run(self, cmd, *args, **kwargs):
         cmd = self.expand(cmd, *args, **kwargs)
-        return _run(cmd, self._cwd, self._env, *args, **kwargs)
+        try:
+            try:
+                stdi = termios.tcgetattr(sys.stdin.fileno())
+                stdo = termios.tcgetattr(sys.stdout.fileno())
+                stde = termios.tcgetattr(sys.stderr.fileno())
+            except:
+                pass
+            return _run(cmd, self._cwd, self._env, *args, **kwargs)
+        finally:
+            if stdi:
+                termios.tcsetattr(sys.stdin.fileno(), termios.TCSANOW, stdi)
+            if stdo:
+                termios.tcsetattr(sys.stdout.fileno(), termios.TCSANOW, stdo)
+            if stde:
+                termios.tcsetattr(sys.stderr.fileno(), termios.TCSANOW, stde)
 
     def setenv(self, key, value=None):
         if value is None:
@@ -396,6 +438,11 @@ class Tools(object):
                 pass
         else:
             self._env[key] = self.expand(value)
+
+    def symlink(self, src, dest):
+        src = self.expand(src, *args, **kwargs)
+        dst = self.expand(dst, *args, **kwargs)
+        fs.symlink(src, dst)
 
     def tmpdir(self, name, *args, **kwargs):
         return _tmpdir(name, cwd=self._cwd)

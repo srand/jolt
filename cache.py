@@ -281,7 +281,7 @@ class Artifact(object):
     def tools(self):
         return self._node.tools
 
-    def collect(self, files, dest=None, flatten=False):
+    def collect(self, files, dest=None, flatten=False, symlinks=False):
         assert self._temp, "artifact is already published"
         files = self._node.task._get_expansion(files)
         dest = self._node.task._get_expansion(dest) if dest is not None else None
@@ -294,7 +294,7 @@ class Artifact(object):
                 dest = fs.path.join(dirname, src) \
                        if not flatten else \
                           fs.path.join(dirname, fs.path.basename(src))
-                self.tools.copy(src, dest)
+                self.tools.copy(src, dest, symlinks=symlinks)
                 log.verbose("Collected {0} -> {1}", src, dest[len(self._temp):])
 
     def copy(self, pattern, dest, flatten=False):

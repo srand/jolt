@@ -1,7 +1,6 @@
 from tasks import *
 from influence import *
 
-
 import build.model
 import toolchains.pam
 
@@ -44,4 +43,3 @@ class CXXExecutable(Task, HashInfluenceProvider):
         return self.cxx_project.job.get_hash()
 
 
-TaskRegistry.get().add_task_class(CXXExecutable)

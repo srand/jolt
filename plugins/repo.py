@@ -175,6 +175,7 @@ class RepoInfluenceProvider(HashInfluenceProvider):
     def get_manifest(self, task):
         manifest_path = fs.path.join(task.joltdir, task._get_expansion(self.path))
         manifest = RepoManifest(task, manifest_path)
+        manifest.parse()
         return manifest
 
 

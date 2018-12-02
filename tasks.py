@@ -64,6 +64,12 @@ class TaskRegistry(object):
     def add_test_class(self, cls):
         self.tests[cls.name] = cls
 
+    def add_task(self, task, extra_params):
+        name, params = utils.parse_task_name(task.name)
+        params.update(extra_params or {})
+        full_name = utils.format_task_name(name, params)
+        self.instances[full_name] = task
+
     def get_task_class(self, name):
         return self.tasks.get(name)
 
