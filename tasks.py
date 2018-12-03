@@ -36,6 +36,9 @@ class Parameter(object):
     def is_unset(self):
         return self._value is None
 
+    def is_set(self):
+        return self._value is not None and self._value != self._default
+
     def get_value(self):
         return self._value
 
@@ -144,7 +147,7 @@ class TaskBase(object):
         return {key: getattr(self, key).get_value()
                 for key in dir(self)
                 if isinstance(getattr(self, key), Parameter) and \
-                 (unset or not getattr(self, key).is_unset()) }
+                 (unset or getattr(self, key).is_set()) }
 
     def _get_properties(self):
         return {key: str(getattr(self, key))
