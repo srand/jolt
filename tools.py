@@ -415,6 +415,7 @@ class Tools(object):
     def run(self, cmd, *args, **kwargs):
         cmd = self.expand(cmd, *args, **kwargs)
         try:
+            stdi, stdo, stde = None, None, None
             try:
                 stdi = termios.tcgetattr(sys.stdin.fileno())
                 stdo = termios.tcgetattr(sys.stdout.fileno())
