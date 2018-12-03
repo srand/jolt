@@ -125,8 +125,11 @@ class TaskRegistry(object):
 
 
 class TaskBase(object):
+    cacheable = True
+
     def __init__(self, *args, **kwargs):
         super(TaskBase, self).__init__(*args, **kwargs)
+        self.cacheable = self.__class__.cacheable
 
     def _create_parameters(self):
         for key, param in self.__class__.__dict__.items():
@@ -211,7 +214,7 @@ class Task(TaskBase):
                 "forgot to set the parameter?".format(self.name, e)
 
     def is_cacheable(self):
-        return True
+        return self.cacheable
 
     def is_runnable(self):
         return True

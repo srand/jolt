@@ -7,8 +7,9 @@ from concurrent.futures import ThreadPoolExecutor, Future, as_completed
 import traceback
 try:
     import asyncio
+    has_asyncio = True
 except:
-    pass
+    has_asyncio = False
 
 
 class TaskQueue(object):
@@ -69,11 +70,9 @@ class LocalExecutor(Executor):
         self.force_upload = force_upload
 
     def run(self):
-        try:
+        if has_asyncio:
             loop = asyncio.SelectorEventLoop()
             asyncio.set_event_loop(loop)
-        except:
-            pass
 
         try:
             self.task.started()

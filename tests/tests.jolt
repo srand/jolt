@@ -9,6 +9,7 @@ directory.global_influence("../plugins", "*.py")
 class Tests(Task):
     requires = \
         "test/artifact", \
+	"test/cli", \
         "test/tools"
 
 
