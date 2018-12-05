@@ -11,5 +11,6 @@ pipelines:
         caches:
           - pip
         script: # Modify the commands below to build your repository.
+          - apt-get install zip
           - pip install -e .
           - cd tests && jolt build tests
