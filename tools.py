@@ -81,6 +81,23 @@ def _replace_in_file(path, search, replace):
         assert False, "failed to replace string in file: {0}".format(path)
 
 
+class _String(object):
+    def __init__(self, s=None):
+        self._str = s or ''
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, type, value, tb):
+        pass
+
+    def __str__(self):
+        return self._str
+
+    def __get__(self):
+        return self._str
+
+
 class _tmpdir(object):
     def __init__(self, name, cwd=None):
         self._name = name
@@ -104,27 +121,6 @@ class _tmpdir(object):
     @property
     def path(self):
         return self.get_path()
-
-    def get_path(self):
-        return self._path
-
-
-class builddir(object):
-    def __init__(self, task, remove=False):
-        self._path = "build/{0}".format(task.qualified_name)
-        self._remove = remove
-
-    def __enter__(self):
-        try:
-            fs.makedirs(self._path)
-        except:
-            raise
-        assert self._path, "failed to create build directory"
-        return self
-
-    def __exit__(self, type, value, tb):
-        if self._path and self._remove:
-            fs.rmtree(self._path)
 
     def get_path(self):
         return self._path
@@ -257,7 +253,7 @@ class Tools(object):
             dirname = self._cwd
             fs.makedirs(dirname)
             self._builddir[name] = fs.mkdtemp(prefix=name+"-", dir=dirname)
-        return self._builddir[name]
+        return _String(self._builddir[name])
 
     def chmod(self, filepath, mode):
         filepath = self.expand(filepath)
