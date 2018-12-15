@@ -1,4 +1,4 @@
-Quickstart
+Tutorial
 ==========
 
 Let's kick off with a few examples, getting more into details as we move along. 
@@ -126,7 +126,7 @@ content of the current ``hello`` artifact, run:
 You will see the ``message.txt`` file just created.
 
 
-Using Parameters
+Parameters
 ----------------
 
 Next, we're going to use a task parameter to alter the ``Hello world!`` 
@@ -138,7 +138,7 @@ use the new parameter's value when writing the ``message.txt`` file.
 .. code-block:: python
 
     class Hello(Task):
-        """ Creates a text file with cheerful message """
+        """ Creates a text file with a cheerful message """
 
         recipient = Parameter(default="world", help="Name of greeting recipient.") 
 
@@ -192,4 +192,85 @@ to the ``recipient`` parameter. Try it out:
     $ jolt build print:recipient=Lisa
     $ jolt build print:recipient=Kelly
 
+
+Tools
+-----
+
+The ``run`` and ``publish`` methods take a ``tools`` argument as their
+last parameter. This toolbox provides a large set of tools useful for many 
+different types of tasks. See the reference documentation for more information.
+
+However, Jolt was originally created with compilation tasks in mind. Below is
+a real world example of a task compiling the ``e2fsprogs`` package containing 
+EXT2/4/4 filesystem utility programs. It uses AutoTools to configure and 
+build its sources into binary application. Luckily, the ``tools`` object 
+provides utilities for building autotools projects as seen below. 
+In addition to AutoTools, there is also support for CMake as well as generic
+support for running any tool.
+
+.. code-block:: python
+
+    from tasks import *
+    from plugins import git
+
+
+    class E2fsprogs(Task): 
+        """ Ext 2/3/4 filesystem utilities """
+
+        requires = "git:url=git://git.kernel.org/pub/scm/fs/ext2/e2fsprogs.git"
+
+        def run(self, deps, tools):
+            ac = tools.autotools()
+            ac.configure("e2fsprogs")
+            ac.build()
+            ac.install()
+
+        def publish(self, artifact, tools):
+            ac = tools.autotools()
+            ac.publish(artifact)
+            artifact.environ.PATH.append("bin")
+
+The autotools ``ac`` object automatically creates build and install (--prefix) 
+directories which are used when configuring, building and installing the 
+project. All files installed in the installation directory will be published. 
+Both directories are removed when execution has finished, i.e. the project 
+will be completely rebuilt if the task's influence changes. 
+
+The task also extends the environment of consumers by adding the artifact's 
+``bin`` directory to the ``PATH``. That way, any task that depends on
+``e2fsprogs`` will be able to run its utility programs directly without 
+explicitly referencing the artifact where they reside. 
+
+Also, note that the task requires a ``git`` repository hosted at ``kernel.org``. 
+This git task, implemented by a builtin plugin, is actually not a 
+task but a resource. You can read more about resources next.
+
+
+Resources
+---------
+
+Resources are a special kind of task only executed in the context of other
+tasks. They are invoked to acquire and release a resource before and after 
+the execution of a task. No artifact is produced by a resource. 
+
+A common use-case for resources is to allocate and reserve equipment required 
+during the execution of a task. Such equipment could be a build server or 
+a mobile device on which to run tests.
+
+Below is a skeleton example providing mutual exclusion: 
+
+.. code-block:: python
+
+    from tasks import *
+
+    class Exclusivity(Resource):
+        """ Resource providing mutual exclusion """
+
+        object = Parameter(help="Name of shared object")
+
+        def acquire(self, artifact, deps, tools):
+            # TODO: Implement locking
+
+        def release(self, artifact, deps, tools):
+            # TODO: Implement unlocking
 
