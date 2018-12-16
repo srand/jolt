@@ -151,7 +151,13 @@ class TaskBase(object):
         return {key: getattr(self, key).get_value()
                 for key in dir(self)
                 if isinstance(getattr(self, key), Parameter) and \
-                 (unset or getattr(self, key).is_set()) }
+                 (unset or not getattr(self, key).is_unset()) }
+
+    def _get_explicitly_set_parameters(self):
+        return {key: getattr(self, key).get_value()
+                for key in dir(self)
+                if isinstance(getattr(self, key), Parameter) and \
+                getattr(self, key).is_set() }
 
     def _get_properties(self):
         return {key: str(getattr(self, key))
@@ -324,15 +330,14 @@ class Resource(Task):
 
     """
     
+    cacheable = False
+
     def __init__(self, *args, **kwargs):
         super(Resource, self).__init__(*args, **kwargs)
 
     def _get_source_functions(self):
         return super(Resource, self)._get_source_functions() + \
             [self.acquire, self.release]
-
-    def is_cacheable(self):
-        return False
 
     def is_runnable(self):
         return False

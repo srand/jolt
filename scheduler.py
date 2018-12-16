@@ -90,6 +90,16 @@ class NetworkExecutor(Executor):
     pass
 
 
+class SkipTaskExecutor(LocalExecutor):
+    def __init__(self, *args, **kwargs):
+        super(SkipTaskExecutor, self).__init__(*args, **kwargs)
+
+    def run(self):
+        self.task.started()
+        self.task.finished()
+        return self.task
+
+
 @utils.Singleton
 class ExecutorRegistry(object):
     executor_factories = []
@@ -105,6 +115,10 @@ class ExecutorRegistry(object):
             factory.shutdown()
 
     def create(self, cache, task):
+        if not task.is_cacheable() and self._network:
+            factory = self._factories[-1]
+            return SkipTaskExecutor(factory, cache, task)
+
         for factory in self._factories:
             if not task.is_cacheable() and factory.is_network():
                 continue

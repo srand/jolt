@@ -429,6 +429,7 @@ class Tools(object):
     def run(self, cmd, *args, **kwargs):
         """ Runs a command in a shell interpreter """
         cmd = self.expand(cmd, *args, **kwargs)
+        stdi, stdo, stde = None, None, None
         try:
             stdi, stdo, stde = None, None, None
             try:

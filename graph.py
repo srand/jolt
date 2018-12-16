@@ -40,7 +40,9 @@ class TaskProxy(object):
 
     @property
     def qualified_name(self):
-        return utils.format_task_name(self.task.name, self.task._get_parameters())
+        return utils.format_task_name(
+            self.task.name,
+            self.task._get_explicitly_set_parameters())
 
     @property
     def log_name(self):

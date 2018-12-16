@@ -61,6 +61,10 @@ class RepoProject(SubElement):
             return result.splitlines()
         assert False, "git command failed"
 
+    def has_local_ref(self, ref):
+        with self.tools.cwd(self.path_or_name):
+            return True if self.tools.run("git show-ref {0}", ref, output_on_error=True) else False
+
     def get_remote_ref(self, commit, remote, pattern=None):
         with self.tools.cwd(self.path_or_name):
             result = self.tools.run(
@@ -120,6 +124,11 @@ class RepoManifest(ElementTree):
             return project.remote or self.defaults[0].remote
         return project.remote
 
+    def get_upstream(self, project):
+        if len(self.defaults) > 0:
+            return project.upstream or self.defaults[0].revision or "master"
+        return project.upstream or "master"
+
     def assert_clean(self):
         for project in self.projects:
             assert not project.get_diff(), \
@@ -136,6 +145,12 @@ class RepoManifest(ElementTree):
                     "repo project '{0}' has unpublished commits"\
                     .format(project.path_or_name)
                 head = remote_ref
+
+            if project.revision and project.has_local_ref(project.revision):
+                project.upstream = project.revision
+            else:
+                project.upstream = self.get_upstream(project)
+
             project.revision = head
 
 

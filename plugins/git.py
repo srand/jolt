@@ -88,6 +88,7 @@ class Git(Resource, GitInfluenceProvider):
             "destination folder '{0}' already exists but is not a git repo"\
             .format(self.path)
         depth = "--depth 1" if self.sha.is_unset() else ""
+        log.info("Cloning into {0}", self.path)
         self.tools.run("git clone {0} {1} {2}", depth, self.url, self.path, output_on_error=True)
         assert fs.path.exists(self._get_git_folder()),\
             "failed to clone git repo '{0}'".format(self._get_name())

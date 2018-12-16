@@ -46,7 +46,7 @@ class SelfDeployExtension(NetworkExecutorExtension):
             executor.run()
         jolt_url = acache.location(task)
         assert jolt_url, "failed to selfdeploy jolt to remote cache"
-        return { "jolt_url":  jolt_url}
+        return { "jolt_url":  jolt_url, "jolt_identity": task.identity[:8] }
 
 
 @NetworkExecutorExtensionFactory.Register

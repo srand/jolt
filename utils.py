@@ -103,7 +103,7 @@ class cached:
     @staticmethod
     def instance(f):
         def _f(self, *args, **kwargs):
-            attr = "__cached_result_" + f.__name__
+            attr = "__cached_result_" + str(id(f))
             with cached.mutex:
                 if not hasattr(self, attr):
                     setattr(self, attr, f(self, *args, **kwargs))
@@ -113,7 +113,7 @@ class cached:
     @staticmethod
     def method(f):
         def _f(*args, **kwargs):
-            attr = "__cached_result_" + f.__name__
+            attr = "__cached_result_" + str(id(f))
             with cached.mutex:
                 if not hasattr(f, attr):
                     setattr(f, attr, f(*args, **kwargs))
@@ -134,13 +134,14 @@ def Singleton(cls):
 def map_consecutive(method, iterable):
     return list(map(method, iterable))
 
-def map_concurrent(method, iterable, max_workers=None):
+def map_concurrent(method, iterable, *args, **kwargs):
+    max_workers = kwargs.get("max_workers", None)
     callables = [partial(method, item) for item in iterable]
     results = []
     futures = []
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         for call in callables:
-            futures.append(executor.submit(call, *args, **kwargs))
+            futures.append(executor.submit(call))
         for future in as_completed(futures):
             try:
                 future.result()
