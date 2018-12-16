@@ -42,11 +42,17 @@ class TaskProxy(object):
     def qualified_name(self):
         return utils.format_task_name(
             self.task.name,
+            self.task._get_parameters())
+
+    @property
+    def short_qualified_name(self):
+        return utils.format_task_name(
+            self.task.name,
             self.task._get_explicitly_set_parameters())
 
     @property
     def log_name(self):
-        return "({0} {1})".format(self.qualified_name, self.identity[:8])
+        return "({0} {1})".format(self.short_qualified_name, self.identity[:8])
 
     @property
     @cached.instance
@@ -65,7 +71,7 @@ class TaskProxy(object):
         return sha.hexdigest()
 
     def __str__(self):
-        return "{0}{1}".format(self.qualified_name, "*" if self.is_extension() else '')
+        return "{0}{1}".format(self.short_qualified_name, "*" if self.is_extension() else '')
 
     def info(self, fmt, *args, **kwargs):
         self.task.info(fmt + " " + self.log_name, *args, **kwargs)
