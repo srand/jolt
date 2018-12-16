@@ -14,4 +14,5 @@ plugins.
    
    installing
    quickstart
+   configuration
    reference

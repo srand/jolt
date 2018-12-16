@@ -274,3 +274,36 @@ Below is a skeleton example providing mutual exclusion:
         def release(self, artifact, deps, tools):
             # TODO: Implement unlocking
 
+
+Tests
+------
+
+After implementing he ``e2fsprogs`` task above, the next logical step is 
+to write a few test-cases for the utility programs it builds. Luckily, Jolt
+has integrated test support. 
+
+Test tasks are derived from the ``Test`` base class instead of ``Task`` and 
+they are implemented like a regular Python ``unittest.TestCase``. You can use
+all assertions and decorators like you normally would. In all other respects, 
+a ``Test`` task behaves just like a regular ``Task``. 
+
+Below is an example:
+
+.. code-block:: python
+
+    from tasks import *
+
+    class E2fsTest(Test):
+        requires = "e2fsprogs"
+
+        def setup(self, deps, tools):
+            self.tools = tools
+
+        def test_mke2fs(self):
+            self.assertTrue(self.tools.run("mke2fs"))
+
+        def test_badblocks(self):
+            self.assertTrue(self.tools.run("badblocks"))
+
+        def test_tune2fs(self):
+            self.assertTrue(self.tools.run("tune2fs"))

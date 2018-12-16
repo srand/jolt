@@ -193,6 +193,8 @@ class _AutoTools(object):
 
 
 class Tools(object):
+    """ A collection of useful tools """
+
     def __init__(self, task=None, cwd=None):
         self._cwd = cwd or os.getcwd()
         self._env = {key: value for key, value in os.environ.items()}
@@ -208,6 +210,8 @@ class Tools(object):
         return False
 
     def append_file(self, filepath, content):
+        """ Appends data at the end of a file """
+        
         filepath = self.expand(filepath)
         filepath = fs.path.join(self.getcwd(), filepath)
         content = self.expand(content)
@@ -215,6 +219,7 @@ class Tools(object):
             f.write(content)
 
     def archive(self, filepath, filename):
+        """ Creates a compressed archive """
         filename = self.expand(filename)
         filepath = self.expand(filepath)
         filename = fs.path.join(self.getcwd(), filename)
@@ -246,9 +251,11 @@ class Tools(object):
             assert False, "failed to archive directory: {0}".format(filepath)
 
     def autotools(self, deps=None):
+        """ Creates an AutoTools invokation helper """
         return _AutoTools(deps, self)
 
     def builddir(self, name="build", *args, **kwargs):
+        """ Creates a build directory """
         if name not in self._builddir:
             dirname = self._cwd
             fs.makedirs(dirname)
@@ -256,42 +263,43 @@ class Tools(object):
         return _String(self._builddir[name])
 
     def chmod(self, filepath, mode):
+        """ Changes permissions of files and directories """
         filepath = self.expand(filepath)
         filepath = fs.path.join(self.getcwd(), filepath)
         return os.chmod(filepath, mode)
 
     def cmake(self, deps=None):
+        """ Creates a CMake invokation helper """
         return _CMake(deps, self)
 
     def copy(self, src, dest, symlinks=False):
-        return fs.copy(
-            fs.path.join(self.getcwd(), src),
-            fs.path.join(self.getcwd(), dest),
-            symlinks=symlinks)
-
-    def symlink(self, src, dest, symlinks=False):
+        """ Copies file and directories """
         return fs.copy(
             fs.path.join(self.getcwd(), src),
             fs.path.join(self.getcwd(), dest),
             symlinks=symlinks)
 
     def cpu_count(self):
+        """ Returns the number of CPUs on the host """
         return multiprocessing.cpu_count()
 
     @contextmanager
     def cwd(self, path, *args, **kwargs):
+        """ Changes the current working directory """
         path = self.expand(path, *args, **kwargs)
         prev = self._cwd
-        self._cwd = fs.path.join(self._cwd, path)
+        if path is not None:
+            self._cwd = fs.path.join(self._cwd, path)
         try:
             assert fs.path.exists(self._cwd) and fs.path.isdir(self._cwd), \
                 "failed to change directory to {0}" \
                 .format(self._cwd)
-            yield self._cwd
+            yield fs.path.normpath(self._cwd)
         finally:
             self._cwd = prev
 
     def download(self, url, filename, **kwargs):
+        """ Downloads a file using HTTP(S) """
         url = self.expand(url)
         filename = self.expand(filename)
         filepath = fs.path.join(self.getcwd(), filename)
@@ -312,6 +320,7 @@ class Tools(object):
 
     @contextmanager
     def environ(self, **kwargs):
+        """ Sets variables in an environment context """
         for key, value in kwargs.items():
             kwargs[key] = self.expand(value)
 
@@ -324,11 +333,13 @@ class Tools(object):
         self._env.update(restore)
 
     def expand(self, string, *args, **kwargs):
+        """ Expands macros in a string """
         return self._task._get_expansion(string, *args, **kwargs) \
             if self._task is not None \
             else utils.expand(string, *args, **kwargs)
 
     def extract(self, filename, filepath, files=None):
+        """ Extracts an archive """
         filename = self.expand(filename)
         filepath = self.expand(filepath)
         filename = fs.path.join(self.getcwd(), filename)
@@ -374,6 +385,7 @@ class Tools(object):
             assert False, "failed to extract archive: {0}".format(filename)
 
     def file_size(self, filepath):
+        """ Returns the size of a file """
         filepath = self.expand(filepath)
         filepath = fs.path.join(self.getcwd(), filepath)
         try:
@@ -384,12 +396,15 @@ class Tools(object):
             return stat.st_size
 
     def getcwd(self):
+        """ Returns the current working directory """
         return fs.path.normpath(self._cwd)
 
     def getenv(self, key):
+        """ Returns an environment variable """
         return self._env.get(key)
 
     def glob(self, path, *args, **kwargs):
+        """ Enumerates files and directories """
         path = self.expand(path, *args, **kwargs)
         files = utils.as_list(glob.glob(fs.path.join(self._cwd, path)))
         if not fs.path.isabs(path):
@@ -397,18 +412,22 @@ class Tools(object):
         return files
 
     def map_consecutive(self, callable, iterable):
+        """ Sequential map()"""
         return utils.map_consecutive(callable, iterable)
 
     def map_concurrent(self, callable, iterable, max_workers=None):
+        """ Concurrent map()"""
         return utils.map_concurrent(callable, iterable, max_workers)
 
     def replace_in_file(self, path, search, replace):
+        """ Replaces all occurrences of a substring in a file """
         path = self.expand(path)
         search = self.expand(search)
         replace = self.expand(replace)
         return _replace_in_file(fs.path.join(self._cwd, path), search, replace)
 
     def run(self, cmd, *args, **kwargs):
+        """ Runs a command in a shell interpreter """
         cmd = self.expand(cmd, *args, **kwargs)
         try:
             stdi, stdo, stde = None, None, None
@@ -428,6 +447,7 @@ class Tools(object):
                 termios.tcsetattr(sys.stderr.fileno(), termios.TCSANOW, stde)
 
     def setenv(self, key, value=None):
+        """ Sets an environment variable """
         if value is None:
             try:
                 del self._env[key]
@@ -437,18 +457,23 @@ class Tools(object):
             self._env[key] = self.expand(value)
 
     def symlink(self, src, dest):
+        """ Creates a symbolic link """
         src = self.expand(src, *args, **kwargs)
         dst = self.expand(dst, *args, **kwargs)
         fs.symlink(src, dst)
 
     def tmpdir(self, name, *args, **kwargs):
+        """ Creates a temporary directory """
         return _tmpdir(name, cwd=self._cwd)
 
     def unlink(self, path, *args, **kwargs):
+        """Removes a file from disk"""
         cmd = self.expand(path, *args, **kwargs)
         return fs.unlink(fs.path.join(self._cwd, path))
 
     def upload(self, filename, url, auth=None, **kwargs):
+        """ Uploads a file using HTTP """
+
         filename = self.expand(filename)
         filename = fs.path.join(self.getcwd(), filename)
         try:
@@ -468,6 +493,7 @@ class Tools(object):
         return False
 
     def write_file(self, filepath, content):
+        """ Creates/overwrites a file on disk """
         filepath = self.expand(filepath)
         filepath = fs.path.join(self.getcwd(), filepath)
         content = self.expand(content)

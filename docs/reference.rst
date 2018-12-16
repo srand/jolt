@@ -1,12 +1,18 @@
 Reference
 ===========
 
+Artifact
+--------
 
-Task
-----
+.. autoclass:: tasks.Artifact
+   :members: collect, copy, path
 
-.. autoclass:: tasks.Task
-   :members: run, publish, unpack
+
+Context
+--------
+
+.. autoclass:: tasks.Context
+   :members: items
 
 
 Resource
@@ -14,3 +20,27 @@ Resource
 
 .. autoclass:: tasks.Resource
    :members: acquire, release
+
+
+Task
+----
+
+.. autoclass:: tasks.Task
+   :inherited-members: cacheable
+   :members: info, joltdir, warn, error, run, publish, unpack
+
+
+Test
+----
+
+.. autoclass:: tasks.Test
+   :members: setup, cleanup
+   :undoc-members:
+
+
+Tools
+-----
+
+.. autoclass:: tasks.Tools
+   :members:
+   :undoc-members:

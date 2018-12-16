@@ -125,7 +125,8 @@ class TaskRegistry(object):
 
 
 class TaskBase(object):
-    cacheable = True
+    cacheable = True 
+    """ Whether the task produces an artifact or not. """
 
     def __init__(self, *args, **kwargs):
         super(TaskBase, self).__init__(*args, **kwargs)
@@ -159,10 +160,33 @@ class TaskBase(object):
 
 
 class Task(TaskBase):
+    #: Path to the .jolt file where the task was defined.
     joltdir = "."
+    """ Path to the .jolt file where the task was defined. """
+
     name = None
+    """ Name of the task. Derived from class name if not set. """
+
     requires = []
+    """ List of dependencies to other tasks. """
+    
     extends = ""
+    """ 
+    Name of extended task.
+
+    A task with this attribute set is called an extension. An extension
+    is executed in the context of the extended task, immediately after
+    the extended task has executed. 
+
+    A common use-case for extensions is to produce additional artifacts
+    from the output of another task. Also, for long-running tasks, it is
+    sometimes beneficial to utilize the intermediate output from an extended
+    task. The extension artifact can then be acquired more cheaply than if the
+    extension had performed all of the work from scratch.
+    
+    An extension can only extend one other task.
+    """
+    
     influence = []
 
     def __init__(self, parameters=None):
@@ -220,12 +244,18 @@ class Task(TaskBase):
         return True
 
     def info(self, fmt, *args, **kwargs):
+        """ 
+        Log information about the task. 
+        """
+
         log.info(fmt, *args, **kwargs)
 
     def warn(self, fmt, *args, **kwargs):
+        """ Log a warning concerning the task """
         log.warn(fmt, *args, **kwargs)
 
     def error(self, fmt, *args, **kwargs):
+        """ Log an error concerning the task """
         log.error(fmt, *args, **kwargs)
 
     def run(self, deps, tools):
@@ -236,17 +266,19 @@ class Task(TaskBase):
         deps dictionary. The tools argument provides a set of low
         level tool functions that may be useful.
 
-        with tools.cwd("path/to/subdir"):
-            tools.run("make {target}")
+        .. code-block:: python
+
+          with tools.cwd("path/to/subdir"):
+              tools.run("make {target}")
 
         When using methods from the toolbox, task parameters, such
-        as 'target' above,  are automatically expanded to their values.
+        as ``target`` above,  are automatically expanded to their values.
         """
         pass
 
     def publish(self, artifact, tools):
         """
-        Publishes files produced by run().
+        Publishes files produced by :func:`~run`.
 
         Files can be collected in to the artifact by calling
         artifact.collect().
@@ -255,11 +287,14 @@ class Task(TaskBase):
         variables that should be set whenever the task artifact is
         consumed. Example:
 
+        .. code-block:: python
+
           # Append <artifact-path>/bin to the PATH
           artifact.environ.PATH.append("bin")
 
           # Pass an arbitrary string to a consumer
           artifact.strings.foo = "bar"
+
         """
         pass
 
@@ -278,6 +313,17 @@ class Task(TaskBase):
 
 
 class Resource(Task):
+    """ 
+    A resource.
+
+    Resources are executed in the :class:`~Context` of other tasks. They are invoked to 
+    acquire and release a resource, such as hardware equipment, before and after
+    the execution of a task. No artifact is produced by a resource.
+
+    Implementors should override :func:`~acquire` and :func:`~release`.
+
+    """
+    
     def __init__(self, *args, **kwargs):
         super(Resource, self).__init__(*args, **kwargs)
 
@@ -294,10 +340,12 @@ class Resource(Task):
     def info(self, fmt, *args, **kwargs):
         pass
 
-    def acquire(self, artifact, env, tools):
+    def acquire(self, artifact, deps, tools):
+        """ Called to acquire the resource. """
         pass
 
-    def release(self, artifact, env, tools):
+    def release(self, artifact, deps, tools):
+        """ Called to release the resource. """
         pass
 
     def run(self, env, tools):
