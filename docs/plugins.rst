@@ -58,7 +58,7 @@ These configuration keys exist:
 
 
 Jenkins
-=======
+-------
 
 The Jenkins plugin implements distributed task execution. When used,
 tasks can be executed by a Jenkins job. The plugin automatically
@@ -102,7 +102,7 @@ These configuration keys exist:
 
 
 Selfdeploy
-==========
+-----------
 
 The Selfdeploy plugin automatically deploys the running version of
 Jolt into all configured artifact storage providers. This is useful
