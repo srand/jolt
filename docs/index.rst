@@ -15,4 +15,5 @@ plugins.
    installing
    quickstart
    configuration
+   plugins
    reference
