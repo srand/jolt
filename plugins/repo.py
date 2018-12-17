@@ -154,6 +154,8 @@ class RepoManifest(ElementTree):
             project.revision = head
 
 
+_git_repos = {}
+
 class RepoInfluenceProvider(HashInfluenceProvider):
     name = "Repo"
     path = "."
@@ -178,13 +180,16 @@ class RepoInfluenceProvider(HashInfluenceProvider):
                 if self.exclude is not None and project.path_or_name in self.exclude:
                     continue
 
-                gip = git.GitInfluenceProvider(project.path_or_name)
+                gip = _git_repos.get(project.path_or_name)
+                if gip is None:
+                    gip = git.GitInfluenceProvider(project.path_or_name)
+                    _git_repos[project.path_or_name] = gip
                 result.append(gip.get_influence(task))
 
             return "\n".join(result)
 
         except KeyError as e:
-            pass
+            log.exception()
         assert False, "failed to calculate hash influence for repo manifest at {0}".format(self.path)
 
     def get_manifest(self, task):
