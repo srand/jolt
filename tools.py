@@ -97,6 +97,19 @@ class _String(object):
     def __get__(self):
         return self._str
 
+    def __add__(self, s):
+        return self._str + s
+
+    def __iadd__(self, s):
+        self._str += s
+        return self
+
+    def endswith(self, substr):
+        return self._str.endswith(substr)
+
+    def startswith(self, substr):
+        return self._str.startswith(substr)
+
 
 class _tmpdir(object):
     def __init__(self, name, cwd=None):
@@ -260,7 +273,7 @@ class Tools(object):
             dirname = self._cwd
             fs.makedirs(dirname)
             self._builddir[name] = fs.mkdtemp(prefix=name+"-", dir=dirname)
-        return _String(self._builddir[name])
+        return self._builddir[name]
 
     def chmod(self, filepath, mode):
         """ Changes permissions of files and directories """
