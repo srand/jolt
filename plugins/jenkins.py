@@ -11,6 +11,7 @@ import filesystem as fs
 import hashlib
 from jinja2 import Template
 import utils
+import time
 
 NAME = "jenkins"
 
@@ -65,12 +66,17 @@ class JenkinsServer(object):
 
     def _check_job(self):
         template_xml, template_sha = self._load_job_template()
-        self.job_name = "{0}-{1}".format(config.get(NAME, "job", "Jolt"), template_sha[:6])
+        self.job_name = "{0}-{1}".format(
+            config.get(NAME, "job", "Jolt"),
+            template_sha[:6])
 
         try:
             job_xml = self._server.get_job_config(self.job_name)
         except:
             self._create_job(self.job_name, template_xml, self._server.create_job)
+            view = config.get(NAME, "view")
+            if view:
+                self._server.add_job_to_view(view, self.job_name)
             return
         if self._get_sha(job_xml) != template_sha:
             assert self._create_job(
@@ -109,6 +115,10 @@ class JenkinsExecutor(scheduler.NetworkExecutor):
 
         queue_info = self.server.get_queue_item(queue_id)
         while not queue_info.get("executable"):
+            assert not queue_info.get("cancelled"),\
+            "[JENKINS] {0} failed with status CANCELLED".format(
+                self.task.qualified_name)
+            time.sleep(5)
             queue_info = self.server.get_queue_item(queue_id)
 
         log.verbose("[JENKINS] Executing {0}", self.task.qualified_name)
@@ -116,12 +126,14 @@ class JenkinsExecutor(scheduler.NetworkExecutor):
         build_id = queue_info["executable"]["number"]
 
         build_info = self.server.get_build_info(self.job, build_id)
-        while build_info["result"] not in ["SUCCESS", "FAILURE"]:
+        while build_info["result"] not in ["SUCCESS", "FAILURE", "ABORTED"]:
+            time.sleep(5)
             build_info = self.server.get_build_info(self.job, build_id)
 
         log.verbose("[JENKINS] Finished {0}", self.task.qualified_name)
         assert build_info["result"] == "SUCCESS", \
-            "[JENKINS] {0}: {1}".format(build_info["result"], self.task.qualified_name)
+            "[JENKINS] {1} failed with status {0}".format(
+                build_info["result"], self.task.qualified_name)
 
         assert self.cache.is_available_remotely(self.task), \
             "[JENKINS] no artifact produced for {0}, check configuration"\

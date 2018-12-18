@@ -1,5 +1,6 @@
-from tasks import *
+from tasks import Task, Test
 from plugins import directory
+import os
 
 
 directory.global_influence("..", "*.py")
@@ -20,7 +21,7 @@ class Tools(Test):
         self.tmpdir = self.tools.builddir("tmpdir")
 
     def assertExists(self, filepath):
-        self.assertTrue(fs.path.exists(filepath))
+        self.assertTrue(os.path.exists(filepath))
 
     def test_tools_extract_zip(self):
         with self.tools.cwd(self.tmpdir):

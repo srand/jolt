@@ -1,4 +1,4 @@
-from tasks import *
+from tasks import Task, Test
 import threading
 import sys
 

@@ -30,6 +30,12 @@
           <defaultValue></defaultValue>
           <trim>false</trim>
         </hudson.model.StringParameterDefinition>
+        <hudson.model.StringParameterDefinition>
+          <name>jolt_identity</name>
+          <description></description>
+          <defaultValue></defaultValue>
+          <trim>false</trim>
+        </hudson.model.StringParameterDefinition>
         <hudson.model.TextParameterDefinition>
           <name>config</name>
           <description></description>
@@ -62,19 +68,24 @@
     <hudson.tasks.Shell>
       <command>
 if [ -n "$jolt_url" ]; then
-  mkdir -p jolt
-  cd jolt
-  curl -o jolt.tgz $jolt_url
-  tar -xzvf jolt.tgz
-  rm -f jolt.tgz
-  cd ..
-  virtualenv jolt-python
-  . jolt-python/bin/activate
-  pip install -e jolt
+  jolt_dir=jolt-$jolt_identity
+
+  if [ ! -d "$jolt_dir" ]; then
+    mkdir -p $jolt_dir/src $jolt_dir/tgz
+    curl -o $jolt_dir/tgz/jolt.tgz $jolt_url
+    tar -xzvf $jolt_dir/tgz/jolt.tgz -C $jolt_dir/src
+    virtualenv $jolt_dir/env
+    . $jolt_dir/env/bin/activate
+    pip install -e $jolt_dir/src || rm -rf $jolt_dir
+  else
+    . $jolt_dir/env/bin/activate
+  fi
 fi
 
-echo &quot;$config&quot; &gt; jolt.conf
-echo &quot;$joltfile&quot; &gt; tasks.jolt
+set +x
+/bin/echo -E &quot;$config&quot; &gt; jolt.conf
+/bin/echo -E &quot;$joltfile&quot; &gt; tasks.jolt
+set -x
 
 jolt -vv -c jolt.conf build -i $task_identity $task</command>
     </hudson.tasks.Shell>
@@ -86,7 +97,7 @@ jolt -vv -c jolt.conf build -i $task_identity $task</command>
       <skipWhenFailed>false</skipWhenFailed>
       <cleanWhenSuccess>true</cleanWhenSuccess>
       <cleanWhenUnstable>true</cleanWhenUnstable>
-      <cleanWhenFailure>true</cleanWhenFailure>
+      <cleanWhenFailure>false</cleanWhenFailure>
       <cleanWhenNotBuilt>true</cleanWhenNotBuilt>
       <cleanWhenAborted>true</cleanWhenAborted>
       <notFailBuild>false</notFailBuild>

@@ -67,4 +67,4 @@ class JoltLoader(object):
         return self._tasks, self._tests
 
     def get_sources(self):
-        return "".join(self._source)
+        return "\n".join(self._source)

@@ -30,7 +30,7 @@ the Jolt configuration.
 
 These configuration keys exist:
 
-* ``download`` - 
+* ``download`` -
   Boolean. Allow/disallow artifacts to be downloaded from Artifactory.
   Defaults to ``true``.
 
@@ -42,18 +42,18 @@ These configuration keys exist:
   Boolean. Allow/disallow artifacts to be uploaded to Artifactory.
   Defaults to ``true``.
 
-* ``uri`` - 
-  URL to the Artifactory server. 
+* ``uri`` -
+  URL to the Artifactory server.
 
-* ``keyring.username`` - 
+* ``keyring.username`` -
   Username to use when authenticating with Artifactory.
-  
-* ``keyring.password`` - 
+
+* ``keyring.password`` -
   Password to use when authenticating with Artifactory. Should normally
   never need to be set in the configuration file. By default, Jolt asks
   for the password when needed and stores it in a keyring for future use.
 
-* ``keyring.service`` - 
+* ``keyring.service`` -
   Keyring service identifier. Defaults to ``artifactory``.
 
 
@@ -84,20 +84,27 @@ These configuration keys exist:
   template to create the job required to execute tasks. The job is
   automatically recreated if the template is changed or manually
   reconfigured in the Jenkins UI.
-  If no template is configured, a default one is used. 
+  If no template is configured, a default one is used.
 
-* ``uri`` - 
-  URL to the Jenkins server. 
+* ``uri`` -
+  URL to the Jenkins server.
 
-* ``keyring.username`` - 
+* ``job`` -
+  Name prefix of the automatically created Jenkins job. Defaults to ``Jolt``.
+
+* ``view`` -
+  Optional. Name of a Jenkins view to add the automatically created job to.
+  The view must exist.
+
+* ``keyring.username`` -
   Username to use when authenticating with Jenkins.
-  
-* ``keyring.password`` - 
+
+* ``keyring.password`` -
   Password to use when authenticating with Jenkins. Should normally
   never need to be set in the configuration file. By default, Jolt asks
   for the password when needed and stores it in a keyring for future use.
 
-* ``keyring.service`` - 
+* ``keyring.service`` -
   Keyring service identifier. Defaults to ``jenkins``.
 
 

@@ -127,6 +127,7 @@ TOGGLE_OFFLINE = 'computer/%(name)s/toggleOffline?offlineMessage=%(msg)s'
 CONFIG_NODE = 'computer/%(name)s/config.xml'
 VIEW_NAME = '%(folder_url)sview/%(short_name)s/api/json?tree=name'
 VIEW_JOBS = 'view/%(name)s/api/json?tree=jobs[url,color,name]'
+ADD_JOB_TO_VIEW = 'view/%(view_name)s/addJobToView?name=%(job_name)s'
 CREATE_VIEW = '%(folder_url)screateView?name=%(short_name)s'
 CONFIG_VIEW = '%(folder_url)sview/%(short_name)s/config.xml'
 DELETE_VIEW = '%(folder_url)sview/%(short_name)s/doDelete'
@@ -1672,6 +1673,15 @@ class Jenkins(object):
         ))
         if self.view_exists(name):
             raise JenkinsException('delete[%s] failed' % (name))
+
+    def add_job_to_view(self, view_name, job_name):
+        '''Delete Jenkins view permanently.
+
+        :param name: Name of Jenkins view, ``str``
+        '''
+        self.jenkins_open(requests.Request(
+            'POST', self._build_url(ADD_JOB_TO_VIEW, locals())
+        ))
 
     def create_view(self, name, config_xml):
         '''Create a new Jenkins view
