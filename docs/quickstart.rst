@@ -307,3 +307,16 @@ Below is an example:
 
         def test_tune2fs(self):
             self.assertTrue(self.tools.run("tune2fs"))
+
+
+Influence
+---------
+
+It is important to ensure that all attributes that influence a task's
+identity are known and registered to avoid false cache hits. For example,
+in a compilation task all compiled source files should influence the task's
+identity and trigger re-execution of the task if changed. However, Jolt
+has no way of knowing what source files to monitor. This information must be
+explicitly provided by the task implementor. Luckily, Jolt provides a few
+builtin class decorators to make it easier.
+

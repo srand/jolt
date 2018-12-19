@@ -1,5 +1,6 @@
 from tasks import Task, Test
 from plugins import directory
+import utils
 import os
 
 
@@ -11,7 +12,8 @@ class Tests(Task):
     requires = \
         "test/artifact", \
 	"test/cli", \
-        "test/tools"
+        "test/tools", \
+        "test/utils"
 
 
 class Tools(Test):
@@ -40,3 +42,25 @@ class Tools(Test):
             self.tools.run("tar cjvf tests.tar.bz2 ../tests.jolt")
             self.tools.extract("tests.tar.bz2", self.tmpdir)
             self.assertExists("tests.jolt")
+
+
+class Utils(Test):
+    name = "test/utils"
+
+    def setup(self, deps, tools):
+        self.tmpdir = self.tools.builddir("tmpdir")
+
+    @utils.retried.on_exception(AssertionError)
+    def raise1(self):
+        self.exc_count += 1
+        assert self.exc_count > 1, "failed!"
+
+    @utils.retried.on_exception(AssertionError, count=2)
+    def raise2(self):
+        self.exc_count += 1
+        assert self.exc_count > 2, "failed!"
+
+    def test_retried_on_exception(self):
+        self.exc_count = 0
+        with self.assertRaises(AssertionError):
+            self.raise2()

@@ -12,6 +12,8 @@ import hashlib
 from jinja2 import Template
 import utils
 import time
+from requests.exceptions import ConnectionError
+
 
 NAME = "jenkins"
 
@@ -99,6 +101,18 @@ class JenkinsExecutor(scheduler.NetworkExecutor):
         self.task = task
         self.job = self.server.job_name
 
+    @utils.retried.on_exception(ConnectionError)
+    def _get_queue_item(self, queue_id):
+        return self.server.get_queue_item(queue_id)
+
+    @utils.retried.on_exception(ConnectionError)
+    def _get_build_info(self, build_id):
+        return self.server.get_build_info(self.job, build_id)
+
+    @utils.retried.on_exception(ConnectionError)
+    def _build_job(self, parameters):
+        return self.server.build_job(self.job, parameters)
+
     def _run(self):
         task = [self.task.qualified_name]
         task += [t.qualified_name for t in self.task.extensions]
@@ -110,25 +124,25 @@ class JenkinsExecutor(scheduler.NetworkExecutor):
         }
         parameters.update(scheduler.ExecutorRegistry.get().get_network_parameters(self.task))
 
-        queue_id = self.server.build_job(self.job, parameters)
+        queue_id = self._build_job(parameters)
+
         log.verbose("[JENKINS] Queued {0}", self.task.qualified_name)
 
-        queue_info = self.server.get_queue_item(queue_id)
+        queue_info = self._get_queue_item(queue_id)
         while not queue_info.get("executable"):
             assert not queue_info.get("cancelled"),\
             "[JENKINS] {0} failed with status CANCELLED".format(
                 self.task.qualified_name)
             time.sleep(5)
-            queue_info = self.server.get_queue_item(queue_id)
+            queue_info = self._get_queue_item(queue_id)
 
         log.verbose("[JENKINS] Executing {0}", self.task.qualified_name)
 
         build_id = queue_info["executable"]["number"]
-
-        build_info = self.server.get_build_info(self.job, build_id)
+        build_info = self._get_build_info(build_id)
         while build_info["result"] not in ["SUCCESS", "FAILURE", "ABORTED"]:
             time.sleep(5)
-            build_info = self.server.get_build_info(self.job, build_id)
+            build_info = self._get_build_info(build_id)
 
         log.verbose("[JENKINS] Finished {0}", self.task.qualified_name)
         assert build_info["result"] == "SUCCESS", \

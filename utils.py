@@ -5,6 +5,7 @@ from threading import RLock
 from string import *
 import os
 import hashlib
+import log
 
 
 def is_str(s):
@@ -119,6 +120,26 @@ class cached:
                     setattr(f, attr, f(*args, **kwargs))
             return getattr(f, attr)
         return _f
+
+
+class retried:
+    @staticmethod
+    def on_exception(exc_type, pattern=None, count=4, backoff=[1,4,10]):
+        def _decorate(f):
+            def _f(*args, **kwargs):
+                for i in range(0, count):
+                    try:
+                        if i > 0:
+                            time.sleep(backoff[i - 1])
+                        return f(*args, **kwargs)
+                    except exc_type as e:
+                        if pattern is None or pattern in str(e):
+                            log.hysterical("Exception caught, retrying : " + str(e))
+                            # log.exception()
+                            continue
+                raise e
+            return _f
+        return _decorate
 
 
 def Singleton(cls):

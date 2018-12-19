@@ -87,6 +87,7 @@ set +x
 /bin/echo -E &quot;$joltfile&quot; &gt; tasks.jolt
 set -x
 
+jolt -vv -c jolt.conf clean $task
 jolt -vv -c jolt.conf build -i $task_identity $task</command>
     </hudson.tasks.Shell>
   </builders>
