@@ -13,15 +13,27 @@ NORMAL = 2
 VERBOSE = 3
 HYSTERICAL = 4
 
+_levelstr = ["ERROR", "WARNING", "INFO", "VERBOSE", "HYSTERICAL"]
+
 path = config.get("jolt", "logfile", fs.path.join(fs.path.dirname(__file__), "jolt.log"))
 
 _loglevel = NORMAL
 _file = open(path, "a")
 
+def _prefix(level, **kwargs):
+    if type(level) == int:
+        level = "[{}]".format(_levelstr[level])
+    elif type(level) == str:
+        level = "[{}]".format(level)
+    else:
+        level = ""
+    context = kwargs.get("log_context")
+    context = "[{}]".format(context) if context else ""
+    pad = " " if level and context else ""
+    return context + pad + level + " "
+
 def _line(level, fmt, *args, **kwargs):
-    levelstr = ["ERROR", "WARNING", "INFO", "VERBOSE", "HYSTERICAL"]
-    return "[{}] ".format(levelstr[level]) + \
-        utils.expand(fmt, *args, ignore_errors=True, **kwargs)
+    return _prefix(level, **kwargs) + utils.expand(fmt, *args, ignore_errors=True, **kwargs)
 
 def _streamwrite(stream, line):
     stream.write(line + "\r\n")
@@ -65,8 +77,8 @@ def stdout(fmt, *args, **kwargs):
         line = utils.expand(fmt, *args, ignore_errors=True, **kwargs)
     except:
         line = fmt
-    _streamwrite(sys.stdout, line)
-    _streamwrite(_file, "[STDOUT] " + line)
+    _streamwrite(sys.stdout, _prefix(None, **kwargs) + line)
+    _streamwrite(_file, _prefix("STDOUT", **kwargs) + line)
 
 def stderr(fmt, *args, **kwargs):
     try:

@@ -25,6 +25,7 @@ class JenkinsServer(object):
         self._server = Jenkins(config.get(NAME, "uri"), username, password)
         self.get_job_info = self._server.get_job_info
         self.get_build_info = self._server.get_build_info
+        self.get_build_console_output = self._server.get_build_console_output
         self.get_queue_item = self._server.get_queue_item
         self.build_job = self._server.build_job
         self._check_job()
@@ -113,6 +114,20 @@ class JenkinsExecutor(scheduler.NetworkExecutor):
     def _build_job(self, parameters):
         return self.server.build_job(self.job, parameters)
 
+    def _get_console_log(self, build_id):
+        if not config.getboolean(NAME, "console", True):
+            return
+        logtext = self.server.get_build_console_output(self.job, build_id)
+        for line in logtext.splitlines():
+            if line.startswith("[ERROR]"):
+                log.error(line[8:], log_context=self.task.identity[:8])
+            elif line.startswith("[VERBOSE]"):
+                log.verbose(line[10:], log_context=self.task.identity[:8])
+            elif line.startswith("[HYSTERICAL]"):
+                log.error(line[13:], log_context=self.task.identity[:8])
+            else:
+                log.stdout(line, log_context=self.task.identity[:8])
+
     def _run(self):
         task = [self.task.qualified_name]
         task += [t.qualified_name for t in self.task.extensions]
@@ -145,6 +160,10 @@ class JenkinsExecutor(scheduler.NetworkExecutor):
             build_info = self._get_build_info(build_id)
 
         log.verbose("[JENKINS] Finished {0}", self.task.qualified_name)
+
+        if build_info["result"] != "SUCCESS":
+            self._get_console_log(build_id)
+
         assert build_info["result"] == "SUCCESS", \
             "[JENKINS] {1} failed with status {0}".format(
                 build_info["result"], self.task.qualified_name)
