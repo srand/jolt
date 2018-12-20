@@ -47,8 +47,8 @@ def _run(cmd, cwd, env, *args, **kwargs):
                         self.output(line)
                     self.buffer.append(line)
             except Exception as e:
-                self.output("{0}", str(e))
-                if output:
+                if self.output:
+                    self.output("{0}", str(e))
                     self.output(line)
                 self.buffer.append(line)
 
