@@ -73,10 +73,10 @@ def _run(cmd, cwd, env, *args, **kwargs):
 def _replace_in_file(path, search, replace):
     try:
         with open(path) as f:
-            data = f.read()
+            data = f.read().decode()
         data = data.replace(search, replace)
         with open(path, "wb") as f:
-            f.write(data)
+            f.write(data.encode())
     except:
         assert False, "failed to replace string in file: {0}".format(path)
 
@@ -229,7 +229,7 @@ class Tools(object):
         filepath = fs.path.join(self.getcwd(), filepath)
         content = self.expand(content)
         with open(path, "ab") as f:
-            f.write(content)
+            f.write(content.encode())
 
     def archive(self, filepath, filename):
         """ Creates a compressed archive """
@@ -512,4 +512,4 @@ class Tools(object):
         filepath = fs.path.join(self.getcwd(), filepath)
         content = self.expand(content)
         with open(filepath, "wb") as f:
-            f.write(content)
+            f.write(content.encode())

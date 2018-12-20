@@ -137,7 +137,9 @@ class retried:
                             log.hysterical("Exception caught, retrying : " + str(e))
                             # log.exception()
                             continue
-                raise e
+                        if i+1 >= count:
+                            raise e
+                assert False, "bug!"
             return _f
         return _decorate
 
