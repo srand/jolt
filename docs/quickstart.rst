@@ -157,7 +157,7 @@ message, try this:
 
 .. code-block:: bash
 
-    $ jolt build hello:name=John
+    $ jolt build hello:recipient=John
 
 
 Dependencies
@@ -202,7 +202,7 @@ different types of tasks. See the reference documentation for more information.
 
 However, Jolt was originally created with compilation tasks in mind. Below is
 a real world example of a task compiling the ``e2fsprogs`` package containing 
-EXT2/4/4 filesystem utility programs. It uses AutoTools to configure and 
+EXT2/3/4 filesystem utility programs. It uses AutoTools to configure and 
 build its sources into binary application. Luckily, the ``tools`` object 
 provides utilities for building autotools projects as seen below. 
 In addition to AutoTools, there is also support for CMake as well as generic
@@ -230,9 +230,9 @@ support for running any tool.
             ac.publish(artifact)
             artifact.environ.PATH.append("bin")
 
-The autotools ``ac`` object automatically creates build and install (--prefix) 
-directories which are used when configuring, building and installing the 
-project. All files installed in the installation directory will be published. 
+The autotools ``ac`` object automatically creates temporary build and install
+(--prefix) directories which are used when configuring, building and installing
+the project. All files installed in the installation directory will be published. 
 Both directories are removed when execution has finished, i.e. the project 
 will be completely rebuilt if the task's influence changes. 
 
@@ -278,7 +278,7 @@ Below is a skeleton example providing mutual exclusion:
 Tests
 ------
 
-After implementing he ``e2fsprogs`` task above, the next logical step is 
+After implementing the ``e2fsprogs`` task above, the next logical step is 
 to write a few test-cases for the utility programs it builds. Luckily, Jolt
 has integrated test support. 
 

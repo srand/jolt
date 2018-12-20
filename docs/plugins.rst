@@ -1,7 +1,7 @@
 Plugins
 =======
 
-Jolt is extendible through plugins.
+Jolt is extensible through plugins.
 
 
 Artifactory

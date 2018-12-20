@@ -20,11 +20,11 @@ The ``[jolt]`` config section contains global configuration.
 * ``cachesize = <size>``
   
   Maximum size of the local artifact cache. When this size is reached, Jolt
-  will start to evict artifacts from the cache until it longer exceeds the 
+  will start to evict artifacts from the cache until it no longer exceeds the 
   configured limit. Artifacts which are required to execute a task currently 
   present in the dependency tree are never evicted. Therefore, it may not be
   possible for Jolt to evict enough artifacts to reach the limit. Consider 
-  this size advisory. The size is specified in bytes and SI units such as 
+  this size advisory. The size is specified in bytes and SI prefixes such as 
   K, M and G are supported. Example: ``cachesize = 5G``
 
 * ``download = <boolean>``
