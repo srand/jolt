@@ -188,7 +188,7 @@ class _AutoTools(object):
         with self.tools.cwd(self.builddir):
             self.tools.run("{0}/configure --prefix={1} {2}",
                            sourcedir, self.installdir,
-                           self.tools._env.get("CONFIGURE_FLAGS", ""),
+                           self.tools.getenv("CONFIGURE_FLAGS"),
                            output=True)
 
     def build(self, *args, **kwargs):
@@ -412,9 +412,9 @@ class Tools(object):
         """ Returns the current working directory """
         return fs.path.normpath(self._cwd)
 
-    def getenv(self, key):
+    def getenv(self, key, default=""):
         """ Returns an environment variable """
-        return self._env.get(key)
+        return self._env.get(key, default)
 
     def glob(self, path, *args, **kwargs):
         """ Enumerates files and directories """
