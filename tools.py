@@ -319,7 +319,7 @@ class Tools(object):
         try:
             response = requests.get(url, stream=True, **kwargs)
             name = fs.path.basename(filename)
-            size = int(response.headers['content-length'])/1024
+            size = int(response.headers['content-length'])
             with log.progress("Downloading {0}".format(name), size, "B") as pbar:
                 with open(filepath, 'wb') as out_file:
                     chunk_size = 4096
