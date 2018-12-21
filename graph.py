@@ -9,6 +9,7 @@ from networkx.drawing.nx_agraph import write_dot
 import log
 import utils
 import traceback
+import colors
 
 
 class TaskProxy(object):
@@ -170,7 +171,7 @@ class TaskProxy(object):
             self.graph.remove_node(self)
         except:
             self.warn("Pruned task was executed")
-        self.info("Execution finished after {0}", self.duration)
+        self.task.info(colors.green("Execution finished after {0} " + self.log_name), self.duration)
 
     def run(self, cache, force_upload=False, force_build=False):
         with self.tools:

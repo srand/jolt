@@ -68,7 +68,7 @@ setup(
     # https://packaging.python.org/en/latest/requirements.html
     install_requires=["requests", "click", "networkx", "keyring", "keyrings.alt",
                       "jinja2", "futures", "python-jenkins", "multi_key_dict",
-                      "tqdm", "bz2file"],
+                      "tqdm", "bz2file", "colorama"],
 
     dependency_links=[
         "git+https://bitbucket.org/rand_r/pam.git#egg=Package"

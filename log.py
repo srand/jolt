@@ -5,7 +5,7 @@ import filesystem as fs
 import tqdm
 import utils
 import traceback
-
+import colors
 
 ERROR = 0
 WARN = 1
@@ -62,11 +62,11 @@ def hysterical(fmt, *args, **kwargs):
     _log(HYSTERICAL, sys.stdout, fmt, *args, **kwargs)
 
 def error(fmt, *args, **kwargs):
-    _log(ERROR, sys.stdout, fmt, *args, **kwargs)
+    _log(ERROR, sys.stdout, colors.red(fmt), *args, **kwargs)
 
 def exception(exc=None):
     if exc:
-        _streamwrite(sys.stderr, "[ERROR] " + str(exc))
+        _streamwrite(sys.stderr, "[ERROR] " + colors.red(str(exc)))
         _streamwrite(_file, "[ERROR] " + str(exc))
     backtrace = traceback.format_exc()
     for line in backtrace.splitlines():
