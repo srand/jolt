@@ -1,13 +1,14 @@
 import hashlib
-import utils
 import inspect
-from cache import *
-from copy import copy
+import copy
 from contextlib import contextmanager
 import unittest as ut
 import functools as ft
 import types
-from tools import Tools
+
+from jolt import utils
+from jolt.cache import *
+from jolt.tools import Tools
 
 
 class Parameter(object):
@@ -125,7 +126,7 @@ class TaskRegistry(object):
 
 
 class TaskBase(object):
-    cacheable = True 
+    cacheable = True
     """ Whether the task produces an artifact or not. """
 
     def __init__(self, *args, **kwargs):
@@ -135,7 +136,7 @@ class TaskBase(object):
     def _create_parameters(self):
         for key, param in self.__class__.__dict__.items():
             if isinstance(param, Parameter):
-                param = copy(param)
+                param = copy.copy(param)
                 setattr(self, key, param)
 
     def _set_parameters(self, params):
@@ -175,24 +176,24 @@ class Task(TaskBase):
 
     requires = []
     """ List of dependencies to other tasks. """
-    
+
     extends = ""
-    """ 
+    """
     Name of extended task.
 
     A task with this attribute set is called an extension. An extension
     is executed in the context of the extended task, immediately after
-    the extended task has executed. 
+    the extended task has executed.
 
     A common use-case for extensions is to produce additional artifacts
     from the output of another task. Also, for long-running tasks, it is
     sometimes beneficial to utilize the intermediate output from an extended
     task. The extension artifact can then be acquired more cheaply than if the
     extension had performed all of the work from scratch.
-    
+
     An extension can only extend one other task.
     """
-    
+
     influence = []
 
     def __init__(self, parameters=None):
@@ -250,8 +251,8 @@ class Task(TaskBase):
         return True
 
     def info(self, fmt, *args, **kwargs):
-        """ 
-        Log information about the task. 
+        """
+        Log information about the task.
         """
 
         log.info(fmt, *args, **kwargs)
@@ -319,17 +320,17 @@ class Task(TaskBase):
 
 
 class Resource(Task):
-    """ 
+    """
     A resource.
 
-    Resources are executed in the :class:`~Context` of other tasks. They are invoked to 
+    Resources are executed in the :class:`~Context` of other tasks. They are invoked to
     acquire and release a resource, such as hardware equipment, before and after
     the execution of a task. No artifact is produced by a resource.
 
     Implementors should override :func:`~acquire` and :func:`~release`.
 
     """
-    
+
     cacheable = False
 
     def __init__(self, *args, **kwargs):
@@ -374,7 +375,7 @@ class _Test(Task):
     def _create_parameters(self):
         for key, param in self.test_cls.__dict__.items():
             if isinstance(param, Parameter):
-                param = copy(param)
+                param = copy.copy(param)
                 setattr(self, key, param)
 
     def _get_test_names(self):

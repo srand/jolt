@@ -2,7 +2,8 @@ from xml.etree import ElementTree as ET
 from xml.etree.ElementTree import Element
 from xml.etree.ElementTree import ElementTree
 from xml.dom import minidom
-from utils import cached
+
+from jolt.utils import cached
 
 
 

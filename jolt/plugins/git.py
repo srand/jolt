@@ -1,10 +1,11 @@
-from tasks import *
-from influence import *
-from tools import *
-from scheduler import *
-import utils
 from copy import copy
-import filesystem as fs
+
+from jolt.tasks import *
+from jolt.influence import *
+from jolt.tools import *
+from jolt.scheduler import *
+from jolt import utils
+from jolt import filesystem as fs
 
 try:
     import pygit2

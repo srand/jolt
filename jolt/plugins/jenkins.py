@@ -1,19 +1,19 @@
-import config
 import keyring
-import scheduler
 import sys
-from tps.jenkins import Jenkins
-import log
 import getpass
 import inspect
-import loader
-import filesystem as fs
 import hashlib
 from jinja2 import Template
-import utils
 import time
 from requests.exceptions import ConnectionError
 
+from jolt import config
+from jolt import utils
+from jolt import scheduler
+from jolt.tps.jenkins import Jenkins
+from jolt import log
+from jolt import loader
+from jolt import filesystem as fs
 
 NAME = "jenkins"
 

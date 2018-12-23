@@ -1,5 +1,5 @@
-import utils
-import log
+from jolt import utils
+from jolt import log
 
 
 _providers = []

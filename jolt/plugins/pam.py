@@ -1,5 +1,5 @@
-from tasks import *
-from influence import *
+from jolt.tasks import *
+from jolt.influence import *
 
 import build.model
 import toolchains.pam
@@ -41,5 +41,3 @@ class CXXExecutable(Task, HashInfluenceProvider):
 
     def get_influence(self, task):
         return self.cxx_project.job.get_hash()
-
-

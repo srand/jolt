@@ -1,4 +1,4 @@
-from cache import *
+from jolt.cache import *
 
 
 class EnvironmentVariable(ArtifactStringAttribute):

@@ -1,5 +1,5 @@
-from tasks import *
-from plugins.git import Git
+from jolt import *
+from jolt.plugins.git import Git
 
 
 class Breakpad(Task):

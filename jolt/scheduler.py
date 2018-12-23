@@ -1,15 +1,17 @@
-import sys
-import inspect
-import cache
-import log
-import utils
 from concurrent.futures import ThreadPoolExecutor, Future, as_completed
 import traceback
+import sys
+import inspect
 try:
     import asyncio
     has_asyncio = True
 except:
     has_asyncio = False
+
+
+from jolt import cache
+from jolt import log
+from jolt import utils
 
 
 class TaskQueue(object):

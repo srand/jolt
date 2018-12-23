@@ -1,8 +1,10 @@
-from tasks import *
-from glob import glob
-import filesystem as fs
-from plugins import git
 import unittest
+from glob import glob
+
+from jolt import *
+from jolt import filesystem as fs
+from jolt.plugins import git
+
 
 class Sdk(Task):
     """

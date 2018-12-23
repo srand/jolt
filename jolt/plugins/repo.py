@@ -1,11 +1,12 @@
-from influence import *
-from tools import Tools
-import utils
-import filesystem as fs
 from copy import copy
 from xmldom import *
-from plugins import git
-from scheduler import *
+
+from jolt.influence import *
+from jolt.tools import Tools
+from jolt import utils
+from jolt import filesystem as fs
+from jolt.plugins import git
+from jolt.scheduler import *
 
 
 @Attribute('name')

@@ -5,7 +5,6 @@ from threading import RLock
 from string import *
 import os
 import hashlib
-import log
 
 
 def is_str(s):
@@ -134,6 +133,7 @@ class retried:
                         return f(*args, **kwargs)
                     except exc_type as e:
                         if pattern is None or pattern in str(e):
+                            from jolt import log
                             log.hysterical("Exception caught, retrying : " + str(e))
                             # log.exception()
                             continue

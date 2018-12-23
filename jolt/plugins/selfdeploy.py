@@ -1,14 +1,15 @@
-from tasks import *
-from plugins import directory
-from cache import *
-from graph import *
-from scheduler import *
+from jolt.tasks import *
+from jolt.plugins import directory
+from jolt.cache import *
+from jolt.graph import *
+from jolt.scheduler import *
 
 
 log.verbose("SelfDeploy loaded")
 
 
 _path = fs.path.dirname(__file__)
+_path = fs.path.dirname(_path)
 _path = fs.path.dirname(_path)
 
 
@@ -22,10 +23,11 @@ class Jolt(Task):
     def publish(self, artifact, tools):
         with tools.cwd(_path):
             artifact.collect('README.rst')
-            artifact.collect('*.py')
-            artifact.collect('*/*.py')
-            artifact.collect('*/*.job')
-            artifact.collect('*/*/*.py')
+            artifact.collect('setup.py')
+            artifact.collect('jolt/*.py')
+            artifact.collect('jolt/*.job')
+            artifact.collect('jolt/*/*.py')
+            artifact.collect('jolt/*/*/*.py')
 
 
 class SelfDeployExtension(NetworkExecutorExtension):

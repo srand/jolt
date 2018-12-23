@@ -2,11 +2,8 @@ import subprocess
 import os
 import threading
 import sys
-import filesystem as fs
-import log
 import threading
 import termios
-import utils
 import glob
 import multiprocessing
 import shutil
@@ -15,6 +12,10 @@ import tarfile
 import zipfile
 import bz2file
 from contextlib import contextmanager
+
+from jolt import filesystem as fs
+from jolt import log
+from jolt import utils
 
 
 def _run(cmd, cwd, env, *args, **kwargs):
@@ -224,7 +225,7 @@ class Tools(object):
 
     def append_file(self, filepath, content):
         """ Appends data at the end of a file """
-        
+
         filepath = self.expand(filepath)
         filepath = fs.path.join(self.getcwd(), filepath)
         content = self.expand(content)

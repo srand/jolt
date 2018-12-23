@@ -1,25 +1,23 @@
-#!/usr/bin/python
-
 import click
 import imp
-from tasks import Task, TaskRegistry, Parameter
-import scheduler
-import graph
-import cache
-import filesystem as fs
-import log
-from log import path as log_path
-import config
-import sys
-import plugins
-import plugins.environ
-import plugins.strings
-import loader
-import utils
-from influence import *
 import traceback
 import subprocess
 import signal
+import sys
+
+from jolt.tasks import Task, TaskRegistry, Parameter
+from jolt import scheduler
+from jolt import graph
+from jolt import cache
+from jolt import filesystem as fs
+from jolt import log
+from jolt.log import path as log_path
+from jolt import config
+from jolt import plugins
+from jolt.plugins import environ, strings
+from jolt import loader
+from jolt import utils
+from jolt.influence import *
 
 
 @click.group()
@@ -41,7 +39,7 @@ def cli(verbose, extra_verbose, config_file):
         path = fs.path.dirname(__file__)
         path = fs.path.join(path, "plugins", section + ".py")
         if fs.path.exists(path):
-            imp.load_source("plugins." + section, path)
+            imp.load_source("jolt.plugins." + section, path)
 
     tasks, tests = loader.JoltLoader().get().load()
     for cls in tasks:
@@ -80,7 +78,8 @@ def build(task, network, identity, no_download, no_upload, download, upload):
 
     executor = scheduler.ExecutorRegistry.get(network=network)
     acache = cache.ArtifactCache()
-    gb = graph.GraphBuilder()
+    registry = TaskRegistry().get()
+    gb = graph.GraphBuilder(registry)
     dag = gb.build(task)
     dag.prune(lambda graph, task: task.is_cached(acache, network))
 
@@ -122,7 +121,8 @@ def clean(task):
     """
     acache = cache.ArtifactCache()
     if task:
-        dag = graph.GraphBuilder().build(task)
+        registry = TaskRegistry().get()
+        dag = graph.GraphBuilder(registry).build(task)
         tasks = dag.select(lambda graph, node: node.name in task)
         for task in tasks:
             acache.discard(task)
@@ -249,14 +249,3 @@ def info(task, influence=False):
         for string in HashInfluenceRegistry.get().get_strings(task):
             click.echo("    " + string)
         click.echo()
-
-def main():
-    try:
-        cli()
-    except Exception as e:
-        log.exception(e)
-        sys.exit(1)
-
-
-if __name__ == "__main__":
-    main()

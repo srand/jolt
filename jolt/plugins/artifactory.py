@@ -1,14 +1,15 @@
-import cache
-import log
-import config
 import shutil
 import requests
 from requests.auth import HTTPBasicAuth
 from requests.exceptions import ConnectionError
-import filesystem as fs
 import keyring
 import getpass
-import utils
+
+from jolt import utils
+from jolt import cache
+from jolt import log
+from jolt import config
+from jolt import filesystem as fs
 
 NAME = "artifactory"
 

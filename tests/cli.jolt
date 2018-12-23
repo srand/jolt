@@ -1,6 +1,7 @@
-from tasks import Task, Test
 import threading
 import sys
+
+from jolt import *
 
 
 class Sigint(Task):

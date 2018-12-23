@@ -1,11 +1,12 @@
-from tasks import Task, Test
-from plugins import directory
-import utils
 import os
+
+from jolt import *
+from jolt import utils
+from jolt.plugins import directory
 
 
 directory.global_influence("..", "*.py")
-directory.global_influence("../plugins", "*.py")
+directory.global_influence("../jolt/plugins", "*.py")
 
 
 class Tests(Task):

@@ -1,5 +1,5 @@
-from tasks import *
-from plugins import git
+from jolt import *
+from jolt.plugins import git
 
 
 class TestResource(Resource):

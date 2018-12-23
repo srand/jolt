@@ -1,5 +1,0 @@
-from plugins import pam
-
-
-class PamTest(pam.CXXExecutable):
-    sources = "*.cpp"

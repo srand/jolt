@@ -1,12 +1,13 @@
 import inspect
 import imp
-from tasks import Task, Test, Resource
 import copy
 import glob
-import filesystem as fs
-import log
-import utils
 import os
+
+from jolt.tasks import Task, Test, Resource
+from jolt import filesystem as fs
+from jolt import log
+from jolt import utils
 
 
 @utils.Singleton

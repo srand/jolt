@@ -1,11 +1,11 @@
 from __future__ import print_function
 import sys
-import config
-import filesystem as fs
 import tqdm
-import utils
 import traceback
-import colors
+
+from jolt import config
+from jolt import filesystem as fs
+from jolt import colors
 
 ERROR = 0
 WARN = 1
@@ -33,7 +33,8 @@ def _prefix(level, **kwargs):
     return context + pad + level + " "
 
 def _line(level, fmt, *args, **kwargs):
-    return _prefix(level, **kwargs) + utils.expand(fmt, *args, ignore_errors=True, **kwargs)
+    from jolt.utils import expand
+    return _prefix(level, **kwargs) + expand(fmt, *args, ignore_errors=True, **kwargs)
 
 def _streamwrite(stream, line):
     stream.write(line + "\r\n")

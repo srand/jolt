@@ -1,5 +1,6 @@
 from colorama import Fore, Style
-import config
+
+from jolt import config
 
 
 enabled = config.getboolean("jolt", "colors", True)

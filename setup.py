@@ -70,9 +70,7 @@ setup(
                       "jinja2", "futures", "python-jenkins", "multi_key_dict",
                       "tqdm", "bz2file", "colorama"],
 
-    dependency_links=[
-        "git+https://bitbucket.org/rand_r/pam.git#egg=Package"
-    ],
+    dependency_links=[],
 
     # List additional groups of dependencies here (e.g. development
     # dependencies). You can install these using the following syntax,
@@ -81,7 +79,6 @@ setup(
     extras_require={
         'dev': ['check-manifest'],
         'test': ['coverage'],
-        'plugin-pam': ['pam']
     },
 
     # If there are data files included in your packages that need to be
@@ -102,7 +99,7 @@ setup(
     # pip to create the appropriate form of executable for the target platform.
     entry_points={
         'console_scripts': [
-            'jolt=jolt:main',
+            'jolt=jolt.__main__:main',
         ],
     },
 )

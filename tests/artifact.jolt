@@ -1,4 +1,4 @@
-from tasks import Task, Test
+from jolt import *
 
 
 class ArtifactPathAppend(Task):

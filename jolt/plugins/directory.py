@@ -1,7 +1,8 @@
-from influence import *
-from tools import Tools
-import utils
 from copy import copy
+
+from jolt.influence import *
+from jolt.tools import Tools
+from jolt import utils
 
 
 class DirectoryInfluenceProvider(HashInfluenceProvider):

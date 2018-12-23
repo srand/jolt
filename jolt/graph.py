@@ -1,15 +1,16 @@
-from tasks import *
-from utils import *
-from influence import *
 from copy import copy
 import hashlib
-from tools import Tools
 import networkx as nx
 from networkx.drawing.nx_agraph import write_dot
-import log
-import utils
 import traceback
-import colors
+
+from jolt.tasks import *
+from jolt.utils import *
+from jolt.influence import *
+from jolt.tools import Tools
+from jolt import log
+from jolt import utils
+from jolt import colors
 
 
 class TaskProxy(object):
@@ -251,10 +252,10 @@ class Graph(nx.DiGraph):
 
 
 class GraphBuilder(object):
-    def __init__(self, registry=None):
+    def __init__(self, registry):
         self.graph = Graph()
         self.nodes = {}
-        self.registry = registry or tasks.TaskRegistry.get()
+        self.registry = registry
 
     def _get_node(self, name):
         node = self.nodes.get(name)

@@ -1,15 +1,15 @@
-import filesystem as fs
 import glob
-import log
-import tasks
 import json
 import copy
 import os
 from tempfile import mkdtemp
-import tools
-import influence
-import config
 import time
+
+from jolt import filesystem as fs
+from jolt import log
+from jolt import tools
+from jolt import influence
+from jolt import config
 
 
 DEFAULT_ARCHIVE_TYPE = ".tar.gz"
@@ -168,14 +168,14 @@ class ArtifactStringAttribute(ArtifactAttribute):
 
 class Artifact(object):
     """
-    An artifact is a collection of files and metadata produced by a task. 
+    An artifact is a collection of files and metadata produced by a task.
 
-    Task implementors call artifact methods to collect files to be published. 
+    Task implementors call artifact methods to collect files to be published.
     In addition to files, other metadata can be provided as well, such as variables
-    that should be set in the environment of a consumer task. 
+    that should be set in the environment of a consumer task.
 
     """
-    
+
     def __init__(self, cache, node):
         self._cache = cache
         self._node = node
@@ -292,7 +292,7 @@ class Artifact(object):
 
     def collect(self, files, dest=None, flatten=False, symlinks=False):
         """ Collect files to be included in the artifact """
-        
+
         assert self._temp, "artifact is already published"
         files = self._node.task._get_expansion(files)
         dest = self._node.task._get_expansion(dest) if dest is not None else None
@@ -310,7 +310,7 @@ class Artifact(object):
 
     def copy(self, pattern, dest, flatten=False):
         """ Copy files from the artifact """
-        
+
         assert not self._temp, "artifact is not published"
         pattern = self._node.task._get_expansion(pattern)
         dest = self._node.task._get_expansion(dest)
@@ -366,14 +366,14 @@ class Artifact(object):
 
 
 class Context(object):
-    """ 
-    Execution context and dependency wrapper. 
-    
-    A Context gathers dependencies and initializes the environment 
+    """
+    Execution context and dependency wrapper.
+
+    A Context gathers dependencies and initializes the environment
     for an executing task.
 
     A task implementor can use the context as a dictionary of dependencies where
-    the key is the name of a dependency and the value is the dependency's 
+    the key is the name of a dependency and the value is the dependency's
     Artifact. The Context object is called `deps` when passed as an argument to
     Task methods.
 
@@ -402,7 +402,7 @@ class Context(object):
         return self._artifacts[key]
 
     def items(self):
-        """ List of (key, value) task dependency tuples. """ 
+        """ List of (key, value) task dependency tuples. """
         return self._artifacts.items()
 
 

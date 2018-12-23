@@ -1,6 +1,7 @@
-import filesystem as fs
 from configparser import SafeConfigParser, NoOptionError
-import utils
+
+from jolt import filesystem as fs
+from jolt import utils
 
 
 location = fs.path.join(fs.path.expanduser("~"), ".config", "jolt", "config")
