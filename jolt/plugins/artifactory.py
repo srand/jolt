@@ -1,7 +1,7 @@
 import shutil
 import requests
 from requests.auth import HTTPBasicAuth
-from requests.exceptions import ConnectionError
+from requests.exceptions import ConnectionError, ConnectTimeout
 import keyring
 import getpass
 
@@ -12,6 +12,7 @@ from jolt import config
 from jolt import filesystem as fs
 
 NAME = "artifactory"
+CONNECT_TIMEOUT = 3.5
 
 
 class Artifactory(cache.StorageProvider):
@@ -25,6 +26,7 @@ class Artifactory(cache.StorageProvider):
         self._repository = config.get(NAME, "repository", "jolt")
         self._upload = config.getboolean(NAME, "upload", False)
         self._download = config.getboolean(NAME, "download", True)
+        self._disabled = False
 
     def _get_auth(self):
         service = config.get(NAME, "keyring.service")
@@ -59,6 +61,8 @@ class Artifactory(cache.StorageProvider):
 
     @utils.retried.on_exception(ConnectionError)
     def download(self, node, force=False):
+        if self._disabled:
+            return False
         if not self._download and not force:
             return False
         with self._cache.get_artifact(node) as artifact:
@@ -69,6 +73,8 @@ class Artifactory(cache.StorageProvider):
 
     @utils.retried.on_exception(ConnectionError)
     def upload(self, node, force=False):
+        if self._disabled:
+            return True
         if not self._upload and not force:
             return True
         with self._cache.get_artifact(node) as artifact:
@@ -79,9 +85,17 @@ class Artifactory(cache.StorageProvider):
 
     @utils.retried.on_exception(ConnectionError)
     def location(self, node):
+        if self._disabled:
+            return False
         with self._cache.get_artifact(node) as artifact:
             url = self._get_url(node, artifact)
-            response = requests.head(url, stream=True)
+            try:
+                response = requests.head(url, stream=True, timeout=CONNECT_TIMEOUT)
+            except ConnectTimeout as e:
+                self._disabled = True
+                log.warn("[ARTIFACTORY] failed to establish server connection, disabled")
+                return False
+
             log.hysterical("[ARTIFACTORY] Head: {0}", url)
             log.hysterical("[ARTIFACTORY] Response: {0}", response.status_code)
             return url if response.status_code == 200 else ''

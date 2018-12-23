@@ -8,6 +8,9 @@ enabled = config.getboolean("jolt", "colors", True)
 def red(s):
     return Fore.RED + Style.BRIGHT + s + Style.RESET_ALL if enabled else s
 
+def yellow(s):
+    return Fore.YELLOW + Style.BRIGHT + s + Style.RESET_ALL if enabled else s
+
 def green(s):
     return Fore.GREEN + Style.BRIGHT + s + Style.RESET_ALL if enabled else s
 

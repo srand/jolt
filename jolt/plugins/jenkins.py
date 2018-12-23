@@ -16,19 +16,24 @@ from jolt import loader
 from jolt import filesystem as fs
 
 NAME = "jenkins"
+CONNECT_TIMEOUT = 3.5
 
 
 @utils.Singleton
 class JenkinsServer(object):
     def __init__(self):
         username, password = self._get_auth()
-        self._server = Jenkins(config.get(NAME, "uri"), username, password)
+        self._server = Jenkins(config.get(NAME, "uri"), username, password, timeout=CONNECT_TIMEOUT)
         self.get_job_info = self._server.get_job_info
         self.get_build_info = self._server.get_build_info
         self.get_build_console_output = self._server.get_build_console_output
         self.get_queue_item = self._server.get_queue_item
         self.build_job = self._server.build_job
-        self._check_job()
+        try:
+            self._ok = self._check_job()
+        except:
+            log.warn("[JENKINS] failed to establish server connection, disabled")
+            self._ok = False
 
     def _get_auth(self):
         service = config.get(NAME, "keyring.service")
@@ -85,6 +90,10 @@ class JenkinsServer(object):
             assert self._create_job(
                 self.job_name, template_xml, self._server.reconfig_job), \
                 "[JENKINS] failed to change misconfigured job"
+        return True
+
+    def ok(self):
+        return self._ok
 
     def _create_job(self, name, job_template, func):
         template = Template(job_template)
@@ -97,7 +106,7 @@ class JenkinsServer(object):
 class JenkinsExecutor(scheduler.NetworkExecutor):
     def __init__(self, factory, cache, task):
         super(JenkinsExecutor, self).__init__(factory)
-        self.server = JenkinsServer().get()
+        self.server = JenkinsServer.get()
         self.cache = cache
         self.task = task
         self.job = self.server.job_name
@@ -204,6 +213,9 @@ class JenkinsExecutor(scheduler.NetworkExecutor):
 @scheduler.ExecutorFactory.Register
 class JenkinsExecutorFactory(scheduler.NetworkExecutorFactory):
     def create(self, cache, task):
+        server = JenkinsServer.get()
+        if not server.ok():
+            return None
         return JenkinsExecutor(self, cache, task)
 
 log.verbose("Jenkins loaded")

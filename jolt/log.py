@@ -54,7 +54,7 @@ def info(fmt, *args, **kwargs):
     _log(NORMAL, sys.stdout, fmt, *args, **kwargs)
 
 def warn(fmt, *args, **kwargs):
-    _log(WARN, sys.stdout, fmt, *args, **kwargs)
+    _log(WARN, sys.stdout, colors.yellow(fmt), *args, **kwargs)
 
 def verbose(fmt, *args, **kwargs):
     _log(VERBOSE, sys.stdout, fmt, *args, **kwargs)
