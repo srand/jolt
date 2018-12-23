@@ -51,6 +51,7 @@ def cli(verbose, extra_verbose, config_file):
 @cli.command()
 @click.argument("task", type=str, nargs=-1, required=True)
 @click.option("-n", "--network", is_flag=True, default=False, help="Build on network.")
+@click.option("-k", "--keep-going", is_flag=True, default=False, help="Build as many tasks as possible, don't abort on first failure.")
 @click.option("-i", "--identity", type=str, help="Expected hash identity")
 @click.option("--no-download", is_flag=True, default=False,
               help="Don't download artifacts from remote storage")
@@ -60,7 +61,7 @@ def cli(verbose, extra_verbose, config_file):
               help="Do download artifacts from remote storage")
 @click.option("--upload", is_flag=True, default=False,
               help="Do upload artifacts to remote storage")
-def build(task, network, identity, no_download, no_upload, download, upload):
+def build(task, network, keep_going, identity, no_download, no_upload, download, upload):
     """
     Execute specified task.
 
@@ -106,7 +107,7 @@ def build(task, network, identity, no_download, no_upload, download, upload):
             dag.debug()
             assert task, "no more tasks in progress, only blocked tasks remain"
 
-        if error is not None:
+        if not keep_going and error is not None:
             queue.abort()
             raise error
 
