@@ -337,6 +337,9 @@ class Artifact(object):
         archive = self._path + DEFAULT_ARCHIVE_TYPE
         self.tools.extract(archive, self._path)
         self.tools.unlink(archive)
+        if self._temp:
+            fs.rmtree(self._temp)
+            self._temp = None
         self._read_manifest()
 
     def get_archive(self):
@@ -546,7 +549,7 @@ class ArtifactCache(StorageProvider):
             if provider.download(node, force):
                 with self.get_artifact(node) as artifact:
                     artifact.decompress()
-                self.evict()
+                    self.commit(artifact)
                 return True
         return len(self.storage_providers) == 0
 
