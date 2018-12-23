@@ -132,14 +132,12 @@ class retried:
                             time.sleep(backoff[i - 1])
                         return f(*args, **kwargs)
                     except exc_type as e:
+                        if i+1 >= count:
+                            raise e
                         if pattern is None or pattern in str(e):
                             from jolt import log
                             log.hysterical("Exception caught, retrying : " + str(e))
-                            # log.exception()
                             continue
-                        if i+1 >= count:
-                            raise e
-                assert False, "bug!"
             return _f
         return _decorate
 
