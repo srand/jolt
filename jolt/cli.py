@@ -4,6 +4,8 @@ import traceback
 import subprocess
 import signal
 import sys
+import webbrowser
+
 
 from jolt.tasks import Task, TaskRegistry, Parameter
 from jolt import scheduler
@@ -149,6 +151,16 @@ def display(task, prune):
         gb.display()
     else:
         log.info("No tasks to display")
+
+
+@cli.command()
+@click.option("-f", "--follow", is_flag=True, help="Display log output as it appears")
+@click.option("-D", "--delete", is_flag=True, help="Delete the log file")
+def docs(follow, delete):
+    """
+    Opens the Jolt documentation in the default webbrowser.
+    """
+    webbrowser.open("http://jolt.readthedocs.io/")
 
 
 @cli.command()
