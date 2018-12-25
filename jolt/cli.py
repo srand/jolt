@@ -244,7 +244,8 @@ def info(task, influence=False):
     click.echo()
 
     acache = cache.ArtifactCache()
-    dag = graph.GraphBuilder().build([utils.format_task_name(task.name, task._get_parameters())])
+    dag = graph.GraphBuilder(task_registry).build(
+        [utils.format_task_name(task.name, task._get_parameters())])
     tasks = dag.select(lambda graph, node: graph.is_root(node))
     assert len(tasks) == 1, "unexpected graph generated"
     proxy = tasks[0]
