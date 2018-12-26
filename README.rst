@@ -1,20 +1,11 @@
-Installation instructions for virtualenv
-==============================================
+Welcome to Jolt
+===============
 
-0. pip install virtualenv
-1. virtualenv joltdev
-2. . joltdev/bin/activate
-3. pip install -e .
+Jolt is an easy to use, yet powerful task execution tool. Tasks are defined
+in Python scripts using a class based API. A task typically produces output
+which can be published as binary artifacts into content addressable caches
+for later consumption by other tasks.
 
+Distributed execution and remote storage providers are supported through plugins.
 
-Running
-==============================================
-
-1. jolt list
-2. jolt info example
-3. jolt build example
-
-# With Artifactory and Jenkins on localhost
-4. jolt -c example.conf build -n example  
-
-Tasks are defined in example.jolt.
+For full documentation, please visit http://jolt.readthedocs.io/
