@@ -4,28 +4,28 @@ Reference
 Artifact
 --------
 
-.. autoclass:: tasks.Artifact
+.. autoclass:: jolt.tasks.Artifact
    :members: collect, copy, path
 
 
 Context
 --------
 
-.. autoclass:: tasks.Context
+.. autoclass:: jolt.tasks.Context
    :members: items
 
 
 Resource
 ---------
 
-.. autoclass:: tasks.Resource
+.. autoclass:: jolt.tasks.Resource
    :members: acquire, release
 
 
 Task
 ----
 
-.. autoclass:: tasks.Task
+.. autoclass:: jolt.tasks.Task
    :inherited-members: cacheable
    :members: info, joltdir, warn, error, run, publish, unpack
 
@@ -33,7 +33,7 @@ Task
 Test
 ----
 
-.. autoclass:: tasks.Test
+.. autoclass:: jolt.tasks.Test
    :members: setup, cleanup
    :undoc-members:
 
@@ -41,6 +41,6 @@ Test
 Tools
 -----
 
-.. autoclass:: tasks.Tools
+.. autoclass:: jolt.tasks.Tools
    :members:
    :undoc-members:
