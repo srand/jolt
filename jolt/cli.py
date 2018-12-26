@@ -142,7 +142,8 @@ def display(task, prune):
 
     <WIP>
     """
-    gb = graph.GraphBuilder()
+    registry = TaskRegistry.get()
+    gb = graph.GraphBuilder(registry)
     dag = gb.build(task)
     if prune:
         acache = cache.ArtifactCache()
@@ -173,15 +174,17 @@ def list(task=None, reverse=False, all=False):
     <WIP>
     """
 
+    registry = TaskRegistry.get()
+
     if not task:
-        classes = TaskRegistry().get().get_task_classes()
-        classes += TaskRegistry().get().get_test_classes()
+        classes = registry.get_task_classes()
+        classes += registry.get_test_classes()
         for task in sorted(classes, key=lambda x: x.name):
             if task.name:
                 print(task.name)
         return
 
-    dag = graph.GraphBuilder().build(task)
+    dag = graph.GraphBuilder(registry).build(task)
     tasks = dag.select(lambda graph, node: node.qualified_name in task)
     successors = set()
     for task in tasks:
