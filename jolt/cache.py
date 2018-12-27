@@ -172,8 +172,47 @@ class Artifact(object):
 
     Task implementors call artifact methods to collect files to be published.
     In addition to files, other metadata can be provided as well, such as variables
-    that should be set in the environment of a consumer task.
+    that should be set in the environment of consumer tasks.
 
+    """
+
+    environ = {}
+    """ Artifact environment variables.
+
+    A task can add environment variables to an artifact. Such a
+    variable will automatically be set in the environment when
+    consumer tasks are executed. A common use-case is to add
+    programs to the PATH.
+
+    Values appended to PATH-type variables are relative to the artifact
+    root. They will be automatically expanded to absolute paths. These
+    PATH-type variables are supported:
+
+    - ``PATH``
+    - ``LD_LIBRARY_PATH``
+    - ``PKG_CONFIG_PATH``
+
+    Example:
+
+        .. code-block:: python
+
+            def publish(self, artifact, tools):
+                artifact.environ.PATH.append("bin")
+                artifact.environ.JAVA_HOME = artifact.final_path
+    """
+
+    strings = {}
+    """ Artifact strings.
+
+    A task can add arbitrary string values to an artifact. Such a
+    string will be available for consumer tasks to read.
+
+    Example:
+
+        .. code-block:: python
+
+            def publish(self, artifact, tools):
+                artifact.strings.version = "1.2"
     """
 
     def __init__(self, cache, node):
@@ -284,14 +323,40 @@ class Artifact(object):
 
     @property
     def path(self):
+        """ str: The current location of the artifact in the local cache. """
         return self._temp or self._path
+
+    @property
+    def final_path(self):
+        """ str: The final location of the artifact in the local cache. """
+        return self._path
 
     @property
     def tools(self):
         return self._node.tools
 
     def collect(self, files, dest=None, flatten=False, symlinks=False):
-        """ Collect files to be included in the artifact """
+        """ Collect files to be included in the artifact.
+
+        Args:
+            files (str): A filename pattern matching the files to be include
+                in the artifact. The pattern may contain simple shell-style
+                wildcards such as '*' and '?'. Note: files starting with a
+                dot are not matched by these wildcards.
+            dest (str, optional): Destination path within the artifact. If
+                the string ends with a path separator a new directory will
+                be created and all matched source files will be copied into
+                the new directory. A destination without trailing path
+                separator can be used to rename single files, one at a time.
+            flatten (boolean, optional): If True, the directory tree structure
+                of matched source files will flattened, i.e. all files will
+                be copied into the root of the destination path. The default
+                is False, which retains the directory tree structure
+                relative to the current working directory.
+            symlinks (boolean, optional): If True, symlinks are copied.
+                The default is False, i.e. the symlink target is copied.
+
+        """
 
         assert self._temp, "artifact is already published"
         files = self._node.task._get_expansion(files)
@@ -308,23 +373,43 @@ class Artifact(object):
                 self.tools.copy(src, dest, symlinks=symlinks)
                 log.verbose("Collected {0} -> {1}", src, dest[len(self._temp):])
 
-    def copy(self, pattern, dest, flatten=False):
-        """ Copy files from the artifact """
+    def copy(self, pathname, dest, flatten=False, symlinks=False):
+        """ Copy files from the artifact.
+
+        Args:
+            pathname (str): A pathname pattern, relative to the root, matching
+                the files to be copied from the artifact.
+                The pattern may contain simple shell-style
+                wildcards such as '*' and '?'. Note: files starting with a
+                dot are not matched by these wildcards.
+            dest (str, optional): Destination path. If the string ends with a
+                path separator a new directory will
+                be created and all matched source files will be copied into
+                the new directory. A destination without trailing path
+                separator can be used to rename single files, one at a time.
+            flatten (boolean, optional): If True, the directory tree structure
+                of matched source files will flattened, i.e. all files will
+                be copied into the root of the destination path. The default
+                is False, which retains the directory tree structure.
+            symlinks (boolean, optional): If True, symlinks are copied.
+                The default is False, i.e. the symlink target is copied.
+
+        """
 
         assert not self._temp, "artifact is not published"
-        pattern = self._node.task._get_expansion(pattern)
+        pathname = self._node.task._get_expansion(pathname)
         dest = self._node.task._get_expansion(dest)
 
         files = []
         with self.tools.cwd(self._path):
-            files = self.tools.glob(pattern)
+            files = self.tools.glob(pathname)
         for src in files:
             srcs = fs.scandir(src) if fs.path.isdir(src) and flatten else [src]
             for src in srcs:
                 destfile = fs.path.join(dest, src) \
                            if not flatten else \
                               fs.path.join(dest, fs.path.basename(src))
-                self.tools.copy(fs.path.join(self._path, src), destfile)
+                self.tools.copy(fs.path.join(self._path, src), destfile, symlinks=symlinks)
                 log.verbose("Copied {0} -> {1}", src, destfile)
 
     def compress(self):
@@ -372,13 +457,13 @@ class Context(object):
     """
     Execution context and dependency wrapper.
 
-    A Context gathers dependencies and initializes the environment
-    for an executing task.
+    A ``Context`` gathers dependencies and initializes the environment
+    for an executing task. It is passed as an argument to the
+    Task's :func:`~jolt.Task.run` method.
 
     A task implementor can use the context as a dictionary of dependencies where
     the key is the name of a dependency and the value is the dependency's
-    Artifact. The Context object is called `deps` when passed as an argument to
-    Task methods.
+    :class:`~jolt.Artifact`.
 
     """
 
@@ -400,12 +485,35 @@ class Context(object):
             ArtifactAttributeSetRegistry.unapply_all(self._node.task, artifact)
 
     def __getitem__(self, key):
+        """ Get artifact for a task listed as a requirement.
+
+        Args:
+            key (str): Name of the task listed as a requirement.
+
+        Returns:
+            The :class:`~jolt.Artifact` associated with the task.
+
+        Example:
+            .. code-block:: python
+
+                requires = "dependency"
+
+                def run(self, deps, tools):
+                    dependency_artifact = deps["dependency"]
+
+        """
+
         key = self._node.task._get_expansion(key)
         assert key in self._artifacts, "no such dependency: {0}".format(key)
         return self._artifacts[key]
 
     def items(self):
-        """ List of (key, value) task dependency tuples. """
+        """ List all requirements and their artifacts.
+
+        Returns:
+            Requirement dictionary items. Each item is a tuple with the
+            requirement name and the artifact.
+        """
         return self._artifacts.items()
 
 

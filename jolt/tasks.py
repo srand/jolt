@@ -12,7 +12,25 @@ from jolt.tools import Tools
 
 
 class Parameter(object):
+    """ Generic task parameter type. """
+
     def __init__(self, default=None, values=None, help=None):
+        """
+        Creates a new parameter.
+
+        Args:
+            default (str, optional): An optional default value.
+            values (list, optional): A list of accepted values. An
+                assertion is raised if an unlisted value is assigned to the parameter.
+            help (str, optional): Documentation for the parameter.
+                This text is displayed when running the ``info`` command on the
+                associated task.
+
+        Raises:
+            AssertionError: If the parameter is assigned an illegal value
+                during task execution.
+        """
+
         self._default = default
         self._value = default
         self._accepted_values = values
@@ -21,6 +39,7 @@ class Parameter(object):
             self._validate(default)
 
     def __str__(self):
+        """ Returns the parameter value as a string """
         return str(self._value) if self._value is not None else ''
 
     def _validate(self, value):
@@ -29,21 +48,50 @@ class Parameter(object):
             .format(value)
 
     def get_default(self):
+        """ Get the default value of the parameter.
+
+        Returns:
+            The default value or None if no default was given.
+        """
         return self._default
 
     def is_default(self):
+        """ Check if parameter is set to its default value.
+
+        Returns:
+            True if the assigned value is the default value.
+        """
         return self._default == self._value
 
     def is_unset(self):
+        """ Check if the parameter is unset.
+
+        Returns:
+            True if the assigned value is None.
+        """
         return self._value is None
 
     def is_set(self):
-        return self._value is not None and self._value != self._default
+        """ Check if the parameter is set to a non-default value.
+
+        Returns:
+            True if the assigned value is not the default value.
+        """
+        return not self.is_unset() and not self.is_default()
 
     def get_value(self):
+        """ Get the parameter value. """
         return self._value
 
     def set_value(self, value):
+        """ Set the parameter value.
+
+        Args:
+            value (str): The new parameter value.
+
+        Raises:
+            AssertionError: If the parameter is assigned an illegal value.
+        """
         self._validate(value)
         self._value = value
 
@@ -321,11 +369,11 @@ class Task(TaskBase):
 
 class Resource(Task):
     """
-    A resource.
+    A resource task.
 
-    Resources are executed in the :class:`~Context` of other tasks. They are invoked to
-    acquire and release a resource, such as hardware equipment, before and after
-    the execution of a task. No artifact is produced by a resource.
+    Resources are special tasks executed in the :class:`~jolt.Context` of other tasks.
+    They are invoked to acquire and release a resource, such as hardware equipment,
+    before and after the execution of a task. No artifact is produced by a resource.
 
     Implementors should override :func:`~acquire` and :func:`~release`.
 
@@ -347,11 +395,36 @@ class Resource(Task):
         pass
 
     def acquire(self, artifact, deps, tools):
-        """ Called to acquire the resource. """
+        """ Called to acquire the resource.
+
+        An implementor overrides this method in a subclass. The acquired
+        resource must be released manually if an exception occurs before the
+        method has returned.
+
+        Args:
+            artifact (:class:`~jolt.Artifact`): The artifact associated with the resource.
+                It is not possible to publish files from a resource, but the implementor
+                can still use the resource to pass information to consuming tasks.
+            deps (:class:`~jolt.Context`): Task execution context used to access the
+                artifacts of dependencies.
+            tools (:class:`~jolt.Tools`): A task specific toolbox.
+
+        """
         pass
 
     def release(self, artifact, deps, tools):
-        """ Called to release the resource. """
+        """ Called to release the resource.
+
+        An implementor overrides this method in a subclass.
+
+        Args:
+            artifact (:class:`~jolt.Artifact`): The artifact associated with the resource.
+                It is not possible to publish files from a resource, but the implementor
+                can still use the resource to pass information to consuming tasks.
+            deps (:class:`~jolt.Context`): Task execution context used to access the
+                artifacts of dependencies.
+            tools (:class:`~jolt.Tools`): A task specific toolbox.
+        """
         pass
 
     def run(self, env, tools):
