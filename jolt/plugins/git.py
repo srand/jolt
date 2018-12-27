@@ -1,5 +1,3 @@
-from copy import copy
-
 from jolt.tasks import *
 from jolt.influence import *
 from jolt.tools import *
@@ -58,7 +56,7 @@ def global_influence(path, cls=GitInfluenceProvider):
 def influence(path, cls=GitInfluenceProvider):
     def _decorate(taskcls):
         if "influence" not in taskcls.__dict__:
-            taskcls.influence = copy(taskcls.influence)
+            taskcls.influence = copy.copy(taskcls.influence)
         provider = cls(path=path)
         taskcls.influence.append(provider)
         return taskcls
