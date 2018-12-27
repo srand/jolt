@@ -1,5 +1,4 @@
 from copy import copy
-from xmldom import *
 
 from jolt.influence import *
 from jolt.tools import Tools
@@ -7,6 +6,7 @@ from jolt import utils
 from jolt import filesystem as fs
 from jolt.plugins import git
 from jolt.scheduler import *
+from jolt.xmldom import *
 
 
 @Attribute('name')
