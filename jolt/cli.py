@@ -185,7 +185,7 @@ def list(task=None, reverse=False, all=False):
         return
 
     dag = graph.GraphBuilder(registry).build(task)
-    tasks = dag.select(lambda graph, node: node.qualified_name in task)
+    tasks = dag.select(lambda graph, node: node.short_qualified_name in task)
     successors = set()
     for task in tasks:
         map(successors.add, dag.successors(task))
