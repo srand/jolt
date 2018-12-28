@@ -133,7 +133,7 @@ class JenkinsExecutor(scheduler.NetworkExecutor):
             elif line.startswith("[VERBOSE]"):
                 log.verbose(line[10:], log_context=self.task.identity[:8])
             elif line.startswith("[HYSTERICAL]"):
-                log.error(line[13:], log_context=self.task.identity[:8])
+                log.hysterical(line[13:], log_context=self.task.identity[:8])
             else:
                 log.stdout(line, log_context=self.task.identity[:8])
 
