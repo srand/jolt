@@ -9,6 +9,7 @@ import types
 from jolt import utils
 from jolt.cache import *
 from jolt.tools import Tools
+from jolt.influence import TaskSourceInfluence
 
 
 class Parameter(object):
@@ -255,6 +256,9 @@ class Task(TaskBase):
         assert len(self.extends) == 1, "{0} extends multiple tasks, only one allowed".format(self.name)
         self.extends = self.extends[0]
         self.name = self.__class__.name
+        self.influence.append(TaskSourceInfluence("publish"))
+        self.influence.append(TaskSourceInfluence("run"))
+        self.influence.append(TaskSourceInfluence("unpack"))
 
     def _get_source(self, func):
         source, lines = inspect.getsourcelines(func)
@@ -383,10 +387,8 @@ class Resource(Task):
 
     def __init__(self, *args, **kwargs):
         super(Resource, self).__init__(*args, **kwargs)
-
-    def _get_source_functions(self):
-        return super(Resource, self)._get_source_functions() + \
-            [self.acquire, self.release]
+        self.influence.append(TaskSourceInfluence("acquire"))
+        self.influence.append(TaskSourceInfluence("release"))
 
     def is_runnable(self):
         return False
@@ -444,6 +446,10 @@ class _Test(Task):
         self.__class__.requires = test_cls.requires
         self.__class__.influence = test_cls.influence
         super(_Test, self).__init__(*args, **kwargs)
+        self.influence.append(TaskSourceInfluence("setup", self.test_cls))
+        self.influence.append(TaskSourceInfluence("cleanup", self.test_cls))
+        for name in self._get_test_names():
+            self.influence.append(TaskSourceInfluence(name, self.test_cls))
 
     def _create_parameters(self):
         for key, param in self.test_cls.__dict__.items():
@@ -454,14 +460,6 @@ class _Test(Task):
     def _get_test_names(self):
         return [attrib for attrib in dir(self.test_cls)
                 if attrib.startswith("test_")]
-
-    def _get_test_funcs(self):
-        return [getattr(self.test_cls, func)
-                for func in self._get_test_names()]
-
-    def _get_source_functions(self):
-        funcs = super(_Test, self)._get_source_functions()
-        return funcs + self._get_test_funcs() + [self.test_cls.setup, self.test_cls.cleanup]
 
     def run(self, deps, tools):
         testsuite = ut.TestSuite()

@@ -2,9 +2,11 @@
 #include <cstdlib>
 #include <iostream>
 
+#include "lib.h"
+
 
 int main()
 {
-  std::cout << "Hello world!" << std::endl;
+  std::cout << message() << std::endl;
   return EXIT_SUCCESS;
 }

@@ -34,6 +34,37 @@ class HashInfluenceProvider(object):
         raise NotImplemented()
 
 
+class TaskAttributeInfluence(HashInfluenceProvider):
+    def __init__(self, attrib):
+        self._attrib = attrib
+        self.name = attrib.title()
+
+    def get_influence(self, task):
+        return getattr(task, self._attrib)
+
+
+def attribute(name):
+    def _decorate(cls):
+        _old_init = cls.__init__
+        def _init(self, *args, **kwargs):
+            _old_init(self, *args, **kwargs)
+            self.influence.append(TaskAttributeInfluence(name))
+        cls.__init__ = _init
+        return cls
+    return _decorate
+
+
+class TaskSourceInfluence(HashInfluenceProvider):
+    def __init__(self, funcname, obj=None):
+        self.name = "Source:" + funcname
+        self.funcname = funcname
+        self.obj = obj
+
+    def get_influence(self, task):
+        obj = self.obj or task
+        return utils.sha1(task._get_source(getattr(obj, self.funcname)))
+
+
 @HashInfluenceRegistry.Register
 class TaskNameInfluence(HashInfluenceProvider):
     name = "Name"
@@ -48,10 +79,3 @@ class TaskParameterInfluence(HashInfluenceProvider):
         return ",".join(
             sorted(["{0}={1}".format(key, value)
                     for key, value in task._get_parameters().items()]))
-
-
-@HashInfluenceRegistry.Register
-class TaskSourceInfluence(HashInfluenceProvider):
-    name = "Source"
-    def get_influence(self, task):
-        return task._get_source_hash()

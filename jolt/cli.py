@@ -16,7 +16,7 @@ from jolt import log
 from jolt.log import path as log_path
 from jolt import config
 from jolt import plugins
-from jolt.plugins import environ, strings
+from jolt.plugins import cxxinfo, environ, strings
 from jolt import loader
 from jolt import utils
 from jolt.influence import *

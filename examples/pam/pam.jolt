@@ -1,0 +1,33 @@
+from jolt import Task, Parameter
+from jolt.plugins import pam
+
+pam.verbose()
+
+
+class Toolchain(Task):
+    target = Parameter(values=["x86", "arm"])
+
+    def publish(self, artifact, tools):
+        if str(self.target) == "x86":
+            artifact.environ.CC = "gcc"
+            artifact.environ.CXX = "g++"
+            artifact.environ.LD = "g++"
+        if str(self.target) == "arm":
+            artifact.environ.CC = "arm-linux-gnueabi-gcc"
+            artifact.environ.CXX = "arm-linux-gnueabi-g++"
+            artifact.environ.LD = "arm-linux-gnueabi-g++"
+
+
+class Lib(pam.CXXLibrary):
+    target = Parameter("x86")
+    requires = "toolchain:target={target}"
+    features = "optimize:full", "debug"
+
+    sources = "lib.cpp"
+
+
+class Exe(pam.CXXExecutable):
+    target = Parameter("x86")
+    requires = "toolchain:target={target}", "lib:target={target}"
+
+    sources = "test.cpp"
