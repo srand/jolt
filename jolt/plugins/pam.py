@@ -47,7 +47,10 @@ class CXXProject(Task):
         artifact.collect("output/pam-gcc/{0}/{0}".format(self.name), flatten=True)
 
 
+@influence.attribute("shared")
 class CXXLibrary(CXXProject):
+    shared = False
+
     def __init__(self, *args, **kwargs):
         super(CXXLibrary, self).__init__(*args, **kwargs)
 
@@ -65,15 +68,16 @@ class CXXLibrary(CXXProject):
             features=self.features,
             incpaths=self.incpaths + incpaths,
             macros=self.macros,
+            shared=self.shared,
         )
         super(CXXLibrary, self).run(deps, tools)
 
     def publish(self, artifact, tools):
         with tools.cwd(self.cxx_project.output):
-            artifact.collect("*.a")
-            artifact.collect("*.so")
-            artifact.collect("*.dll")
-        artifact.cxxinfo.libpaths.append(artifact.final_path)
+            artifact.collect("*.a", "lib/")
+            artifact.collect("*.so", "lib/")
+            artifact.collect("*.dll", "lib/")
+        artifact.cxxinfo.libpaths.append("lib")
         artifact.cxxinfo.libraries.append(self.name)
 
 
@@ -95,8 +99,10 @@ class CXXExecutable(CXXProject):
         macros = []
 
         for name, artifact in deps.items():
-            incpaths += artifact.cxxinfo.incpaths.items()
-            libpaths += artifact.cxxinfo.libpaths.items()
+            incpaths += [fs.path.join(artifact.path, path)
+                         for path in artifact.cxxinfo.incpaths.items()]
+            libpaths += [fs.path.join(artifact.path, path)
+                         for path in artifact.cxxinfo.libpaths.items()]
             libraries += artifact.cxxinfo.libraries.items()
             macros += artifact.cxxinfo.macros.items()
 
@@ -114,7 +120,7 @@ class CXXExecutable(CXXProject):
     def publish(self, artifact, tools):
         with tools.cwd(self.cxx_project.output):
             if platform.system() == "Windows":
-                artifact.collect(self.name + '.exe')
+                artifact.collect(self.name + '.exe', "bin/")
             else:
-                artifact.collect(self.name)
-        artifact.environ.PATH.append("")
+                artifact.collect(self.name, "bin/")
+        artifact.environ.PATH.append("bin")
