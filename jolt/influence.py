@@ -1,3 +1,5 @@
+import datetime
+
 from jolt import utils
 from jolt import log
 
@@ -65,6 +67,17 @@ class TaskSourceInfluence(HashInfluenceProvider):
         return utils.sha1(task._get_source(getattr(obj, self.funcname)))
 
 
+def source(name):
+    def _decorate(cls):
+        _old_init = cls.__init__
+        def _init(self, *args, **kwargs):
+            _old_init(self, *args, **kwargs)
+            self.influence.append(TaskSourceInfluence(name))
+        cls.__init__ = _init
+        return cls
+    return _decorate
+
+
 @HashInfluenceRegistry.Register
 class TaskNameInfluence(HashInfluenceProvider):
     name = "Name"
@@ -79,3 +92,65 @@ class TaskParameterInfluence(HashInfluenceProvider):
         return ",".join(
             sorted(["{0}={1}".format(key, value)
                     for key, value in task._get_parameters().items()]))
+
+
+
+class TaskDateInfluence(HashInfluenceProvider):
+    name = "Date"
+
+    def __init__(self, fmt):
+        self.fmt = fmt
+
+    def get_influence(self, task):
+        now = datetime.datetime.now()
+        return now.strftime(self.fmt)
+
+
+def _date_influence(fmt):
+    def _decorate(cls):
+        _old_init = cls.__init__
+        def _init(self, *args, **kwargs):
+            _old_init(self, *args, **kwargs)
+            self.influence.append(TaskDateInfluence(fmt))
+        cls.__init__ = _init
+        return cls
+    return _decorate
+
+
+yearly = _date_influence("%Y")
+monthly = _date_influence("%Y-%m")
+daily = _date_influence("%Y-%m-%d")
+hourly = _date_influence("%Y-%m-%d %H")
+
+
+# class FileInfluence(HashInfluenceProvider):
+#     name = "File"
+#     path = "."
+#     pattern = "*"
+#
+#     def __init__(self, path=None, pattern=None):
+#         self.path = path or self.__class__.path
+#         self.pattern = pattern or self.__class__.pattern
+#
+#     def get_influence(self, task):
+#         try:
+#             with Tools(task, task.joltdir) as tools:
+#                 path = task._get_expansion(self.path)
+#                 with tools.cwd(path):
+#                     return tools.run("find -type f -name '{0}' | LC_ALL=C sort | xargs -n1 sha1sum"
+#                                      .format(self.pattern),
+#                                      output=False, output_on_error=True)
+#         except KeyError as e:
+#             pass
+#         assert False, "failed to change directory to {0}".format(self.path)
+#
+#
+# def file(path, pattern=None):
+#     def _decorate(taskcls):
+#         if "influence" not in taskcls.__dict__:
+#             taskcls.influence = copy(taskcls.influence)
+#         provider = FileInfluence(path, pattern)
+#         taskcls.influence.append(provider)
+#         return taskcls
+#     return _decorate
+#

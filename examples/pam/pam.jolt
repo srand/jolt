@@ -1,5 +1,7 @@
 from jolt import Task, Parameter
 from jolt.plugins import pam
+from jolt import influence
+
 
 pam.verbose()
 
@@ -18,6 +20,7 @@ class Toolchain(Task):
             artifact.environ.LD = "arm-linux-gnueabi-g++"
 
 
+@influence.hourly
 class Lib(pam.CXXLibrary):
     arch = Parameter("x86")
     requires = "toolchain:arch={arch}"
