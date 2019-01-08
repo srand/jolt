@@ -15,6 +15,13 @@ Context
    :members: items, __getitem__
 
 
+Influence
+---------
+
+.. automodule:: jolt.influence
+   :members: attribute, daily, environ, files, hourly, monthly, source, weekly, yearly
+
+
 Parameter
 ---------
 

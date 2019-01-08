@@ -49,6 +49,22 @@ class TaskAttributeInfluence(HashInfluenceProvider):
 
 
 def attribute(name):
+    """ Add task attribute value as hash influence.
+
+    Args:
+        name (str): Name of task class attribute/property.
+
+    Example:
+
+    .. code-block:: python
+
+        from jolt import influence
+
+        @influence.source("attribute")
+        class Example(Task):
+            attribute = False
+    """
+
     def _decorate(cls):
         _old_init = cls.__init__
         def _init(self, *args, **kwargs):
@@ -71,6 +87,23 @@ class TaskSourceInfluence(HashInfluenceProvider):
 
 
 def source(name):
+    """ Add function source code as hash influence.
+
+    Args:
+        name (str): Name of function in task class.
+
+    Example:
+
+    .. code-block:: python
+
+        from jolt import influence
+
+        @influence.source("method")
+        class Example(Task):
+            def method(self):
+                return False
+
+    """
     def _decorate(cls):
         _old_init = cls.__init__
         def _init(self, *args, **kwargs):
@@ -121,10 +154,84 @@ def _date_influence(fmt):
 
 
 yearly = _date_influence("%Y")
+""" Add yearly hash influence.
+
+If nothing else changes, the task is re-executed once every year.
+
+Example:
+
+    .. code-block:: python
+
+        from jolt import influence
+
+        @influence.yearly
+        class Example(Task):
+
+"""
+
 weekly = _date_influence("%Y-%w")
+""" Add weekly hash influence.
+
+If nothing else changes, the task is re-executed once every week.
+
+Example:
+
+    .. code-block:: python
+
+        from jolt import influence
+
+        @influence.weekly
+        class Example(Task):
+
+"""
+
 monthly = _date_influence("%Y-%m")
+""" Add monthly hash influence.
+
+If nothing else changes, the task is re-executed once every month.
+
+Example:
+
+    .. code-block:: python
+
+        from jolt import influence
+
+        @influence.monthly
+        class Example(Task):
+
+"""
+
 daily = _date_influence("%Y-%m-%d")
+""" Add daily hash influence.
+
+If nothing else changes, the task is re-executed once every day.
+
+Example:
+
+    .. code-block:: python
+
+        from jolt import influence
+
+        @influence.daily
+        class Example(Task):
+
+"""
+
 hourly = _date_influence("%Y-%m-%d %H")
+""" Add hourly hash influence.
+
+If nothing else changes, the task is re-executed once every hour.
+
+Example:
+
+    .. code-block:: python
+
+        from jolt import influence
+
+        @influence.hourly
+        class Example(Task):
+
+"""
 
 
 
@@ -139,6 +246,22 @@ class TaskEnvironmentInfluence(HashInfluenceProvider):
 
 
 def environ(variable):
+    """ Add environment variable hash influence.
+
+    Args:
+        variable (str): Name of an environment variable that will
+            influence the hash of the task.
+
+    Example:
+
+    .. code-block:: python
+
+        from jolt import influence
+
+        @influence.environ("CFLAGS")
+        class Example(Task):
+
+    """
     def _decorate(cls):
         _old_init = cls.__init__
         def _init(self, *args, **kwargs):
@@ -164,14 +287,33 @@ class FileInfluence(HashInfluenceProvider):
         return sha.hexdigest()
 
 
-def files(pattern):
+def files(pathname):
+    """ Add file content hash influence.
+
+    Args:
+        pathname (str): A pathname pattern used to find files that will
+                influence the hash of the task
+                The pattern may contain simple shell-style
+                wildcards such as '*' and '?'. Note: files starting with a
+                dot are not matched by these wildcards.
+
+    Example:
+
+    .. code-block:: python
+
+        from jolt import influence
+
+        @influence.files("*.cpp")
+        class Example(Task):
+
+    """
     def _decorate(cls):
         _old_init = cls.__init__
         def _init(self, *args, **kwargs):
             _old_init(self, *args, **kwargs)
             f = []
             with Tools(self, self.joltdir) as tools:
-                f = tools.glob(pattern)
+                f = tools.glob(pathname)
             f.sort()
             for i in f:
                 self.influence.append(FileInfluence(i))
