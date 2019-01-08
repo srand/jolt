@@ -1,4 +1,5 @@
 import datetime
+import os
 
 from jolt import utils
 from jolt import log
@@ -121,6 +122,30 @@ yearly = _date_influence("%Y")
 monthly = _date_influence("%Y-%m")
 daily = _date_influence("%Y-%m-%d")
 hourly = _date_influence("%Y-%m-%d %H")
+
+
+
+class TaskEnvironmentInfluence(HashInfluenceProvider):
+    name = "Environment"
+
+    def __init__(self, variable):
+        self.variable = variable
+
+    def get_influence(self, task):
+        return self.variable + "=" + os.environ.get(self.variable, "<unset>")
+
+
+def environ(variable):
+    def _decorate(cls):
+        _old_init = cls.__init__
+        def _init(self, *args, **kwargs):
+            _old_init(self, *args, **kwargs)
+            self.influence.append(TaskEnvironmentInfluence(variable))
+        cls.__init__ = _init
+        return cls
+
+    return _decorate
+
 
 
 # class FileInfluence(HashInfluenceProvider):

@@ -21,6 +21,7 @@ class Toolchain(Task):
 
 
 @influence.hourly
+@influence.environ("CFLAGS")
 class Lib(pam.CXXLibrary):
     arch = Parameter("x86")
     requires = "toolchain:arch={arch}"
