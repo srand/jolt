@@ -76,11 +76,13 @@ its name to ``hello``.
         name = "hello"
 
         def run(self, deps, tools):
-            with tools.builddir() as b, tools.cwd(b):
+            b = tools.builddir()
+            with tools.cwd(b):
                 tools.write_file("message.txt", "Hello world!")
 
         def publish(self, artifact, tools):
-            with tools.builddir() as b, tools.cwd(b):
+            b = tools.builddir()
+            with tools.cwd(b):
                 artifact.collect("*.txt")
 
 The implementation of the task is now split into two methods,
@@ -143,11 +145,13 @@ use the new parameter's value when writing the ``message.txt`` file.
         recipient = Parameter(default="world", help="Name of greeting recipient.")
 
         def run(self, deps, tools):
-            with tools.builddir() as b, tools.cwd(b):
+            b = tools.builddir()
+            with tools.cwd(b):
                 tools.write_file("message.txt", "Hello {recipient}!")
 
         def publish(self, artifact, tools):
-            with tools.builddir() as b, tools.cwd(b):
+            b = tools.builddir()
+            with tools.cwd(b):
                 artifact.collect("*.txt")
 
 
@@ -312,10 +316,81 @@ Below is an example:
 Influence
 ---------
 
-It is important to ensure that all attributes that influence a task's
-identity are known and registered to avoid false cache hits. For example,
-in a compilation task all compiled source files should influence the task's
-identity and trigger re-execution of the task if changed. However, Jolt
-has no way of knowing what source files to monitor. This information must be
-explicitly provided by the task implementor. Luckily, Jolt provides a few
-builtin class decorators to make it easier.
+It is important that all attributes that define the output of a task are known
+and registered to avoid false cache hits. For example, in a compilation task all
+compiled source files should influence the task's identity and trigger re-execution
+of the task if changed, otherwise binary compatibility will be lost quickly.
+
+When using an external second-level build tool such as make, Jolt has no way of
+knowing what source files to monitor. This information must be explicitly provided
+by the task's implementor. Luckily, Jolt provides a few builtin class decorators
+to make it easier.
+
+Let's revisit the ``e2fsprogs`` task from earlier, but this time we assume that the
+repository is already cloned and managed by external tools and not through the
+builtin Jolt ``git`` resource. We can no longer rely on the resource
+to influence the hash of the task. We instead use the ``git.influence`` decorator:
+
+.. code-block:: python
+
+    from jolt import *
+    from jolt.plugins import git
+
+    @git.influence(path="path/to/e2fsprogs")
+    class E2fsprogs(Task):
+        def run(self, deps, tools):
+            ac = tools.autotools()
+            ac.configure("path/to/e2fsprogs")
+            ac.build()
+            ac.install()
+
+The decorator adds the git repository's root tree hash as task hash influence.
+It will also add the ``git diff`` output as influence to simplify iterative local
+development.
+
+There are a number of other useful influence decorators as well:
+
+.. code-block:: python
+
+    from jolt import *
+    from jolt import influence
+    from jolt.plugins import git
+
+    @influence.files("path/to/e2fsprogs/*.c")
+    @influence.environ("CFLAGS")
+    @influence.weekly
+    @influence.source("report")
+    class E2fsprogs(Task):
+        def report(self):
+	    # TODO: Report something
+
+	def run(self, deps, tools):
+            ac = tools.autotools()
+            ac.configure("path/to/e2fsprogs")
+            ac.build()
+            ac.install()
+	    self.report()
+
+Above, the ``git.influence`` decorator has been replaced by
+``influence.files``. The result is virtually the same, the content of all files
+matched by the provided pattern will influence the hash of the task. However,
+the Git tree hash implementation is more effecient and faster, but it obviously
+doesn't work if sources reside in a different type of repository.
+
+The ``influence.environ`` decorator is used to influence the hash of
+the task based on the value of the ``CFLAGS`` environment variable. If the
+value of the variable changes the task will be re-executed.
+
+The ``influence.weekly`` decorator adds the week number as hash influence. If nothing else
+changes, the task will be re-executed once every week. This can be useful to
+verify that external resources, such as files downloaded from the Internet,
+are still available. Other time-based decorators include:
+
+- ``influence.yearly``
+- ``influence.montly``
+- ``influence.daily``
+- ``influence.hourly``
+
+The ``influence.source`` decorator adds the source code of a task function as
+hash influence. Above, the ``report`` method is registered. Similarly, there is
+also a ``influence.attribute`` decorator for task attributes and properties.

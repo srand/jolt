@@ -5,7 +5,7 @@ import os
 from jolt import utils
 from jolt import log
 from jolt import filesystem as fs
-
+from jolt.tools import Tools
 
 _providers = []
 
@@ -121,6 +121,7 @@ def _date_influence(fmt):
 
 
 yearly = _date_influence("%Y")
+weekly = _date_influence("%Y-%w")
 monthly = _date_influence("%Y-%m")
 daily = _date_influence("%Y-%m-%d")
 hourly = _date_influence("%Y-%m-%d %H")
@@ -161,3 +162,20 @@ class FileInfluence(HashInfluenceProvider):
             for data in iter(lambda: f.read(4096), ''):
                 sha.update(data)
         return sha.hexdigest()
+
+
+def files(pattern):
+    def _decorate(cls):
+        _old_init = cls.__init__
+        def _init(self, *args, **kwargs):
+            _old_init(self, *args, **kwargs)
+            f = []
+            with Tools(self, self.joltdir) as tools:
+                f = tools.glob(pattern)
+            f.sort()
+            for i in f:
+                self.influence.append(FileInfluence(i))
+        cls.__init__ = _init
+        return cls
+
+    return _decorate
