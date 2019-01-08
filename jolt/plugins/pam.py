@@ -21,6 +21,7 @@ class CXXProject(Task):
     features = []
     macros = []
     sources = []
+    source_influence = True
 
     def __init__(self, *args, **kwargs):
         super(CXXProject, self).__init__(*args, **kwargs)
@@ -28,12 +29,16 @@ class CXXProject(Task):
         self.macros = utils.as_list(utils.call_or_return(self, self.__class__.macros))
         self.incpaths = utils.as_list(utils.call_or_return(self, self.__class__.incpaths))
         self.features = utils.as_list(utils.call_or_return(self, self.__class__.features))
+        if self.source_influence:
+            for source in self.sources:
+                self.influence.append(influence.FileInfluence(source))
 
     def _init_sources(self):
         sources = utils.as_list(utils.call_or_return(self, self.__class__.sources))
         self.sources = []
         for l in map(self.tools.glob, sources):
             self.sources += l
+        self.sources.sort()
         assert self.sources, "no source files found for task {0}".format(self.name)
 
     def run(self, deps, tools):

@@ -1,8 +1,10 @@
 import datetime
+import hashlib
 import os
 
 from jolt import utils
 from jolt import log
+from jolt import filesystem as fs
 
 
 _providers = []
@@ -148,34 +150,14 @@ def environ(variable):
 
 
 
-# class FileInfluence(HashInfluenceProvider):
-#     name = "File"
-#     path = "."
-#     pattern = "*"
-#
-#     def __init__(self, path=None, pattern=None):
-#         self.path = path or self.__class__.path
-#         self.pattern = pattern or self.__class__.pattern
-#
-#     def get_influence(self, task):
-#         try:
-#             with Tools(task, task.joltdir) as tools:
-#                 path = task._get_expansion(self.path)
-#                 with tools.cwd(path):
-#                     return tools.run("find -type f -name '{0}' | LC_ALL=C sort | xargs -n1 sha1sum"
-#                                      .format(self.pattern),
-#                                      output=False, output_on_error=True)
-#         except KeyError as e:
-#             pass
-#         assert False, "failed to change directory to {0}".format(self.path)
-#
-#
-# def file(path, pattern=None):
-#     def _decorate(taskcls):
-#         if "influence" not in taskcls.__dict__:
-#             taskcls.influence = copy(taskcls.influence)
-#         provider = FileInfluence(path, pattern)
-#         taskcls.influence.append(provider)
-#         return taskcls
-#     return _decorate
-#
+class FileInfluence(HashInfluenceProvider):
+    def __init__(self, path):
+        self.path = path
+        self.name = "File:" + fs.path.basename(path)
+
+    def get_influence(self, task):
+        sha = hashlib.sha1()
+        with open(self.path, "rb") as f:
+            for data in iter(lambda: f.read(4096), ''):
+                sha.update(data)
+        return sha.hexdigest()
