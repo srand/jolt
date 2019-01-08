@@ -21,14 +21,15 @@ class GitInfluenceProvider(HashInfluenceProvider):
         self.path = path or self.__class__.path
 
     def _get_path(self, task):
-        return task._get_expansion(self.path)
+        p = task.tools.expand_path(self.path)
+        return p
 
     @utils.cached.instance
     def _get_tree_hash(self, task, sha="HEAD"):
-        with task.tools.cwd(self._get_path(task)):
-            if has_pygit:
-                return pygit2.Repository(self._get_path(task)).revparse_single(sha + ":").id
-            else:
+        if has_pygit:
+            return pygit2.Repository(self._get_path(task)).revparse_single(sha + ":").id
+        else:
+            with task.tools.cwd(self._get_path(task)):
                 return task.tools.run("git rev-parse {0}:".format(sha), output_on_error=True)
         return ""
 
