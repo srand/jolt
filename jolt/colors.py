@@ -14,5 +14,8 @@ def yellow(s):
 def green(s):
     return Fore.GREEN + Style.BRIGHT + s + Style.RESET_ALL if enabled else s
 
+def blue(s):
+    return Fore.BLUE + Style.BRIGHT + s + Style.RESET_ALL if enabled else s
+
 def bright(s):
     return Style.BRIGHT + s + Style.RESET_ALL if enabled else s

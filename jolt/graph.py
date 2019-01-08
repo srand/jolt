@@ -159,7 +159,7 @@ class TaskProxy(object):
         return self.identity
 
     def started(self):
-        self.info("Execution started")
+        self.task.info(colors.blue("Execution started " + self.log_name))
         self.duration = utils.duration()
 
     def failed(self):
