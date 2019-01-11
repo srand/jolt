@@ -29,7 +29,8 @@ class HashInfluenceRegistry(object):
     def get_strings(self, task):
         content = []
         for provider in self._providers + task.influence:
-            content.append("Influence-{0}: {1}".format(provider.name, provider.get_influence(task)))
+            for line in str(provider.get_influence(task)).splitlines():
+                content.append("Influence-{0}: {1}".format(provider.name, line))
         return content
 
 

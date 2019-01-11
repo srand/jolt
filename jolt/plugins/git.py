@@ -28,7 +28,7 @@ class GitInfluenceProvider(HashInfluenceProvider):
         p = self._get_path(task)
         if p.startswith(task.joltdir):
             p = p[len(task.joltdir):]
-            p = p[1:] if p[0] == fs.pathsep else p
+            p = p[1:] if p[0] == fs.sep else p
         return p
 
     @utils.cached.instance
@@ -54,7 +54,7 @@ class GitInfluenceProvider(HashInfluenceProvider):
         return "{0}:{1}:{2}".format(
             self._get_relative_path(task),
             self._get_tree_hash(task),
-            self._get_diff_hash(task))
+            self._get_diff_hash(task)[:8])
 
 
 def global_influence(path, cls=GitInfluenceProvider):
