@@ -1,7 +1,7 @@
 import shutil
 import requests
 from requests.auth import HTTPBasicAuth
-from requests.exceptions import ConnectionError, ConnectTimeout
+from requests.exceptions import ConnectionError, ConnectTimeout, ReadTimeout
 import keyring
 import getpass
 
@@ -59,7 +59,7 @@ class Artifactory(cache.StorageProvider):
             name=node.name,
             file=fs.path.basename(artifact.get_archive_path()))
 
-    @utils.retried.on_exception(ConnectionError)
+    @utils.retried.on_exception((ConnectionError, ReadTimeout))
     def download(self, node, force=False):
         if self._disabled:
             return False
@@ -71,7 +71,7 @@ class Artifactory(cache.StorageProvider):
                 return True
         return False
 
-    @utils.retried.on_exception(ConnectionError)
+    @utils.retried.on_exception((ConnectionError, ReadTimeout))
     def upload(self, node, force=False):
         if self._disabled:
             return True
@@ -83,7 +83,7 @@ class Artifactory(cache.StorageProvider):
             return node.tools.upload(archive, url, auth=self._get_auth())
         return False
 
-    @utils.retried.on_exception(ConnectionError)
+    @utils.retried.on_exception((ConnectionError, ReadTimeout))
     def location(self, node):
         if self._disabled:
             return False

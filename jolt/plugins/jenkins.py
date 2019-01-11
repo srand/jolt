@@ -5,7 +5,7 @@ import inspect
 import hashlib
 from jinja2 import Template
 import time
-from requests.exceptions import ConnectionError
+from requests.exceptions import ConnectionError, ReadTimeout
 
 from jolt import config
 from jolt import utils
@@ -111,15 +111,15 @@ class JenkinsExecutor(scheduler.NetworkExecutor):
         self.task = task
         self.job = self.server.job_name
 
-    @utils.retried.on_exception(ConnectionError)
+    @utils.retried.on_exception((ConnectionError, ReadTimeout))
     def _get_queue_item(self, queue_id):
         return self.server.get_queue_item(queue_id)
 
-    @utils.retried.on_exception(ConnectionError)
+    @utils.retried.on_exception((ConnectionError, ReadTimeout))
     def _get_build_info(self, build_id):
         return self.server.get_build_info(self.job, build_id)
 
-    @utils.retried.on_exception(ConnectionError)
+    @utils.retried.on_exception((ConnectionError, ReadTimeout))
     def _build_job(self, parameters):
         return self.server.build_job(self.job, parameters)
 
