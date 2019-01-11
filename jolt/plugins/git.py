@@ -24,6 +24,13 @@ class GitInfluenceProvider(HashInfluenceProvider):
         p = task.tools.expand_path(self.path)
         return p
 
+    def _get_relative_path(self, task):
+        p = self._get_path(task)
+        if p.startswith(task.joltdir):
+            p = p[len(task.joltdir):]
+            p = p[1:] if p[0] == fs.pathsep else p
+        return p
+
     @utils.cached.instance
     def _get_tree_hash(self, task, sha="HEAD"):
         if has_pygit:
@@ -45,7 +52,7 @@ class GitInfluenceProvider(HashInfluenceProvider):
 
     def get_influence(self, task):
         return "{0}:{1}:{2}".format(
-            self._get_path(task),
+            self._get_relative_path(task),
             self._get_tree_hash(task),
             self._get_diff_hash(task))
 
