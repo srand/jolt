@@ -15,7 +15,7 @@ from jolt.influence import TaskSourceInfluence
 class Parameter(object):
     """ Generic task parameter type. """
 
-    def __init__(self, default=None, values=None, help=None):
+    def __init__(self, default=None, values=None, required=True, help=None):
         """
         Creates a new parameter.
 
@@ -23,6 +23,8 @@ class Parameter(object):
             default (str, optional): An optional default value.
             values (list, optional): A list of accepted values. An
                 assertion is raised if an unlisted value is assigned to the parameter.
+            required (boolean, optional): If required, the parameter must be assigned
+                a value before the task can be executed. The default is ``True``.
             help (str, optional): Documentation for the parameter.
                 This text is displayed when running the ``info`` command on the
                 associated task.
@@ -35,6 +37,7 @@ class Parameter(object):
         self._default = default
         self._value = default
         self._accepted_values = values
+        self._required = required
         self.__doc__ = help
         if default:
             self._validate(default)
@@ -55,6 +58,14 @@ class Parameter(object):
             The default value or None if no default was given.
         """
         return self._default
+
+    def is_required(self):
+        """ Check if the parameter must be set to a value.
+
+        Returns:
+            True if the parameter must be assigned a value, False otherwise.
+        """
+        return self._required
 
     def is_default(self):
         """ Check if parameter is set to its default value.
@@ -196,18 +207,26 @@ class TaskBase(object):
                 param.set_value(value)
                 continue
             assert False, "no such parameter for task {0}: {1}".format(self.name, key)
+        self._assert_required_parameters_assigned()
+
+    def _assert_required_parameters_assigned(self):
+        for key, param in self._get_parameter_objects().items():
+            assert not param.is_required() or not param.is_unset(), \
+                "required parameter '{0}' has not been set for '{1}'".format(key, self.name)
+
+    def _get_parameter_objects(self, unset=False):
+        return { key: getattr(self, key) for key in dir(self)
+                 if isinstance(getattr(self, key), Parameter) }
 
     def _get_parameters(self, unset=False):
-        return {key: getattr(self, key).get_value()
-                for key in dir(self)
-                if isinstance(getattr(self, key), Parameter) and \
-                 (unset or not getattr(self, key).is_unset()) }
+        return {key: param.get_value()
+                for key, param in self._get_parameter_objects().items()
+                if unset or not param.is_unset() }
 
     def _get_explicitly_set_parameters(self):
-        return {key: getattr(self, key).get_value()
-                for key in dir(self)
-                if isinstance(getattr(self, key), Parameter) and \
-                getattr(self, key).is_set() }
+        return {key: param.get_value()
+                for key, param in self._get_parameter_objects().items()
+                if param.is_set() }
 
     def _get_properties(self):
         return {key: str(getattr(self, key))

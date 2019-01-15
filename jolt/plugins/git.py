@@ -81,8 +81,8 @@ class Git(Resource, GitInfluenceProvider):
 
     name = "git"
     url = Parameter(help="URL to the git repo to clone. Required.")
-    sha = Parameter(help="Specific commit sha to be checked out. Optional.")
-    path = Parameter(help="Local path where repo should be cloned.")
+    sha = Parameter(required=False, help="Specific commit sha to be checked out. Optional.")
+    path = Parameter(required=False, help="Local path where repo should be cloned.")
 
     def __init__(self, *args, **kwargs):
         super(Git, self).__init__(*args, **kwargs)

@@ -214,14 +214,16 @@ def _log(follow, delete):
 @cli.command()
 @click.argument("task")
 @click.option("-i", "--influence", is_flag=True, help="Print task influence.")
-def info(task, influence=False):
+@click.option("-a", "--artifacts", is_flag=True, help="Print task artifact status.")
+def info(task, influence=False, artifacts=False):
     """
     View information about a task, including its documentation.
 
     <WIP>
     """
+    task_name = task
     task_registry = TaskRegistry.get()
-    task = task_registry.get_task(task)
+    task = task_registry.get_task_class(task_name)
 
     click.echo()
     click.echo("  {0}".format(task.name))
@@ -246,23 +248,25 @@ def info(task, influence=False):
         click.echo("    None")
     click.echo()
 
-    acache = cache.ArtifactCache()
-    dag = graph.GraphBuilder(task_registry).build(
-        [utils.format_task_name(task.name, task._get_parameters())])
-    tasks = dag.select(lambda graph, node: graph.is_root(node))
-    assert len(tasks) == 1, "unexpected graph generated"
-    proxy = tasks[0]
+    if artifacts:
+        task = task_registry.get_task(task_name)
+        acache = cache.ArtifactCache()
+        dag = graph.GraphBuilder(task_registry).build(
+            [utils.format_task_name(task.name, task._get_parameters())])
+        tasks = dag.select(lambda graph, node: graph.is_root(node))
+        assert len(tasks) == 1, "unexpected graph generated"
+        proxy = tasks[0]
 
-    click.echo("  Cache")
-    click.echo("    Identity          {0}".format(proxy.identity))
-    if acache.is_available_locally(proxy):
-        click.echo("    Local             {0} ({1})".format(
-            True, utils.as_human_size(acache.get_artifact(proxy).get_size())))
-    click.echo("    Remote            {0}".format(acache.is_available_remotely(proxy)))
-    click.echo()
+        click.echo("  Cache")
+        click.echo("    Identity          {0}".format(proxy.identity))
+        if acache.is_available_locally(proxy):
+            click.echo("    Local             {0} ({1})".format(
+                True, utils.as_human_size(acache.get_artifact(proxy).get_size())))
+            click.echo("    Remote            {0}".format(acache.is_available_remotely(proxy)))
+            click.echo()
 
-    if influence:
-        click.echo("  Influence")
-        for string in HashInfluenceRegistry.get().get_strings(task):
-            click.echo("    " + string)
-        click.echo()
+        if influence:
+            click.echo("  Influence")
+            for string in HashInfluenceRegistry.get().get_strings(task):
+                click.echo("    " + string)
+                click.echo()
