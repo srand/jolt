@@ -479,6 +479,14 @@ class _Test(Task):
         for name in self._get_test_names():
             self.influence.append(TaskSourceInfluence(name, self.test_cls))
 
+    @property
+    def identity(self):
+        return self.test_cls.identity
+
+    @identity.setter
+    def identity(self, identity):
+        self.test_cls.identity = identity
+
     def _create_parameters(self):
         for key, param in self.test_cls.__dict__.items():
             if isinstance(param, Parameter):

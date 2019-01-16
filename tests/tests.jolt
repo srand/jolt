@@ -13,8 +13,28 @@ class Tests(Task):
     requires = \
         "test/artifact", \
 	"test/cli", \
+        "test/tasks", \
         "test/tools", \
         "test/utils"
+
+
+class TasksTask(Task):
+    name = "test/tasks/task"
+
+    def run(self, deps, tools):
+        print(self.identity)
+        assert self.identity is not None, \
+	    "task identity not readable from task"
+
+
+class Tasks(Test):
+    name = "test/tasks"
+
+    requires = "test/tasks/task"
+
+    def test_identity(self):
+        print(self.identity)
+        self.assertTrue(self.identity is not None)
 
 
 class Tools(Test):
