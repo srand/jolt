@@ -32,6 +32,7 @@ class JenkinsServer(object):
         try:
             self._ok = self._check_job()
         except:
+            log.exception()
             log.warn("[JENKINS] failed to establish server connection, disabled")
             self._ok = False
 
