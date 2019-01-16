@@ -192,6 +192,15 @@ class TaskBase(object):
     def __init__(self, *args, **kwargs):
         super(TaskBase, self).__init__(*args, **kwargs)
         self.cacheable = self.__class__.cacheable
+        self._identity = None
+
+    @property
+    def identity(self):
+        return self._identity
+
+    @identity.setter
+    def identity(self, identity):
+        self._identity = identity
 
     def _create_parameters(self):
         for key, param in self.__class__.__dict__.items():

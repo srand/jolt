@@ -70,7 +70,8 @@ class TaskProxy(object):
         if self._extended_task:
             sha.update(self._extended_task.identity.encode())
 
-        return sha.hexdigest()
+        self.task.identity = sha.hexdigest()
+        return self.task.identity
 
     def __str__(self):
         return "{0}{1}".format(self.short_qualified_name, "*" if self.is_extension() else '')
