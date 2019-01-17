@@ -749,15 +749,15 @@ class Tools(object):
         else:
             self._env[key] = self.expand(value)
 
-    def symlink(self, src, dest):
+    def symlink(self, src, dst):
         """ Creates a symbolic link.
 
         Args:
             src (str): Path to target file or directory.
-            dest (str): Name/path of symbolic link.
+            dst (str): Name/path of symbolic link.
         """
-        src = self.expand_path(src, *args, **kwargs)
-        dst = self.expand_path(dst, *args, **kwargs)
+        src = self.expand_path(src)
+        dst = self.expand_path(dst)
         fs.symlink(src, dst)
 
     def tmpdir(self, name):
