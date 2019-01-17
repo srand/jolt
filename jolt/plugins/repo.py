@@ -150,12 +150,14 @@ class RepoManifest(ElementTree):
                     .format(project.path_or_name)
                 head = remote_ref
 
-            if project.revision and project.has_local_ref(project.revision):
-                project.upstream = project.revision
-            else:
-                project.upstream = self.get_upstream(project)
+            if not project.upstream:
+                if project.revision and project.has_local_ref(project.revision):
+                    project.upstream = project.revision
+                else:
+                    project.upstream = self.get_upstream(project)
 
-            project.revision = head
+            if not project.revision.startswith("refs/changes"):
+                project.revision = head
 
 
 _git_repos = {}
