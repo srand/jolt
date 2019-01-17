@@ -64,7 +64,10 @@ class RepoProject(SubElement):
 
     def has_local_ref(self, ref):
         with self.tools.cwd(self.path_or_name):
-            return True if self.tools.run("git show-ref {0}", ref, output_on_error=True) else False
+            try:
+                return True if self.tools.run("git show-ref {0}", ref, output=False) else False
+            except:
+                return False
 
     def get_remote_ref(self, commit, remote, pattern=None):
         with self.tools.cwd(self.path_or_name):
