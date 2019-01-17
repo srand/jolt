@@ -38,13 +38,15 @@ class JoltLoader(object):
         cls_exclude_list = [Task, Resource]
 
         tasks = [cls for cls in classes
-                 if issubclass(cls, Task) and cls not in cls_exclude_list]
+                 if issubclass(cls, Task) and cls not in cls_exclude_list \
+                 and not cls.__name__.startswith("_")]
         for task in tasks:
             task.name = task.name or task.__name__.lower()
             task.joltdir = directory
         self._tasks += tasks
 
-        tests = [cls for cls in classes if issubclass(cls, Test) and cls is not Test]
+        tests = [cls for cls in classes if issubclass(cls, Test) and cls is not Test \
+                 and not cls.__name__.startswith("_")]
         for test in tests:
             test.name = test.name or test.__name__.lower()
             test.joltdir = directory

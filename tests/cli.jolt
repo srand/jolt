@@ -27,6 +27,14 @@ class Fail(Task):
         assert False, "This task always fails"
 
 
+class _HiddenTask(Task):
+    pass
+
+
+class _HiddenTest(Test):
+    pass
+
+
 class Cli(Test):
     name = "test/cli"
 
@@ -37,3 +45,9 @@ class Cli(Test):
         self.jolt("build pass")
         with self.assertRaises(Exception):
             self.jolt("build fail")
+
+    def test_list_hidden(self):
+        with self.assertRaises(Exception):
+            self.jolt("list _hiddentask")
+        with self.assertRaises(Exception):
+            self.jolt("list _hiddentest")
