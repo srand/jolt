@@ -62,6 +62,9 @@ class JoltLoader(object):
             files = glob.glob(fs.path.join(path, JoltLoader.filename))
             for file in files:
                 self._load_file(file)
+            if files:
+                self._path = path
+                break
             path = fs.path.dirname(path)
             if path == root:
                 break
@@ -69,3 +72,7 @@ class JoltLoader(object):
 
     def get_sources(self):
         return "\n".join(self._source)
+
+    @property
+    def joltdir(self):
+        return self._path

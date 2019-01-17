@@ -2,6 +2,7 @@ from jolt.tasks import *
 from jolt.influence import *
 from jolt.tools import *
 from jolt.scheduler import *
+from jolt.loader import JoltLoader
 from jolt import utils
 from jolt import filesystem as fs
 
@@ -87,6 +88,7 @@ class Git(Resource, GitInfluenceProvider):
     def __init__(self, *args, **kwargs):
         super(Git, self).__init__(*args, **kwargs)
         self.path = str(self.path) or self._get_name()
+        self.path = fs.path.join(JoltLoader.get().joltdir, self.path)
         self.influence.append(self)
 
     @utils.cached.instance
