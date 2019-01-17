@@ -238,8 +238,8 @@ class Artifact(object):
             fs.rmtree(self._temp)
 
     def __getattr__(self, name):
-        assert False, "no attribute '{0}' in artifact for '{1}'".format(
-            name, self._node.qualified_name)
+        assert False, "no attribute '{0}' in artifact for '{1} ({2})'"\
+            .format(name, self._node.qualified_name, self._node.identity[:8])
 
     def _write_manifest(self):
         content = {}
@@ -315,7 +315,9 @@ class Artifact(object):
             fs.rmtree(self._path)
 
     def modify(self):
-        assert not self._temp, "artifact is not published"
+        assert not self._temp, \
+            "attempting to unpack absent artifact of task '{0} ({1})'"\
+            .format(self._node.qualified_name, self._node.identity[:8])
         #self._temp = self._cache.get_path(self._node) + ".unpack"
         #fs.move(self._path, self._temp)
         self._temp = self._path
@@ -358,7 +360,9 @@ class Artifact(object):
 
         """
 
-        assert self._temp, "artifact is already published"
+        assert self._temp, \
+            "can't collect files into already published artifact of task '{0} ({1})'"\
+            .format(self._node.qualified_name, self._node.identity[:8])
         files = self._node.task._get_expansion(files)
         dest = self._node.task._get_expansion(dest) if dest is not None else None
 
@@ -396,7 +400,9 @@ class Artifact(object):
 
         """
 
-        assert not self._temp, "artifact is not published"
+        assert self._temp, \
+            "can't copy files from the unpublished artifact of task '{0} ({1})'"\
+            .format(self._node.qualified_name, self._node.identity[:8])
         pathname = self._node.task._get_expansion(pathname)
         dest = self._node.task._get_expansion(dest)
 
@@ -413,7 +419,9 @@ class Artifact(object):
                 log.verbose("Copied {0} -> {1}", src, destfile)
 
     def compress(self):
-        assert not self._temp, "artifact is not published, can't compress"
+        assert not self._temp, \
+            "can't compress the unpublished artifact of task '{0} ({1})'"\
+            .format(self._node.qualified_name, self._node.identity[:8])
         if not self.get_archive():
             self._archive = self.tools.archive(
                 self._path, self._path + DEFAULT_ARCHIVE_TYPE)
@@ -504,7 +512,9 @@ class Context(object):
         """
 
         key = self._node.task._get_expansion(key)
-        assert key in self._artifacts, "no such dependency: {0}".format(key)
+        assert key in self._artifacts, \
+            "no such dependency '{0}' for task '{1} ({2})'"\
+            .format(key, self._node.qualified_name, self._node.identity[:8])
         return self._artifacts[key]
 
     def items(self):
@@ -568,7 +578,7 @@ class CacheStats(object):
         return size
 
     def get_lru(self):
-        assert self.stats, "no artifacts in cache"
+        assert self.stats, "can't evict LRU artifact, no artifacts in cache"
         nt = [dict(identity=artifact, **stats) for artifact, stats in self.stats.items()]
         nt = sorted(nt, key=lambda x: x["used"])
         # Don't evict artifacts in the current working set
@@ -614,7 +624,8 @@ class ArtifactCache(StorageProvider):
             path = mkdtemp(prefix=node.identity, dir=dirname)
         except:
             pass
-        assert path, "couldn't create temporary directory"
+        assert path, "couldn't create temporary artifact directory for task '{0} ({1})'"\
+            .format(node.qualified_name, node.identity[:8])
         return path
 
     def is_available_locally(self, node):
@@ -669,7 +680,9 @@ class ArtifactCache(StorageProvider):
             return False
         if not node.task.is_cacheable():
             return True
-        assert self.is_available_locally(node), "can't upload task, not in the local cache"
+        assert self.is_available_locally(node), \
+            "can't upload artifact of task '{0} ({1})', absent in the local cache"\
+            .format(node.qualified_name, node.identity[:8])
         if self.storage_providers:
             with self.get_artifact(node) as artifact:
                 artifact.compress()
