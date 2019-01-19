@@ -3,6 +3,7 @@ import hashlib
 import networkx as nx
 from networkx.drawing.nx_agraph import write_dot
 import traceback
+from threading import RLock
 
 from jolt.tasks import *
 from jolt.utils import *
@@ -221,35 +222,47 @@ class TaskProxy(object):
 class Graph(nx.DiGraph):
     def __init__(self):
         super(Graph, self).__init__()
+        self._mutex = RLock()
+
+    def remove_node(self, node):
+        with self._mutex:
+            super(Graph, self).remove_node(node)
 
     def prune(self, func):
-        for node in nx.topological_sort(self):
-            if func(self, node):
-                log.hysterical("[GRAPH] Pruned {0} ({1})", node.name, node.identity)
-                self.remove_node(node)
+        with self._mutex:
+            for node in nx.topological_sort(self):
+                if func(self, node):
+                    log.hysterical("[GRAPH] Pruned {0} ({1})", node.name, node.identity)
+                    self.remove_node(node)
 
-        for node in self.nodes:
-            log.hysterical("[GRAPH] Keeping {0} ({1})", node.qualified_name, node.identity)
+            for node in self.nodes:
+                log.hysterical("[GRAPH] Keeping {0} ({1})", node.qualified_name, node.identity)
 
     def select(self, func):
-        return [n for n in self.nodes if func(self, n)]
+        with self._mutex:
+            return [n for n in self.nodes if func(self, n)]
 
     def debug(self):
-        log.verbose("[GRAPH] Listing all nodes")
-        for node in nx.topological_sort(self):
-            log.verbose("[GRAPH]   " + node.qualified_name)
+        with self._mutex:
+            log.verbose("[GRAPH] Listing all nodes")
+            for node in nx.topological_sort(self):
+                log.verbose("[GRAPH]   " + node.qualified_name)
 
     def is_leaf(self, node):
-        return self.out_degree(node) == 0
+        with self._mutex:
+            return self.out_degree(node) == 0
 
     def is_root(self, node):
-        return self.in_degree(node) == 0
+        with self._mutex:
+            return self.in_degree(node) == 0
 
     def is_orphan(self, node):
-        return self.is_root(node) and self.is_leaf(node)
+        with self._mutex:
+            return self.is_root(node) and self.is_leaf(node)
 
     def are_neighbors(self, n1, n2):
-        return n2 in self[n1]
+        with self._mutex:
+            return n2 in self[n1]
 
 
 class GraphBuilder(object):
