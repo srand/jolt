@@ -35,7 +35,7 @@ class SelfDeployExtension(NetworkExecutorExtension):
     def get_parameters(self, task):
         registry = TaskRegistry()
         registry.add_task_class(Jolt)
-        acache = ArtifactCache()
+        acache = ArtifactCache.get()
         gb = GraphBuilder(registry)
         dag = gb.build(["jolt"])
         task = dag.select(lambda graph, task: True)

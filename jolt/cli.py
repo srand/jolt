@@ -80,7 +80,7 @@ def build(task, network, keep_going, identity, no_download, no_upload, download,
         config.set("jolt", "upload", "true")
 
     executor = scheduler.ExecutorRegistry.get(network=network)
-    acache = cache.ArtifactCache()
+    acache = cache.ArtifactCache.get()
     registry = TaskRegistry().get()
     gb = graph.GraphBuilder(registry)
     dag = gb.build(task)
@@ -122,7 +122,7 @@ def clean(task):
 
     <WIP>
     """
-    acache = cache.ArtifactCache()
+    acache = cache.ArtifactCache.get()
     if task:
         registry = TaskRegistry().get()
         dag = graph.GraphBuilder(registry).build(task)
@@ -146,7 +146,7 @@ def display(task, prune):
     gb = graph.GraphBuilder(registry)
     dag = gb.build(task)
     if prune:
-        acache = cache.ArtifactCache()
+        acache = cache.ArtifactCache.get()
         dag.prune(lambda graph, task: task.is_cached(acache, network=False))
     if len(dag.nodes) > 0:
         gb.display()
@@ -250,7 +250,7 @@ def info(task, influence=False, artifacts=False):
 
     if artifacts:
         task = task_registry.get_task(task_name)
-        acache = cache.ArtifactCache()
+        acache = cache.ArtifactCache.get()
         dag = graph.GraphBuilder(task_registry).build(
             [utils.format_task_name(task.name, task._get_parameters())])
         tasks = dag.select(lambda graph, node: graph.is_root(node))

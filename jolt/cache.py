@@ -10,6 +10,7 @@ from jolt import log
 from jolt import tools
 from jolt import influence
 from jolt import config
+from jolt import utils
 
 
 DEFAULT_ARCHIVE_TYPE = ".tar.gz"
@@ -586,6 +587,7 @@ class CacheStats(object):
         return nt[0] if len(nt) > 0 else None
 
 
+@utils.Singleton
 class ArtifactCache(StorageProvider):
     root = fs.path.join(fs.path.expanduser("~"), ".cache", "jolt")
     storage_provider_factories = []
