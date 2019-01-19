@@ -98,6 +98,9 @@ class TaskProxy(object):
     def is_resource(self):
         return isinstance(self.task, Resource)
 
+    def has_artifact(self):
+        return not self.is_resource()
+
     def has_extensions(self):
         return len(self.extensions) > 0
 
@@ -180,6 +183,14 @@ class TaskProxy(object):
         with self.tools:
             tasks = [self] + self.extensions
             available_locally = available_remotely = False, False
+
+            for child in self.children:
+                if not child.has_artifact():
+                    continue
+                if not cache.is_available_locally(child):
+                    assert cache.download(child), \
+                        "no artifact of task '{0} ({1})' available"\
+                        .format(child.qualified_name, child.identity[:8])
 
             if not force_build:
                 available_locally = all(map(cache.is_available_locally, tasks))
