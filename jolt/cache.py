@@ -650,11 +650,6 @@ class ArtifactCache(StorageProvider):
     def is_available(self, node):
         return self.is_available_locally(node) or self.is_available_remotely(node)
 
-    def is_available(self, node, on_network):
-        return \
-            (not on_network and self.is_available_locally(node)) or \
-            (on_network and self.is_available_remotely(node))
-
     def download_enabled(self):
         return config.getboolean("jolt", "download", True)
 

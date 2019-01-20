@@ -1,4 +1,5 @@
 from concurrent.futures import ThreadPoolExecutor, Future, as_completed
+from functools import partial
 import traceback
 import sys
 import inspect
@@ -15,17 +16,24 @@ from jolt import utils
 from jolt.options import JoltOptions
 
 
+class JoltEnvironment(object):
+    def __init__(self, **kwargs):
+        self.__dict__.update(kwargs)
+
+
 class TaskQueue(object):
-    def __init__(self, execregistry):
+    def __init__(self, strategy):
         self.futures = {}
-        self.execregistry = execregistry
+        self.strategy = strategy
 
     def submit(self, cache, task):
-        executor = self.execregistry.create(cache, task)
+        env = JoltEnvironment(cache=cache)
+        executor = self.strategy.create_executor(task)
         assert executor, "no executor can execute the task; "\
             "requesting a network build without proper configuration?"
 
-        future = executor.submit()
+        task.set_in_progress()
+        future = executor.submit(env)
         self.futures[future] = task
         return future
 
@@ -48,7 +56,7 @@ class TaskQueue(object):
             future.cancel()
         if len(self.futures):
             log.info("Waiting for tasks to finish")
-        self.execregistry.shutdown()
+        self.strategy.executors.shutdown()
 
     def in_progress(self, task):
         return task in self.futures.values()
@@ -58,28 +66,27 @@ class Executor(object):
     def __init__(self, factory):
         self.factory = factory
 
-    def submit(self):
-        return self.factory.submit(self)
+    def submit(self, env):
+        return self.factory.submit(self, env)
 
-    def run(self, task):
+    def run(self, env):
         pass
 
 
 class LocalExecutor(Executor):
-    def __init__(self, factory, cache, task, force_upload=False):
+    def __init__(self, factory, task, force_upload=False):
         super(LocalExecutor, self).__init__(factory)
-        self.cache = cache
         self.task = task
         self.force_upload = force_upload
 
-    def run(self):
+    def run(self, env):
         if has_asyncio:
             loop = asyncio.SelectorEventLoop()
             asyncio.set_event_loop(loop)
 
         try:
             self.task.started()
-            self.task.run(self.cache, self.force_upload)
+            self.task.run(env.cache, self.force_upload)
         except Exception as e:
             self.task.failed()
             log.exception()
@@ -93,13 +100,64 @@ class NetworkExecutor(Executor):
     pass
 
 
-class SkipTaskExecutor(LocalExecutor):
-    def __init__(self, *args, **kwargs):
-        super(SkipTaskExecutor, self).__init__(*args, **kwargs)
+class SkipTask(Executor):
+    def __init__(self, factory, task, *args, **kwargs):
+        super(SkipTask, self).__init__(factory, *args, **kwargs)
+        self.task = task
 
-    def run(self):
-        self.task.started()
-        self.task.finished()
+    def run(self, env):
+        self.task.skipped()
+        for ext in self.task.extensions:
+            ext.skipped()
+        return self.task
+
+
+class Downloader(Executor):
+    def __init__(self, factory, task, *args, **kwargs):
+        super(Downloader, self).__init__(factory, *args, **kwargs)
+        self.task = task
+
+    def _download(self, env, task):
+        try:
+            task.started("Download")
+            assert env.cache.download(task), \
+                "failed to download artifact of task '{0} ({1})'"\
+                .format(task.qualified_name, task.identity[:8])
+        except Exception as e:
+            task.failed("Download")
+            raise e
+        else:
+            task.finished("Download")
+
+    def run(self, env):
+        self._download(env, self.task)
+        for ext in self.task.extensions:
+            self._download(env, ext)
+        return self.task
+
+
+class Uploader(Executor):
+    def __init__(self, factory, task, *args, **kwargs):
+        super(Uploader, self).__init__(factory, *args, **kwargs)
+        self.task = task
+
+    def _upload(self, env, task):
+        try:
+            task.started("Upload")
+            assert env.cache.upload(task), \
+                "failed to upload artifact of task '{0} ({1})'"\
+                .format(task.qualified_name, task.identity[:8])
+        except Exception as e:
+            task.failed("Upload")
+            raise e
+        else:
+            task.finished("Upload")
+
+    def run(self, env):
+        self._upload(env, self.task)
+        for ext in self.task.extensions:
+            self._upload(env, ext)
+
         return self.task
 
 
@@ -110,6 +168,7 @@ class ExecutorRegistry(object):
 
     def __init__(self, options=None):
         self._factories = [factory() for factory in self.__class__.executor_factories]
+        self._local_factory = LocalExecutorFactory()
         self._extensions = [factory().create() for factory in self.__class__.extension_factories]
         self._options = options or JoltOptions()
 
@@ -117,19 +176,24 @@ class ExecutorRegistry(object):
         for factory in self._factories:
             factory.shutdown()
 
-    def create(self, cache, task):
-        if not task.is_cacheable() and self._options.network:
-            factory = self._factories[-1]
-            return SkipTaskExecutor(factory, cache, task)
+    def create_skipper(self, task):
+        return SkipTask(self._local_factory, task)
 
+    def create_downloader(self, task):
+        return Downloader(self._local_factory, task)
+
+    def create_uploader(self, task):
+        return Uploader(self._local_factory, task)
+
+    def create_local(self, task):
+        return self._local_factory.create(task)
+
+    def create_network(self, task):
         for factory in self._factories:
-            if not task.is_cacheable() and factory.is_network():
-                continue
-            if not self._options.network and factory.is_network():
-                continue
-            if factory.is_eligable(cache, task):
-                return factory.create(cache, task, self._options.network)
-        return None
+            executor = factory.create(task)
+            if executor is not None:
+                return executor
+        return self._local_factory.create(task)
 
     def get_network_parameters(self, task):
         parameters = {}
@@ -165,17 +229,11 @@ class ExecutorFactory(object):
     def shutdown(self):
         self.pool.shutdown()
 
-    def is_network(self):
-        return False
-
-    def is_eligable(self, cache, task):
+    def create(self, task):
         raise NotImplemented()
 
-    def create(self, cache, task):
-        raise NotImplemented()
-
-    def submit(self, executor):
-        return self.pool.submit(executor.run)
+    def submit(self, executor, env):
+        return self.pool.submit(partial(executor.run, env))
 
 
 
@@ -183,21 +241,100 @@ class LocalExecutorFactory(ExecutorFactory):
     def __init__(self):
         super(LocalExecutorFactory, self).__init__(num_workers=1)
 
-    def is_network(self):
-        return False
-
-    def is_eligable(self, cache, task):
-        return True
-
-    def create(self, cache, task):
-        return LocalExecutor(self, cache, task)
-
-ExecutorFactory.Register(LocalExecutorFactory)
+    def create(self, task):
+        return LocalExecutor(self, task)
 
 
 class NetworkExecutorFactory(ExecutorFactory):
-    def is_network(self):
-        return True
+    pass
 
-    def is_eligable(self, cache, task):
-        return True
+
+class ExecutionStrategy(object):
+    def create_executor(self, task):
+        raise NotImplemented()
+
+
+class LocalStrategy(ExecutionStrategy):
+    def __init__(self, executors, cache):
+        self.executors = executors
+        self.cache = cache
+
+    def create_executor(self, task):
+        if not task.is_cacheable():
+            return self.executors.create_local(task)
+        if task.is_available_locally(self.cache):
+            return self.executors.create_skipper(task)
+        if self.cache.download_enabled() and task.is_available_remotely(self.cache):
+            return self.executors.create_downloader(task)
+        return self.executors.create_local(task)
+
+        assert False, "unable to determine execution strategy for task '{0} ({1})'"\
+            .format(task.qualified_name, task.identity[:8])
+
+
+class DistributedStrategy(ExecutionStrategy):
+    def __init__(self, executors, cache):
+        self.executors = executors
+        self.cache = cache
+
+    def create_executor(self, task):
+        if task.is_resource():
+            return self.executors.create_local(task)
+
+        if not task.is_cacheable():
+            return self.executors.create_network(task)
+
+        if not self.cache.download_enabled():
+            if not task.is_available_locally(self.cache):
+                return self.executors.create_local(task)
+            else:
+                return self.executors.create_skipper(task)
+
+        if task.is_available_remotely(self.cache):
+            if not task.is_available_locally(self.cache):
+                return self.executors.create_downloader(task)
+            else:
+                return self.executors.create_skipper(task)
+
+        if self.cache.upload_enabled() and task.is_available_locally(self.cache):
+            return self.executors.create_uploader(task)
+
+        return self.executors.create_network(task)
+
+        assert False, "unable to determine execution strategy for task '{0} ({1})'"\
+            .format(task.qualified_name, task.identity[:8])
+
+
+class WorkerStrategy(ExecutionStrategy):
+    def __init__(self, executors, cache):
+        self.executors = executors
+        self.cache = cache
+
+    def create_executor(self, task):
+        if task.is_resource():
+            return self.executors.create_local(task)
+
+        assert self.cache.upload_enabled(),\
+            "artifact upload must be enabled for workers, fix configuration"
+
+        if not task.is_cacheable():
+            return self.executors.create_local(task)
+
+        if task.is_available_locally(self.cache):
+            if not task.is_available_remotely(self.cache):
+                return self.executors.create_uploader(task)
+            else:
+                return self.executors.create_skipper(task)
+
+            return self.executors.create_downloader(task)
+
+        if not self.cache.download_enabled():
+            return self.executors.create_local(task)
+
+        if task.is_available_remotely(self.cache):
+            return self.executors.create_downloader(task)
+
+        return self.executors.create_local(task)
+
+        assert False, "unable to determine execution strategy for task '{0} ({1})'"\
+            .format(task.qualified_name, task.identity[:8])

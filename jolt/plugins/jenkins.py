@@ -106,10 +106,9 @@ class JenkinsServer(object):
 
 
 class JenkinsExecutor(scheduler.NetworkExecutor):
-    def __init__(self, factory, cache, task):
+    def __init__(self, factory, task):
         super(JenkinsExecutor, self).__init__(factory)
         self.server = JenkinsServer.get()
-        self.cache = cache
         self.task = task
         self.job = self.server.job_name
 
@@ -139,7 +138,7 @@ class JenkinsExecutor(scheduler.NetworkExecutor):
             else:
                 log.stdout(line, log_context=self.task.identity[:8])
 
-    def _run(self):
+    def _run(self, env):
         task = [self.task.qualified_name]
         task += [t.qualified_name for t in self.task.extensions]
 
@@ -179,29 +178,29 @@ class JenkinsExecutor(scheduler.NetworkExecutor):
             "[JENKINS] {1} failed with status {0}".format(
                 build_info["result"], self.task.qualified_name)
 
-        assert self.cache.is_available_remotely(self.task), \
+        assert env.cache.is_available_remotely(self.task), \
             "[JENKINS] no artifact produced for {0}, check configuration"\
             .format(self.task.qualified_name)
 
-        assert self.cache.download(self.task) or \
-            not self.cache.download_enabled(), \
+        assert env.cache.download(self.task) or \
+            not env.cache.download_enabled(), \
             "[JENKINS] failed to download artifact for {0}"\
             .format(self.task.qualified_name)
 
         for extension in self.task.extensions:
-            assert self.cache.download(extension) or \
-                not self.cache.download_enabled(), \
+            assert env.cache.download(extension) or \
+                not env.cache.download_enabled(), \
                 "[JENKINS] failed to download artifact for {0}"\
                 .format(extension.qualified_name)
 
         return self.task
 
-    def run(self):
+    def run(self, env):
         try:
             self.task.started()
             for extension in self.task.extensions:
                 extension.started()
-            self._run()
+            self._run(env)
             for extension in self.task.extensions:
                 extension.finished()
             self.task.finished()
@@ -214,10 +213,10 @@ class JenkinsExecutor(scheduler.NetworkExecutor):
 
 @scheduler.ExecutorFactory.Register
 class JenkinsExecutorFactory(scheduler.NetworkExecutorFactory):
-    def create(self, cache, task):
+    def create(self, task):
         server = JenkinsServer.get()
         if not server.ok():
             return None
-        return JenkinsExecutor(self, cache, task)
+        return JenkinsExecutor(self, task)
 
 log.verbose("Jenkins loaded")

@@ -121,6 +121,14 @@ class TaskProxy(object):
             return self._extended_task.get_extended_task()
         return self
 
+    def is_available_locally(self, cache):
+        tasks = [self] + self.extensions
+        return all(map(cache.is_available_locally, tasks))
+
+    def is_available_remotely(self, cache):
+        tasks = [self] + self.extensions
+        return all(map(cache.is_available_remotely, tasks))
+
     def in_progress(self):
         return self._in_progress
 
@@ -135,13 +143,6 @@ class TaskProxy(object):
 
     def is_completed(self):
         return self._completed
-
-    def is_cached(self, cache, options):
-        for extension in self.extensions:
-            if not cache.is_available(extension, options.network):
-                return False
-        return cache.is_available(self, options.network) or \
-            (self.graph.is_orphan(self) and isinstance(self.task, Resource))
 
     def set_in_progress(self):
         self._in_progress = True
@@ -163,21 +164,28 @@ class TaskProxy(object):
         self.anestors = nx.ancestors(dag, self)
         return self.identity
 
-    def started(self):
-        self.task.info(colors.blue("Execution started " + self.log_name))
+    def started(self, what="Execution"):
+        self.task.info(colors.blue(what + " started " + self.log_name))
         self.duration = utils.duration()
 
-    def failed(self):
-        self.error("Execution failed after {0}", self.duration)
+    def failed(self, what="Execution"):
+        self.error("{0} failed after {1}", what, self.duration)
 
-    def finished(self):
+    def finished(self, what="Execution"):
         assert not self._completed, "task has already been completed"
         self._completed = True
         try:
             self.graph.remove_node(self)
         except:
             self.warn("Pruned task was executed")
-        self.task.info(colors.green("Execution finished after {0} " + self.log_name), self.duration)
+        self.task.info(colors.green(what + " finished after {0} " + self.log_name), self.duration)
+
+    def skipped(self):
+        self._completed = True
+        try:
+            self.graph.remove_node(self)
+        except:
+            self.warn("Pruned task was executed")
 
     def run(self, cache, force_upload=False, force_build=False):
         with self.tools:

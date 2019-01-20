@@ -36,6 +36,7 @@ class SelfDeployExtension(NetworkExecutorExtension):
         registry = TaskRegistry()
         registry.add_task_class(Jolt)
         acache = ArtifactCache.get()
+        env = JoltEnvironment(cache=acache)
         gb = GraphBuilder(registry)
         dag = gb.build(["jolt"])
         task = dag.select(lambda graph, task: True)
@@ -44,8 +45,8 @@ class SelfDeployExtension(NetworkExecutorExtension):
         if not acache.is_available_remotely(task):
             duration = utils.duration()
             factory = LocalExecutorFactory()
-            executor = LocalExecutor(factory, acache, task, force_upload=True)
-            executor.run()
+            executor = LocalExecutor(factory, task, force_upload=True)
+            executor.run(env)
         jolt_url = acache.location(task)
         assert jolt_url, "failed to selfdeploy jolt to remote cache"
         return { "jolt_url":  jolt_url, "jolt_identity": task.identity[:8] }

@@ -64,7 +64,9 @@ def cli(verbose, extra_verbose, config_file):
               help="Do download artifacts from remote storage")
 @click.option("--upload", is_flag=True, default=False,
               help="Do upload artifacts to remote storage")
-def build(task, network, keep_going, identity, no_download, no_upload, download, upload):
+@click.option("--worker", is_flag=True, default=False,
+              help="Run with the worker build strategy", hidden=True)
+def build(task, network, keep_going, identity, no_download, no_upload, download, upload, worker):
     """
     Execute specified task.
 
@@ -85,18 +87,28 @@ def build(task, network, keep_going, identity, no_download, no_upload, download,
                           upload=config.getboolean("jolt", "upload"),
                           keep_going=keep_going)
 
-    executor = scheduler.ExecutorRegistry.get(options)
     acache = cache.ArtifactCache.get()
-    registry = TaskRegistry().get()
+
+    executors = scheduler.ExecutorRegistry.get(options)
+    if worker:
+        log.verbose("Local build as a worker")
+        strategy = scheduler.WorkerStrategy(executors, acache)
+    elif network:
+        log.verbose("Distributed build as a user")
+        strategy = scheduler.DistributedStrategy(executors, acache)
+    else:
+        log.verbose("Local build as a user")
+        strategy = scheduler.LocalStrategy(executors, acache)
+
+    registry = TaskRegistry.get()
     gb = graph.GraphBuilder(registry)
     dag = gb.build(task)
-    dag.prune(lambda graph, task: task.is_cached(acache, options))
 
     if identity:
         root = dag.select(lambda graph, task: task.identity.startswith(identity))
         assert len(root) >= 1, "unknown hash identity, no such task: {0}".format(identity)
 
-    queue = scheduler.TaskQueue(executor)
+    queue = scheduler.TaskQueue(strategy)
 
     def signal_handle(_signal, frame):
         print('You pressed Ctrl+C!')
@@ -107,7 +119,6 @@ def build(task, network, keep_going, identity, no_download, no_upload, download,
         leafs = dag.select(lambda graph, task: task.is_ready())
         while leafs:
             task = leafs.pop()
-            task.set_in_progress()
             queue.submit(acache, task)
 
         task, error = queue.wait()
@@ -130,7 +141,7 @@ def clean(task):
     """
     acache = cache.ArtifactCache.get()
     if task:
-        registry = TaskRegistry().get()
+        registry = TaskRegistry.get()
         dag = graph.GraphBuilder(registry).build(task)
         tasks = dag.select(lambda graph, node: node.name in task)
         for task in tasks:
@@ -154,7 +165,7 @@ def display(task, prune):
     dag = gb.build(task)
     if prune:
         acache = cache.ArtifactCache.get()
-        dag.prune(lambda graph, task: task.is_cached(acache, options))
+        dag.prune(lambda graph, task: acache.is_available(task) or task.is_resource())
     if len(dag.nodes) > 0:
         gb.display()
     else:
