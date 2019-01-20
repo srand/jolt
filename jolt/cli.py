@@ -20,6 +20,7 @@ from jolt.plugins import cxxinfo, environ, strings
 from jolt import loader
 from jolt import utils
 from jolt.influence import *
+from jolt.options import JoltOptions
 
 
 @click.group()
@@ -79,12 +80,17 @@ def build(task, network, keep_going, identity, no_download, no_upload, download,
     if upload:
         config.set("jolt", "upload", "true")
 
-    executor = scheduler.ExecutorRegistry.get(network=network)
+    options = JoltOptions(network=network,
+                          download=config.getboolean("jolt", "download"),
+                          upload=config.getboolean("jolt", "upload"),
+                          keep_going=keep_going)
+
+    executor = scheduler.ExecutorRegistry.get(options)
     acache = cache.ArtifactCache.get()
     registry = TaskRegistry().get()
     gb = graph.GraphBuilder(registry)
     dag = gb.build(task)
-    dag.prune(lambda graph, task: task.is_cached(acache, network))
+    dag.prune(lambda graph, task: task.is_cached(acache, options))
 
     if identity:
         root = dag.select(lambda graph, task: task.identity.startswith(identity))
@@ -142,12 +148,13 @@ def display(task, prune):
 
     <WIP>
     """
+    options = JoltOptions()
     registry = TaskRegistry.get()
     gb = graph.GraphBuilder(registry)
     dag = gb.build(task)
     if prune:
         acache = cache.ArtifactCache.get()
-        dag.prune(lambda graph, task: task.is_cached(acache, network=False))
+        dag.prune(lambda graph, task: task.is_cached(acache, options))
     if len(dag.nodes) > 0:
         gb.display()
     else:

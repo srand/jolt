@@ -136,11 +136,11 @@ class TaskProxy(object):
     def is_completed(self):
         return self._completed
 
-    def is_cached(self, cache, network):
+    def is_cached(self, cache, options):
         for extension in self.extensions:
-            if not cache.is_available(extension, network):
+            if not cache.is_available(extension, options.network):
                 return False
-        return cache.is_available(self, network) or \
+        return cache.is_available(self, options.network) or \
             (self.graph.is_orphan(self) and isinstance(self.task, Resource))
 
     def set_in_progress(self):

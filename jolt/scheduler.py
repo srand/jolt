@@ -12,6 +12,7 @@ except:
 from jolt import cache
 from jolt import log
 from jolt import utils
+from jolt.options import JoltOptions
 
 
 class TaskQueue(object):
@@ -107,30 +108,27 @@ class ExecutorRegistry(object):
     executor_factories = []
     extension_factories = []
 
-    def __init__(self, network=True):
+    def __init__(self, options=None):
         self._factories = [factory() for factory in self.__class__.executor_factories]
         self._extensions = [factory().create() for factory in self.__class__.extension_factories]
-        self._network = network
+        self._options = options or JoltOptions()
 
     def shutdown(self):
         for factory in self._factories:
             factory.shutdown()
 
     def create(self, cache, task):
-        if not task.is_cacheable() and self._network:
+        if not task.is_cacheable() and self._options.network:
             factory = self._factories[-1]
             return SkipTaskExecutor(factory, cache, task)
 
         for factory in self._factories:
             if not task.is_cacheable() and factory.is_network():
                 continue
-            if not self._network and factory.is_network():
+            if not self._options.network and factory.is_network():
                 continue
-            if self._network and not factory.is_network():
-                if task.is_cacheable():
-                    continue
             if factory.is_eligable(cache, task):
-                return factory.create(cache, task)
+                return factory.create(cache, task, self._options.network)
         return None
 
     def get_network_parameters(self, task):
