@@ -178,7 +178,7 @@ class RepoInfluenceProvider(HashInfluenceProvider):
             manifest.parse(fs.path.join(manifest_path, ".repo", "manifest.xml"))
 
             result = []
-            for project in manifest.projects:
+            for project in sorted(manifest.projects, key=lambda p: p.name):
                 if self.include is not None and project.path_or_name not in self.include:
                     continue
                 if self.exclude is not None and project.path_or_name in self.exclude:
