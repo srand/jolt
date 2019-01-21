@@ -104,6 +104,9 @@ def build(task, network, keep_going, identity, no_download, no_upload, download,
     gb = graph.GraphBuilder(registry)
     dag = gb.build(task)
 
+    # Inform cache about what task artifacts we will need.
+    acache.advise(dag.tasks)
+
     if identity:
         root = dag.select(lambda graph, task: task.identity.startswith(identity))
         assert len(root) >= 1, "unknown hash identity, no such task: {0}".format(identity)
@@ -115,7 +118,7 @@ def build(task, network, keep_going, identity, no_download, no_upload, download,
         queue.abort()
     signal.signal(signal.SIGINT, signal_handle)
 
-    while dag.nodes:
+    while dag.has_tasks():
         leafs = dag.select(lambda graph, task: task.is_ready())
         while leafs:
             task = leafs.pop()
@@ -165,8 +168,8 @@ def display(task, prune):
     dag = gb.build(task)
     if prune:
         acache = cache.ArtifactCache.get()
-        dag.prune(lambda graph, task: acache.is_available(task) or task.is_resource())
-    if len(dag.nodes) > 0:
+        dag.prune(lambda graph, task: task.is_available_locally(acache) or task.is_resource())
+    if dag.has_tasks():
         gb.display()
     else:
         log.info("No tasks to display")

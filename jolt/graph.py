@@ -247,6 +247,15 @@ class Graph(nx.DiGraph):
         with self._mutex:
             super(Graph, self).remove_node(node)
 
+    @property
+    def tasks(self):
+        with self._mutex:
+            return [n for n in self.nodes]
+
+    def has_tasks(self):
+        with self._mutex:
+            return len(self.nodes) > 0
+
     def prune(self, func):
         with self._mutex:
             for node in nx.topological_sort(self):

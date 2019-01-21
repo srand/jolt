@@ -564,7 +564,7 @@ class CacheStats(object):
         with open(self.path, "wb") as f:
             f.write(json.dumps(self.stats, indent=3).encode())
 
-    def update(self, artifact):
+    def update(self, artifact, save=True):
         if artifact.is_temporary():
             return
         stats = {}
@@ -573,7 +573,8 @@ class CacheStats(object):
         stats["size"] = artifact.get_size()
         self.stats[artifact.get_identity()] = stats
         self.active.add(artifact.get_identity())
-        self.save()
+        if save:
+            self.save()
 
     def remove(self, artifact):
         del self.stats[artifact["identity"]]
@@ -748,3 +749,10 @@ class ArtifactCache(StorageProvider):
 
     def get_archive_path(self, node):
         return fs.get_archive(self.get_path(node))
+
+    @locked
+    def advise(self, node_list):
+        """ Advise the cache about what artifacts to retain in the cache. """
+        for node in node_list:
+            self.stats.update(Artifact(self, node), save=False)
+        self.stats.save()
