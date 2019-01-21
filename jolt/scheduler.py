@@ -296,8 +296,11 @@ class DistributedStrategy(ExecutionStrategy):
             else:
                 return self.executors.create_skipper(task)
 
-        if self.cache.upload_enabled() and task.is_available_locally(self.cache):
-            return self.executors.create_uploader(task)
+        if task.is_available_locally(self.cache):
+            if self.cache.upload_enabled():
+                return self.executors.create_uploader(task)
+            else:
+                return self.executors.create_skipper(task)
 
         return self.executors.create_network(task)
 
