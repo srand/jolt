@@ -2,6 +2,7 @@ from __future__ import print_function
 import sys
 import tqdm
 import traceback
+from datetime import datetime
 
 from jolt import config
 from jolt import filesystem as fs
@@ -40,11 +41,15 @@ def _streamwrite(stream, line):
     stream.write(line + "\r\n")
     stream.flush()
 
+def _streamwrite_file(stream, line):
+    ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")
+    _streamwrite(stream, ts + " " + line)
+
 def _log(level, stream, fmt, *args, **kwargs):
     line = _line(level, fmt, *args, **kwargs)
     if level <= _loglevel:
         _streamwrite(stream, line)
-    _streamwrite(_file, line)
+    _streamwrite_file(_file, line)
 
 def set_level(level):
     global _loglevel
@@ -68,10 +73,10 @@ def error(fmt, *args, **kwargs):
 def exception(exc=None):
     if exc:
         _streamwrite(sys.stderr, "[ERROR] " + colors.red(str(exc)))
-        _streamwrite(_file, "[ERROR] " + str(exc))
+        _streamwrite_file(_file, "[ERROR] " + str(exc))
     backtrace = traceback.format_exc()
     for line in backtrace.splitlines():
-        _streamwrite(_file, "[ERROR] " + line)
+        _streamwrite_file(_file, "[ERROR] " + line)
 
 def stdout(fmt, *args, **kwargs):
     try:
@@ -79,7 +84,7 @@ def stdout(fmt, *args, **kwargs):
     except:
         line = fmt
     _streamwrite(sys.stdout, _prefix(None, **kwargs) + line)
-    _streamwrite(_file, _prefix("STDOUT", **kwargs) + line)
+    _streamwrite_file(_file, _prefix("STDOUT", **kwargs) + line)
 
 def stderr(fmt, *args, **kwargs):
     try:
@@ -87,10 +92,10 @@ def stderr(fmt, *args, **kwargs):
     except:
         line = fmt
     _streamwrite(sys.stderr, line)
-    _streamwrite(_file, "[STDERR] " + line)
+    _streamwrite_file(_file, "[STDERR] " + line)
 
 def progress(desc, count, unit):
-    _streamwrite(_file, "[INFO] " + desc)
+    _streamwrite_file(_file, "[INFO] " + desc)
     p = tqdm.tqdm(total=count, unit=unit, unit_scale=True)
     p.set_description(desc)
     return p
