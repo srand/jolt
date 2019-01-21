@@ -71,6 +71,9 @@ class Artifactory(cache.StorageProvider):
                 return True
         return False
 
+    def download_enabled(self):
+        return not self._disabled
+
     @utils.retried.on_exception((ConnectionError, ReadTimeout))
     def upload(self, node, force=False):
         if self._disabled:
@@ -82,6 +85,9 @@ class Artifactory(cache.StorageProvider):
             archive = artifact.get_archive()
             return node.tools.upload(archive, url, auth=self._get_auth())
         return False
+
+    def upload_enabled(self):
+        return not self._disabled
 
     @utils.retried.on_exception((ConnectionError, ReadTimeout))
     def location(self, node):
