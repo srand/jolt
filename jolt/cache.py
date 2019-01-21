@@ -4,7 +4,7 @@ import copy
 import os
 from tempfile import mkdtemp
 import time
-from threading import RLock
+from threading import RLock, current_thread
 
 from jolt import filesystem as fs
 from jolt import log
@@ -27,8 +27,14 @@ class StorageProvider(object):
     def download(self, node, force=False):
         return False
 
+    def download_enabled(self):
+        return True
+
     def upload(self, node, force=False):
         return False
+
+    def upload_enabled(self):
+        return True
 
     def location(self, node):
         return ''  # URL
@@ -537,6 +543,7 @@ class Context(object):
 
 class CacheStats(object):
     def __init__(self, cache):
+        self._lock = RLock()
         self.cache = cache
         self.path = fs.path.join(cache.root, ".stats.json")
         try:
@@ -560,10 +567,12 @@ class CacheStats(object):
 
         self.save()
 
+    @locked
     def save(self):
         with open(self.path, "wb") as f:
             f.write(json.dumps(self.stats, indent=3).encode())
 
+    @locked
     def update(self, artifact, save=True):
         if artifact.is_temporary():
             return
@@ -576,16 +585,19 @@ class CacheStats(object):
         if save:
             self.save()
 
+    @locked
     def remove(self, artifact):
         del self.stats[artifact["identity"]]
         self.save()
 
+    @locked
     def get_size(self):
         size = 0
         for artifact, stats in self.stats.items():
             size += stats["size"]
         return size
 
+    @locked
     def get_lru(self):
         assert self.stats, "can't evict LRU artifact, no artifacts in cache"
         nt = [dict(identity=artifact, **stats) for artifact, stats in self.stats.items()]
@@ -601,7 +613,6 @@ class ArtifactCache(StorageProvider):
     storage_provider_factories = []
 
     def __init__(self):
-        self._lock = RLock()
         try:
             self.root = config.get("jolt", "cachedir") or ArtifactCache.root
             fs.makedirs(self.root)
@@ -617,7 +628,6 @@ class ArtifactCache(StorageProvider):
     def get_path(self, node):
         return fs.path.join(self.root, node.canonical_name, node.identity)
 
-    @locked
     def evict(self):
         while self.stats.get_size() > self.max_size:
             artifact = self.stats.get_lru()
@@ -628,7 +638,6 @@ class ArtifactCache(StorageProvider):
             self.stats.remove(artifact)
             fs.rmtree(path, ignore_errors=True)
 
-    @locked
     def create_path(self, node):
         path = None
         try:
@@ -641,7 +650,6 @@ class ArtifactCache(StorageProvider):
             .format(node.qualified_name, node.identity[:8])
         return path
 
-    @locked
     def is_available_locally(self, node):
         if not node.task.is_cacheable():
             return False
@@ -663,9 +671,9 @@ class ArtifactCache(StorageProvider):
         return self.is_available_locally(node) or self.is_available_remotely(node)
 
     def download_enabled(self):
-        return config.getboolean("jolt", "download", True)
+        return config.getboolean("jolt", "download", True) and \
+            any([provider.download_enabled() for provider in self.storage_providers])
 
-    @locked
     def download(self, node, force=False):
         if not force and not self.download_enabled():
             return False
@@ -683,9 +691,9 @@ class ArtifactCache(StorageProvider):
         return len(self.storage_providers) == 0
 
     def upload_enabled(self):
-        return config.getboolean("jolt", "upload", True)
+        return config.getboolean("jolt", "upload", True) and \
+            any([provider.upload_enabled() for provider in self.storage_providers])
 
-    @locked
     def upload(self, node, force=False):
         if not force and not self.upload_enabled():
             return False
@@ -709,7 +717,6 @@ class ArtifactCache(StorageProvider):
                 return url
         return ''
 
-    @locked
     def unpack(self, node):
         if not node.task.is_cacheable():
             return False
@@ -723,12 +730,10 @@ class ArtifactCache(StorageProvider):
             artifact.commit()
         return True
 
-    @locked
     def commit(self, artifact):
         self.stats.update(artifact)
         self.evict()
 
-    @locked
     def discard(self, node):
         if not self.is_available_locally(node):
             return False
@@ -737,11 +742,9 @@ class ArtifactCache(StorageProvider):
             artifact.discard()
         return True
 
-    @locked
     def get_context(self, node):
         return Context(self, node)
 
-    @locked
     def get_artifact(self, node):
         artifact = Artifact(self, node)
         self.stats.update(artifact)
@@ -750,9 +753,12 @@ class ArtifactCache(StorageProvider):
     def get_archive_path(self, node):
         return fs.get_archive(self.get_path(node))
 
-    @locked
     def advise(self, node_list):
         """ Advise the cache about what artifacts to retain in the cache. """
         for node in node_list:
-            self.stats.update(Artifact(self, node), save=False)
+            if not node.task.is_cacheable():
+                continue
+            if fs.path.exists(self.get_path(node)):
+                with Artifact(self, node) as artifact:
+                    self.stats.update(artifact, save=False)
         self.stats.save()
