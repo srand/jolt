@@ -12,7 +12,7 @@ from jolt import config
 from jolt import filesystem as fs
 
 NAME = "artifactory"
-CONNECT_TIMEOUT = 3.5
+TIMEOUT = (3.5, 27)
 
 
 class Artifactory(cache.StorageProvider):
@@ -67,7 +67,7 @@ class Artifactory(cache.StorageProvider):
             return False
         with self._cache.get_artifact(node) as artifact:
             url = self._get_url(node, artifact)
-            if node.tools.download(url, artifact.get_archive_path()):
+            if node.tools.download(url, artifact.get_archive_path(), timeout=TIMEOUT):
                 return True
         return False
 
@@ -83,7 +83,7 @@ class Artifactory(cache.StorageProvider):
         with self._cache.get_artifact(node) as artifact:
             url = self._get_url(node, artifact)
             archive = artifact.get_archive()
-            return node.tools.upload(archive, url, auth=self._get_auth())
+            return node.tools.upload(archive, url, auth=self._get_auth(), timeout=TIMEOUT)
         return False
 
     def upload_enabled(self):
@@ -96,7 +96,7 @@ class Artifactory(cache.StorageProvider):
         with self._cache.get_artifact(node) as artifact:
             url = self._get_url(node, artifact)
             try:
-                response = requests.head(url, stream=True, timeout=CONNECT_TIMEOUT)
+                response = requests.head(url, stream=True, timeout=TIMEOUT)
             except ConnectTimeout as e:
                 self._disabled = True
                 log.warn("[ARTIFACTORY] failed to establish server connection, disabled")
