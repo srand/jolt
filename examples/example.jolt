@@ -53,14 +53,13 @@ class Example(Task):
 
     name = "example"
     requires = "test:flavor=hello_01", "test:flavor=hello_02_shared_lib"
-
-    def run(self, deps, tools):
-        log.info
+    fast = True
 
 
 class Extension(Task):
     name = "extension"
     extends = "example"
+    fast = True
 
     def run(self, deps, tools):
         log.info("Running extension example")
@@ -69,6 +68,7 @@ class Extension(Task):
 class SecondExtension(Task):
     name = "second-extension"
     extends = "example"
+    fast = True
 
     def run(self, deps, tools):
         log.info("Running second extension example")
@@ -90,6 +90,7 @@ class ExtensionExtension(Task):
 class Intermediate(Task):
     name = "intermediate"
     requires = "example"
+    fast = True
 
 
 class All(Task):

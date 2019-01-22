@@ -271,6 +271,18 @@ class Task(TaskBase):
     An extension can only extend one other task.
     """
 
+    fast = False
+    """
+    Indication of task speed.
+
+    The information is used by the distributed execution strategy to
+    optimize how tasks are scheduled. Scheduling tasks remotely is always
+    associated with some overhead and sometimes it's beneficial to instead
+    schedule fast tasks locally if possible.
+
+    An extended task is only considered fast if all extensions are fast.
+    """
+
     influence = []
 
     def __init__(self, parameters=None):

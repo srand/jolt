@@ -129,6 +129,10 @@ class TaskProxy(object):
         tasks = [self] + self.extensions
         return all(map(cache.is_available_remotely, tasks))
 
+    def is_fast(self):
+        tasks = [self.task] + [e.task for e in self.extensions]
+        return all([task.fast for task in tasks])
+
     def in_progress(self):
         return self._in_progress
 

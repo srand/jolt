@@ -268,9 +268,6 @@ class LocalStrategy(ExecutionStrategy):
             return self.executors.create_downloader(task)
         return self.executors.create_local(task)
 
-        assert False, "unable to determine execution strategy for task '{0} ({1})'"\
-            .format(task.qualified_name, task.identity[:8])
-
 
 class DistributedStrategy(ExecutionStrategy):
     def __init__(self, executors, cache):
@@ -302,10 +299,13 @@ class DistributedStrategy(ExecutionStrategy):
             else:
                 return self.executors.create_skipper(task)
 
-        return self.executors.create_network(task)
+        if task.is_fast():
+            if not self.cache.upload_enabled():
+                return self.executors.create_network(task)
+            else:
+                return self.executors.create_local(task)
 
-        assert False, "unable to determine execution strategy for task '{0} ({1})'"\
-            .format(task.qualified_name, task.identity[:8])
+        return self.executors.create_network(task)
 
 
 class WorkerStrategy(ExecutionStrategy):
@@ -338,6 +338,3 @@ class WorkerStrategy(ExecutionStrategy):
             return self.executors.create_downloader(task)
 
         return self.executors.create_local(task)
-
-        assert False, "unable to determine execution strategy for task '{0} ({1})'"\
-            .format(task.qualified_name, task.identity[:8])
