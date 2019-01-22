@@ -39,7 +39,7 @@ class TaskProxy(object):
 
     @property
     def canonical_name(self):
-        return self.task.name.replace("/", "_")
+        return self.task.canonical_name
 
     @property
     def qualified_name(self):

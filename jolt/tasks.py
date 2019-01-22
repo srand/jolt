@@ -323,6 +323,9 @@ class Task(TaskBase):
         except KeyError as e:
             assert False, "invalid macro expansion used in task {0}: {1} - "\
                 "forgot to set the parameter?".format(self.name, e)
+    @property
+    def canonical_name(self):
+        return self.name.replace("/", "_")
 
     def is_cacheable(self):
         return self.cacheable

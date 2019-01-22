@@ -314,7 +314,7 @@ class Artifact(object):
         if not self._node.task.is_cacheable():
             return
         if self._temp:
-            self.size = self._get_size()
+            self._size = self._get_size()
             self._write_manifest()
             fs.rename(self._temp, self._path)
             self._temp = None
@@ -577,7 +577,7 @@ class CacheStats(object):
         if artifact.is_temporary():
             return
         stats = {}
-        stats["name"] = artifact.get_task().name
+        stats["name"] = artifact.get_task().canonical_name
         stats["used"] = time.time()
         stats["size"] = artifact.get_size()
         self.stats[artifact.get_identity()] = stats
