@@ -16,10 +16,20 @@ HYSTERICAL = 4
 
 _levelstr = ["ERROR", "WARNING", "INFO", "VERBOSE", "HYSTERICAL"]
 
-path = config.get("jolt", "logfile", fs.path.join(fs.path.dirname(__file__), "jolt.log"))
+default_path = fs.path.join(fs.path.expanduser("~"), ".jolt", "jolt.log")
+path = config.get("jolt", "logfile", default_path)
 
 _loglevel = NORMAL
-_file = open(path, "a")
+try:
+    dirpath = fs.path.dirname(path)
+    if not fs.path.exists(dirpath):
+        fs.makedirs(dirpath)
+    _file = open(path, "a")
+except:
+    print("[ERROR] " + colors.red("could not open logfile: {0}".format(path)))
+    print("[ERROR] " + colors.red("please set 'jolt.logfile' to an alternate path"))
+    sys.exit(1)
+
 
 def _prefix(level, **kwargs):
     if type(level) == int:
