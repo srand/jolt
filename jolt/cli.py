@@ -73,21 +73,28 @@ def build(task, network, keep_going, identity, no_download, no_upload, download,
     <WIP>
     """
 
+    if network:
+        download = config.getboolean("network", "download", True)
+        upload = config.getboolean("network", "upload", True)
+    else:
+        download = config.getboolean("jolt", "download", True)
+        upload = config.getboolean("jolt", "upload", True)
+
     if no_download:
-        config.set("jolt", "download", "false")
+        download = False
     if no_upload:
-        config.set("jolt", "upload", "false")
+        upload = False
     if download:
-        config.set("jolt", "download", "true")
+        download = True
     if upload:
-        config.set("jolt", "upload", "true")
+        upload = True
 
     options = JoltOptions(network=network,
-                          download=config.getboolean("jolt", "download"),
-                          upload=config.getboolean("jolt", "upload"),
+                          download=download,
+                          upload=upload,
                           keep_going=keep_going)
 
-    acache = cache.ArtifactCache.get()
+    acache = cache.ArtifactCache.get(options)
 
     executors = scheduler.ExecutorRegistry.get(options)
     if worker:

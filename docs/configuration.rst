@@ -35,7 +35,8 @@ The ``[jolt]`` config section contains global configuration.
 * ``download = <boolean>``
 
   Configures if Jolt is allowed to download artifacts from remote storage
-  providers or not. The default value is ``true``.
+  providers or not when building locally. The option has no effect on
+  distributed network builds. The default value is ``true``.
 
 * ``log = <filepath>``
 
@@ -45,7 +46,8 @@ The ``[jolt]`` config section contains global configuration.
 * ``upload = <boolean>``
 
   Configures if Jolt is allowed to upload artifacts to remote storage
-  providers or not. The default value is ``true``.
+  providers or not when building locally. The option has no effect on
+  distributed network builds. The default value is ``true``.
 
 
 

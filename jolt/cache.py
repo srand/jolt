@@ -12,6 +12,7 @@ from jolt import tools
 from jolt import influence
 from jolt import config
 from jolt import utils
+from jolt.options import JoltOptions
 
 
 DEFAULT_ARCHIVE_TYPE = ".tar.gz"
@@ -612,7 +613,7 @@ class ArtifactCache(StorageProvider):
     root = fs.path.join(fs.path.expanduser("~"), ".cache", "jolt")
     storage_provider_factories = []
 
-    def __init__(self):
+    def __init__(self, options=None):
         try:
             self.root = config.get("jolt", "cachedir") or ArtifactCache.root
             fs.makedirs(self.root)
@@ -624,6 +625,7 @@ class ArtifactCache(StorageProvider):
         self.storage_providers = [
             factory.create(self)
             for factory in ArtifactCache.storage_provider_factories]
+        self._options = options or JoltOptions()
 
     def get_path(self, node):
         return fs.path.join(self.root, node.canonical_name, node.identity)
@@ -671,7 +673,7 @@ class ArtifactCache(StorageProvider):
         return self.is_available_locally(node) or self.is_available_remotely(node)
 
     def download_enabled(self):
-        return config.getboolean("jolt", "download", True) and \
+        return self._options.download and \
             any([provider.download_enabled() for provider in self.storage_providers])
 
     def download(self, node, force=False):
@@ -691,7 +693,7 @@ class ArtifactCache(StorageProvider):
         return len(self.storage_providers) == 0
 
     def upload_enabled(self):
-        return config.getboolean("jolt", "upload", True) and \
+        return self._options.upload and \
             any([provider.upload_enabled() for provider in self.storage_providers])
 
     def upload(self, node, force=False):
