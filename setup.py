@@ -62,7 +62,7 @@ setup(
     # your project is installed. For an analysis of "install_requires" vs pip's
     # requirements files see:
     # https://packaging.python.org/en/latest/requirements.html
-    install_requires=["requests", "click", "networkx", "keyring", "keyrings.alt",
+    install_requires=["requests", "click>=7.0", "networkx", "keyring", "keyrings.alt",
                       "jinja2", "futures", "python-jenkins", "multi_key_dict",
                       "tqdm", "bz2file", "colorama"],
 
