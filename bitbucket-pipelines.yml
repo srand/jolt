@@ -15,3 +15,11 @@ pipelines:
           - apt-get install -y zip
           - pip install -e .
           - cd tests && jolt build tests
+    - step:
+        caches:
+          - pip
+        script: # Modify the commands below to build your repository.
+          - apt-get update
+          - apt-get install -y zip
+          - pip install jolt
+          - cd tests && jolt build tests
