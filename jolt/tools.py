@@ -137,13 +137,15 @@ class _CMake(object):
         self.installdir = self.tools.builddir("install")
 
     def configure(self, sourcedir, *args, **kwargs):
-        sourcedir = sourcedir \
-                    if fs.path.isabs(sourcedir) \
-                    else fs.path.join(os.getcwd(), sourcedir)
+        sourcedir = self.tools.expand_path(sourcedir)
+
+        extra_args = ["-D{0}={1}".format(key, self.tools.expand(val))
+                      for key, val in kwargs.items()]
+        extra_args = " ".join(extra_args)
 
         with self.tools.cwd(self.builddir):
-            self.tools.run("cmake {0} -DCMAKE_INSTALL_PREFIX={1}",
-                           sourcedir, self.installdir,
+            self.tools.run("cmake {0} -DCMAKE_INSTALL_PREFIX={1} {2}",
+                           sourcedir, self.installdir, extra_args,
                            output=True)
 
     def build(self, *args, **kwargs):
@@ -159,6 +161,31 @@ class _CMake(object):
             artifact.collect(files, *args, **kwargs)
 
 
+class _Meson(object):
+    def __init__(self, deps, tools):
+        self.deps = deps
+        self.tools = tools
+        self.builddir = self.tools.builddir()
+        self.installdir = self.tools.builddir("install")
+
+    def configure(self, sourcedir, *args, **kwargs):
+        sourcedir = self.tools.expand_path(sourcedir)
+        self.tools.run("meson --prefix=/ {0} {1}", sourcedir, self.builddir,
+                       output=True)
+
+    def build(self, *args, **kwargs):
+        self.tools.run("ninja -C {0} ", self.builddir, output=True)
+
+    def install(self, *args, **kwargs):
+        self.tools.run("DESTDIR={0} ninja -C {1} install",
+                       self.installdir, self.builddir,
+                       output=True)
+
+    def publish(self, artifact, files='*', *args, **kwargs):
+        with self.tools.cwd(self.installdir):
+            artifact.collect(files, *args, **kwargs)
+
+
 class _AutoTools(object):
     def __init__(self, deps, tools):
         self.deps = deps
@@ -167,9 +194,7 @@ class _AutoTools(object):
         self.installdir = self.tools.builddir("install")
 
     def configure(self, sourcedir, *args, **kwargs):
-        sourcedir = sourcedir \
-                    if fs.path.isabs(sourcedir) \
-                    else fs.path.join(os.getcwd(), sourcedir)
+        sourcedir = self.tools.expand_path(sourcedir)
 
         if not fs.path.exists(fs.path.join(sourcedir, "configure")):
             with self.tools.cwd(sourcedir):
@@ -643,6 +668,10 @@ class Tools(object):
 
         """
         return utils.map_concurrent(callable, iterable, max_workers)
+
+    def meson(self, deps=None):
+        """ Creates a Meson invokation helper """
+        return _Meson(deps, self)
 
     def replace_in_file(self, pathname, search, replace):
         """ Replaces all occurrences of a substring in a file.
