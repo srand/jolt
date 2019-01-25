@@ -75,7 +75,9 @@ class _SafeDict(object):
         return None
 
     def __getitem__(self, key):
-        value = self.values.get(key) or self._envget(key)
+        value = self.values.get(key)
+        if value is None:
+            value = self._envget(key)
         if value is not None:
             return value
         if self.errors:
