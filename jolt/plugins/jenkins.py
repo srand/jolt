@@ -16,14 +16,15 @@ from jolt import loader
 from jolt import filesystem as fs
 
 NAME = "jenkins"
-CONNECT_TIMEOUT = 3.5
+TYPE = "Remote execution"
+TIMEOUT = (3.5, 27)
 
 
 @utils.Singleton
 class JenkinsServer(object):
     def __init__(self):
         username, password = self._get_auth()
-        self._server = Jenkins(config.get(NAME, "uri"), username, password, timeout=CONNECT_TIMEOUT)
+        self._server = Jenkins(config.get(NAME, "uri"), username, password, timeout=TIMEOUT)
         self.get_job_info = self._server.get_job_info
         self.get_build_info = self._server.get_build_info
         self.get_build_console_output = self._server.get_build_console_output
@@ -81,13 +82,13 @@ class JenkinsServer(object):
             template_sha[:6])
 
         try:
-            job_xml = self._server.get_job_config(self.job_name)
+            job_xml = self._get_job_config(self.job_name)
         except:
             self._create_job(self.job_name, template_xml, self._server.create_job)
             view = config.get(NAME, "view")
             if view:
-                self._server.add_job_to_view(view, self.job_name)
-            return
+                self._add_job_to_view(view, self.job_name)
+            return True
         if self._get_sha(job_xml) != template_sha:
             assert self._create_job(
                 self.job_name, template_xml, self._server.reconfig_job), \
@@ -97,12 +98,21 @@ class JenkinsServer(object):
     def ok(self):
         return self._ok
 
+    @utils.retried.on_exception((ConnectionError, ReadTimeout))
     def _create_job(self, name, job_template, func):
         template = Template(job_template)
         network_config = config.get("network", "config", "", expand=False)
         xml = template.render(config=network_config)
         func(name, xml)
         return True
+
+    @utils.retried.on_exception((ConnectionError, ReadTimeout))
+    def _add_job_to_view(self, view, job):
+        self._server.add_job_to_view(view, job)
+
+    @utils.retried.on_exception((ConnectionError, ReadTimeout))
+    def _get_job_config(self, job):
+        return self._server.get_job_config(job)
 
 
 class JenkinsExecutor(scheduler.NetworkExecutor):
@@ -124,6 +134,7 @@ class JenkinsExecutor(scheduler.NetworkExecutor):
     def _build_job(self, parameters):
         return self.server.build_job(self.job, parameters)
 
+    @utils.retried.on_exception((ConnectionError, ReadTimeout))
     def _get_console_log(self, build_id):
         if not config.getboolean(NAME, "console", True):
             return
@@ -197,16 +208,18 @@ class JenkinsExecutor(scheduler.NetworkExecutor):
 
     def run(self, env):
         try:
-            self.task.started()
+            self.task.started(TYPE)
             for extension in self.task.extensions:
-                extension.started()
+                extension.started(TYPE)
             self._run(env)
             for extension in self.task.extensions:
-                extension.finished()
-            self.task.finished()
+                extension.finished(TYPE)
+            self.task.finished(TYPE)
         except Exception as e:
             log.exception()
-            self.task.failed()
+            for extension in self.task.extensions:
+                extension.failed(TYPE)
+            self.task.failed(TYPE)
             raise e
         return self.task
 
