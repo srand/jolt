@@ -57,6 +57,48 @@ These configuration keys exist:
   Keyring service identifier. Defaults to ``artifactory``.
 
 
+FTP
+-----------
+
+The FTP plugin implements an artifact storage provider. When used,
+artifacts can be automatically uploaded to and downloaded from a configured
+FTP server when tasks are executed.
+
+The plugin is enabled by adding an ``[ftp]`` section in
+the Jolt configuration.
+
+These configuration keys exist:
+
+* ``download`` -
+  Boolean. Allow/disallow artifacts to be downloaded from the FTP server.
+  Defaults to ``true``.
+
+* ``host`` -
+  Hostname/IP address of the FTP server.
+
+* ``path`` -
+  Path to directory where artifacts should be stored on the FTP server.
+  Defaults to ``jolt``. The directory is created if it doesn't exist.
+
+* ``tls`` -
+  Use a TLS connection to the FTP server.
+
+* ``upload`` -
+  Boolean. Allow/disallow artifacts to be uploaded to the FTP server.
+  Defaults to ``true``.
+
+* ``keyring.username`` -
+  Username to use when authenticating with the FTP server.
+
+* ``keyring.password`` -
+  Password to use when authenticating with the FTP server. Should normally
+  never need to be set in the configuration file. By default, Jolt asks
+  for the password when needed and stores it in a keyring for future use.
+
+* ``keyring.service`` -
+  Keyring service identifier. Defaults to ``ftp``.
+
+
 Jenkins
 -------
 

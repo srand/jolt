@@ -281,13 +281,18 @@ class DistributedStrategy(ExecutionStrategy):
         if not task.is_cacheable():
             return self.executors.create_network(task)
 
+        # Check remote availability first so that the availability of
+        # remote storage providers is made known when checking if
+        # artifacts can be downloaded or not.
+        remote = task.is_available_remotely(self.cache)
+
         if not self.cache.download_enabled():
             if not task.is_available_locally(self.cache):
                 return self.executors.create_local(task)
             else:
                 return self.executors.create_skipper(task)
 
-        if task.is_available_remotely(self.cache):
+        if remote:
             if not task.is_available_locally(self.cache):
                 return self.executors.create_downloader(task)
             else:
