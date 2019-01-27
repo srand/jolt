@@ -66,13 +66,14 @@ def cli(verbose, extra_verbose, config_file):
               help="Do upload artifacts to remote storage")
 @click.option("--worker", is_flag=True, default=False,
               help="Run with the worker build strategy", hidden=True)
-def build(task, network, keep_going, identity, no_download, no_upload, download, upload, worker):
+@click.option("-d", "--default", type=str, multiple=True, help="Override default parameter values.")
+def build(task, network, keep_going, identity, default,
+          no_download, no_upload, download, upload, worker):
     """
     Execute specified task.
 
     <WIP>
     """
-
     if network:
         download = config.getboolean("network", "download", True)
         upload = config.getboolean("network", "upload", True)
@@ -92,7 +93,8 @@ def build(task, network, keep_going, identity, no_download, no_upload, download,
     options = JoltOptions(network=network,
                           download=download,
                           upload=upload,
-                          keep_going=keep_going)
+                          keep_going=keep_going,
+                          default=default)
 
     acache = cache.ArtifactCache.get(options)
 
@@ -108,6 +110,10 @@ def build(task, network, keep_going, identity, no_download, no_upload, download,
         strategy = scheduler.LocalStrategy(executors, acache)
 
     registry = TaskRegistry.get()
+
+    for params in default:
+        registry.set_default_parameters(params)
+
     gb = graph.GraphBuilder(registry)
     dag = gb.build(task)
 

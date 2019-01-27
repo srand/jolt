@@ -24,7 +24,7 @@ class Artifactory(cache.StorageProvider):
         if self._uri[-1] != "/":
             self._uri += "/"
         self._repository = config.get(NAME, "repository", "jolt")
-        self._upload = config.getboolean(NAME, "upload", False)
+        self._upload = config.getboolean(NAME, "upload", True)
         self._download = config.getboolean(NAME, "download", True)
         self._disabled = False
 

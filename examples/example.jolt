@@ -1,5 +1,12 @@
 from jolt import *
 from jolt.plugins import git
+from platform import system, machine
+
+
+class Toolchain(Task):
+    host = Parameter(system())
+    arch = Parameter(machine())
+    fast = True
 
 
 class TestResource(Resource):
@@ -16,7 +23,7 @@ class HelloWorld(Task):
     """ Builds the classic Hello World! application """
 
     name = "hello"
-    requires = "git:url=https://github.com/gideont/hello_world.git,sha=d80bb20", "resource"
+    requires = "git:url=https://github.com/gideont/hello_world.git,sha=d80bb20", "resource", "toolchain"
     flavor = Parameter(default="hello_01", help="Flavor of the hello world application")
 
     def run(self, deps, tools):

@@ -25,6 +25,12 @@
           <trim>false</trim>
         </hudson.model.StringParameterDefinition>
         <hudson.model.StringParameterDefinition>
+          <name>task_default</name>
+          <description></description>
+          <defaultValue></defaultValue>
+          <trim>false</trim>
+        </hudson.model.StringParameterDefinition>
+        <hudson.model.StringParameterDefinition>
           <name>jolt_url</name>
           <description></description>
           <defaultValue></defaultValue>
@@ -88,7 +94,7 @@ set +x
 set -x
 
 jolt -vv -c jolt.conf clean $task
-jolt -vv -c jolt.conf build -i $task_identity --worker $task</command>
+jolt -vv -c jolt.conf build -i $task_identity --worker $task_default $task</command>
     </hudson.tasks.Shell>
   </builders>
   <publishers>

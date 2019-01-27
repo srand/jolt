@@ -119,6 +119,7 @@ class JenkinsExecutor(scheduler.NetworkExecutor):
     def __init__(self, factory, task):
         super(JenkinsExecutor, self).__init__(factory)
         self.server = JenkinsServer.get()
+        self.factory = factory
         self.task = task
         self.job = self.server.job_name
 
@@ -156,7 +157,8 @@ class JenkinsExecutor(scheduler.NetworkExecutor):
         parameters = {
             "joltfile": loader.JoltLoader.get().get_sources(),
             "task": " ".join(task),
-            "task_identity": self.task.identity[:8]
+            "task_identity": self.task.identity[:8],
+            "task_default": " ".join(["-d {0}".format(d) for d in self.factory.options.default])
         }
         parameters.update(scheduler.ExecutorRegistry.get().get_network_parameters(self.task))
 
@@ -226,6 +228,15 @@ class JenkinsExecutor(scheduler.NetworkExecutor):
 
 @scheduler.ExecutorFactory.Register
 class JenkinsExecutorFactory(scheduler.NetworkExecutorFactory):
+
+    def __init__(self, options):
+        super(JenkinsExecutorFactory, self).__init__(num_workers=1)
+        self._options = options
+
+    @property
+    def options(self):
+        return self._options
+
     def create(self, task):
         server = JenkinsServer.get()
         if not server.ok():

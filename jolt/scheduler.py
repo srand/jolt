@@ -167,10 +167,10 @@ class ExecutorRegistry(object):
     extension_factories = []
 
     def __init__(self, options=None):
-        self._factories = [factory() for factory in self.__class__.executor_factories]
-        self._local_factory = LocalExecutorFactory()
-        self._extensions = [factory().create() for factory in self.__class__.extension_factories]
         self._options = options or JoltOptions()
+        self._factories = [factory(self._options) for factory in self.__class__.executor_factories]
+        self._local_factory = LocalExecutorFactory(self._options)
+        self._extensions = [factory().create() for factory in self.__class__.extension_factories]
 
     def shutdown(self):
         for factory in self._factories:
@@ -207,6 +207,7 @@ class NetworkExecutorExtensionFactory(object):
     def Register(cls):
         # assert cls is Factory
         ExecutorRegistry.extension_factories.insert(0, cls)
+        return cls
 
     def create(self):
         raise NotImplemented()
@@ -222,6 +223,7 @@ class ExecutorFactory(object):
     def Register(cls):
         # assert cls is Factory
         ExecutorRegistry.executor_factories.insert(0, cls)
+        return cls
 
     def __init__(self, num_workers=None):
         self.pool = ThreadPoolExecutor(max_workers=num_workers)
@@ -238,8 +240,9 @@ class ExecutorFactory(object):
 
 
 class LocalExecutorFactory(ExecutorFactory):
-    def __init__(self):
+    def __init__(self, options=None):
         super(LocalExecutorFactory, self).__init__(num_workers=1)
+        self._options = options or JoltOptions()
 
     def create(self, task):
         return LocalExecutor(self, task)

@@ -59,6 +59,17 @@ class Parameter(object):
         """
         return self._default
 
+    def set_default(self, value):
+        """ Set the default value of the parameter.
+
+        Args:
+            value (str): The new default value of the parameter.
+        """
+        self._validate(value)
+        if self.is_default():
+            self._value = value
+        self._default = value
+
     def is_required(self):
         """ Check if the parameter must be set to a value.
 
@@ -169,6 +180,15 @@ class TaskRegistry(object):
 
         assert task, "no such task: {0}".format(full_name)
 
+    def set_default_parameters(self, task):
+        name, params = utils.parse_task_name(task)
+
+        cls = self.tasks.get(name)
+        if not cls:
+            cls = self.tests.get(name)
+        assert cls, "no such task: {0}".format(task)
+        cls._set_default_parameters(cls, params)
+
     def _create_parents(self, name):
         names = name.split("/")
 
@@ -217,6 +237,16 @@ class TaskBase(object):
                 continue
             assert False, "no such parameter for task {0}: {1}".format(self.name, key)
         self._assert_required_parameters_assigned()
+
+    @staticmethod
+    def _set_default_parameters(cls, params):
+        params = params or {}
+        for key, value in params.items():
+            param = cls.__dict__.get(key)
+            if isinstance(param, Parameter):
+                param.set_default(value)
+                continue
+            assert False, "no such parameter for task {0}: {1}".format(cls.name, key)
 
     def _assert_required_parameters_assigned(self):
         for key, param in self._get_parameter_objects().items():
