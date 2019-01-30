@@ -5,6 +5,14 @@ from threading import RLock
 from string import *
 import os
 import hashlib
+import sys
+
+
+
+if sys.version_info[0] == 3:
+    read_input = input
+else:
+    read_input = raw_input
 
 
 def is_str(s):

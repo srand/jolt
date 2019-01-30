@@ -31,7 +31,7 @@ class Artifactory(cache.StorageProvider):
     def _get_auth(self):
         service = config.get(NAME, "keyring.service")
         if not service:
-            service = raw_input(NAME + " keyring service name (artifactory): ")
+            service = utils.read_input(NAME + " keyring service name (artifactory): ")
             if not service:
                 service = NAME
             config.set(NAME, "keyring.service", service)
@@ -39,7 +39,7 @@ class Artifactory(cache.StorageProvider):
 
         username = config.get(NAME, "keyring.username")
         if not username:
-            username = raw_input(NAME + " username: ")
+            username = utils.read_input(NAME + " username: ")
             assert username, "no username configured for " + NAME
             config.set(NAME, "keyring.username", username)
             config.save()
