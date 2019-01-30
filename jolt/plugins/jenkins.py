@@ -228,9 +228,8 @@ class JenkinsExecutor(scheduler.NetworkExecutor):
 
 @scheduler.ExecutorFactory.Register
 class JenkinsExecutorFactory(scheduler.NetworkExecutorFactory):
-
     def __init__(self, options):
-        super(JenkinsExecutorFactory, self).__init__(num_workers=1)
+        super(JenkinsExecutorFactory, self).__init__()
         self._options = options
 
     @property
