@@ -234,6 +234,7 @@ class Artifact(object):
         self._cache = cache
         self._node = node
         self._path = cache.get_path(node)
+        self._stable_path = cache.get_stable_path(node)
         self._temp = cache.create_path(node) \
                      if not fs.path.exists(cache.get_path(node)) \
                      else None
@@ -311,6 +312,13 @@ class Artifact(object):
                 size += stat.st_size
         return size
 
+    def apply(self):
+        fs.unlink(self._stable_path, ignore_errors=True)
+        os.symlink(self._path, self._stable_path)
+
+    def unapply(self):
+        fs.unlink(self._stable_path, ignore_errors=True)
+
     def commit(self):
         if not self._node.task.is_cacheable():
             return
@@ -347,6 +355,11 @@ class Artifact(object):
     def final_path(self):
         """ str: The final location of the artifact in the local cache. """
         return self._path
+
+    @property
+    def stable_path(self):
+        """ str: A stable location of the artifact in the local cache. """
+        return self._stable_path
 
     @property
     def tools(self):
@@ -494,18 +507,23 @@ class Context(object):
         self._cache = cache
         self._node = node
         self._artifacts = {}
+        self._artifacts_index = {}
 
     def __enter__(self):
         for dep in self._node.children:
             self._cache.unpack(dep)
             with self._cache.get_artifact(dep) as artifact:
                 self._artifacts[dep.qualified_name] = artifact
+                self._artifacts_index[dep.qualified_name] = artifact
+                self._artifacts_index[dep.short_qualified_name] = artifact
+                artifact.apply()
                 ArtifactAttributeSetRegistry.apply_all(self._node.task, artifact)
         return self
 
     def __exit__(self, type, value, tb):
         for name, artifact in self._artifacts.items():
             ArtifactAttributeSetRegistry.unapply_all(self._node.task, artifact)
+            artifact.unapply()
 
     def __getitem__(self, key):
         """ Get artifact for a task listed as a requirement.
@@ -527,10 +545,10 @@ class Context(object):
         """
 
         key = self._node.task._get_expansion(key)
-        assert key in self._artifacts, \
+        assert key in self._artifacts_index, \
             "no such dependency '{0}' for task '{1} ({2})'"\
             .format(key, self._node.qualified_name, self._node.identity[:8])
-        return self._artifacts[key]
+        return self._artifacts_index[key]
 
     def items(self):
         """ List all requirements and their artifacts.
@@ -629,6 +647,10 @@ class ArtifactCache(StorageProvider):
 
     def get_path(self, node):
         return fs.path.join(self.root, node.canonical_name, node.identity)
+
+    def get_stable_path(self, node):
+        identity = utils.sha1(node.qualified_name)
+        return fs.path.join(self.root, node.canonical_name, identity)
 
     def evict(self):
         while self.stats.get_size() > self.max_size:

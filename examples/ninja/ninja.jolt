@@ -1,0 +1,57 @@
+from jolt import Task, Parameter
+from jolt.plugins.ninja import CXXLibrary, CXXExecutable, Rule
+from jolt import influence
+
+
+class Toolchain(Task):
+    arch = Parameter("x86", values=["x86", "arm"])
+    debug = Parameter("false", values=["false", "true"])
+    optimize = Parameter("full", values=["no", "debug", "size", "speed", "full"])
+
+    def publish(self, artifact, tools):
+        cflags = ""
+        if str(self.debug) == "true":
+	    cflags += " -g"
+	    cflags += {"no": " -O0",
+                       "debug": " -Og"}\
+                       .get(str(self.optimize), " -Og")
+        else:
+	    cflags += {"no": " -O0",
+                       "debug": " -Og",
+                       "size": " -Os",
+                       "speed": " -Ofast",
+                       "full": " -O3"}\
+                       .get(str(self.optimize))
+
+        if str(self.arch) == "x86":
+            artifact.environ.CC = "gcc"
+            artifact.environ.CXX = "g++"
+            artifact.environ.LD = "g++"
+        if str(self.arch) == "arm":
+            artifact.environ.CC = "arm-linux-gnueabi-gcc"
+            artifact.environ.CXX = "arm-linux-gnueabi-g++"
+            artifact.environ.LD = "arm-linux-gnueabi-g++"
+
+        artifact.environ.CFLAGS = cflags
+        artifact.environ.CXXFLAGS = cflags
+
+
+class Lib(CXXLibrary):
+    requires = "toolchain"
+    sources = "lib/*"
+    rename = Rule("cp $in $out", files=[".x"], suffix=".c")
+
+    def publish(self, artifact, tools):
+        super(Lib, self).publish(artifact, tools)
+        artifact.collect("lib/*.h", "include/", flatten=True)
+        artifact.cxxinfo.incpaths.append("include")
+
+
+class Exe(CXXExecutable):
+    binary = "executable"
+    requires = "lib"
+    sources = "test.cpp"
+
+
+# jolt build exe -d toolchain:arch=x86,debug=true
+# jolt build exe -d toolchain:arch=arm,optimize=false

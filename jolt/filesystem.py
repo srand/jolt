@@ -29,8 +29,12 @@ def move(src, dst):
 def rmtree(path, ignore_errors=False):
     shutil.rmtree(path, ignore_errors)
 
-def unlink(path):
-    os.unlink(path)
+def unlink(path, ignore_errors=False):
+    try:
+        os.unlink(path)
+    except:
+        if not ignore_errors:
+            raise
 
 def symlink(src, dest, *args, **kwargs):
     os.symlink(src, dest, *args, **kwargs)
