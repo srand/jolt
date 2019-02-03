@@ -1,16 +1,16 @@
-from jolt import Task, Parameter
+from jolt import *
 from jolt.plugins.ninja import CXXLibrary, CXXExecutable, Rule
 from jolt import influence
 
 
 class Toolchain(Task):
     arch = Parameter("x86", values=["x86", "arm"])
-    debug = Parameter("false", values=["false", "true"])
+    debug = BooleanParameter(False)
     optimize = Parameter("full", values=["no", "debug", "size", "speed", "full"])
 
     def publish(self, artifact, tools):
         cflags = ""
-        if str(self.debug) == "true":
+        if self.debug.is_true:
 	    cflags += " -g"
 	    cflags += {"no": " -O0",
                        "debug": " -Og"}\

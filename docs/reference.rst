@@ -29,6 +29,13 @@ Parameter
    :members: __init__, __str__, is_default, get_default, get_value, set_value, is_set, is_unset
 
 
+BooleanParameter
+---------
+
+.. autoclass:: jolt.BooleanParameter
+   :members: __init__, __str__, is_default, get_default, get_value, set_value, is_set, is_unset, is_true, is_false
+
+
 Resource
 ---------
 

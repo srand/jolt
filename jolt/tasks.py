@@ -119,6 +119,59 @@ class Parameter(object):
         self._value = value
 
 
+class BooleanParameter(Parameter):
+    """ Boolean task parameter type. """
+
+    def __init__(self, default=None, required=True, help=None):
+        """
+        Creates a new parameter.
+
+        Args:
+            default (boolean, optional): An optional default boolean value.
+            required (boolean, optional): If required, the parameter must be assigned
+                a value before the task can be executed. The default is ``True``.
+            help (str, optional): Documentation for the parameter.
+                This text is displayed when running the ``info`` command on the
+                associated task.
+
+        Raises:
+            AssertionError: If the parameter is assigned an illegal value
+                during task execution.
+        """
+        default = str(default).lower() if default is not None else None
+        super(BooleanParameter, self).__init__(
+            default, values=["false", "true", "0", "1"],
+            required=required, help=help)
+
+    def _validate(self, value):
+        assert self._accepted_values is None or value in self._accepted_values, \
+            "illegal value '{0}' assigned to boolean parameter"\
+            .format(value)
+
+    def set_value(self, value):
+        """ Set the parameter value.
+
+        Args:
+            value (boolean): The new parameter value. Accepted values are:
+                False, True, "false, and "true", 0 and 1.
+
+        Raises:
+            AssertionError: If the parameter is assigned an illegal value.
+        """
+        value = str(value).lower()
+        super(BooleanParameter, self).set_value(value)
+
+    @property
+    def is_true(self):
+        """ The parameter value is True. """
+        return str(self.get_value()) in ["true", "1"]
+
+    @property
+    def is_false(self):
+        """ The parameter value is False. """
+        return not self.is_true
+
+
 class TaskRegistry(object):
     _instance = None
 
