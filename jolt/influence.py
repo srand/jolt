@@ -282,7 +282,7 @@ class FileInfluence(HashInfluenceProvider):
 
     def get_influence(self, task):
         sha = hashlib.sha1()
-        with open(self.path, "rb") as f:
+        with open(task.tools.expand_path(self.path), "rb") as f:
             for data in iter(lambda: f.read(4096), ''):
                 sha.update(data)
         return sha.hexdigest()
