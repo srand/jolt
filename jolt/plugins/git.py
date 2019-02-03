@@ -117,7 +117,6 @@ class Git(Resource, GitInfluenceProvider):
             return True if self.tools.run("git branch -r --contains HEAD", output_on_error=True) else False
         return True
 
-    @utils.cached.instance
     def _is_cloned(self):
         return fs.path.exists(self._get_git_folder())
 
