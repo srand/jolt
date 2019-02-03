@@ -54,6 +54,7 @@ def cli(verbose, extra_verbose, config_file):
 @cli.command()
 @click.argument("task", type=str, nargs=-1, required=True)
 @click.option("-n", "--network", is_flag=True, default=False, help="Build on network.")
+@click.option("-l", "--local", is_flag=True, default=False, help="Disable all network operations.")
 @click.option("-k", "--keep-going", is_flag=True, default=False, help="Build as many tasks as possible, don't abort on first failure.")
 @click.option("-i", "--identity", type=str, help="Expected hash identity")
 @click.option("--no-download", is_flag=True, default=False,
@@ -67,7 +68,7 @@ def cli(verbose, extra_verbose, config_file):
 @click.option("--worker", is_flag=True, default=False,
               help="Run with the worker build strategy", hidden=True)
 @click.option("-d", "--default", type=str, multiple=True, help="Override default parameter values.")
-def build(task, network, keep_going, identity, default,
+def build(task, network, keep_going, identity, default, local,
           no_download, no_upload, download, upload, worker):
     """
     Execute specified task.
@@ -89,6 +90,10 @@ def build(task, network, keep_going, identity, default,
         download = True
     if upload:
         upload = True
+
+    if local:
+        download = False
+        upload = False
 
     options = JoltOptions(network=network,
                           download=download,
