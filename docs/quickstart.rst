@@ -394,3 +394,123 @@ are still available. Other time-based decorators include:
 The ``influence.source`` decorator adds the source code of a task function as
 hash influence. Above, the ``report`` method is registered. Similarly, there is
 also a ``influence.attribute`` decorator for task attributes and properties.
+
+
+Ninja
+-----
+
+Ninja is a fast third-party build system. Where other build systems, such as Jolt,
+are high-level languages, Ninja aims to be an assembler. Together they form a
+powerful couple. Jolt has builtin Ninja tasks which automatically generate Ninja
+files and build your projects for you. All you have to do is to tell Jolt which
+source files to compile. You can also define custom build rules for file types not
+recognized by Jolt.
+
+Below is an example of a library and a program. The library contains a function
+returning a message. The program calls this function and prints the message.
+
+.. code-block:: c++
+
+    // lib/message.cpp
+
+    #include "message.h"
+
+    const char *message() {
+      return "Hello world!";
+    }
+
+.. code-block:: c++
+
+    // program/main.cpp
+
+    #include <cstdlib>
+    #include <iostream>
+    #include "message.h"
+
+    int main() {
+      std::cout << message() << std::endl;
+      return EXIT_SUCCESS;
+    }
+
+
+To build the library and the program we use this Jolt recipe:
+
+.. code-block:: python
+
+    from jolt import *
+    from jolt.plugins.ninja import *
+
+
+    class Message(CXXLibrary):
+        sources = "lib/message.cpp"
+
+        def publish(self, artifact, tools):
+	    super(Message, self).publish(artifact, tools)
+            artifact.collect("lib/*.h", "include/", flatten=True)
+            artifact.cxxinfo.incpaths.append("include")
+
+
+    class HelloWorld(CXXExecutable):
+        requires = "message"
+        sources = "program/main.cpp"
+
+
+Jolt automatically configures include paths, link libraries, and other build
+attributes for the ``HelloWorld`` program based on metadata found in the artifact
+of the ``Message`` library task. In the example, the ``Message`` library sets up
+an include path to its published header file while linking metadata is
+automatically provided by ``CXXLibrary``.
+
+The ``cxxinfo`` artifact metadata can be used with other build systems too,
+such as CMake and Autotools. It enables your Ninja tasks to stay oblivious to
+whatever build system their dependencies use as long as binary compatibility
+is guaranteed.
+
+
+Toolchains
+----------
+
+Maintaining binary compatibility between libraries can be a pain. To ensure
+that a chain of dependencies stay compatible you could inject a synthetic
+toolchain task at the bottom of your dependency tree and use it to control
+all compiler options. This methods also enables easy cross-compilation.
+
+First, define a toolchain:
+
+.. code-block:: python
+
+    class Toolchain(Task):
+        arch = Parameter("i386", values=["i386", "arm"])
+	host = Parameter(platform.system())
+	debug = BooleanParameter(False)
+
+	def publish(self, artifact, tools):
+	    if self.arch.get_value() == "arm":
+		artifact.environ.CC = "arm-linux-gnueabi-gcc"
+	    if self.arch.get_value() == "i386":
+		artifact.environ.CC = "x86_64-linux-gnu-gcc -m32"
+	    artifact.environ.CFLAGS = "-g -Og" if self.debug.is_true else "-O2"
+
+
+Secondly, declare the toolchain as a dependency of all your compilation tasks:
+
+
+.. code-block:: python
+
+    class HelloWorld(CXXExecutable):
+        requires = "toolchain"
+        sources = "src/main.cpp"
+
+
+Don't assign explicit values to the toolchain's parameters, use default values
+and instead override these from the command line when you need to. For example,
+to build the ``HelloWorld`` task for the ARM architecture, run:
+
+.. code-block:: bash
+
+    $ jolt build helloworld -d toolchain:arch=arm
+
+The ``-d toolchain:arch=arm`` command line argument instructs Jolt to overide
+the default value of the ``arch`` parameter of the ``toolchain`` task. The new
+value changes the identity of the toolchain artifact which will have a rippling
+effect and trigger a rebuild of all tasks in the dependency tree.

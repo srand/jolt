@@ -41,9 +41,9 @@ class Rule(object):
             outfile = fs.path.join(project.outdir, outfile)
         return outfile
 
-    def create(self, project, writer):
+    def create(self, project, writer, deps, tools):
         if self.command is not None:
-            writer.rule(self.name, self.command, depfile=self.depfile)
+            writer.rule(self.name, tools.expand(self.command), depfile=self.depfile)
             writer.newline()
 
     def build(self, project, writer, infiles):
@@ -60,7 +60,7 @@ class Skip(Rule):
         self.files = files
         self.command = None
 
-    def create(self, project, writer):
+    def create(self, project, writer, deps, tools):
         pass
 
     def build(self, project, writer, infiles):
@@ -72,7 +72,7 @@ class Objects(Rule):
         self.files = files
         self.command = None
 
-    def create(self, project, writer):
+    def create(self, project, writer, deps, tools):
         pass
 
     def build(self, project, writer, infiles):
@@ -327,9 +327,9 @@ class CXXProject(Task):
 
     def _populate_rules(self, writer, deps, tools):
         for name, rule in Toolchain.all_rules(toolchain):
-            rule.create(self, writer)
+            rule.create(self, writer, deps, tools)
         for name, rule in Toolchain.all_rules(self):
-            rule.create(self, writer)
+            rule.create(self, writer, deps, tools)
         writer.newline()
 
     def _populate_inputs(self, writer, deps, tools):

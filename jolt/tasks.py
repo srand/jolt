@@ -370,6 +370,7 @@ class Task(TaskBase):
 
     def __init__(self, parameters=None):
         super(Task, self).__init__()
+        self.name = self.__class__.name
         self.tools = Tools(self, self.joltdir)
         self._create_parameters()
         self._set_parameters(parameters)
@@ -378,7 +379,6 @@ class Task(TaskBase):
         self.extends = utils.as_list(utils.call_or_return(self, self.__class__.extends))
         assert len(self.extends) == 1, "{0} extends multiple tasks, only one allowed".format(self.name)
         self.extends = self.extends[0]
-        self.name = self.__class__.name
         self.influence.append(TaskSourceInfluence("publish"))
         self.influence.append(TaskSourceInfluence("run"))
         self.influence.append(TaskSourceInfluence("unpack"))

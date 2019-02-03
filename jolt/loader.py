@@ -8,6 +8,7 @@ from jolt.tasks import Task, Test, Resource
 from jolt import filesystem as fs
 from jolt import log
 from jolt import utils
+from jolt.plugins.ninja import CXXExecutable, CXXLibrary
 
 
 @utils.Singleton
@@ -35,7 +36,7 @@ class JoltLoader(object):
             if inspect.isclass(obj):
                 classes.append(obj)
 
-        cls_exclude_list = [Task, Resource]
+        cls_exclude_list = [Task, Resource, CXXLibrary, CXXExecutable]
 
         tasks = [cls for cls in classes
                  if issubclass(cls, Task) and cls not in cls_exclude_list \
