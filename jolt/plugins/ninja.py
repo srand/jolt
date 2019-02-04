@@ -22,6 +22,14 @@ class EnvironmentVariable(Variable):
         writer.variable(self.name, tools.getenv(self.name.upper(), self._default))
 
 
+class ProjectVariable(Variable):
+    def __init__(self, default=None):
+        self._default = default or ''
+
+    def create(self, project, writer, deps, tools):
+        writer.variable(self.name, getattr(project, self.name))
+
+
 class Rule(object):
     def __init__(self, command, variables=None, depfile=None, suffix=None,
                  prefix=None, files=None, ):
@@ -84,8 +92,46 @@ class GNUCompiler(Rule):
     pass
 
 
+class FileListWriter(Rule):
+    def __init__(self, name):
+        self.name = name
+
+    def _write(self, flp, flhp, data, digest):
+        with open(flp, "w") as f:
+            f.write(data)
+        with open(flhp, "w") as f:
+            f.write(digest)
+
+    def _identical(self, flp, flhp, data, digest):
+        if not fs.path.exists(flp) or not fs.path.exists(flhp):
+            return False
+
+        try:
+            with open(flhp, "r") as f:
+                disk_digest = f.read()
+        except:
+            return False
+
+        return digest == disk_digest
+
+    def _data(self, files):
+        data = "\n".join(files)
+        return data, utils.sha1(data)
+
+    def build(self, project, writer, infiles):
+        file_list_path = fs.path.join(project.outdir, "{0}.list".format(self.name))
+        file_list_hash_path = fs.path.join(project.outdir, "{0}.hash".format(self.name))
+        data, digest = self._data(infiles)
+        if not self._identical(file_list_path, file_list_hash_path, data, digest):
+            self._write(file_list_path, file_list_hash_path, data, digest)
+        project.depimports.append(file_list_path)
+
+
 class GNULinker(Rule):
     def build(self, project, writer, infiles):
+        file_list = FileListWriter("objects")
+        file_list.build(project, writer, infiles)
+
         outfile = self.outfile(project, project.binary)
         writer.build(outfile, self.name, infiles, implicit=project.depimports)
         return outfile
@@ -93,8 +139,11 @@ class GNULinker(Rule):
 
 class GNUArchiver(Rule):
     def build(self, project, writer, infiles):
+        file_list = FileListWriter("objects")
+        file_list.build(project, writer, infiles)
+
         outfile = self.outfile(project, project.binary)
-        writer.build(outfile, self.name, infiles)
+        writer.build(outfile, self.name, infiles, implicit=project.depimports)
         return outfile
 
 
@@ -216,6 +265,8 @@ class GNUToolchain(Toolchain):
     hh = Skip(files=[".h", ".hh", ".hpp", ".hxx"])
     obj = Objects(files=[".o", ".obj", ".a"])
 
+    outdir = ProjectVariable()
+
     ar = EnvironmentVariable(default="ar")
     cc = EnvironmentVariable(default="gcc")
     cxx = EnvironmentVariable(default="g++")
@@ -256,10 +307,10 @@ class GNUToolchain(Toolchain):
         suffix=".o")
 
     link = GNULinker(
-        command="$ld $ldflags $extra_ldflags $libpaths -Wl,--start-group $in -Wl,--end-group -o $out $libraries")
+        command="$ld $ldflags $extra_ldflags $libpaths -Wl,--start-group @objects.list -Wl,--end-group -o $out $libraries")
 
     archive = GNUArchiver(
-        command="$ar cr $out $in",
+        command="$ar cr $out @objects.list",
         prefix="lib",
         suffix=".a")
 
@@ -279,6 +330,7 @@ class CXXProject(Task):
     incpaths = []
     macros = []
     sources = []
+    depimports = []
     source_influence = True
     binary = None
     incremental = True
@@ -359,6 +411,10 @@ class CXXLibrary(CXXProject):
     def __init__(self, *args, **kwargs):
         super(CXXLibrary, self).__init__(*args, **kwargs)
 
+    def _populate_inputs(self, writer, deps, tools):
+        self.depimports += toolchain.depimport.build(self, writer, deps)
+        super(CXXLibrary, self)._populate_inputs(writer, deps, tools)
+
     def _populate_project(self, writer, deps, tools):
         toolchain.archive.build(self, writer, self.objects)
 
@@ -383,7 +439,7 @@ class CXXExecutable(CXXProject):
         self.libraries = utils.as_list(utils.call_or_return(self, self.__class__.libraries))
 
     def _populate_inputs(self, writer, deps, tools):
-        self.depimports = toolchain.depimport.build(self, writer, deps)
+        self.depimports += toolchain.depimport.build(self, writer, deps)
         super(CXXExecutable, self)._populate_inputs(writer, deps, tools)
 
     def _populate_project(self, writer, deps, tools):
