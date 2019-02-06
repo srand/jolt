@@ -34,17 +34,14 @@ class GitInfluenceProvider(HashInfluenceProvider):
 
     @utils.cached.instance
     def _get_tree_hash(self, task, sha="HEAD"):
-        if has_pygit:
-            return pygit2.Repository(self._get_path(task)).revparse_single(sha + ":").id
-        else:
-            with task.tools.cwd(self._get_path(task)):
-                return task.tools.run("git rev-parse {0}:".format(sha), output_on_error=True)
+        with task.tools.cwd(self._get_path(task)):
+            return task.tools.run("git rev-parse {0}:./".format(sha), output_on_error=True)
         return ""
 
     @utils.cached.instance
     def _get_diff(self, task):
         with task.tools.cwd(self._get_path(task)):
-            return task.tools.run("git diff HEAD", output_on_error=True)
+            return task.tools.run("git diff HEAD .", output_on_error=True)
         return ""
 
     @utils.cached.instance

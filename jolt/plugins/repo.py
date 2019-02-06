@@ -1,4 +1,5 @@
 from copy import copy
+from threading import RLock
 
 from jolt.influence import *
 from jolt.tools import Tools
@@ -161,6 +162,11 @@ class RepoManifest(ElementTree):
 
 
 _git_repos = {}
+_git_repo_lock = RLock()
+
+_repo_manifests = {}
+_repo_manifest_lock = RLock()
+
 
 class RepoInfluenceProvider(HashInfluenceProvider):
     name = "Repo"
@@ -186,11 +192,12 @@ class RepoInfluenceProvider(HashInfluenceProvider):
                 if self.exclude is not None and project.path_or_name in self.exclude:
                     continue
 
-                gip = _git_repos.get(project.path_or_name)
-                if gip is None:
-                    gip = git.GitInfluenceProvider(project.path_or_name)
-                    _git_repos[project.path_or_name] = gip
-                result.append(gip.get_influence(task))
+                with _git_repo_lock:
+                    gip = _git_repos.get(project.path_or_name)
+                    if gip is None:
+                        gip = git.GitInfluenceProvider(project.path_or_name)
+                        _git_repos[project.path_or_name] = gip
+                    result.append(gip.get_influence(task))
 
             return "\n".join(result)
 
@@ -200,9 +207,15 @@ class RepoInfluenceProvider(HashInfluenceProvider):
 
     def get_manifest(self, task):
         manifest_path = fs.path.join(task.joltdir, task._get_expansion(self.path))
-        manifest = RepoManifest(task, manifest_path)
-        manifest.parse()
-        return manifest
+        with _repo_manifest_lock:
+            manifest = _repo_manifests.get(manifest_path)
+            if manifest is None:
+                manifest = RepoManifest(task, manifest_path)
+                manifest.parse()
+                manifest.assert_clean()
+                manifest.lock_revisions()
+                _repo_manifests[manifest_path] = manifest
+            return manifest
 
 
 class RepoNetworkExecutorExtension(NetworkExecutorExtension):
@@ -215,8 +228,6 @@ class RepoNetworkExecutorExtension(NetworkExecutorExtension):
             rip = rip[0]
             if rip.network:
                 manifest = rip.get_manifest(task.task)
-                manifest.assert_clean()
-                manifest.lock_revisions()
                 return {"repo_manifest": manifest.format()}
         return {}
 
