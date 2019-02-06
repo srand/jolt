@@ -215,7 +215,7 @@ class Macros(Variable):
         macros = [macro for macro in project.macros]
         for name, artifact in deps.items():
             macros += artifact.cxxinfo.macros.items()
-        macros = ["{0}{1}".format(self.prefix, macros) for macro in macros]
+        macros = ["{0}{1}".format(self.prefix, macro) for macro in macros]
         writer.variable(self.name, " ".join(macros))
 
 
