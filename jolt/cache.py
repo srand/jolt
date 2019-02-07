@@ -570,7 +570,7 @@ class CacheStats(object):
         except:
             self.stats = {}
         self.active = set()
-        log.verbose("Cache size is {0} bytes", self.get_size())
+        log.verbose("Cache size is {0}", utils.as_human_size(self.get_size()))
 
     def load(self):
         with open(self.path) as f:
@@ -638,7 +638,8 @@ class ArtifactCache(StorageProvider):
         except:
             assert False, "failed to create cache directory"
 
-        self.max_size = config.getsize("jolt", "cachesize", 0)
+        self.max_size = config.getsize(
+            "jolt", "cachesize", os.environ.get("JOLT_CACHESIZE", 1*1024**3))
         self.stats = CacheStats(self)
         self.storage_providers = [
             factory.create(self)
