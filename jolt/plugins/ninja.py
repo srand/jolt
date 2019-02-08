@@ -15,11 +15,13 @@ class Variable(object):
 
 
 class EnvironmentVariable(Variable):
-    def __init__(self, default=None):
+    def __init__(self, default=None, envname=None):
         self._default = default or ''
+        self._envname = envname
 
     def create(self, project, writer, deps, tools):
-        writer.variable(self.name, tools.getenv(self.name.upper(), self._default))
+        envname = self._envname or self.name
+        writer.variable(self.name, tools.getenv(envname.upper(), self._default))
 
 
 class ProjectVariable(Variable):
@@ -175,8 +177,8 @@ class GNUDepImporter(Rule):
 
 class Toolchain(object):
     def __init__(self):
-        self._build_variables()
         self._rule_map = self.build_rule_map(self)
+        self.build_variables(self)
 
     @staticmethod
     def build_rule_map(cls):
@@ -187,8 +189,9 @@ class Toolchain(object):
                 rule_map[ext] = rule
         return rule_map
 
-    def _build_variables(self):
-        for name, var in Toolchain.all_variables(self):
+    @staticmethod
+    def build_variables(cls):
+        for name, var in Toolchain.all_variables(cls):
             var.name = name
 
     @staticmethod
@@ -307,7 +310,7 @@ class GNUToolchain(Toolchain):
         suffix=".o")
 
     link = GNULinker(
-        command="$ld $ldflags $extra_ldflags $libpaths -Wl,--start-group @objects.list -Wl,--end-group -o $out $libraries")
+        command="$ld $ldflags $extra_ldflags $libpaths -Wl,--start-group @objects.list -Wl,--end-group -o $out -Wl,--start-group $libraries -Wl,--end-group")
 
     archive = GNUArchiver(
         command="$ar cr $out @objects.list",
@@ -345,6 +348,7 @@ class CXXProject(Task):
             for source in self.sources:
                 self.influence.append(influence.FileInfluence(source))
         self._rule_map = Toolchain.build_rule_map(self)
+        Toolchain.build_variables(self)
 
     def _init_sources(self):
         sources = utils.as_list(utils.call_or_return(self, self.__class__.sources))
@@ -352,7 +356,6 @@ class CXXProject(Task):
         for l in map(self.tools.glob, sources):
             self.sources += l
         self.sources.sort()
-        assert self.sources, "no source files found for task {0}".format(self.name)
 
     def _write_ninja_file(self, basedir, deps, tools):
         with open(fs.path.join(basedir, "build.ninja"), "w") as fobj:
