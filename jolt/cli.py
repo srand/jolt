@@ -164,7 +164,9 @@ def clean(task):
     if task:
         registry = TaskRegistry.get()
         dag = graph.GraphBuilder(registry).build(task)
-        tasks = dag.select(lambda graph, node: node.name in task)
+        tasks = dag.select(
+            lambda graph, node: node.short_qualified_name in task or \
+            node.qualified_name in task)
         for task in tasks:
             acache.discard(task)
     else:
