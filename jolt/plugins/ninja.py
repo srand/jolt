@@ -212,7 +212,7 @@ class Macros(Variable):
         self.prefix = prefix or ''
 
     def create(self, project, writer, deps, tools):
-        macros = [macro for macro in project.macros]
+        macros = [tools.expand(macro) for macro in project.macros]
         for name, artifact in deps.items():
             macros += artifact.cxxinfo.macros.items()
         macros = ["{0}{1}".format(self.prefix, macro) for macro in macros]
@@ -254,7 +254,7 @@ class Libraries(Variable):
     def create(self, project, writer, deps, tools):
         if isinstance(project, CXXLibrary):
             return
-        libraries = [lib for lib in project.libraries]
+        libraries = [tools.expand(lib) for lib in project.libraries]
         for name, artifact in deps.items():
             libraries += artifact.cxxinfo.libraries.items()
         libraries = ["{0}{1}".format(self.prefix, path) for path in libraries]
