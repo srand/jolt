@@ -494,7 +494,7 @@ class Task(TaskBase):
 
         This hook is executed in the context of a consuming task.
         """
-        pass
+        raise NotImplementedError()
 
 
 class Resource(Task):

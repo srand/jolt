@@ -240,6 +240,7 @@ class Artifact(object):
                      else None
         self._archive = None
         self._unpacked = False
+        self._uploadable = True
         self._size = 0
         ArtifactAttributeSetRegistry.create_all(self)
         self._read_manifest()
@@ -262,6 +263,7 @@ class Artifact(object):
         content["task"] = self._node.name
         content["size"] = self._get_size()
         content["unpacked"] = self._unpacked
+        content["uploadable"] = self._uploadable
         content["identity"] = self._node.identity
         content["requires"] = self._node.task._get_requires()
         content["parameters"] = self._node.task._get_parameters()
@@ -280,6 +282,7 @@ class Artifact(object):
             content = json.loads(f.read().decode())
             self._size = content["size"]
             self._unpacked = content["unpacked"]
+            self._uploadable = content["uploadable"]
             ArtifactAttributeSetRegistry.parse_all(self, content)
 
     def _get_size(self):
@@ -319,10 +322,11 @@ class Artifact(object):
     def unapply(self):
         fs.unlink(self._stable_path, ignore_errors=True)
 
-    def commit(self):
+    def commit(self, uploadable=True):
         if not self._node.task.is_cacheable():
             return
         if self._temp:
+            self._uploadable = uploadable
             self._size = self._get_size()
             self._write_manifest()
             fs.rename(self._temp, self._path)
@@ -487,6 +491,9 @@ class Artifact(object):
 
     def is_unpacked(self):
         return self._unpacked
+
+    def is_uploadable(self):
+        return self._uploadable
 
 
 class Context(object):
@@ -697,6 +704,10 @@ class ArtifactCache(StorageProvider):
     def is_available(self, node):
         return self.is_available_locally(node) or self.is_available_remotely(node)
 
+    def is_uploadable(self, node):
+        with self.get_artifact(node) as artifact:
+            return artifact.is_uploadable()
+
     def download_enabled(self):
         return self._options.download and \
             any([provider.download_enabled() for provider in self.storage_providers])
@@ -753,8 +764,11 @@ class ArtifactCache(StorageProvider):
             artifact.modify()
             task = artifact.get_task()
             with tools.Tools(task) as t:
-                task.unpack(artifact, t)
-            artifact.commit()
+                try:
+                    task.unpack(artifact, t)
+                    artifact.commit(uploadable=False)
+                except NotImplementedError:
+                    artifact.commit()
         return True
 
     def commit(self, artifact):

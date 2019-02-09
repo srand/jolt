@@ -54,6 +54,9 @@ class TestTask(Task):
         hello = deps[self.requires[0]]
         tools.run(hello.strings.executable.get_value())
 
+    def unpack(self, artifact, tools):
+    	pass
+
 
 class Example(Task):
     """ Example task which builds and tests two flavors of Hello world! """
