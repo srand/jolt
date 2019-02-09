@@ -30,7 +30,7 @@ Now try to execute the task:
 
 Once the task has been executed, executing it again won't have any effect.
 This is because the task produced an empty artifact which is now stored in
-the local artifact cache. When ``jolt`` determines if a task should be executed
+the local artifact cache. When Jolt determines if a task should be executed
 or not, it first calculates a task identity by hashing different attributes
 that would influence the output of the task, such as:
 
@@ -39,7 +39,7 @@ that would influence the output of the task, such as:
 * Parameters
 * Dependencies
 
-When the task identity is known, ``jolt`` searches its artifact cache for an
+When the task identity is known, Jolt searches its artifact cache for an
 artifact with the same identity. If one is found, no action is taken. You can
 try this out by changing the ``Hello world!`` string to something else and
 executing the task again. If the string is reverted back to ``Hello world!``, the
@@ -107,7 +107,7 @@ the task in order to know what artifact to look for. Run:
 
 .. code-block:: bash
 
-    $ jolt info hello
+    $ jolt info -a hello
 
 The ``info`` command shows information about the task, including the
 documentation written in its Python implementation. We're looking for the
@@ -207,10 +207,10 @@ different types of tasks. See the reference documentation for more information.
 However, Jolt was originally created with compilation tasks in mind. Below is
 a real world example of a task compiling the ``e2fsprogs`` package containing
 EXT2/3/4 filesystem utility programs. It uses AutoTools to configure and
-build its sources into binary application. Luckily, the ``tools`` object
+build its sources into different binary applications. Luckily, the ``tools`` object
 provides utilities for building autotools projects as seen below.
-In addition to AutoTools, there is also support for CMake as well as generic
-support for running any tool.
+In addition to AutoTools, there is also support for CMake and Meson as well as
+generic support for running any third-party build tool.
 
 .. code-block:: python
 
@@ -240,10 +240,11 @@ the project. All files installed in the installation directory will be published
 Both directories are removed when execution has finished, i.e. the project
 will be completely rebuilt if the task's influence changes.
 
-The task also extends the environment of consumers by adding the artifact's
+The task also extends the environment of consumer tasks by adding the artifact's
 ``bin`` directory to the ``PATH``. That way, any task that depends on
-``e2fsprogs`` will be able to run its utility programs directly without
-explicitly referencing the artifact where they reside.
+``e2fsprogs`` will be able to run its published programs directly without
+explicitly referencing the artifact where they reside. Use this method to
+package tools required by other tasks.
 
 Also, note that the task requires a ``git`` repository hosted at ``kernel.org``.
 This git task, implemented by a builtin plugin, is actually not a
@@ -268,16 +269,28 @@ Below is a skeleton example providing mutual exclusion:
     from jolt import *
 
     class Exclusivity(Resource):
-        """ Resource providing mutual exclusion """
+        """ Resource providing mutual exclusion to an object """
 
-        object = Parameter(help="Name of shared object")
+        to = Parameter(help="Name of shared object")
 
         def acquire(self, artifact, deps, tools):
-            # TODO: Implement locking
+	    # TODO: Implement locking
+            self.info("{to} is now locked")
 
         def release(self, artifact, deps, tools):
-            # TODO: Implement unlocking
+	    # TODO: Implement unlocking
+            self.info("{to} is now unlocked")
 
+
+    class RebootDevice(Task):
+	""" Reboots the specified test device """
+
+	device = Parameter(help="Name of device to reboot")
+        requires = "exclusivity:to={device}"
+	cacheable = False
+
+	def run(self, deps, tools):
+	    tools.run("ssh {device} reboot")
 
 Tests
 ------
@@ -321,15 +334,15 @@ and registered to avoid false cache hits. For example, in a compilation task all
 compiled source files should influence the task's identity and trigger re-execution
 of the task if changed, otherwise binary compatibility will be lost quickly.
 
-When using an external second-level build tool such as make, Jolt has no way of
+When using an external third-party build tool such as make, Jolt has no way of
 knowing what source files to monitor. This information must be explicitly provided
 by the task's implementor. Luckily, Jolt provides a few builtin class decorators
 to make it easier.
 
 Let's revisit the ``e2fsprogs`` task from earlier, but this time we assume that the
 repository is already cloned and managed by external tools and not through the
-builtin Jolt ``git`` resource. We can no longer rely on the resource
-to influence the hash of the task. We instead use the ``git.influence`` decorator:
+builtin Jolt ``git`` resource. We can no longer rely on the resource to automatically
+influence the hash of the task. We instead use the ``git.influence`` decorator:
 
 .. code-block:: python
 
@@ -344,7 +357,7 @@ to influence the hash of the task. We instead use the ``git.influence`` decorato
             ac.build()
             ac.install()
 
-The decorator adds the git repository's root tree hash as task hash influence.
+The decorator adds the git repository's tree hash as hash influence.
 It will also add the ``git diff`` output as influence to simplify iterative local
 development.
 
@@ -402,7 +415,7 @@ Ninja
 Ninja is a fast third-party build system. Where other build systems, such as Jolt,
 are high-level languages, Ninja aims to be an assembler. Together they form a
 powerful couple. Jolt has builtin Ninja tasks which automatically generate Ninja
-files and build your projects for you. All you have to do is to tell Jolt which
+build files and build your projects for you. All you have to do is to tell Jolt which
 source files to compile. You can also define custom build rules for file types not
 recognized by Jolt.
 
@@ -416,7 +429,7 @@ returning a message. The program calls this function and prints the message.
     #include "message.h"
 
     const char *message() {
-      return "Hello world!";
+      return "Hello " RECIPIENT "!";
     }
 
 .. code-block:: c++
@@ -442,7 +455,9 @@ To build the library and the program we use this Jolt recipe:
 
 
     class Message(CXXLibrary):
-        sources = "lib/message.cpp"
+        recipient = Parameter(default="world", help="Name of greeting recipient.")
+        sources = ["lib/message.cpp"]
+	macros = ['RECIPIENT="{recipient}"']
 
         def publish(self, artifact, tools):
 	    super(Message, self).publish(artifact, tools)
@@ -459,10 +474,10 @@ Jolt automatically configures include paths, link libraries, and other build
 attributes for the ``HelloWorld`` program based on metadata found in the artifact
 of the ``Message`` library task. In the example, the ``Message`` library sets up
 an include path to its published header file while linking metadata is
-automatically provided by ``CXXLibrary``.
+automatically provided by ``CXXLibrary.publish``.
 
 The ``cxxinfo`` artifact metadata can be used with other build systems too,
-such as CMake and Autotools. It enables your Ninja tasks to stay oblivious to
+such as CMake, Meson and Autotools. It enables your Ninja tasks to stay oblivious to
 whatever build system their dependencies use as long as binary compatibility
 is guaranteed.
 
@@ -475,7 +490,7 @@ that a chain of dependencies stay compatible you could inject a synthetic
 toolchain task at the bottom of your dependency tree and use it to control
 all compiler options. This methods also enables easy cross-compilation.
 
-First, define a toolchain:
+First, define a toolchain task:
 
 .. code-block:: python
 
@@ -512,5 +527,5 @@ to build the ``HelloWorld`` task for the ARM architecture, run:
 
 The ``-d toolchain:arch=arm`` command line argument instructs Jolt to overide
 the default value of the ``arch`` parameter of the ``toolchain`` task. The new
-value changes the identity of the toolchain artifact which will have a rippling
-effect and trigger a rebuild of all tasks in the dependency tree.
+value changes the identity of the toolchain artifact which triggers a
+rebuild of all depending tasks.

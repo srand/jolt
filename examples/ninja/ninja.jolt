@@ -40,6 +40,8 @@ class Lib(CXXLibrary):
     requires = "toolchain"
     sources = "lib/*"
     rename = Rule("cp $in $out", files=[".x"], suffix=".c")
+    recipient = Parameter("world")
+    macros = ['RECIPIENT="{recipient}"']
 
     def publish(self, artifact, tools):
         super(Lib, self).publish(artifact, tools)

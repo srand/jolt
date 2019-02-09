@@ -24,7 +24,7 @@ The ``[jolt]`` config section contains global configuration.
   configured limit. Artifacts which are required to execute a task currently
   present in the dependency tree are never evicted. Therefore, it may not be
   possible for Jolt to evict enough artifacts to reach the limit. Consider
-  this size advisory. The size is specified in bytes and SI prefixes such as
+  this size advisory. The size is specified in bytes and SI suffixes such as
   K, M and G are supported. Example: ``cachesize = 5G``
 
 * ``colors = <boolean>``
