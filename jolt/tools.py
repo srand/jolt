@@ -25,6 +25,7 @@ def _run(cmd, cwd, env, *args, **kwargs):
     output = False if output_on_error else output
     p = subprocess.Popen(
         cmd,
+        stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         shell=True,

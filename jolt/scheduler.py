@@ -25,8 +25,12 @@ class TaskQueue(object):
     def __init__(self, strategy):
         self.futures = {}
         self.strategy = strategy
+        self._aborted = False
 
     def submit(self, cache, task):
+        if self._aborted:
+            return None
+
         env = JoltEnvironment(cache=cache)
         executor = self.strategy.create_executor(task)
         assert executor, "no executor can execute the task; "\
@@ -51,6 +55,7 @@ class TaskQueue(object):
         return None, None
 
     def abort(self):
+        self._aborted = True
         for future, task in self.futures.items():
             task.info("Execution cancelled")
             future.cancel()
