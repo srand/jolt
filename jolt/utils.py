@@ -14,6 +14,11 @@ if sys.version_info[0] == 3:
 else:
     read_input = raw_input
 
+try:
+    from inspect import getattr_static
+    getattr_safe = getattr_static
+except:
+    getattr_safe = getattr
 
 def is_str(s):
     try:

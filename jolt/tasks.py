@@ -308,7 +308,7 @@ class TaskBase(object):
 
     def _get_parameter_objects(self, unset=False):
         return { key: getattr(self, key) for key in dir(self)
-                 if isinstance(getattr(self, key), Parameter) }
+                 if isinstance(utils.getattr_safe(self, key), Parameter) }
 
     def _get_parameters(self, unset=False):
         return {key: param.get_value()

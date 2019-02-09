@@ -1,7 +1,7 @@
 import platform
-
 from jolt.tasks import *
 from jolt import influence
+from jolt import utils
 
 import ninja_syntax as ninja
 
@@ -194,7 +194,7 @@ class Toolchain(object):
     @staticmethod
     def all_rules(cls):
         return [(key, getattr(cls, key)) for key in dir(cls)
-                if isinstance(getattr(cls, key), Rule)]
+                if isinstance(utils.getattr_safe(cls, key), Rule)]
 
     def find_rule(self, ext):
         rule = self._rule_map.get(ext)
@@ -204,7 +204,7 @@ class Toolchain(object):
     @staticmethod
     def all_variables(cls):
         return [(key, getattr(cls, key)) for key in dir(cls)
-                if isinstance(getattr(cls, key), Variable)]
+                if isinstance(utils.getattr_safe(cls, key), Variable)]
 
 
 class Macros(Variable):
