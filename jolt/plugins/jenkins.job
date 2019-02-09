@@ -80,9 +80,9 @@ if [ -n "$jolt_url" ]; then
     mkdir -p $jolt_dir/src $jolt_dir/tgz
     curl -o $jolt_dir/tgz/jolt.tgz $jolt_url
     tar -xzvf $jolt_dir/tgz/jolt.tgz -C $jolt_dir/src
-    virtualenv $jolt_dir/env
+    virtualenv -p python3 $jolt_dir/env
     . $jolt_dir/env/bin/activate
-    pip install -e $jolt_dir/src || rm -rf $jolt_dir
+    pip3 install -e $jolt_dir/src || rm -rf $jolt_dir
   else
     . $jolt_dir/env/bin/activate
   fi
