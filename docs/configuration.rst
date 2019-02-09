@@ -25,7 +25,8 @@ The ``[jolt]`` config section contains global configuration.
   present in the dependency tree are never evicted. Therefore, it may not be
   possible for Jolt to evict enough artifacts to reach the limit. Consider
   this size advisory. The size is specified in bytes and SI suffixes such as
-  K, M and G are supported. Example: ``cachesize = 5G``
+  K, M and G are supported. Example: ``cachesize = 5G``. The default size is
+  1G.
 
 * ``colors = <boolean>``
 
@@ -40,8 +41,8 @@ The ``[jolt]`` config section contains global configuration.
 
 * ``log = <filepath>``
 
-  Location of Jolt's logfile. By default, the logfile is written in the
-  installation directory.
+  Location of Jolt's logfile. By default, the logfile is written in
+  ``$HOME/.jolt/jolt.log``.
 
 * ``upload = <boolean>``
 
