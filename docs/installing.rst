@@ -7,7 +7,7 @@ There are several methods to install Jolt, but the recommendation is to use ``pi
 Prerequisites
 -------------
 
-You need a working installation of Python 2.7 or Python 3.X to run Jolt.
+You need a working installation of Python 3.2+ (or deprecated 2.7) to run Jolt.
 Plugins can have additional requirements. Consult plugin documentation for details.
 
 
