@@ -30,6 +30,8 @@ class JenkinsServer(object):
         self.get_build_console_output = self._server.get_build_console_output
         self.get_queue_item = self._server.get_queue_item
         self.build_job = self._server.build_job
+        self.stop_build = self._server.stop_build
+        self.cancel_queue = self._server.cancel_queue
         try:
             self._ok = self._check_job()
         except:
@@ -136,6 +138,14 @@ class JenkinsExecutor(scheduler.NetworkExecutor):
         return self.server.build_job(self.job, parameters)
 
     @utils.retried.on_exception((ConnectionError, ReadTimeout))
+    def _cancel_queue(self, queue_id):
+        return self.server.cancel_queue(queue_id)
+
+    @utils.retried.on_exception((ConnectionError, ReadTimeout))
+    def _stop_build(self, build_id):
+        return self.server.stop_build(self.job, build_id)
+
+    @utils.retried.on_exception((ConnectionError, ReadTimeout))
     def _get_console_log(self, build_id):
         if not config.getboolean(NAME, "console", True):
             return
@@ -171,6 +181,9 @@ class JenkinsExecutor(scheduler.NetworkExecutor):
             assert not queue_info.get("cancelled"),\
             "[JENKINS] {0} failed with status CANCELLED".format(
                 self.task.qualified_name)
+            if self.is_aborted():
+                self._cancel_queue(queue_id)
+                assert False, "[JENKINS] execution cancelled"
             time.sleep(5)
             queue_info = self._get_queue_item(queue_id)
 
@@ -179,6 +192,9 @@ class JenkinsExecutor(scheduler.NetworkExecutor):
         build_id = queue_info["executable"]["number"]
         build_info = self._get_build_info(build_id)
         while build_info["result"] not in ["SUCCESS", "FAILURE", "ABORTED"]:
+            if self.is_aborted():
+                self._stop_build(build_id)
+                assert False, "[JENKINS] execution cancelled"
             time.sleep(5)
             build_info = self._get_build_info(build_id)
 

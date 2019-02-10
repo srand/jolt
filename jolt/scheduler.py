@@ -60,8 +60,11 @@ class TaskQueue(object):
             task.info("Execution cancelled")
             future.cancel()
         if len(self.futures):
-            log.info("Waiting for tasks to finish")
+            log.info("Waiting for tasks to finish, please be patient")
         self.strategy.executors.shutdown()
+
+    def is_aborted(self):
+        return self._aborted
 
     def in_progress(self, task):
         return task in self.futures.values()
@@ -73,6 +76,9 @@ class Executor(object):
 
     def submit(self, env):
         return self.factory.submit(self, env)
+
+    def is_aborted(self):
+        return self.factory.is_aborted()
 
     def run(self, env):
         pass
@@ -232,15 +238,27 @@ class ExecutorFactory(object):
 
     def __init__(self, num_workers=None):
         self.pool = ThreadPoolExecutor(max_workers=num_workers)
+        self._aborted = False
+
+    def is_aborted(self):
+        return self._aborted
 
     def shutdown(self):
+        self._aborted = True
         self.pool.shutdown()
 
     def create(self, task):
         raise NotImplemented()
 
+    def _run(self, executor, env):
+        try:
+            if not self.is_aborted():
+                executor.run(env)
+        except KeyboardInterrupt:
+            assert False, "Interrupted by user"
+
     def submit(self, executor, env):
-        return self.pool.submit(partial(executor.run, env))
+        return self.pool.submit(partial(self._run, executor, env))
 
 
 

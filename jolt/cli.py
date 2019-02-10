@@ -131,25 +131,29 @@ def build(task, network, keep_going, identity, default, local,
 
     queue = scheduler.TaskQueue(strategy)
 
-    def signal_handle(_signal, frame):
-        print('You pressed Ctrl+C!')
-        queue.abort()
-    signal.signal(signal.SIGINT, signal_handle)
+    try:
+        while dag.has_tasks():
+            leafs = dag.select(lambda graph, task: task.is_ready())
+            while leafs:
+                task = leafs.pop()
+                queue.submit(acache, task)
 
-    while dag.has_tasks():
-        leafs = dag.select(lambda graph, task: task.is_ready())
-        while leafs:
-            task = leafs.pop()
-            queue.submit(acache, task)
+            task, error = queue.wait()
+            if not task:
+                dag.debug()
+                assert task, "no more tasks in progress, only blocked tasks remain"
 
-        task, error = queue.wait()
-        if not task:
-            dag.debug()
-            assert task, "no more tasks in progress, only blocked tasks remain"
-
-        if not keep_going and error is not None:
+            if not keep_going and error is not None:
+                queue.abort()
+                raise error
+    except KeyboardInterrupt:
+        log.warn("Interrupted by user")
+        try:
             queue.abort()
-            raise error
+            return
+        except KeyboardInterrupt:
+            log.warn("Interrupted again, exiting")
+            os._exit(1)
 
 
 @cli.command()

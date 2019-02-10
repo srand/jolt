@@ -8,6 +8,9 @@ from jolt import log
 def main():
     try:
         cli.cli()
+    except KeyboardInterrupt as e:
+        log.warn("Interrupted by user")
+        sys.exit(1)
     except Exception as e:
         log.exception(e)
         sys.exit(1)
