@@ -138,6 +138,10 @@ These configuration keys exist:
   Optional. Name of a Jenkins view to add the automatically created job to.
   The view must exist.
 
+* ``workers`` -
+  Optional. The maximum number of tasks Jolt is allowed to run in parallel.
+  Defaults to 16.
+
 * ``keyring.username`` -
   Username to use when authenticating with Jenkins.
 

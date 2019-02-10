@@ -236,8 +236,8 @@ class ExecutorFactory(object):
         ExecutorRegistry.executor_factories.insert(0, cls)
         return cls
 
-    def __init__(self, num_workers=None):
-        self.pool = ThreadPoolExecutor(max_workers=num_workers)
+    def __init__(self, max_workers=None):
+        self.pool = ThreadPoolExecutor(max_workers=max_workers)
         self._aborted = False
 
     def is_aborted(self):
@@ -264,7 +264,7 @@ class ExecutorFactory(object):
 
 class LocalExecutorFactory(ExecutorFactory):
     def __init__(self, options=None):
-        super(LocalExecutorFactory, self).__init__(num_workers=1)
+        super(LocalExecutorFactory, self).__init__(max_workers=1)
         self._options = options or JoltOptions()
 
     def create(self, task):
@@ -272,7 +272,8 @@ class LocalExecutorFactory(ExecutorFactory):
 
 
 class NetworkExecutorFactory(ExecutorFactory):
-    pass
+    def __init__(self, *args, **kwargs):
+        super(NetworkExecutorFactory, self).__init__(*args, **kwargs)
 
 
 class ExecutionStrategy(object):

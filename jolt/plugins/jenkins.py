@@ -245,7 +245,8 @@ class JenkinsExecutor(scheduler.NetworkExecutor):
 @scheduler.ExecutorFactory.Register
 class JenkinsExecutorFactory(scheduler.NetworkExecutorFactory):
     def __init__(self, options):
-        super(JenkinsExecutorFactory, self).__init__()
+        workers = config.get(NAME, "workers", 16)
+        super(JenkinsExecutorFactory, self).__init__(max_workers=workers)
         self._options = options
 
     @property
