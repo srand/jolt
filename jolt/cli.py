@@ -51,8 +51,14 @@ def cli(verbose, extra_verbose, config_file):
         TaskRegistry.get().add_test_class(cls)
 
 
+def _autocomplete_tasks(ctx, args, incomplete):
+    tasks, tests = loader.JoltLoader.get().load()
+    tasks = [task.name for task in tasks + tests if task.name.startswith(incomplete or '')]
+    return tasks
+
+
 @cli.command()
-@click.argument("task", type=str, nargs=-1, required=True)
+@click.argument("task", type=str, nargs=-1, required=True, autocompletion=_autocomplete_tasks)
 @click.option("-n", "--network", is_flag=True, default=False, help="Build on network.")
 @click.option("-l", "--local", is_flag=True, default=False, help="Disable all network operations.")
 @click.option("-k", "--keep-going", is_flag=True, default=False, help="Build as many tasks as possible, don't abort on first failure.")
@@ -157,7 +163,7 @@ def build(task, network, keep_going, identity, default, local,
 
 
 @cli.command()
-@click.argument("task", type=str, nargs=-1, required=False)
+@click.argument("task", type=str, nargs=-1, required=False, autocompletion=_autocomplete_tasks)
 def clean(task):
     """
     Remove (task artifact from) local cache.
@@ -178,7 +184,7 @@ def clean(task):
 
 
 @cli.command()
-@click.argument("task", type=str, nargs=-1, required=False)
+@click.argument("task", type=str, nargs=-1, required=False, autocompletion=_autocomplete_tasks)
 @click.option("-p", "--prune", is_flag=True, help="Omit tasks with cached artifacts.")
 def display(task, prune):
     """
@@ -209,10 +215,10 @@ def docs(follow, delete):
     webbrowser.open("http://jolt.readthedocs.io/")
 
 
-@cli.command()
-@click.argument("task", type=str, nargs=-1, required=False)
+@cli.command(name="list")
+@click.argument("task", type=str, nargs=-1, required=False, autocompletion=_autocomplete_tasks)
 @click.option("-a", "--all", is_flag=True, help="Print all tasks recursively")
-def list(task=None, reverse=False, all=False):
+def _list(task=None, reverse=False, all=False):
     """
     List all tasks, or dependencies of a specific task.
 
@@ -257,7 +263,7 @@ def _log(follow, delete):
 
 
 @cli.command()
-@click.argument("task")
+@click.argument("task", autocompletion=_autocomplete_tasks)
 @click.option("-i", "--influence", is_flag=True, help="Print task influence.")
 @click.option("-a", "--artifacts", is_flag=True, help="Print task artifact status.")
 def info(task, influence=False, artifacts=False):
