@@ -1,4 +1,5 @@
 from __future__ import print_function
+import os
 import sys
 import tqdm
 import traceback
@@ -7,6 +8,11 @@ from datetime import datetime
 from jolt import config
 from jolt import filesystem as fs
 from jolt import colors
+
+
+_stdout = os.fdopen(os.dup(sys.__stdout__.fileno()), "w")
+_stderr = os.fdopen(os.dup(sys.__stderr__.fileno()), "w")
+
 
 ERROR = 0
 WARN = 1
@@ -66,23 +72,23 @@ def set_level(level):
     _loglevel = level
 
 def info(fmt, *args, **kwargs):
-    _log(NORMAL, sys.stdout, fmt, *args, **kwargs)
+    _log(NORMAL, _stdout, fmt, *args, **kwargs)
 
 def warn(fmt, *args, **kwargs):
-    _log(WARN, sys.stdout, colors.yellow(fmt), *args, **kwargs)
+    _log(WARN, _stdout, colors.yellow(fmt), *args, **kwargs)
 
 def verbose(fmt, *args, **kwargs):
-    _log(VERBOSE, sys.stdout, fmt, *args, **kwargs)
+    _log(VERBOSE, _stdout, fmt, *args, **kwargs)
 
 def hysterical(fmt, *args, **kwargs):
-    _log(HYSTERICAL, sys.stdout, fmt, *args, **kwargs)
+    _log(HYSTERICAL, _stdout, fmt, *args, **kwargs)
 
 def error(fmt, *args, **kwargs):
-    _log(ERROR, sys.stdout, colors.red(fmt), *args, **kwargs)
+    _log(ERROR, _stdout, colors.red(fmt), *args, **kwargs)
 
 def exception(exc=None):
     if exc:
-        _streamwrite(sys.stderr, "[ERROR] " + colors.red(str(exc)))
+        _streamwrite(_stderr, "[ERROR] " + colors.red(str(exc)))
         _streamwrite_file(_file, "[ERROR] " + str(exc))
     backtrace = traceback.format_exc()
     for line in backtrace.splitlines():
@@ -93,7 +99,7 @@ def stdout(fmt, *args, **kwargs):
         line = utils.expand(fmt, *args, ignore_errors=True, **kwargs)
     except:
         line = fmt
-    _streamwrite(sys.stdout, _prefix(None, **kwargs) + line)
+    _streamwrite(_stdout, _prefix(None, **kwargs) + line)
     _streamwrite_file(_file, _prefix("STDOUT", **kwargs) + line)
 
 def stderr(fmt, *args, **kwargs):
@@ -101,7 +107,7 @@ def stderr(fmt, *args, **kwargs):
         line = utils.expand(fmt, *args, ignore_errors=True, **kwargs)
     except:
         line = fmt
-    _streamwrite(sys.stderr, line)
+    _streamwrite(_stderr, line)
     _streamwrite_file(_file, "[STDERR] " + line)
 
 def progress(desc, count, unit):
