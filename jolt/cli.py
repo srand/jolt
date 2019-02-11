@@ -200,9 +200,14 @@ def display(task, prune):
         acache = cache.ArtifactCache.get()
         dag.prune(lambda graph, task: task.is_available_locally(acache) or task.is_resource())
     if dag.has_tasks():
-        gb.display()
+        try:
+            gb.display()
+        except Exception as e:
+            if "requires pygraphviz" in str(e):
+                assert False, "this features requires pygraphviz, please install it"
+            assert False, "an exception occurred during task dependency evaluation, see log for details"
     else:
-        log.info("No tasks to display")
+        log.info("no tasks to display")
 
 
 @cli.command()
@@ -235,7 +240,11 @@ def _list(task=None, reverse=False, all=False):
                 print(task.name)
         return
 
-    dag = graph.GraphBuilder(registry).build(task)
+    try:
+        dag = graph.GraphBuilder(registry).build(task)
+    except:
+        assert False, "an exception occurred during task dependency evaluation, see log for details"
+
     tasks = dag.select(lambda graph, node: \
                        node.short_qualified_name in task or \
                        node.qualified_name in task)

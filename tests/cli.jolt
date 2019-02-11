@@ -57,8 +57,12 @@ class InfoTaskReqFuncParam(Task):
     name = "test/cli/reqfuncparam"
     arg1 = Parameter()
 
+    @property
+    def something(self):
+        return str(len(self.arg1.get_value()))
+
     def requires(self):
-        return "test/cli/infotask:arg1={arg1}"
+        return "test/cli/infotask:arg1={arg1}{something}"
 
 
 class InfoTaskRaising(Task):
