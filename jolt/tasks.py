@@ -306,6 +306,7 @@ class TaskBase(object):
             assert not param.is_required() or not param.is_unset(), \
                 "required parameter '{0}' has not been set for '{1}'".format(key, self.name)
 
+    @utils.cached.instance
     def _get_parameter_objects(self, unset=False):
         return { key: getattr(self, key) for key in dir(self)
                  if isinstance(utils.getattr_safe(self, key), Parameter) }
