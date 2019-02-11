@@ -35,19 +35,101 @@ class _HiddenTest(Test):
     pass
 
 
+class InfoTaskParam(Task):
+    name = "test/cli/infotask"
+    arg1 = Parameter(help="helptext")
+
+
+class InfoTaskReqFunc(Task):
+    name = "test/cli/reqfunc"
+
+    def requires(self):
+        return ["pass"]
+
+
+class InfoTaskReqParam(Task):
+    name = "test/cli/reqparam"
+    arg1 = Parameter()
+    requires = "test/cli/infotask:arg1={arg1}"
+
+
+class InfoTaskReqFuncParam(Task):
+    name = "test/cli/reqfuncparam"
+    arg1 = Parameter()
+
+    def requires(self):
+        return "test/cli/infotask:arg1={arg1}"
+
+
+class InfoTaskRaising(Task):
+    name = "test/cli/raise"
+
+    def requires(self):
+        raise "broken"
+
+
 class Cli(Test):
     name = "test/cli"
 
     def jolt(self, cmd, *args, **kwargs):
-        self.tools.run("jolt " + cmd, *args, **kwargs)
+        return self.tools.run("jolt " + cmd, *args, **kwargs)
 
     def test_return_value(self):
-        self.jolt("build pass")
+        self.jolt("build -l pass")
         with self.assertRaises(Exception):
-            self.jolt("build fail")
+            self.jolt("build -l fail")
 
     def test_list_hidden(self):
         with self.assertRaises(Exception):
             self.jolt("list _hiddentask")
         with self.assertRaises(Exception):
             self.jolt("list _hiddentest")
+
+    def test_list(self):
+        output = self.jolt("list")
+        self.assertIn("test/cli\n", output)
+        self.assertTrue(output.endswith("tests"))
+
+    def test_list_dependencies(self):
+        output = self.jolt("list tests")
+        self.assertIn("test/cli\n", output)
+
+    def test_info_invalid(self):
+        with self.assertRaises(Exception):
+            self.jolt("info non-existing-task")
+
+    def test_info_tests(self):
+        output = self.jolt("info tests")
+        self.assertIn("Parameters\n    None", output)
+
+    def test_info_parameterized(self):
+        output = self.jolt("info test/cli/infotask")
+        self.assertIn("Parameters\n    arg1", output)
+        self.assertIn("helptext", output)
+
+    def test_info_requirements_func(self):
+        output = self.jolt("info test/cli/reqfunc")
+        self.assertIn("Requirements\n    pass", output)
+
+    def test_info_requirements_param_error(self):
+        output = self.jolt("info test/cli/reqfuncparam")
+        self.assertIn("Unavailable", output)
+
+    def test_info_requirements_param_ok(self):
+        output = self.jolt("info test/cli/reqparam:arg1=testvalue")
+        self.assertIn("Parameters\n    arg1", output)
+        self.assertIn("Requirements\n    test/cli/infotask:arg1=testvalue", output)
+
+    def test_info_requirements_funcparam_error(self):
+        output = self.jolt("info test/cli/reqfuncparam")
+        self.assertIn("Unavailable", output)
+
+    def test_info_requirements_funcparam_ok(self):
+        output = self.jolt("info test/cli/reqfuncparam:arg1=testvalue")
+        self.assertIn("Parameters\n    arg1", output)
+        self.assertIn("Requirements\n    test/cli/infotask:arg1=testvalue", output)
+
+    def test_info_requirements_exception(self):
+        output = self.jolt("info test/cli/raise")
+        self.assertIn("Parameters\n    None", output)
+        self.assertIn("Unavailable", output)

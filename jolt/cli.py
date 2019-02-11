@@ -236,13 +236,16 @@ def _list(task=None, reverse=False, all=False):
         return
 
     dag = graph.GraphBuilder(registry).build(task)
-    tasks = dag.select(lambda graph, node: node.short_qualified_name in task)
+    tasks = dag.select(lambda graph, node: \
+                       node.short_qualified_name in task or \
+                       node.qualified_name in task)
     successors = set()
     for task in tasks:
-        map(successors.add, dag.successors(task))
+        for successor in dag.successors(task):
+            successors.add(successor.qualified_name)
 
-    for task in sorted(successors):
-        print(task.qualified_name)
+    for task in sorted(list(successors)):
+        print(task)
 
 
 @cli.command(name="log")
@@ -273,8 +276,10 @@ def info(task, influence=False, artifacts=False):
     <WIP>
     """
     task_name = task
+    task_cls_name, task_params = utils.parse_task_name(task_name)
     task_registry = TaskRegistry.get()
-    task = task_registry.get_task_class(task_name)
+    task = task_registry.get_task_class(task_cls_name)
+    assert task, "no such task: {0}".format(task_name)
 
     click.echo()
     click.echo("  {0}".format(task.name))
@@ -293,14 +298,23 @@ def info(task, influence=False, artifacts=False):
 
     click.echo()
     click.echo("  Requirements")
-    for req in task.requires:
-        click.echo("    {0}".format(req))
-    if not task.requires:
-        click.echo("    None")
-    click.echo()
+    try:
+        task = task_registry.get_task(task_name)
+        for req in utils.as_list(utils.call_or_return(task, task.requires)):
+            click.echo("    {0}".format(task.tools.expand(req)))
+        if not task.requires:
+            click.echo("    None")
+        click.echo()
+    except Exception as e:
+        if "has not been set" in str(e):
+            click.echo("    Unavailable (parameters must be set)")
+            click.echo()
+            return
+        click.echo("    Unavailable (exception during evaluation)")
+        click.echo()
+
 
     if artifacts:
-        task = task_registry.get_task(task_name)
         acache = cache.ArtifactCache.get()
         dag = graph.GraphBuilder(task_registry).build(
             [utils.format_task_name(task.name, task._get_parameters())])
