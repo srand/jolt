@@ -54,7 +54,7 @@ def cli(verbose, extra_verbose, config_file):
 def _autocomplete_tasks(ctx, args, incomplete):
     tasks, tests = loader.JoltLoader.get().load()
     tasks = [task.name for task in tasks + tests if task.name.startswith(incomplete or '')]
-    return tasks
+    return sorted(tasks)
 
 
 @cli.command()
