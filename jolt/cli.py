@@ -81,6 +81,8 @@ def build(task, network, keep_going, identity, default, local,
 
     <WIP>
     """
+    duration = utils.duration()
+
     if network:
         download = config.getboolean("network", "download", True)
         upload = config.getboolean("network", "upload", True)
@@ -138,6 +140,9 @@ def build(task, network, keep_going, identity, default, local,
     queue = scheduler.TaskQueue(strategy)
 
     try:
+        if not dag.has_tasks():
+            return
+
         while dag.has_tasks():
             leafs = dag.select(lambda graph, task: task.is_ready())
             while leafs:
@@ -152,6 +157,8 @@ def build(task, network, keep_going, identity, default, local,
             if not keep_going and error is not None:
                 queue.abort()
                 raise error
+
+        log.info("Total execution time: {0}", str(duration))
     except KeyboardInterrupt:
         log.warn("Interrupted by user")
         try:
