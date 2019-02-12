@@ -282,7 +282,7 @@ class Artifact(object):
             content = json.loads(f.read().decode())
             self._size = content["size"]
             self._unpacked = content["unpacked"]
-            self._uploadable = content.get("uploadable", "true") == "true"
+            self._uploadable = content.get("uploadable", True)
             ArtifactAttributeSetRegistry.parse_all(self, content)
 
     def _get_size(self):
