@@ -82,6 +82,9 @@ def format_task_name(name, params):
     params = sorted([(key, value) for key, value in params.items()], key=lambda x: x[0])
     return "{0}:{1}".format(name, ",".join([_param(key, value) for key, value in params]))
 
+def stable_task_name(name):
+    task, params = parse_task_name(name)
+    return format_task_name(task, params)
 
 class _SafeDict(object):
     def __init__(self, values, ignore_errors=False):

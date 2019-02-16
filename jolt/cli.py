@@ -179,6 +179,7 @@ def clean(task):
     """
     acache = cache.ArtifactCache.get()
     if task:
+        task = [utils.stable_task_name(t) for t in task]
         registry = TaskRegistry.get()
         dag = graph.GraphBuilder(registry).build(task)
         tasks = dag.select(
