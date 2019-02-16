@@ -11,12 +11,12 @@ class Toolchain(Task):
     def publish(self, artifact, tools):
         cflags = ""
         if self.debug.is_true:
-	    cflags += " -g"
-	    cflags += {"no": " -O0",
+            cflags += " -g"
+            cflags += {"no": " -O0",
                        "debug": " -Og"}\
                        .get(str(self.optimize), " -Og")
         else:
-	    cflags += {"no": " -O0",
+            cflags += {"no": " -O0",
                        "debug": " -Og",
                        "size": " -Os",
                        "speed": " -Ofast",

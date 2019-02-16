@@ -26,6 +26,12 @@ def is_str(s):
     except NameError:
         return type(s) == str
 
+def decode_str(s):
+    try:
+        return s.decode()
+    except:
+        return s
+
 def as_list(t):
     return [t] if type(t) == str else list(t)
 

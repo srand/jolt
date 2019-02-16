@@ -279,7 +279,8 @@ class Artifact(object):
             return
         manifest = fs.path.join(self._path, ".manifest.json")
         with open(manifest, "rb") as f:
-            content = json.loads(f.read().decode())
+            data = utils.decode_str(f.read())
+            content = json.loads(data)
             self._size = content["size"]
             self._unpacked = content["unpacked"]
             self._uploadable = content.get("uploadable", True)
@@ -581,7 +582,8 @@ class CacheStats(object):
 
     def load(self):
         with open(self.path) as f:
-            self.stats = json.loads(f.read().decode())
+            data = utils.decode_str(f.read())
+            self.stats = json.loads(data)
 
         deleted = []
         for artifact, stats in self.stats.items():

@@ -705,7 +705,7 @@ class Tools(object):
         replace = self.expand(replace)
         try:
             with open(pathname) as f:
-                data = f.read().decode()
+                data = utils.decode_str(f.read())
             data = data.replace(search, replace)
             with open(pathname, "wb") as f:
                 f.write(data.encode())
