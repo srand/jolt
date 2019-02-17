@@ -15,7 +15,7 @@ def main():
     signal.signal(signal.SIGUSR1, start_pdb)
 
     try:
-        cli.cli()
+        cli.cli(obj={})
     except KeyboardInterrupt as e:
         log.warn("Interrupted by user")
         sys.exit(1)

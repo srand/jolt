@@ -14,10 +14,13 @@ from jolt.tps.jenkins import Jenkins
 from jolt import log
 from jolt import loader
 from jolt import filesystem as fs
+from jolt.manifest import JoltManifest
+
 
 NAME = "jenkins"
 TYPE = "Remote execution"
 TIMEOUT = (3.5, 27)
+POLL_INTERVAL = 1
 
 
 @utils.Singleton
@@ -165,12 +168,13 @@ class JenkinsExecutor(scheduler.NetworkExecutor):
         task += [t.qualified_name for t in self.task.extensions]
 
         parameters = {
-            "joltfile": loader.JoltLoader.get().get_sources(),
             "task": " ".join(task),
             "task_identity": self.task.identity[:8],
             "task_default": " ".join(["-d {0}".format(d) for d in self.factory.options.default])
         }
-        parameters.update(scheduler.ExecutorRegistry.get().get_network_parameters(self.task))
+        registry = scheduler.ExecutorRegistry.get()
+        parameters.update(registry.get_network_parameters(self.task))
+        parameters["jolt_manifest"] = JoltManifest.export(self.task).format()
 
         queue_id = self._build_job(parameters)
 
@@ -184,7 +188,7 @@ class JenkinsExecutor(scheduler.NetworkExecutor):
             if self.is_aborted():
                 self._cancel_queue(queue_id)
                 assert False, "[JENKINS] execution cancelled"
-            time.sleep(5)
+            time.sleep(POLL_INTERVAL)
             queue_info = self._get_queue_item(queue_id)
 
         log.verbose("[JENKINS] Executing {0}", self.task.qualified_name)
@@ -199,7 +203,7 @@ class JenkinsExecutor(scheduler.NetworkExecutor):
             if self.is_aborted():
                 self._stop_build(build_id)
                 assert False, "[JENKINS] execution cancelled"
-            time.sleep(5)
+            time.sleep(POLL_INTERVAL)
             build_info = self._get_build_info(build_id)
 
         log.verbose("[JENKINS] Finished {0}", self.task.qualified_name)

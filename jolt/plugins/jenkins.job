@@ -43,6 +43,12 @@
           <trim>false</trim>
         </hudson.model.StringParameterDefinition>
         <hudson.model.TextParameterDefinition>
+          <name>jolt_manifest</name>
+          <description></description>
+          <defaultValue></defaultValue>
+          <trim>false</trim>
+        </hudson.model.TextParameterDefinition>
+        <hudson.model.TextParameterDefinition>
           <name>config</name>
           <description></description>
           <defaultValue>{{ config }}</defaultValue>
@@ -73,6 +79,8 @@
     </hudson.plugins.descriptionsetter.DescriptionSetterBuilder>
     <hudson.tasks.Shell>
       <command>
+set +x
+
 if [ -n "$jolt_url" ]; then
   jolt_dir=jolt-$jolt_identity
 
@@ -88,12 +96,12 @@ if [ -n "$jolt_url" ]; then
   fi
 fi
 
-set +x
+rm -f *.jolt
+
 /bin/echo -E &quot;$config&quot; &gt; jolt.conf
-/bin/echo -E &quot;$joltfile&quot; &gt; tasks.jolt
+/bin/echo -E &quot;$jolt_manifest&quot; &gt; default.joltxmanifest
 set -x
 
-jolt -vv -c jolt.conf clean $task
 jolt -vv -c jolt.conf build -i $task_identity --worker $task_default $task</command>
     </hudson.tasks.Shell>
   </builders>

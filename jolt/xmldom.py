@@ -12,9 +12,35 @@ class SubElement(object):
         super(SubElement, self).__init__()
         self._elem = elem if elem is not None else Element(tag)
 
+    def append(self, e, *args, **kwargs):
+        return self._elem.append(e._elem, *args, **kwargs)
+
     @property
     def attrib(self):
         return self._elem.attrib
+
+    @property
+    def tag(self):
+        return self._elem.tag
+
+    @property
+    def text(self):
+        return self._elem.text
+
+    @text.setter
+    def text(self, value):
+        self._elem.text = value
+
+    @property
+    def items(self):
+        return self._elem.items
+
+    @property
+    def tail(self):
+        return self._elem.tail
+
+    def __len__(self):
+        return len(self._elem)
 
     def get(self, *args, **kwargs):
         return self._elem.get(*args, **kwargs)
@@ -22,6 +48,8 @@ class SubElement(object):
     def set(self, *args, **kwargs):
         return self._elem.set(*args, **kwargs)
 
+    def iter(self, *args, **kwargs):
+        return self._elem.iter(*args, **kwargs)
 
 
 class Attribute(object):
@@ -55,8 +83,9 @@ class Attribute(object):
 
             def child_get(self):
                 if not hasattr(self, '_'+varname):
-                    return ''
-                return getattr(self, '_'+varname).text
+                    e = SubElement(attribute, elem=self._elem.find(attribute))
+                    setattr(self, '_'+varname, e)
+                return str(getattr(self, '_'+varname).text)
 
             def child_set(self, value):
                 _check_value(value, values)
@@ -84,7 +113,7 @@ class Composition(object):
         def decorate(cls, comp_cls, name):
             def create(self, *args, **kwargs):
                 child = comp_cls(*args, **kwargs)
-                self.append(child)
+                self.append(child._elem)
                 return child
 
             @property

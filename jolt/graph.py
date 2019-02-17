@@ -28,6 +28,8 @@ class TaskProxy(object):
         self._extended_task = None
         self._in_progress = False
         self._completed = False
+        self._identity = None
+        self._frozen = False
 
     def __hash__(self):
         return id(self)
@@ -61,8 +63,10 @@ class TaskProxy(object):
         return "({0} {1})".format(self.short_qualified_name, self.identity[:8])
 
     @property
-    @cached.instance
     def identity(self):
+        if self._identity is not None:
+            return self._identity
+
         sha = hashlib.sha1()
 
         HashInfluenceRegistry.get().apply_all(self.task, sha)
@@ -74,8 +78,15 @@ class TaskProxy(object):
         if self._extended_task:
             sha.update(self._extended_task.identity.encode())
 
-        self.task.identity = sha.hexdigest()
-        return self.task.identity
+        self._identity = sha.hexdigest()
+        self.task.identity = self._identity
+        return self._identity
+
+    @identity.setter
+    def identity(self, value):
+        self._frozen = True
+        self._identity = value
+        self.task.identity = self._identity
 
     def __str__(self):
         return "{0}{1}".format(self.short_qualified_name, "*" if self.is_extension() else '')
@@ -94,6 +105,9 @@ class TaskProxy(object):
 
     def has_ancestors(self):
         return len(self.ancestors) > 0
+
+    def is_frozen(self):
+        return self._frozen
 
     def is_cacheable(self):
         return self.task.is_cacheable()
@@ -158,8 +172,9 @@ class TaskProxy(object):
     def set_in_progress(self):
         self._in_progress = True
 
-    def finalize(self, dag):
+    def finalize(self, dag, manifest):
         log.verbose("Finalizing: " + self.qualified_name)
+        self.manifest = manifest
 
         # Find all direct and transitive dependencies
         self.children = sorted(
@@ -173,6 +188,11 @@ class TaskProxy(object):
                    self.children))
 
         self.anestors = nx.ancestors(dag, self)
+
+        identity = self.manifest.task_identities.get(self.qualified_name)
+        if identity is not None:
+            self.identity = identity
+
         return self.identity
 
     def started(self, what="Execution"):
@@ -210,6 +230,9 @@ class TaskProxy(object):
             self.warn("Pruned task was executed")
 
     def run(self, cache, force_upload=False, force_build=False):
+        if self.is_frozen():
+            return
+
         with self.tools:
             tasks = [self] + self.extensions
             available_locally = available_remotely = False, False
@@ -279,6 +302,10 @@ class Graph(nx.DiGraph):
         with self._mutex:
             return len(self.nodes) > 0
 
+    def get_task(self, qualified_name):
+        with self._mutex:
+            return self._nodes_by_name.get(qualified_name)
+
     def prune(self, func):
         with self._mutex:
             for node in nx.topological_sort(self):
@@ -317,10 +344,11 @@ class Graph(nx.DiGraph):
 
 
 class GraphBuilder(object):
-    def __init__(self, registry):
+    def __init__(self, registry, manifest):
         self.graph = Graph()
         self.nodes = {}
         self.registry = registry
+        self.manifest = manifest
 
     def _get_node(self, name):
         node = self.nodes.get(name)
@@ -347,12 +375,13 @@ class GraphBuilder(object):
             child = self._get_node(requirement)
             self.graph.add_edges_from([(parent, child)])
 
-        node.finalize(self.graph)
+        node.finalize(self.graph, self.manifest)
         return node
 
     def build(self, task_list):
         proxies = [self._get_node(task) for task in task_list]
         assert nx.is_directed_acyclic_graph(self.graph), "cyclic graph"
+        self.graph._nodes_by_name = self.nodes
         return self.graph
 
     def display(self):

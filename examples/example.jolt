@@ -36,6 +36,7 @@ class HelloWorld(Task):
             artifact.collect("{flavor}/*.so", "bin/", flatten=True)
         artifact.environ.PATH.append("bin")
         artifact.environ.LD_LIBRARY_PATH.append("bin")
+
         artifact.strings.executable = "hello"
 
 
@@ -55,7 +56,7 @@ class TestTask(Task):
         tools.run(hello.strings.executable.get_value())
 
     def unpack(self, artifact, tools):
-    	pass
+        pass
 
 
 class Example(Task):

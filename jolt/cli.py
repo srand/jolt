@@ -17,18 +17,20 @@ from jolt.log import path as log_path
 from jolt import config
 from jolt import plugins
 from jolt.plugins import cxxinfo, environ, strings
-from jolt import loader
+from jolt.loader import JoltLoader
 from jolt import utils
 from jolt.influence import *
 from jolt.options import JoltOptions
 from jolt.hooks import TaskHookRegistry
+from jolt.manifest import JoltManifest
 
 
 @click.group()
 @click.option("-v", "--verbose", is_flag=True, help="Verbose.")
 @click.option("-vv", "--extra-verbose", is_flag=True, help="Verbose.")
 @click.option("-c", "--config-file", type=str, help="Configuration file")
-def cli(verbose, extra_verbose, config_file):
+@click.pass_context
+def cli(ctx, verbose, extra_verbose, config_file):
     """ Jolt - a task execution tool. """
 
     if verbose:
@@ -45,7 +47,15 @@ def cli(verbose, extra_verbose, config_file):
         if fs.path.exists(path):
             imp.load_source("jolt.plugins." + section, path)
 
-    tasks, tests = loader.JoltLoader().get().load()
+    manifest = JoltManifest()
+    try:
+        manifest.parse()
+    except:
+        pass
+    ctx.obj["manifest"] = manifest
+
+    loader = JoltLoader.get()
+    tasks, tests = loader.load(manifest)
     for cls in tasks:
         TaskRegistry.get().add_task_class(cls)
     for cls in tests:
@@ -76,7 +86,8 @@ def _autocomplete_tasks(ctx, args, incomplete):
               help="Run with the worker build strategy", hidden=True)
 @click.option("-d", "--default", type=str, multiple=True, help="Override default parameter values.")
 @click.option("-f", "--force", is_flag=True, default=False, help="Force rebuild.")
-def build(task, network, keep_going, identity, default, local,
+@click.pass_context
+def build(ctx, task, network, keep_going, identity, default, local,
           no_download, no_upload, download, upload, worker, force):
     """
     Execute specified task.
@@ -135,7 +146,9 @@ def build(task, network, keep_going, identity, default, local,
     for params in default:
         registry.set_default_parameters(params)
 
-    gb = graph.GraphBuilder(registry)
+    manifest = ctx.obj["manifest"]
+
+    gb = graph.GraphBuilder(registry, manifest)
     dag = gb.build(task)
 
     # Inform cache about what task artifacts we will need.
@@ -181,7 +194,8 @@ def build(task, network, keep_going, identity, default, local,
 
 @cli.command()
 @click.argument("task", type=str, nargs=-1, required=False, autocompletion=_autocomplete_tasks)
-def clean(task):
+@click.pass_context
+def clean(ctx, task):
     """
     Remove (task artifact from) local cache.
 
@@ -191,7 +205,7 @@ def clean(task):
     if task:
         task = [utils.stable_task_name(t) for t in task]
         registry = TaskRegistry.get()
-        dag = graph.GraphBuilder(registry).build(task)
+        dag = graph.GraphBuilder(registry, ctx.obj["manifest"]).build(task)
         tasks = dag.select(
             lambda graph, node: node.short_qualified_name in task or \
             node.qualified_name in task)
@@ -204,7 +218,8 @@ def clean(task):
 @cli.command()
 @click.argument("task", type=str, nargs=-1, required=False, autocompletion=_autocomplete_tasks)
 @click.option("-p", "--prune", is_flag=True, help="Omit tasks with cached artifacts.")
-def display(task, prune):
+@click.pass_context
+def display(ctx, task, prune):
     """
     Display a task and its dependencies visually.
 
@@ -212,7 +227,7 @@ def display(task, prune):
     """
     options = JoltOptions()
     registry = TaskRegistry.get()
-    gb = graph.GraphBuilder(registry)
+    gb = graph.GraphBuilder(registry, ctx.obj["manifest"])
     dag = gb.build(task)
     if prune:
         acache = cache.ArtifactCache.get()
@@ -238,10 +253,48 @@ def docs(follow, delete):
     webbrowser.open("http://jolt.readthedocs.io/")
 
 
+@cli.command(hidden=True)
+@click.argument("task", type=str, nargs=-1, required=True)
+@click.option("-d", "--default", type=str, multiple=True, help="Override default parameter values.")
+@click.option("-o", "--output", type=str, default="default.joltmanifestx", help="Manifest filename.")
+@click.pass_context
+def freeze(ctx, task, default, output):
+    """
+    Freeze the identity of a task.
+
+    <WIP>
+    """
+    options = JoltOptions(default=default)
+    acache = cache.ArtifactCache.get(options)
+    executors = scheduler.ExecutorRegistry.get(options)
+    registry = TaskRegistry.get()
+
+    for params in default:
+        registry.set_default_parameters(params)
+
+    gb = graph.GraphBuilder(registry, ctx.obj["manifest"])
+    dag = gb.build(task)
+
+    available_in_cache = [
+        (t.is_available_locally(acache) or t.is_available_remotely(acache), t.name)
+        for t in dag.tasks if t.is_cacheable()]
+    assert all(available_in_cache),\
+        "can't freeze '{0}': not available in any cache, build it first"\
+        .format(" ".join(task))
+
+    for task in dag.tasks:
+        if not manifest.has_task(task):
+            manifest_task = manifest.create_task()
+            manifest_task.name = task.qualified_name
+            manifest_task.identity = task.identity
+
+    manifest.write(output)
+
+
 @cli.command(name="list")
 @click.argument("task", type=str, nargs=-1, required=False, autocompletion=_autocomplete_tasks)
-@click.option("-a", "--all", is_flag=True, help="Print all tasks recursively")
-def _list(task=None, reverse=False, all=False):
+@click.pass_context
+def _list(ctx, task=None, reverse=False):
     """
     List all tasks, or dependencies of a specific task.
 
@@ -259,7 +312,7 @@ def _list(task=None, reverse=False, all=False):
         return
 
     try:
-        dag = graph.GraphBuilder(registry).build(task)
+        dag = graph.GraphBuilder(registry, ctx.obj["manifest"]).build(task)
     except:
         assert False, "an exception occurred during task dependency evaluation, see log for details"
 
@@ -296,7 +349,8 @@ def _log(follow, delete):
 @click.argument("task", autocompletion=_autocomplete_tasks)
 @click.option("-i", "--influence", is_flag=True, help="Print task influence.")
 @click.option("-a", "--artifacts", is_flag=True, help="Print task artifact status.")
-def info(task, influence=False, artifacts=False):
+@click.pass_context
+def info(ctx, task, influence=False, artifacts=False):
     """
     View information about a task, including its documentation.
 
@@ -343,7 +397,7 @@ def info(task, influence=False, artifacts=False):
 
     if artifacts:
         acache = cache.ArtifactCache.get()
-        dag = graph.GraphBuilder(task_registry).build(
+        dag = graph.GraphBuilder(task_registry, ctx.obj["manifest"]).build(
             [utils.format_task_name(task.name, task._get_parameters())])
         tasks = dag.select(lambda graph, node: graph.is_root(node))
         assert len(tasks) == 1, "unexpected graph generated"

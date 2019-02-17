@@ -37,7 +37,7 @@ class SelfDeployExtension(NetworkExecutorExtension):
         registry.add_task_class(Jolt)
         acache = ArtifactCache.get()
         env = JoltEnvironment(cache=acache)
-        gb = GraphBuilder(registry)
+        gb = GraphBuilder(registry, JoltManifest())
         dag = gb.build(["jolt"])
         task = dag.select(lambda graph, task: True)
         assert len(task) == 1, "too many selfdeploy tasks found"

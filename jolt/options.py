@@ -8,6 +8,6 @@ class JoltOptions(object):
         self.download = True
         self.upload = True
         self.keep_going = False
-        self.default = None
         self.worker = False
+        self.default = []
         self.__dict__.update(kwargs)

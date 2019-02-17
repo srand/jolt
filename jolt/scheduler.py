@@ -14,6 +14,7 @@ from jolt import cache
 from jolt import log
 from jolt import utils
 from jolt.options import JoltOptions
+from jolt.manifest import *
 
 
 class JoltEnvironment(object):
@@ -376,3 +377,16 @@ class WorkerStrategy(ExecutionStrategy):
             return self.executors.create_downloader(task)
 
         return self.executors.create_local(task)
+
+
+
+class TaskIdentityExtension(ManifestExtension):
+    def export_manifest(self, manifest, task):
+        for child in [task] + task.children:
+            if not child.is_cacheable():
+                continue
+            manifest_task = manifest.create_task()
+            manifest_task.name = child.qualified_name
+            manifest_task.identity = child.identity
+
+ManifestExtensionRegistry.add(TaskIdentityExtension())
