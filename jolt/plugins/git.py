@@ -13,46 +13,118 @@ except:
     has_pygit = False
 
 
+
+class GitRepository(object):
+    def __init__(self, url, path, relpath):
+        self.path = path
+        self.relpath = relpath
+        self.tools = Tools()
+        self.url = url
+
+    @utils.cached.instance
+    def _get_git_folder(self):
+        return fs.path.join(self.path, ".git")
+
+    def is_cloned(self):
+        return fs.path.exists(self._get_git_folder())
+
+    def _is_synced(self):
+        with self.tools.cwd(self.path):
+            return True if self.tools.run("git branch -r --contains HEAD", output_on_error=True) else False
+        return True
+
+    def clone(self):
+        assert not fs.path.exists(self.path), \
+            "destination folder '{0}' already exists but is not a git repo"\
+            .format(self.path)
+        log.info("Cloning into {0}", self.path)
+        self.tools.run("git clone {0} {1}", self.url, self.path, output_on_error=True)
+        assert fs.path.exists(self._get_git_folder()),\
+            "failed to clone git repo '{0}'".format(self.relpath)
+
+    def _diff(self, path="/"):
+        with self.tools.cwd(self.path):
+            return self.tools.run("git diff HEAD .{0}".format(path), output_on_error=True)
+
+    @utils.cached.instance
+    def diff(self, path="/"):
+        return self._diff(path) if self.is_cloned() else ""
+
+    def _head(self):
+        with self.tools.cwd(self.path):
+            return self.tools.run("git rev-parse HEAD", output_on_error=True)
+
+    @utils.cached.instance
+    def head(self):
+        return self._head() if self.is_cloned() else ""
+
+    @utils.cached.instance
+    def diff_hash(self, path="/"):
+        return utils.sha1(self.diff(path))
+
+    @utils.cached.instance
+    def tree_hash(self, sha="HEAD", path="/"):
+        with self.tools.cwd(self.path):
+            return self.tools.run("git rev-parse {0}:.{1}".format(sha, path), output_on_error=True)
+
+    def clean(self):
+        with self.tools.cwd(self.path):
+            return self.tools.run("git clean -fd", output_on_error=True)
+
+    def reset(self):
+        with self.tools.cwd(self.path):
+            return self.tools.run("git reset --hard", output_on_error=True)
+
+    def checkout(self, rev):
+        log.info("Checkout out {0} in {1}", rev, self.path)
+        with self.tools.cwd(self.path):
+            try:
+                return self.tools.run("git checkout -f {rev}", rev=rev, output=False)
+            except:
+                return self.tools.run("git fetch {url} && git checkout -f {rev}",
+                                      url=self.url, rev=rev, output_on_error=True)
+
+
+_repositories = {}
+
+def _create_repo(url, path, relpath):
+    repo = _repositories.get(relpath)
+    if not repo:
+        repo = GitRepository(url, path, relpath)
+        _repositories[relpath] = repo
+    return repo
+
+
+
 class GitInfluenceProvider(HashInfluenceProvider):
     name = "Tree"
-    path = "."
 
-    def __init__(self, path=None):
+    def __init__(self, path):
         super(GitInfluenceProvider, self).__init__()
-        self.path = path or self.__class__.path
+        self.tools = Tools()
+        self.relpath = path
 
-    def _get_path(self, task):
-        p = task.tools.expand_path(self.path)
-        return p
+    @property
+    def path(self):
+        return fs.path.join(JoltLoader.get().joltdir, self.relpath)
 
-    def _get_relative_path(self, task):
-        p = self._get_path(task)
-        if p.startswith(task.joltdir):
-            p = p[len(task.joltdir):]
-            p = p[1:] if p[0] == fs.sep else p
-        return p
+    def diff(self):
+        with self.tools.cwd(self.path):
+            return self.tools.run("git diff HEAD .", output_on_error=True)
 
-    @utils.cached.instance
-    def _get_tree_hash(self, task, sha="HEAD"):
-        with task.tools.cwd(self._get_path(task)):
-            return task.tools.run("git rev-parse {0}:./".format(sha), output_on_error=True)
-        return ""
+    def diff_hash(self):
+        return utils.sha1(self.diff())
 
-    @utils.cached.instance
-    def _get_diff(self, task):
-        with task.tools.cwd(self._get_path(task)):
-            return task.tools.run("git diff HEAD .", output_on_error=True)
-        return ""
+    def tree_hash(self, sha="HEAD", path="/"):
+        with self.tools.cwd(self.path):
+            return self.tools.run("git rev-parse {0}:.{1}".format(sha, path), output_on_error=True)
 
     @utils.cached.instance
-    def _get_diff_hash(self, task):
-        return utils.sha1(self._get_diff(task))
-
     def get_influence(self, task):
         return "{0}:{1}:{2}".format(
-            self._get_relative_path(task),
-            self._get_tree_hash(task),
-            self._get_diff_hash(task)[:8])
+            self.relpath,
+            self.tree_hash(),
+            self.diff_hash()[:8])
 
 
 def global_influence(path, cls=GitInfluenceProvider):
@@ -69,24 +141,22 @@ def influence(path, cls=GitInfluenceProvider):
     return _decorate
 
 
-class Git(Resource, GitInfluenceProvider):
+class GitSrc(Resource):
     """ Clones a Git repo.
-
-    Also influences the hash of consuming tasks, causing tasks to
-    be re-executed if the cloned repo is modified.
-
     """
 
-    name = "git"
+    name = "git-src"
     url = Parameter(help="URL to the git repo to clone. Required.")
     sha = Parameter(required=False, help="Specific commit sha to be checked out. Optional.")
     path = Parameter(required=False, help="Local path where repo should be cloned.")
+    _revision = Export(value=lambda self: self._get_revision() or self.git.head())
 
     def __init__(self, *args, **kwargs):
-        super(Git, self).__init__(*args, **kwargs)
-        self.path = str(self.path) or self._get_name()
-        self.path = fs.path.join(JoltLoader.get().joltdir, self.path)
-        self.influence.append(self)
+        super(GitSrc, self).__init__(*args, **kwargs)
+        self.joltdir = JoltLoader.get().joltdir
+        self.relpath = str(self.path) or self._get_name()
+        self.abspath = fs.path.join(self.joltdir, self.relpath)
+        self.git = _create_repo(self.url, self.abspath, self.relpath)
 
     @utils.cached.instance
     def _get_name(self):
@@ -94,48 +164,56 @@ class Git(Resource, GitInfluenceProvider):
         name, _ = fs.path.splitext(repo)
         return name
 
-    @utils.cached.instance
-    def _get_git_folder(self):
-        return fs.path.join(self.path, ".git")
-
-    def _clone(self):
-        assert not fs.path.exists(self.path), \
-            "destination folder '{0}' already exists but is not a git repo"\
-            .format(self.path)
-        depth = "--depth 1" if self.sha.is_unset() else ""
-        log.info("Cloning into {0}", self.path)
-        self.tools.run("git clone {0} {1} {2}", depth, self.url, self.path, output_on_error=True)
-        assert fs.path.exists(self._get_git_folder()),\
-            "failed to clone git repo '{0}'".format(self._get_name())
-
-    @utils.cached.instance
-    def _is_synced(self):
-        with self.tools.cwd(self.path):
-            return True if self.tools.run("git branch -r --contains HEAD", output_on_error=True) else False
-        return True
-
-    def _is_cloned(self):
-        return fs.path.exists(self._get_git_folder())
+    def _get_revision(self):
+        if self._revision.value is not None:
+            return self._revision.value
+        if not self.sha.is_unset():
+            return self.sha.get_value()
+        return None
 
     def acquire(self, artifact, env, tools):
-        if not self.sha.is_unset():
-            assert self._is_synced(),\
-                "explicit sha requested but git repo '{0}' has local commits"\
-                .format(self._get_name())
-            assert not self._get_diff(self), \
+        if not self.git.is_cloned():
+            self.git.clone()
+        rev = self._get_revision()
+        if rev is not None:
+            assert self.sha.is_unset() or not self.git.diff(), \
                 "explicit sha requested but git repo '{0}' has local changes"\
-                .format(self._get_name())
+                .format(self.git.relpath)
             # Should be safe to do this now
-            with self.tools.cwd(self.path):
-                self.tools.run("git checkout {0}", self.sha, output_on_error=True)
+            self.git.checkout(rev)
+            self.git.clean()
 
+TaskRegistry.get().add_task_class(GitSrc)
+
+
+class Git(GitSrc, HashInfluenceProvider):
+    """ Clones a Git repo.
+
+    Also influences the hash of consuming tasks, causing tasks to
+    be re-executed if the cloned repo is modified.
+
+    """
+    name = "git"
+    url = Parameter(help="URL to the git repo to clone. Required.")
+    sha = Parameter(required=False, help="Specific commit sha to be checked out. Optional.")
+    path = Parameter(required=False, help="Local path where repo should be cloned.")
+    _revision = Export(value=lambda self: self._get_revision())
+
+    def __init__(self, *args, **kwargs):
+        super(Git, self).__init__(*args, **kwargs)
+        self.influence.append(self)
+
+    @utils.cached.instance
     def get_influence(self, task):
-        if isinstance(task, Git):
-            if not self._is_cloned():
-                self._clone()
-            if not self.sha.is_unset():
-                return self._get_tree_hash(self, self.sha.get_value())
-        return super(Git, self).get_influence(task)
+        if not self.git.is_cloned():
+            self.git.clone()
+        rev = self._get_revision()
+        if rev is not None:
+            return self.git.tree_hash(self.sha.get_value())
+        return "{0}:{1}:{2}".format(
+            fs.path.join(self.git.relpath, self.path),
+            self.git.tree_hash(self.path),
+            self.git.diff_hash(self.path)[:8])
 
 TaskRegistry.get().add_task_class(Git)
 
@@ -144,10 +222,11 @@ class GitNetworkExecutorExtension(NetworkExecutorExtension):
     """ Sanity check that a local git repo can be built remotely """
 
     def get_parameters(self, task):
+        return {}
         for child in task.children:
-            if isinstance(child.task, Git):
+            if isinstance(child.task, GitSrc):
                 task = child.task
-                if task._is_cloned() and task.sha.is_unset():
+                if task.git.is_cloned() and task.sha.is_unset():
                     assert task._is_synced(),\
                         "local commit found in git repo '{0}'; "\
                         "push before building remotely"\

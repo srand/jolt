@@ -85,7 +85,8 @@ class Attribute(object):
                 if not hasattr(self, '_'+varname):
                     e = SubElement(attribute, elem=self._elem.find(attribute))
                     setattr(self, '_'+varname, e)
-                return str(getattr(self, '_'+varname).text)
+                value = getattr(self, '_'+varname).text
+                return str(value) if value is not None else None
 
             def child_set(self, value):
                 _check_value(value, values)
@@ -113,13 +114,13 @@ class Composition(object):
         def decorate(cls, comp_cls, name):
             def create(self, *args, **kwargs):
                 child = comp_cls(*args, **kwargs)
-                self.append(child._elem)
+                self.append(child)
                 return child
 
             @property
             @cached.instance
             def get(self):
-                children = list(self.getroot()) if isinstance(self, ElementTree) else list(self)
+                children = list(self.getroot()) if isinstance(self, ElementTree) else list(self._elem)
                 children = [n for n in children if n.tag == name]
                 return [comp_cls(elem=child) for child in children]
 

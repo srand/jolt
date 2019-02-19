@@ -189,9 +189,16 @@ class TaskProxy(object):
 
         self.anestors = nx.ancestors(dag, self)
 
-        identity = self.manifest.task_identities.get(self.qualified_name)
-        if identity is not None:
-            self.identity = identity
+        task = self.manifest.find_task(self.qualified_name)
+        if task is not None:
+            if task.identity:
+                self.identity = task.identity
+            for attrib in task.attributes:
+                export = utils.getattr_safe(self.task, attrib.name)
+                assert isinstance(export, Export), \
+                    "'{0}' is not an exportable attribute of task '{1}'"\
+                    .format(attrib.name, self.qualified_name)
+                export.assign(attrib.value)
 
         return self.identity
 
@@ -230,8 +237,8 @@ class TaskProxy(object):
             self.warn("Pruned task was executed")
 
     def run(self, cache, force_upload=False, force_build=False):
-        if self.is_frozen():
-            return
+        #if self.is_frozen():
+        #    return
 
         with self.tools:
             tasks = [self] + self.extensions

@@ -385,8 +385,25 @@ class TaskIdentityExtension(ManifestExtension):
         for child in [task] + task.children:
             if not child.is_cacheable():
                 continue
-            manifest_task = manifest.create_task()
-            manifest_task.name = child.qualified_name
+            manifest_task = manifest.find_task(child.qualified_name)
+            if manifest_task is None:
+                manifest_task = manifest.create_task()
+                manifest_task.name = child.qualified_name
             manifest_task.identity = child.identity
 
 ManifestExtensionRegistry.add(TaskIdentityExtension())
+
+
+class TaskExportExtension(ManifestExtension):
+    def export_manifest(self, manifest, task):
+        for child in [task] + task.children:
+            manifest_task = manifest.find_task(child.qualified_name)
+            if manifest_task is None:
+                manifest_task = manifest.create_task()
+                manifest_task.name = child.qualified_name
+            for key, export in child.task._get_export_objects().items():
+                attrib = manifest_task.create_attribute()
+                attrib.name = key
+                attrib.value = export.export(child.task)
+
+ManifestExtensionRegistry.add(TaskExportExtension())

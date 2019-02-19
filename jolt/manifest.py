@@ -2,6 +2,13 @@ from jolt.xmldom import *
 from jolt import filesystem as fs
 
 
+@Attribute('name')
+@Attribute('value')
+class _JoltAttribute(SubElement):
+    def __init__(self, elem=None):
+        super(_JoltAttribute, self).__init__('attribute', elem=elem)
+
+
 @Attribute('path')
 @Attribute('source', child=True)
 class _JoltRecipe(SubElement):
@@ -10,7 +17,8 @@ class _JoltRecipe(SubElement):
 
 
 @Attribute('name')
-@Attribute('identity')
+@Attribute('identity', child=True)
+@Composition(_JoltAttribute, "attribute")
 class _JoltTask(SubElement):
     def __init__(self, elem=None):
         super(_JoltTask, self).__init__('task', elem=elem)
@@ -24,7 +32,7 @@ class JoltManifest(ElementTree):
         self._identities = None
 
     def append(self, element):
-        self.getroot().append(element)
+        SubElement(elem=self.getroot()).append(element)
 
     def get(self, key):
         self.getroot().get(key)
@@ -50,6 +58,12 @@ class JoltManifest(ElementTree):
 
     def has_task(self, task):
         return len(self.getroot().findall(".//task[@identity='{}']".format(task.identity))) != 0
+
+    def find_task(self, task):
+        matches = self.getroot().findall(".//task[@name='{0}']".format(task))
+        if not matches or len(matches) > 1:
+            return None
+        return _JoltTask(elem=matches[0])
 
     @property
     def task_identities(self):

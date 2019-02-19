@@ -96,12 +96,13 @@ if [ -n "$jolt_url" ]; then
   fi
 fi
 
-rm -f *.jolt
-
 /bin/echo -E &quot;$config&quot; &gt; jolt.conf
 /bin/echo -E &quot;$jolt_manifest&quot; &gt; default.joltxmanifest
 set -x
 
+rm -f *.jolt
+jolt -vv -c jolt.conf info $task -a
+rm -f *.jolt
 jolt -vv -c jolt.conf build -i $task_identity --worker $task_default $task</command>
     </hudson.tasks.Shell>
   </builders>

@@ -3,6 +3,7 @@ name = "jolt"
 from .tasks import Task
 from .tasks import Test
 from .tasks import Resource
+from .tasks import Export
 from .tasks import Parameter
 from .tasks import BooleanParameter
 

@@ -12,6 +12,19 @@ from jolt.tools import Tools
 from jolt.influence import TaskSourceInfluence
 
 
+
+class Export(object):
+    def __init__(self, value):
+        self.value = None
+        self.exported_value = value
+
+    def assign(self, value):
+        self.value = value
+
+    def export(self, task):
+        return self.value if self.value is not None else self.exported_value(task)
+
+
 class Parameter(object):
     """ Generic task parameter type. """
 
@@ -276,6 +289,12 @@ class TaskBase(object):
     def identity(self, identity):
         self._identity = identity
 
+    def _create_exports(self):
+        for key, export in self.__class__.__dict__.items():
+            if isinstance(export, Export):
+                export = copy.copy(export)
+                setattr(self, key, export)
+
     def _create_parameters(self):
         for key, param in self.__class__.__dict__.items():
             if isinstance(param, Parameter):
@@ -306,6 +325,11 @@ class TaskBase(object):
         for key, param in self._get_parameter_objects().items():
             assert not param.is_required() or not param.is_unset(), \
                 "required parameter '{0}' has not been set for '{1}'".format(key, self.name)
+
+    @utils.cached.instance
+    def _get_export_objects(self):
+        return { key: getattr(self, key) for key in dir(self)
+                 if isinstance(utils.getattr_safe(self, key), Export) }
 
     @utils.cached.instance
     def _get_parameter_objects(self, unset=False):
@@ -374,6 +398,7 @@ class Task(TaskBase):
         super(Task, self).__init__()
         self.name = self.__class__.name
         self.tools = Tools(self, self.joltdir)
+        self._create_exports()
         self._create_parameters()
         self._set_parameters(parameters)
         self.influence = utils.as_list(self.__class__.influence)
@@ -626,6 +651,7 @@ class Test(ut.TestCase, TaskBase):
         assert len(self.extends) == 1, "{0} extends multiple tasks, only one allowed".format(self.name)
         self.extends = self.extends[0]
         self.name = self.__class__.name
+        self._create_exports()
         self._create_parameters()
         self._set_parameters(parameters)
 

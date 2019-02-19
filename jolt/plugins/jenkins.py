@@ -6,6 +6,11 @@ import hashlib
 from jinja2 import Template
 import time
 from requests.exceptions import ConnectionError, ReadTimeout
+try:
+    from StringIO import StringIO
+except:
+    from io import StringIO
+
 
 from jolt import config
 from jolt import utils
@@ -137,8 +142,8 @@ class JenkinsExecutor(scheduler.NetworkExecutor):
         return self.server.get_build_info(self.job, build_id)
 
     @utils.retried.on_exception((ConnectionError, ReadTimeout))
-    def _build_job(self, parameters):
-        return self.server.build_job(self.job, parameters)
+    def _build_job(self, parameters, files):
+        return self.server.build_job(self.job, parameters, files=files)
 
     @utils.retried.on_exception((ConnectionError, ReadTimeout))
     def _cancel_queue(self, queue_id):
@@ -174,9 +179,10 @@ class JenkinsExecutor(scheduler.NetworkExecutor):
         }
         registry = scheduler.ExecutorRegistry.get()
         parameters.update(registry.get_network_parameters(self.task))
-        parameters["jolt_manifest"] = JoltManifest.export(self.task).format()
+        files = {}
+        files["default.joltxmanifest"] = ("default.joltxmanifest", StringIO(JoltManifest.export(self.task).format()))
 
-        queue_id = self._build_job(parameters)
+        queue_id = self._build_job(parameters, files)
 
         log.verbose("[JENKINS] Queued {0}", self.task.qualified_name)
 

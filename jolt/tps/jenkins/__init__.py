@@ -1199,7 +1199,7 @@ class Jenkins(object):
         else:
             return self._build_url(BUILD_JOB, locals())
 
-    def build_job(self, name, parameters=None, token=None):
+    def build_job(self, name, parameters=None, token=None, files=None):
         '''Trigger build job.
 
         This method returns a queue item number that you can pass to
@@ -1215,13 +1215,12 @@ class Jenkins(object):
         '''
 
         url = self.build_job_url(name, parameters, token)
-        parameter_list = [{"name": name, "value": value}
-                          for name, value in parameters.items()]
-        headers = {"Content-Type": "application/x-www-form-urlencoded"}
+        headers = {"Content-Type": "multipart/form-data"}
         response = self.jenkins_request(requests.Request(
             'POST',
-            url, data=urlencode(parameters),
-            headers=headers))
+            url,
+            data=parameters,
+            files=files))
         location = response.headers['Location']
         # location is a queue item, eg. "http://jenkins/queue/item/25/"
         if location.endswith('/'):
