@@ -97,6 +97,7 @@ class LocalExecutor(Executor):
 
         try:
             self.task.started()
+            self.task.running()
             self.task.run(env.cache, self.force_upload)
         except Exception as e:
             self.task.failed()

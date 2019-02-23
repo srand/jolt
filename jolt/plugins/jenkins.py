@@ -189,6 +189,10 @@ class JenkinsExecutor(scheduler.NetworkExecutor):
 
         log.verbose("[JENKINS] Executing {0}", self.task.qualified_name)
 
+        self.task.running()
+        for extension in self.task.extensions:
+            extension.running()
+
         build_id = queue_info["executable"]["number"]
         build_info = self._get_build_info(build_id)
         while build_info["result"] not in ["SUCCESS", "FAILURE", "ABORTED"]:

@@ -21,6 +21,8 @@ class TaskProxy(object):
         self.children = []
         self.ancestors = []
         self.extensions = []
+        self.duration_queued = None
+        self.duration_running = None
 
         self._extended_task = None
         self._in_progress = False
@@ -174,10 +176,16 @@ class TaskProxy(object):
 
     def started(self, what="Execution"):
         self.task.info(colors.blue(what + " started " + self.log_name))
-        self.duration = utils.duration()
+        self.duration_queued = utils.duration()
+        self.duration_running = utils.duration()
+
+    def running(self):
+        self.duration_running = utils.duration()
 
     def failed(self, what="Execution"):
-        self.error("{0} failed after {1}", what, self.duration)
+        self.error("{0} failed after {1} {2}", what,
+                   self.duration_running,
+                   self.duration_queued.diff(self.duration_running))
 
     def finished(self, what="Execution"):
         assert not self._completed, "task has already been completed"
@@ -186,7 +194,9 @@ class TaskProxy(object):
             self.graph.remove_node(self)
         except:
             self.warn("Pruned task was executed")
-        self.task.info(colors.green(what + " finished after {0} " + self.log_name), self.duration)
+        self.task.info(colors.green(what + " finished after {0} {1}" + self.log_name),
+                       self.duration_running,
+                       self.duration_queued.diff(self.duration_running))
 
     def skipped(self):
         self._completed = True
@@ -238,6 +248,7 @@ class TaskProxy(object):
             for extension in self.extensions:
                 try:
                     extension.started()
+                    extension.running()
                     extension.run(cache, force_upload, force_build)
                 except Exception as e:
                     extension.failed()

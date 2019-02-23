@@ -8,7 +8,6 @@ import hashlib
 import sys
 
 
-
 if sys.version_info[0] == 3:
     read_input = input
 else:
@@ -121,6 +120,34 @@ class duration(object):
         if elapsed >= 60:
             return time.strftime("%Mmin %-Ss", time.gmtime(elapsed))
         return time.strftime("%-Ss", time.gmtime(elapsed))
+
+    def __le__(self, d):
+        now = time.time()
+        elapsed1 = now - self._time
+        elapsed2 = now - d._time
+        return elapsed1 < elapsed2
+
+    def diff(self, d):
+        if d is None:
+            return duration_diff(0)
+        now = time.time()
+        elapsed1 = now - self._time
+        elapsed2 = now - d._time
+        return duration_diff(abs(elapsed1 - elapsed2))
+
+
+class duration_diff(object):
+    def __init__(self, elapsed):
+        self._elapsed = elapsed
+
+    def __str__(self):
+        elapsed = self._elapsed + 0.5
+        if elapsed <= 1:
+            return ""
+        if elapsed >= 60:
+            return time.strftime("[%Mmin %-Ss] ", time.gmtime(elapsed))
+        return time.strftime("[%-Ss] ", time.gmtime(elapsed))
+
 
 class cached:
     mutex = RLock()
