@@ -162,7 +162,9 @@ def build(task, network, keep_going, identity, default, local,
                 queue.abort()
                 raise error
 
-        log.info("Total execution time: {0}", str(duration))
+        log.info("Total execution time: {0} {1}",
+                 str(duration),
+                 str(queue.duration_acc) if network else '')
     except KeyboardInterrupt:
         log.warn("Interrupted by user")
         try:

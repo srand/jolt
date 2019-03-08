@@ -148,6 +148,14 @@ class duration_diff(object):
             return time.strftime("[%Mmin %-Ss] ", time.gmtime(elapsed))
         return time.strftime("[%-Ss] ", time.gmtime(elapsed))
 
+    def __iadd__(self, dur):
+        if isinstance(dur, duration):
+            now = duration()
+            self._elapsed += dur.diff(now)._elapsed
+        if type(dur) == int:
+            self._elapsed += dur
+        return self
+
 
 class cached:
     mutex = RLock()

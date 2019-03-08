@@ -25,6 +25,7 @@ class TaskQueue(object):
     def __init__(self, strategy):
         self.futures = {}
         self.strategy = strategy
+        self.duration_acc = utils.duration_diff(0)
         self._aborted = False
 
     def submit(self, cache, task):
@@ -50,6 +51,7 @@ class TaskQueue(object):
                 log.exception()
                 return task, error
             finally:
+                self.duration_acc += task.duration_running or 0
                 del self.futures[future]
             return task, None
         return None, None
