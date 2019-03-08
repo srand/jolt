@@ -1,6 +1,8 @@
 import datetime
 import hashlib
 import os
+import uuid
+
 
 from jolt import utils
 from jolt import log
@@ -38,6 +40,16 @@ class HashInfluenceProvider(object):
     name = "X"
     def get_influence(self, task):
         raise NotImplemented()
+
+
+class ForcedInfluenceProvider(object):
+    name = "Forced"
+    def get_influence(self, task):
+        return str(uuid.uuid4())
+
+
+def taint():
+    HashInfluenceRegistry.get().register(ForcedInfluenceProvider())
 
 
 class TaskAttributeInfluence(HashInfluenceProvider):

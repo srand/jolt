@@ -74,8 +74,9 @@ def _autocomplete_tasks(ctx, args, incomplete):
 @click.option("--worker", is_flag=True, default=False,
               help="Run with the worker build strategy", hidden=True)
 @click.option("-d", "--default", type=str, multiple=True, help="Override default parameter values.")
+@click.option("-f", "--force", is_flag=True, default=False, help="Force rebuild.")
 def build(task, network, keep_going, identity, default, local,
-          no_download, no_upload, download, upload, worker):
+          no_download, no_upload, download, upload, worker, force):
     """
     Execute specified task.
 
@@ -102,6 +103,9 @@ def build(task, network, keep_going, identity, default, local,
     if local:
         download = False
         upload = False
+
+    if force:
+        taint()
 
     options = JoltOptions(network=network,
                           download=download,
