@@ -175,15 +175,16 @@ class BooleanParameter(Parameter):
 class TaskRegistry(object):
     _instance = None
 
-    def __init__(self):
+    def __init__(self, env=None):
+        self.env = env
         self.tasks = {}
         self.tests = {}
         self.instances = {}
 
     @staticmethod
-    def get():
+    def get(*args, **kwargs):
         if not TaskRegistry._instance:
-            TaskRegistry._instance = TaskRegistry()
+            TaskRegistry._instance = TaskRegistry(*args, **kwargs)
         return TaskRegistry._instance
 
     def add_task_class(self, cls):

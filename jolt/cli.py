@@ -21,6 +21,7 @@ from jolt import loader
 from jolt import utils
 from jolt.influence import *
 from jolt.options import JoltOptions
+from jolt.hooks import TaskHookRegistry
 
 
 @click.group()
@@ -108,10 +109,12 @@ def build(task, network, keep_going, identity, default, local,
         taint()
 
     options = JoltOptions(network=network,
+                          local=local,
                           download=download,
                           upload=upload,
                           keep_going=keep_going,
-                          default=default)
+                          default=default,
+                          worker=worker)
 
     acache = cache.ArtifactCache.get(options)
 
@@ -126,7 +129,8 @@ def build(task, network, keep_going, identity, default, local,
         log.verbose("Local build as a user")
         strategy = scheduler.LocalStrategy(executors, acache)
 
-    registry = TaskRegistry.get()
+    hooks = TaskHookRegistry.get(options)
+    registry = TaskRegistry.get(options)
 
     for params in default:
         registry.set_default_parameters(params)

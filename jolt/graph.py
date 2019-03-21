@@ -12,6 +12,7 @@ from jolt.tools import Tools
 from jolt import log
 from jolt import utils
 from jolt import colors
+from jolt import hooks
 
 
 class TaskProxy(object):
@@ -178,6 +179,7 @@ class TaskProxy(object):
         self.task.info(colors.blue(what + " started " + self.log_name))
         self.duration_queued = utils.duration()
         self.duration_running = utils.duration()
+        hooks.task_started(self)
 
     def running(self):
         self.duration_running = utils.duration()
@@ -186,6 +188,7 @@ class TaskProxy(object):
         self.error("{0} failed after {1} {2}", what,
                    self.duration_running,
                    self.duration_queued.diff(self.duration_running))
+        hooks.task_failed(self)
 
     def finished(self, what="Execution"):
         assert not self._completed, "task has already been completed"
@@ -197,6 +200,7 @@ class TaskProxy(object):
         self.task.info(colors.green(what + " finished after {0} {1}" + self.log_name),
                        self.duration_running,
                        self.duration_queued.diff(self.duration_running))
+        hooks.task_finished(self)
 
     def skipped(self):
         self._completed = True

@@ -59,6 +59,12 @@ def as_human_size(size):
 def call_or_return(obj, t):
     return t(obj) if callable(t) else t
 
+def call_and_catch(f, *args, **kwargs):
+    try:
+        return f(*args, **kwargs)
+    except:
+        return None
+
 def parse_task_name(name):
     if ":" in name:
         task, params = name.split(":", 1)
@@ -84,6 +90,10 @@ def format_task_name(name, params):
 def stable_task_name(name):
     task, params = parse_task_name(name)
     return format_task_name(task, params)
+
+def canonical(s):
+    return "".join([c if c.isalnum() else '_' for c in s])
+
 
 class _SafeDict(object):
     def __init__(self, values, ignore_errors=False):
@@ -155,6 +165,10 @@ class duration_diff(object):
         if type(dur) == int:
             self._elapsed += dur
         return self
+
+    @property
+    def elapsed(self):
+        return self._elapsed
 
 
 class cached:
