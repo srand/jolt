@@ -394,7 +394,7 @@ class Task(TaskBase):
 
     influence = []
 
-    def __init__(self, parameters=None):
+    def __init__(self, parameters=None, **kwargs):
         super(Task, self).__init__()
         self.name = self.__class__.name
         self.tools = Tools(self, self.joltdir)

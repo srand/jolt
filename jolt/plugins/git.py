@@ -15,11 +15,12 @@ except:
 
 
 class GitRepository(object):
-    def __init__(self, url, path, relpath):
+    def __init__(self, url, path, relpath, refspecs=None):
         self.path = path
         self.relpath = relpath
         self.tools = Tools()
         self.url = url
+        self.refspecs = utils.as_list(refspecs)
 
     @utils.cached.instance
     def _get_git_folder(self):
@@ -42,19 +43,19 @@ class GitRepository(object):
         assert fs.path.exists(self._get_git_folder()),\
             "failed to clone git repo '{0}'".format(self.relpath)
 
+    @utils.cached.instance
     def _diff(self, path="/"):
         with self.tools.cwd(self.path):
             return self.tools.run("git diff HEAD .{0}".format(path), output_on_error=True)
 
-    @utils.cached.instance
     def diff(self, path="/"):
         return self._diff(path) if self.is_cloned() else ""
 
+    @utils.cached.instance
     def _head(self):
         with self.tools.cwd(self.path):
             return self.tools.run("git rev-parse HEAD", output_on_error=True)
 
-    @utils.cached.instance
     def head(self):
         return self._head() if self.is_cloned() else ""
 
@@ -65,7 +66,11 @@ class GitRepository(object):
     @utils.cached.instance
     def tree_hash(self, sha="HEAD", path="/"):
         with self.tools.cwd(self.path):
-            return self.tools.run("git rev-parse {0}:.{1}".format(sha, path), output_on_error=True)
+            try:
+                return self.tools.run("git rev-parse {0}:.{1}".format(sha, path), output=False)
+            except:
+                self.fetch()
+                return self.tools.run("git rev-parse {0}:.{1}".format(sha, path), output_on_error=True)
 
     def clean(self):
         with self.tools.cwd(self.path):
@@ -75,22 +80,29 @@ class GitRepository(object):
         with self.tools.cwd(self.path):
             return self.tools.run("git reset --hard", output_on_error=True)
 
+    def fetch(self):
+        refspecs = self.refspecs or []
+        for refspec in [''] + refspecs:
+            self.tools.run("git fetch {url} {refspec}",
+                           url=self.url,
+                           refspec=refspec or '')
+
     def checkout(self, rev):
         log.info("Checkout out {0} in {1}", rev, self.path)
         with self.tools.cwd(self.path):
             try:
                 return self.tools.run("git checkout -f {rev}", rev=rev, output=False)
             except:
-                return self.tools.run("git fetch {url} && git checkout -f {rev}",
-                                      url=self.url, rev=rev, output_on_error=True)
+                self.fetch()
+                return self.tools.run("git checkout -f {rev}", rev=rev, output_on_error=True)
 
 
 _repositories = {}
 
-def _create_repo(url, path, relpath):
+def _create_repo(url, path, relpath, refspecs=None):
     repo = _repositories.get(relpath)
     if not repo:
-        repo = GitRepository(url, path, relpath)
+        repo = GitRepository(url, path, relpath, refspecs)
         _repositories[relpath] = repo
     return repo
 
@@ -146,9 +158,9 @@ class GitSrc(Resource):
     """
 
     name = "git-src"
-    url = Parameter(help="URL to the git repo to clone. Required.")
-    sha = Parameter(required=False, help="Specific commit sha to be checked out. Optional.")
-    path = Parameter(required=False, help="Local path where repo should be cloned.")
+    url = Parameter(help="URL to the git repo to be cloned. Required.")
+    sha = Parameter(required=False, help="Specific commit or tag to be checked out. Optional.")
+    path = Parameter(required=False, help="Local path where the repository should be cloned.")
     _revision = Export(value=lambda self: self._get_revision() or self.git.head())
 
     def __init__(self, *args, **kwargs):
@@ -156,7 +168,8 @@ class GitSrc(Resource):
         self.joltdir = JoltLoader.get().joltdir
         self.relpath = str(self.path) or self._get_name()
         self.abspath = fs.path.join(self.joltdir, self.relpath)
-        self.git = _create_repo(self.url, self.abspath, self.relpath)
+        self.refspecs = kwargs.get("refspecs", [])
+        self.git = GitRepository(self.url, self.abspath, self.relpath, self.refspecs)
 
     @utils.cached.instance
     def _get_name(self):
@@ -194,9 +207,9 @@ class Git(GitSrc, HashInfluenceProvider):
 
     """
     name = "git"
-    url = Parameter(help="URL to the git repo to clone. Required.")
-    sha = Parameter(required=False, help="Specific commit sha to be checked out. Optional.")
-    path = Parameter(required=False, help="Local path where repo should be cloned.")
+    url = Parameter(help="URL to the git repo to be cloned. Required.")
+    sha = Parameter(required=False, help="Specific commit or tag to be checked out. Optional.")
+    path = Parameter(required=False, help="Local path where the repository should be cloned.")
     _revision = Export(value=lambda self: self._get_revision())
 
     def __init__(self, *args, **kwargs):
@@ -208,12 +221,13 @@ class Git(GitSrc, HashInfluenceProvider):
         if not self.git.is_cloned():
             self.git.clone()
         rev = self._get_revision()
+        rev = self._get_revision()
         if rev is not None:
-            return self.git.tree_hash(self.sha.get_value())
+            return self.git.tree_hash(rev)
         return "{0}:{1}:{2}".format(
-            fs.path.join(self.git.relpath, self.path),
-            self.git.tree_hash(self.path),
-            self.git.diff_hash(self.path)[:8])
+            fs.path.join(self.git.relpath, str(self.path)),
+            self.git.tree_hash(),
+            self.git.diff_hash()[:8])
 
 TaskRegistry.get().add_task_class(Git)
 
