@@ -788,15 +788,20 @@ class Tools(object):
         else:
             self._env[key] = self.expand(value)
 
-    def symlink(self, src, dst):
+    def symlink(self, src, dst, replace=True, relative=True):
         """ Creates a symbolic link.
 
         Args:
             src (str): Path to target file or directory.
             dst (str): Name/path of symbolic link.
+            replace (boolean): Replace existing file or link. Default: false.
+            relative (boolean): Create link using relative path to target.
+                Default: false (absolute path).
         """
-        src = self.expand_path(src)
+        src = self.expand_path(src) if not relative else self.expand(src)
         dst = self.expand_path(dst)
+        if replace and fs.path.exists(dst):
+            self.unlink(dst)
         fs.symlink(src, dst)
 
     def tmpdir(self, name):
