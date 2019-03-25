@@ -243,7 +243,12 @@ class Artifact(object):
         self._uploadable = True
         self._size = 0
         ArtifactAttributeSetRegistry.create_all(self)
-        self._read_manifest()
+        try:
+            self._read_manifest()
+        except:
+            self.discard()
+            assert False, "Unable to read artifact manifest for ''{1} ({2})''"\
+                .format(self._node.qualified_name, self._node.identity[:8])
 
     def __enter__(self):
         return self
