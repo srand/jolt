@@ -466,7 +466,12 @@ class Artifact(object):
 
     def decompress(self):
         archive = self._path + DEFAULT_ARCHIVE_TYPE
-        self.tools.extract(archive, self._path)
+        try:
+            self.tools.extract(archive, self._path)
+        except:
+            self.discard()
+            assert False, "Failed to extract artifact archive for '{0} ({1})'"\
+                .format(self._node.qualified_name, self._node.identity[:8])
         self.tools.unlink(archive)
         if self._temp:
             fs.rmtree(self._temp)
