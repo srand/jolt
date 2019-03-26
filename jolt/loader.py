@@ -5,7 +5,7 @@ import glob
 import os
 import base64
 
-from jolt.tasks import Task, Test, Resource
+from jolt.tasks import Task, TaskGenerator, Test, Resource
 from jolt import filesystem as fs
 from jolt import log
 from jolt import utils
@@ -39,7 +39,14 @@ class JoltLoader(object):
             if inspect.isclass(obj):
                 classes.append(obj)
 
-        cls_exclude_list = [Task, Resource, CXXLibrary, CXXExecutable]
+        cls_exclude_list = [Task, TaskGenerator, Resource, CXXLibrary, CXXExecutable]
+
+        generators = [cls for cls in classes
+                      if issubclass(cls, TaskGenerator) \
+                      and cls not in cls_exclude_list \
+                      and not cls.__name__.startswith("_")]
+        for gen in generators:
+            classes = utils.as_list(gen().generate()) + classes
 
         tasks = [cls for cls in classes
                  if issubclass(cls, Task) and cls not in cls_exclude_list \

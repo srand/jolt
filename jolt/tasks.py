@@ -12,7 +12,6 @@ from jolt.tools import Tools
 from jolt.influence import TaskSourceInfluence
 
 
-
 class Export(object):
     def __init__(self, value):
         self.value = None
@@ -269,6 +268,44 @@ class TaskRegistry(object):
             if prev:
                 task.requires += [prev.name]
             prev = task
+
+
+class TaskGenerator(object):
+    """
+    Base class for task generators.
+
+    Generators create tasks classes dynamically in runtime.
+    They are used to implement concepts such as components
+    where multiple similar tasks should be created.
+
+    For example, a C++ library should not only be built, it
+    should also be tested. While it is possible to add one
+    task for the compilation of the library and another for
+    the test, it is advisable to instead use a task generator
+    when there are multiple libraries to build and test.
+    The generator will ensure that all libraries are build and
+    tested identically. Additional tasks, such as sourcedoc
+    generation, can be added for all libraries at a later
+    point in time. Refactoring is simplified by gathering
+    shared code in one place.
+
+    Generated tasks can be replaced by defining a task with
+    the same name explicitly.
+
+    """
+
+    def generate(self):
+        """
+        Generate tasks.
+
+        Called by Jolt during the parsing of user task
+        definitions.
+
+        Returns:
+            A list of task classes to be registered with Jolt.
+
+        """
+        raise NotImplementedError()
 
 
 
