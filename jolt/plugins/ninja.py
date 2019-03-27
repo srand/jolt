@@ -257,7 +257,7 @@ class Libraries(Variable):
     def create(self, project, writer, deps, tools):
         if isinstance(project, CXXLibrary):
             return
-        libraries = [tools.expand(lib) for lib in project.libraries]
+        libraries = [tools.expand(lib) for lib in project._libraries()]
         for name, artifact in deps.items():
             libraries += artifact.cxxinfo.libraries.items()
         libraries = ["{0}{1}".format(self.prefix, path) for path in libraries]
@@ -273,7 +273,7 @@ class GNUToolchain(Toolchain):
     ar = EnvironmentVariable(default="ar")
     cc = EnvironmentVariable(default="gcc")
     cxx = EnvironmentVariable(default="g++")
-    ld = EnvironmentVariable(default="g++")
+    ld = EnvironmentVariable(default="g++", envname="CXX")
 
     asflags = EnvironmentVariable(default="")
     cflags = EnvironmentVariable(default="")
@@ -341,8 +341,8 @@ class CXXProject(Task):
     def __init__(self, *args, **kwargs):
         super(CXXProject, self).__init__(*args, **kwargs)
         self._init_sources()
-        self.macros = utils.as_list(utils.call_or_return(self, self.__class__.macros))
-        self.incpaths = utils.as_list(utils.call_or_return(self, self.__class__.incpaths))
+        self.macros = utils.as_list(utils.call_or_return(self, self.__class__._macros))
+        self.incpaths = utils.as_list(utils.call_or_return(self, self.__class__._incpaths))
         self.binary = self.__class__.binary or self.canonical_name
         if self.source_influence:
             for source in self.sources:
@@ -351,7 +351,7 @@ class CXXProject(Task):
         Toolchain.build_variables(self)
 
     def _init_sources(self):
-        sources = utils.as_list(utils.call_or_return(self, self.__class__.sources))
+        sources = utils.as_list(utils.call_or_return(self, self.__class__._sources))
         self.sources = []
         for l in map(self.tools.glob, sources):
             self.sources += l
@@ -401,6 +401,15 @@ class CXXProject(Task):
     def _populate_project(self, writer, deps, tools):
         pass
 
+    def _incpaths(self):
+        return utils.call_or_return(self, self.__class__.incpaths)
+
+    def _macros(self):
+        return utils.call_or_return(self, self.__class__.macros)
+
+    def _sources(self):
+        return utils.call_or_return(self, self.__class__.sources)
+
     def run(self, deps, tools):
         self.outdir = tools.builddir("build/ninja", self.incremental)
         self._write_ninja_file(self.outdir, deps, tools)
@@ -447,6 +456,12 @@ class CXXExecutable(CXXProject):
 
     def _populate_project(self, writer, deps, tools):
         toolchain.link.build(self, writer, self.objects)
+
+    def _libpaths(self):
+        return utils.call_or_return(self, self.__class__.libpaths)
+
+    def _libraries(self):
+        return utils.call_or_return(self, self.__class__.libraries)
 
     def publish(self, artifact, tools):
         with tools.cwd(self.outdir):

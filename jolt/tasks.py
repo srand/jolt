@@ -333,7 +333,8 @@ class TaskBase(object):
                 setattr(self, key, export)
 
     def _create_parameters(self):
-        for key, param in self.__class__.__dict__.items():
+        for key in dir(self):
+            param = utils.getattr_safe(self, key)
             if isinstance(param, Parameter):
                 param = copy.copy(param)
                 setattr(self, key, param)
@@ -341,7 +342,7 @@ class TaskBase(object):
     def _set_parameters(self, params):
         params = params or {}
         for key, value in params.items():
-            param = self.__dict__.get(key)
+            param = utils.getattr_safe(self, key)
             if isinstance(param, Parameter):
                 param.set_value(value)
                 continue
@@ -352,7 +353,7 @@ class TaskBase(object):
     def _set_default_parameters(cls, params):
         params = params or {}
         for key, value in params.items():
-            param = cls.__dict__.get(key)
+            param = utils.getattr_safe(cls, key)
             if isinstance(param, Parameter):
                 param.set_default(value)
                 continue
@@ -439,13 +440,16 @@ class Task(TaskBase):
         self._create_parameters()
         self._set_parameters(parameters)
         self.influence = utils.as_list(self.__class__.influence)
-        self.requires = utils.as_list(utils.call_or_return(self, self.__class__.requires))
+        self.requires = utils.as_list(utils.call_or_return(self, self.__class__._requires))
         self.extends = utils.as_list(utils.call_or_return(self, self.__class__.extends))
         assert len(self.extends) == 1, "{0} extends multiple tasks, only one allowed".format(self.name)
         self.extends = self.extends[0]
         self.influence.append(TaskSourceInfluence("publish"))
         self.influence.append(TaskSourceInfluence("run"))
         self.influence.append(TaskSourceInfluence("unpack"))
+
+    def _requires(self):
+        return utils.as_list(utils.call_or_return(self, self.__class__.requires))
 
     def _get_source(self, func):
         source, lines = inspect.getsourcelines(func)
