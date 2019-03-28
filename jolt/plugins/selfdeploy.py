@@ -3,7 +3,8 @@ from jolt.plugins import directory
 from jolt.cache import *
 from jolt.graph import *
 from jolt.scheduler import *
-
+from jolt.loader import JoltLoader
+from jolt import config
 
 log.verbose("SelfDeploy loaded")
 
@@ -28,6 +29,11 @@ class Jolt(Task):
             artifact.collect('jolt/*.job')
             artifact.collect('jolt/*/*.py')
             artifact.collect('jolt/*/*/*.py')
+            ext = config.get("selfdeploy", "extra", "")
+            ext = ext.split(",")
+            for e in ext:
+                with tools.cwd(fs.path.join(JoltLoader.get().joltdir, fs.path.dirname(e))):
+                    artifact.collect(fs.path.basename(e))
 
 
 class SelfDeployExtension(NetworkExecutorExtension):

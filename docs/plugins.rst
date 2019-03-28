@@ -167,6 +167,12 @@ storage provider.
 The plugin is enabled by adding a ``[selfdeploy]`` section in
 the Jolt configuration.
 
+These configuration keys exist:
+
+* ``extra`` -
+  Comma separated list of paths to additional python modules to be
+  deployed. The paths should be relative to the workspace root.
+
 Once enabled, the plugin automatically passes two parameters to
 distributed network builds:
 
