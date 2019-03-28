@@ -639,7 +639,7 @@ class Tools(object):
                 textfiles = tools.glob("*.txt")
         """
         path = self.expand_path(pathname)
-        files = utils.as_list(glob.glob(path))
+        files = utils.as_list(glob.glob(path, recursive=True))
         if not fs.path.isabs(pathname):
             files = [file[len(self.getcwd())+1:] for file in files]
         return files
