@@ -250,7 +250,7 @@ def docs(follow, delete):
     """
     Opens the Jolt documentation in the default webbrowser.
     """
-    webbrowser.open("http://jolt.readthedocs.io/")
+    webbrowser.open(config.get("jolt", "docs", "http://jolt.readthedocs.io/"))
 
 
 @cli.command(hidden=True)
