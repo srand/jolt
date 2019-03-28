@@ -11,8 +11,9 @@ class GerritSrc(git.GitSrc):
     _revision = Export(value=lambda self: self._get_revision() or self.git.head())
 
     def __init__(self, *args, **kwargs):
-        refspec = '+refs/changes/*:refs/remotes/gerrit/changes/*'
-        super(GerritSrc, self).__init__(*args, refspecs=[refspec], **kwargs)
+        refspec1 = '+refs/heads/*:refs/remotes/gerrit/*'
+        refspec2 = '+refs/changes/*:refs/remotes/gerrit/changes/*'
+        super(GerritSrc, self).__init__(*args, refspecs=[refspec1, refspec2], **kwargs)
 
 
 class Gerrit(git.Git):
@@ -23,8 +24,9 @@ class Gerrit(git.Git):
     _revision = Export(value=lambda self: self._get_revision() or self.git.head())
 
     def __init__(self, *args, **kwargs):
-        refspec = '+refs/changes/*:refs/remotes/gerrit/changes/*'
-        super(Gerrit, self).__init__(*args, refspecs=[refspec], **kwargs)
+        refspec1 = '+refs/heads/*:refs/remotes/gerrit/*'
+        refspec2 = '+refs/changes/*:refs/remotes/gerrit/changes/*'
+        super(Gerrit, self).__init__(*args, refspecs=[refspec1, refspec2], **kwargs)
 
 
 TaskRegistry.get().add_task_class(GerritSrc)
