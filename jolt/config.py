@@ -1,4 +1,8 @@
 from configparser import SafeConfigParser, NoOptionError
+try:
+    from StringIO import StringIO
+except:
+    from io import StringIO
 
 from jolt import filesystem as fs
 from jolt import utils
@@ -65,8 +69,10 @@ def load(file):
 
 def save():
     fs.makedirs(fs.path.dirname(location))
+    config = StringIO()
+    _file.write(config)
     with open(location, 'wb') as configfile:
-        _file.write(configfile)
+        configfile.write(config.getvalue().encode())
 
 def sections():
     return _file.sections()
