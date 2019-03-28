@@ -18,6 +18,21 @@ _path = fs.path.dirname(_path)
 class Jolt(Task):
     name = "jolt"
 
+    def __init__(self, *args, **kwargs):
+        super(Jolt, self).__init__(*args, **kwargs)
+        with Tools(self) as tools:
+            for e in self.extras:
+                self.influence.append(directory.DirectoryInfluenceProvider(e, pattern='*.py'))
+
+    @property
+    def loaderdir(self):
+        return JoltLoader.get().joltdir
+
+    @property
+    def extras(self):
+        ext = config.get("selfdeploy", "extra", "")
+        return [fs.path.join(self.loaderdir, e) for e in ext.split(",")]
+
     def info(self, fmt, *args, **kwargs):
         log.verbose(fmt, *args, **kwargs)
 
@@ -29,10 +44,8 @@ class Jolt(Task):
             artifact.collect('jolt/*.job')
             artifact.collect('jolt/*/*.py')
             artifact.collect('jolt/*/*/*.py')
-            ext = config.get("selfdeploy", "extra", "")
-            ext = ext.split(",")
-            for e in ext:
-                with tools.cwd(fs.path.join(JoltLoader.get().joltdir, fs.path.dirname(e))):
+            for e in self.extras:
+                with tools.cwd(fs.path.dirname(e)):
                     artifact.collect(fs.path.basename(e))
 
 
