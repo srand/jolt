@@ -93,6 +93,8 @@ def exception(exc=None):
     backtrace = traceback.format_exc()
     for line in backtrace.splitlines():
         _streamwrite_file(_file, "[ERROR] " + line)
+        if _loglevel >= HYSTERICAL:
+            _streamwrite(_stderr, "[HYSTERICAL] " + line)
 
 def stdout(fmt, *args, **kwargs):
     try:
