@@ -247,7 +247,7 @@ class Artifact(object):
             self._read_manifest()
         except:
             self.discard()
-            assert False, "Unable to read artifact manifest for ''{1} ({2})''"\
+            assert False, "Unable to read artifact manifest for '{0} ({1})'"\
                 .format(self._node.qualified_name, self._node.identity[:8])
 
     def __enter__(self):
