@@ -264,6 +264,8 @@ def freeze(ctx, task, default, output):
 
     <WIP>
     """
+    manifest = ctx.obj["manifest"]
+
     options = JoltOptions(default=default)
     acache = cache.ArtifactCache.get(options)
     executors = scheduler.ExecutorRegistry.get(options)
@@ -272,7 +274,7 @@ def freeze(ctx, task, default, output):
     for params in default:
         registry.set_default_parameters(params)
 
-    gb = graph.GraphBuilder(registry, ctx.obj["manifest"])
+    gb = graph.GraphBuilder(registry, manifest)
     dag = gb.build(task)
 
     available_in_cache = [

@@ -800,7 +800,7 @@ class Tools(object):
         """
         src = self.expand_path(src) if not relative else self.expand(src)
         dst = self.expand_path(dst)
-        if replace and fs.path.exists(dst):
+        if replace and fs.path.lexists(dst):
             self.unlink(dst)
         fs.symlink(src, dst)
 
