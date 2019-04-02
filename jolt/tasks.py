@@ -294,6 +294,12 @@ class TaskGenerator(object):
 
     """
 
+    abstract = True
+    """ An abstract task generator class indended to be subclassed.
+
+    Abstract task generators are not invoked.
+    """
+
     def generate(self):
         """
         Generate tasks.
@@ -417,6 +423,13 @@ class Task(TaskBase):
 
     An extension can only extend one other task.
     """
+
+    abstract = True
+    """ An abstract task class indended to be subclassed.
+
+    Abstract tasks can't be executed and won't be listed.
+    """
+
 
     fast = False
     """
@@ -580,6 +593,8 @@ class Resource(Task):
     """
 
     cacheable = False
+    abstract = True
+    """ An abstract resource class indended to be subclassed. """
 
     def __init__(self, *args, **kwargs):
         super(Resource, self).__init__(*args, **kwargs)

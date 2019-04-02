@@ -10,7 +10,6 @@ from jolt import filesystem as fs
 from jolt import log
 from jolt import utils
 from jolt import scheduler
-from jolt.plugins.ninja import CXXExecutable, CXXLibrary
 from jolt.manifest import *
 
 
@@ -39,25 +38,28 @@ class JoltLoader(object):
             if inspect.isclass(obj):
                 classes.append(obj)
 
-        cls_exclude_list = [Task, TaskGenerator, Resource, CXXLibrary, CXXExecutable]
+        def is_abstract(cls):
+            return cls.__dict__.get("abstract", False)
 
         generators = [cls for cls in classes
                       if issubclass(cls, TaskGenerator) \
-                      and cls not in cls_exclude_list \
-                      and not cls.__name__.startswith("_")]
+                      and not cls.__name__.startswith("_") \
+                      and not is_abstract(cls)]
         for gen in generators:
             classes = utils.as_list(gen().generate()) + classes
 
         tasks = [cls for cls in classes
-                 if issubclass(cls, Task) and cls not in cls_exclude_list \
-                 and not cls.__name__.startswith("_")]
+                 if issubclass(cls, Task) \
+                 and not cls.__name__.startswith("_") \
+                 and not is_abstract(cls)]
         for task in tasks:
             task.name = task.name or task.__name__.lower()
             task.joltdir = directory
         self._tasks += tasks
 
-        tests = [cls for cls in classes if issubclass(cls, Test) and cls is not Test \
-                 and not cls.__name__.startswith("_")]
+        tests = [cls for cls in classes if issubclass(cls, Test) \
+                 and not cls.__name__.startswith("_") \
+                 and not is_abstract(cls)]
         for test in tests:
             test.name = test.name or test.__name__.lower()
             test.joltdir = directory

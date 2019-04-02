@@ -337,6 +337,7 @@ class CXXProject(Task):
     source_influence = True
     binary = None
     incremental = True
+    abstract = True
 
     def __init__(self, *args, **kwargs):
         super(CXXProject, self).__init__(*args, **kwargs)
@@ -418,6 +419,7 @@ class CXXProject(Task):
 
 @influence.attribute("shared")
 class CXXLibrary(CXXProject):
+    abstract = True
     shared = False
 
     def __init__(self, *args, **kwargs):
@@ -442,6 +444,7 @@ class CXXLibrary(CXXProject):
 @influence.attribute("libpaths")
 @influence.attribute("libraries")
 class CXXExecutable(CXXProject):
+    abstract = True
     libpaths = []
     libraries = []
 
