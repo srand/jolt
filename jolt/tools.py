@@ -111,7 +111,7 @@ class _tmpdir(object):
     def __enter__(self):
         try:
             dirname = self._cwd
-            fs.makedirs(dirname)
+            fs.makedirs(fs.path.join(dirname, fs.path.dirname(self._name)))
             self._path = fs.mkdtemp(prefix=self._name + "-", dir=dirname)
         except:
             raise
@@ -333,7 +333,7 @@ class Tools(object):
 
         if name not in self._builddir:
             dirname = self.getcwd()
-            fs.makedirs(dirname)
+            fs.makedirs(fs.path.join(dirname, fs.path.dirname(name)))
             self._builddir[name] = fs.mkdtemp(prefix=name+"-", dir=dirname)
 
         return self._builddir[name]
