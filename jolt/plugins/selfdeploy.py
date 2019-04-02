@@ -31,7 +31,7 @@ class Jolt(Task):
     @property
     def extras(self):
         ext = config.get("selfdeploy", "extra", "")
-        return [fs.path.join(self.loaderdir, e) for e in ext.split(",")]
+        return [fs.path.join(self.loaderdir, e) for e in ext.split(",")] if ext else []
 
     def info(self, fmt, *args, **kwargs):
         log.verbose(fmt, *args, **kwargs)
