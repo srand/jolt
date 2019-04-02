@@ -269,11 +269,13 @@ class GNUToolchain(Toolchain):
     obj = Objects(files=[".o", ".obj", ".a"])
 
     outdir = ProjectVariable()
+    binary = ProjectVariable()
 
     ar = EnvironmentVariable(default="ar")
     cc = EnvironmentVariable(default="gcc")
     cxx = EnvironmentVariable(default="g++")
     ld = EnvironmentVariable(default="g++", envname="CXX")
+    objcopy = EnvironmentVariable(default="objcopy")
 
     asflags = EnvironmentVariable(default="")
     cflags = EnvironmentVariable(default="")
@@ -310,7 +312,13 @@ class GNUToolchain(Toolchain):
         suffix=".o")
 
     link = GNULinker(
-        command="$ld $ldflags $extra_ldflags $libpaths -Wl,--start-group @objects.list -Wl,--end-group -o $out -Wl,--start-group $libraries -Wl,--end-group")
+        command=" && ".join([
+            "$ld $ldflags $extra_ldflags $libpaths -Wl,--start-group @objects.list -Wl,--end-group -o $out -Wl,--start-group $libraries -Wl,--end-group",
+            "mkdir -p $outdir/.debug",
+            "$objcopy --only-keep-debug $out $outdir/.debug/$binary",
+            "$objcopy --strip-all $out",
+            "$objcopy --add-gnu-debuglink=$outdir/.debug/$binary $out"
+        ]))
 
     archive = GNUArchiver(
         command="$ar cr $out @objects.list",
@@ -472,4 +480,5 @@ class CXXExecutable(CXXProject):
                 artifact.collect(self.binary + '.exe', "bin/")
             else:
                 artifact.collect(self.binary, "bin/")
+                artifact.collect(".debug", "bin/")
         artifact.environ.PATH.append("bin")
