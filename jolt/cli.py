@@ -158,6 +158,10 @@ def build(ctx, task, network, keep_going, identity, default, local,
         root = dag.select(lambda graph, task: task.identity.startswith(identity))
         assert len(root) >= 1, "unknown hash identity, no such task: {0}".format(identity)
 
+    goal_tasks = dag.select(
+        lambda graph, node: node.short_qualified_name in task or \
+        node.qualified_name in task)
+
     queue = scheduler.TaskQueue(strategy)
 
     try:
@@ -178,6 +182,11 @@ def build(ctx, task, network, keep_going, identity, default, local,
             if not keep_going and error is not None:
                 queue.abort()
                 raise error
+
+        for goal in goal_tasks:
+            if acache.is_available_locally(goal):
+                with acache.get_artifact(goal) as artifact:
+                    log.info("Location: {0}", artifact.path)
 
         log.info("Total execution time: {0} {1}",
                  str(duration),
