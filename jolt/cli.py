@@ -381,10 +381,11 @@ def info(ctx, task, influence=False, artifacts=False):
         click.echo()
     click.echo("  Parameters")
     has_param = False
-    for item, param in task.__dict__.items():
-        if isinstance(param, Parameter):
-            has_param = True
-            click.echo("    {0:<15}   {1}".format(item, param.__doc__ or ""))
+    params = { key: getattr(task, key) for key in dir(task)
+               if isinstance(utils.getattr_safe(task, key), Parameter) }
+    for item, param in params.items():
+        has_param = True
+        click.echo("    {0:<15}   {1}".format(item, param.__doc__ or ""))
     if not has_param:
         click.echo("    None")
 
