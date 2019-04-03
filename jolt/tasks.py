@@ -361,7 +361,9 @@ class TaskBase(object):
         for key, value in params.items():
             param = utils.getattr_safe(cls, key)
             if isinstance(param, Parameter):
+                param = copy.copy(param)
                 param.set_default(value)
+                setattr(cls, key, param)
                 continue
             assert False, "no such parameter for task {0}: {1}".format(cls.name, key)
 
