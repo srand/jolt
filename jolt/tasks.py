@@ -652,6 +652,12 @@ class TaskException(Exception):
 
 
 class _Test(Task):
+    abstract = True
+    """ An abstract test class indended to be subclassed.
+
+    Abstract test tasks can't be executed and won't be listed.
+    """
+
     def __init__(self, test_cls, *args, **kwargs):
         self.test_cls = test_cls
         self.__class__.name = test_cls.name
@@ -697,6 +703,12 @@ class Test(ut.TestCase, TaskBase):
     requires = []
     extends = ""
     influence = []
+
+    abstract = True
+    """ An abstract test class indended to be subclassed.
+
+    Abstract test tasks can't be executed and won't be listed.
+    """
 
     def __init__(self, method="runTest", parameters=None, deps=None, tools=None, *args, **kwargs):
         ut.TestCase.__init__(self, method)
