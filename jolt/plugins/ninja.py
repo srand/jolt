@@ -15,21 +15,25 @@ class Variable(object):
 
 
 class EnvironmentVariable(Variable):
-    def __init__(self, default=None, envname=None):
+    def __init__(self, name=None, default=None, envname=None, prefix=None):
+        self.name = name
         self._default = default or ''
         self._envname = envname
+        self._prefix = prefix or ""
 
     def create(self, project, writer, deps, tools):
         envname = self._envname or self.name
-        writer.variable(self.name, tools.getenv(envname.upper(), self._default))
+        writer.variable(self.name, self._prefix + tools.getenv(envname.upper(), self._default))
 
 
 class ProjectVariable(Variable):
-    def __init__(self, default=None):
+    def __init__(self, name=None, default=None, attrib=None):
+        self.name = name
         self._default = default or ''
+        self._attrib = attrib
 
     def create(self, project, writer, deps, tools):
-        writer.variable(self.name, getattr(project, self.name))
+        writer.variable(self.name, str(getattr(project, self._attrib or self.name)))
 
 
 class Rule(object):
@@ -356,8 +360,20 @@ class CXXProject(Task):
         if self.source_influence:
             for source in self.sources:
                 self.influence.append(influence.FileInfluence(source))
+        self._init_variables()
+        self._init_rules()
         self._rule_map = Toolchain.build_rule_map(self)
-        Toolchain.build_variables(self)
+
+    def _init_variables(self):
+        for name, var in Toolchain.all_variables(self):
+            var = copy.copy(var)
+            setattr(self, name, var)
+            var.name = name
+
+    def _init_rules(self):
+        for name, rule in Toolchain.all_rules(self):
+            rule = copy.copy(rule)
+            setattr(self, name, rule)
 
     def _init_sources(self):
         sources = utils.as_list(utils.call_or_return(self, self.__class__._sources))
