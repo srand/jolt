@@ -268,6 +268,29 @@ class Libraries(Variable):
         writer.variable(self.name, " ".join(libraries))
 
 
+class GNUFlags(object):
+    @staticmethod
+    def set(flags, flag, fixup=None):
+        flags = flags.split(" ")
+        fixup = fixup or []
+        flags = [flag for flag in flags if flag not in fixup]
+        flags.append(flag)
+        return " ".join(flags)
+
+
+class GNUOptFlags(GNUFlags):
+    DEBUG = "-Og"
+
+    @staticmethod
+    def set(flags, flag):
+        remove = ("-O0", "-O1", "-O2", "-O3", "-Os", "-Ofast", "-Og", "-O")
+        return GNUFlags.set(flags, flag, remove)
+
+    @staticmethod
+    def set_debug(flags):
+        return GNUOptFlags.set(flags, GNUOptFlags.DEBUG)
+
+
 class GNUToolchain(Toolchain):
     hh = Skip(files=[".h", ".hh", ".hpp", ".hxx"])
     obj = Objects(files=[".o", ".obj", ".a"])
