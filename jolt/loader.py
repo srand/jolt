@@ -23,7 +23,7 @@ class JoltLoader(object):
         self._source = {}
         self._path = None
 
-    def _load_file(self, path):
+    def _load_file(self, path, joltdir=None):
         classes = []
 
         directory = fs.path.dirname(path)
@@ -54,7 +54,7 @@ class JoltLoader(object):
                  and not is_abstract(cls)]
         for task in tasks:
             task.name = task.name or task.__name__.lower()
-            task.joltdir = directory
+            task.joltdir = joltdir or directory
         self._tasks += tasks
 
         tests = [cls for cls in classes if issubclass(cls, Test) \
@@ -62,7 +62,7 @@ class JoltLoader(object):
                  and not is_abstract(cls)]
         for test in tests:
             test.name = test.name or test.__name__.lower()
-            test.joltdir = directory
+            test.joltdir = joltdir or directory
         self._tests += tests
 
         log.verbose("Loaded: {0}", path)
