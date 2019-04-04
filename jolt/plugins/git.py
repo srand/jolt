@@ -109,34 +109,36 @@ def _create_repo(url, path, relpath, refspecs=None):
 
 
 class GitInfluenceProvider(HashInfluenceProvider):
-    name = "Tree"
+    name = "Git"
 
     def __init__(self, path):
         super(GitInfluenceProvider, self).__init__()
-        self.tools = Tools()
         self.relpath = path
 
     @property
     def path(self):
         return fs.path.join(JoltLoader.get().joltdir, self.relpath)
 
-    def diff(self):
-        with self.tools.cwd(self.path):
-            return self.tools.run("git diff HEAD .", output_on_error=True)
+    def diff(self, tools):
+        with tools.cwd(self.path):
+            return tools.run("git diff HEAD .", output_on_error=True)
 
-    def diff_hash(self):
-        return utils.sha1(self.diff())
+    def diff_hash(self, tools):
+        return utils.sha1(self.diff(tools))
 
-    def tree_hash(self, sha="HEAD", path="/"):
-        with self.tools.cwd(self.path):
-            return self.tools.run("git rev-parse {0}:.{1}".format(sha, path), output_on_error=True)
+    def tree_hash(self, tools, sha="HEAD", path="/"):
+        with tools.cwd(self.path):
+            return tools.run("git rev-parse {0}:.{1}".format(sha, path), output_on_error=True)
 
     @utils.cached.instance
     def get_influence(self, task):
+        tools = Tools(task)
+        if not fs.path.exists(tools.expand_path(self.path)):
+            return "{0}:N/A".format(tools.expand(self.relpath))
         return "{0}:{1}:{2}".format(
-            self.relpath,
-            self.tree_hash(),
-            self.diff_hash()[:8])
+            tools.expand(self.relpath),
+            self.tree_hash(tools),
+            self.diff_hash(tools)[:8])
 
 
 def global_influence(path, cls=GitInfluenceProvider):
