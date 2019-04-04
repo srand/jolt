@@ -328,6 +328,8 @@ def _list(ctx, task=None, reverse=False):
                 print(task.name)
         return
 
+    task = [utils.stable_task_name(t) for t in task]
+
     try:
         dag = graph.GraphBuilder(registry, ctx.obj["manifest"]).build(task)
     except:
@@ -339,7 +341,7 @@ def _list(ctx, task=None, reverse=False):
     successors = set()
     for task in tasks:
         for successor in dag.successors(task):
-            successors.add(successor.qualified_name)
+            successors.add(successor.short_qualified_name)
 
     for task in sorted(list(successors)):
         print(task)
