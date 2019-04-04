@@ -497,8 +497,8 @@ class CXXExecutable(CXXProject):
 
     def __init__(self, *args, **kwargs):
         super(CXXExecutable, self).__init__(*args, **kwargs)
-        self.libpaths = utils.as_list(utils.call_or_return(self, self.__class__.libpaths))
-        self.libraries = utils.as_list(utils.call_or_return(self, self.__class__.libraries))
+        self.libpaths = utils.as_list(utils.call_or_return(self, self.__class__._libpaths))
+        self.libraries = utils.as_list(utils.call_or_return(self, self.__class__._libraries))
 
     def _populate_inputs(self, writer, deps, tools):
         self.depimports += toolchain.depimport.build(self, writer, deps)
