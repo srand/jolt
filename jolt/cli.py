@@ -399,12 +399,14 @@ def info(ctx, task, influence=False, artifacts=False):
             click.echo("    None")
         click.echo()
     except Exception as e:
+        log.exception()
         if "has not been set" in str(e):
             click.echo("    Unavailable (parameters must be set)")
             click.echo()
             return
         click.echo("    Unavailable (exception during evaluation)")
         click.echo()
+        return
 
 
     if artifacts:
