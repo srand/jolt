@@ -223,7 +223,6 @@ class Git(GitSrc, HashInfluenceProvider):
         if not self.git.is_cloned():
             self.git.clone()
         rev = self._get_revision()
-        rev = self._get_revision()
         if rev is not None:
             return self.git.tree_hash(rev)
         return "{0}:{1}:{2}".format(
