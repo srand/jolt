@@ -33,7 +33,10 @@ class ProjectVariable(Variable):
         self._attrib = attrib
 
     def create(self, project, writer, deps, tools):
-        writer.variable(self.name, str(getattr(project, self._attrib or self.name)))
+        value = getattr(project, self._attrib or self.name, "")
+        if type(value) == list:
+            value = " ".join(value)
+        writer.variable(self.name, str(value))
 
 
 class Rule(object):
@@ -309,6 +312,11 @@ class GNUToolchain(Toolchain):
     cxxflags = EnvironmentVariable(default="")
     ldflags = EnvironmentVariable(default="")
 
+    extra_asflags = ProjectVariable(attrib="asflags")
+    extra_cflags = ProjectVariable(attrib="cflags")
+    extra_cxxflags = ProjectVariable(attrib="cxxflags")
+    extra_ldflags = ProjectVariable(attrib="ldflags")
+
     macros = Macros(prefix="-D")
     incpaths = IncludePaths(prefix="-I")
     libpaths = LibraryPaths(prefix="-L")
@@ -360,6 +368,9 @@ class GNUToolchain(Toolchain):
 toolchain = GNUToolchain()
 
 
+@influence.attribute("asflags")
+@influence.attribute("cflags")
+@influence.attribute("cxxflags")
 @influence.attribute("incpaths")
 @influence.attribute("macros")
 @influence.attribute("sources")
@@ -368,6 +379,9 @@ class CXXProject(Task):
     incpaths = []
     macros = []
     sources = []
+    asflags = []
+    cflags = []
+    cxxflags = []
     depimports = []
     source_influence = True
     binary = None
@@ -488,12 +502,14 @@ class CXXLibrary(CXXProject):
         artifact.cxxinfo.libraries.append(self.binary)
 
 
+@influence.attribute("ldflags")
 @influence.attribute("libpaths")
 @influence.attribute("libraries")
 class CXXExecutable(CXXProject):
     abstract = True
     libpaths = []
     libraries = []
+    ldflags = []
 
     def __init__(self, *args, **kwargs):
         super(CXXExecutable, self).__init__(*args, **kwargs)
