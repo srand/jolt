@@ -21,6 +21,10 @@ def main():
         sys.exit(1)
     except Exception as e:
         log.exception(e)
+        if cli.debug_enabled:
+            import pdb
+            extype, value, tb = sys.exc_info()
+            pdb.post_mortem(tb)
         sys.exit(1)
 
 

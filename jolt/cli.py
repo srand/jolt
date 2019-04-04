@@ -24,14 +24,20 @@ from jolt.options import JoltOptions
 from jolt.hooks import TaskHookRegistry
 from jolt.manifest import JoltManifest
 
+debug_enabled = False
+
 
 @click.group()
 @click.option("-v", "--verbose", is_flag=True, help="Verbose.")
 @click.option("-vv", "--extra-verbose", is_flag=True, help="Verbose.")
 @click.option("-c", "--config-file", type=str, help="Configuration file")
+@click.option("-d", "--debug", is_flag=True, help="Attach debugger on exception", hidden=True)
 @click.pass_context
-def cli(ctx, verbose, extra_verbose, config_file):
+def cli(ctx, verbose, extra_verbose, config_file, debug):
     """ Jolt - a task execution tool. """
+
+    global debug_enabled
+    debug_enabled = debug
 
     if verbose:
         log.set_level(log.VERBOSE)
