@@ -182,6 +182,7 @@ class JenkinsExecutor(scheduler.NetworkExecutor):
         files = {}
         files["default.joltxmanifest"] = ("default.joltxmanifest", StringIO(JoltManifest.export(self.task).format()))
 
+        assert not self.is_aborted(), "[JENKINS] execution cancelled"
         queue_id = self._build_job(parameters, files)
 
         log.verbose("[JENKINS] Queued {0}", self.task.qualified_name)
@@ -205,10 +206,12 @@ class JenkinsExecutor(scheduler.NetworkExecutor):
 
         build_id = queue_info["executable"]["number"]
         build_info = self._get_build_info(build_id)
+        abort_warning = False
         while build_info["result"] not in ["SUCCESS", "FAILURE", "ABORTED"]:
-            if self.is_aborted():
-                self._stop_build(build_id)
-                assert False, "[JENKINS] execution cancelled"
+            if self.is_aborted() and not abort_warning:
+                abort_warning = True
+                log.verbose("[JENKINS] build aborted but '{0}' must run to completion",
+                            self.task.qualified_name)
             time.sleep(POLL_INTERVAL)
             build_info = self._get_build_info(build_id)
 
