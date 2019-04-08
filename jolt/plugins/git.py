@@ -46,7 +46,7 @@ class GitRepository(object):
     @utils.cached.instance
     def _diff(self, path="/"):
         with self.tools.cwd(self.path):
-            return self.tools.run("git diff HEAD .{0}".format(path), output_on_error=True)
+            return self.tools.run("git diff --no-ext-diff HEAD .{0}".format(path), output_on_error=True)
 
     def diff(self, path="/"):
         return self._diff(path) if self.is_cloned() else ""
@@ -121,7 +121,7 @@ class GitInfluenceProvider(HashInfluenceProvider):
 
     def diff(self, tools):
         with tools.cwd(self.path):
-            return tools.run("git diff HEAD .", output_on_error=True)
+            return tools.run("git diff --no-ext-diff HEAD .", output_on_error=True)
 
     def diff_hash(self, tools):
         return utils.sha1(self.diff(tools))

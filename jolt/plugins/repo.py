@@ -36,7 +36,7 @@ class RepoProject(SubElement):
 
     def get_diff(self):
         with self.tools.cwd(self.path_or_name):
-            return self.tools.run("git diff HEAD", output_on_error=True)
+            return self.tools.run("git diff --no-ext-diff HEAD", output_on_error=True)
         assert False, "git command failed"
 
     def get_head(self):
