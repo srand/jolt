@@ -371,6 +371,7 @@ toolchain = GNUToolchain()
 @influence.attribute("asflags")
 @influence.attribute("cflags")
 @influence.attribute("cxxflags")
+@influence.attribute("depimports")
 @influence.attribute("incpaths")
 @influence.attribute("macros")
 @influence.attribute("sources")
@@ -391,6 +392,10 @@ class CXXProject(Task):
     def __init__(self, *args, **kwargs):
         super(CXXProject, self).__init__(*args, **kwargs)
         self._init_sources()
+        self.asflags = utils.as_list(utils.call_or_return(self, self.__class__._asflags))
+        self.cflags = utils.as_list(utils.call_or_return(self, self.__class__._cflags))
+        self.cxxflags = utils.as_list(utils.call_or_return(self, self.__class__._cxxflags))
+        self.depimports = utils.as_list(utils.call_or_return(self, self.__class__._depimports))
         self.macros = utils.as_list(utils.call_or_return(self, self.__class__._macros))
         self.incpaths = utils.as_list(utils.call_or_return(self, self.__class__._incpaths))
         self.binary = self.__class__.binary or self.canonical_name
@@ -472,6 +477,18 @@ class CXXProject(Task):
     def _sources(self):
         return utils.call_or_return(self, self.__class__.sources)
 
+    def _asflags(self):
+        return utils.call_or_return(self, self.__class__.asflags)
+
+    def _cflags(self):
+        return utils.call_or_return(self, self.__class__.cflags)
+
+    def _cxxflags(self):
+        return utils.call_or_return(self, self.__class__.cxxflags)
+
+    def _depimports(self):
+        return utils.call_or_return(self, self.__class__.depimports)
+
     def run(self, deps, tools):
         self.outdir = tools.builddir("build/ninja", self.incremental)
         self._write_ninja_file(self.outdir, deps, tools)
@@ -513,6 +530,7 @@ class CXXExecutable(CXXProject):
 
     def __init__(self, *args, **kwargs):
         super(CXXExecutable, self).__init__(*args, **kwargs)
+        self.ldflags = utils.as_list(utils.call_or_return(self, self.__class__._ldflags))
         self.libpaths = utils.as_list(utils.call_or_return(self, self.__class__._libpaths))
         self.libraries = utils.as_list(utils.call_or_return(self, self.__class__._libraries))
 
@@ -522,6 +540,9 @@ class CXXExecutable(CXXProject):
 
     def _populate_project(self, writer, deps, tools):
         toolchain.link.build(self, writer, self.objects)
+
+    def _ldflags(self):
+        return utils.call_or_return(self, self.__class__.ldflags)
 
     def _libpaths(self):
         return utils.call_or_return(self, self.__class__.libpaths)
