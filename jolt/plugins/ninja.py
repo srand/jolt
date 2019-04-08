@@ -356,7 +356,7 @@ class GNUToolchain(Toolchain):
         ]))
 
     archive = GNUArchiver(
-        command="$ar cr $out @objects.list",
+        command="rm -f $out && $ar cr $out @objects.list",
         prefix="lib",
         suffix=".a")
 
@@ -495,9 +495,9 @@ class CXXLibrary(CXXProject):
 
     def publish(self, artifact, tools):
         with tools.cwd(self.outdir):
-            artifact.collect("*.a", "lib/")
-            artifact.collect("*.so", "lib/")
-            artifact.collect("*.dll", "lib/")
+            artifact.collect("*{binary}.a", "lib/")
+            artifact.collect("*{binary}.so", "lib/")
+            artifact.collect("*{binary}.dll", "lib/")
         artifact.cxxinfo.libpaths.append("lib")
         artifact.cxxinfo.libraries.append(self.binary)
 
