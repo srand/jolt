@@ -21,6 +21,7 @@ from jolt import utils
 def _run(cmd, cwd, env, *args, **kwargs):
     output = kwargs.get("output")
     output_on_error = kwargs.get("output_on_error")
+    output_rstrip = kwargs.get("output_rstrip", True)
     output = output if output is not None else True
     output = False if output_on_error else output
     p = subprocess.Popen(
@@ -43,7 +44,8 @@ def _run(cmd, cwd, env, *args, **kwargs):
         def run(self):
             try:
                 for line in iter(self.stream.readline, b''):
-                    line = line.rstrip()
+                    if output_rstrip:
+                        line = line.rstrip()
                     line = line.decode(errors='ignore')
                     if self.output:
                         self.output(line)
@@ -69,7 +71,7 @@ def _run(cmd, cwd, env, *args, **kwargs):
             log.stderr(line)
 
     assert p.returncode == 0, "command failed: {0}".format(cmd.format(*args, **kwargs))
-    return "\n".join(stdout.buffer)
+    return "\n".join(stdout.buffer) if output_rstrip else "".join(stdout.buffer)
 
 
 class _String(object):
@@ -737,6 +739,9 @@ class Tools(object):
             output_on_error (boolean, optional): If ``True``, no output is
                 written to the console unless the command fails.
                 The default is ``False``.
+            output_rstrip (boolean, optional): By default, output written
+                to stdout is stripped from whitespace at the end of the
+                string. This can be disabled by setting this argument to False.
 
         Example:
 

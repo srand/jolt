@@ -177,7 +177,7 @@ class TaskProxy(object):
         self.manifest = manifest
 
         # Find all direct and transitive dependencies
-        self.children = sorted(
+        self.descendants = sorted(
             nx.descendants(dag, self),
             key=lambda t: t.qualified_name)
 
@@ -185,7 +185,7 @@ class TaskProxy(object):
         self.children = list(
             filter(lambda n: not n.is_resource() or \
                    dag.are_neighbors(self, n),
-                   self.children))
+                   self.descendants))
 
         self.anestors = nx.ancestors(dag, self)
 

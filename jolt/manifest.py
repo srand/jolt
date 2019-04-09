@@ -3,7 +3,7 @@ from jolt import filesystem as fs
 
 
 @Attribute('name')
-@Attribute('value')
+@Attribute('value', child=True)
 class _JoltAttribute(SubElement):
     def __init__(self, elem=None):
         super(_JoltAttribute, self).__init__('attribute', elem=elem)

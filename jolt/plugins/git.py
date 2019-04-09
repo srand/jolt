@@ -46,10 +46,22 @@ class GitRepository(object):
     @utils.cached.instance
     def _diff(self, path="/"):
         with self.tools.cwd(self.path):
-            return self.tools.run("git diff --no-ext-diff HEAD .{0}".format(path), output_on_error=True)
+            return self.tools.run("git diff --no-ext-diff HEAD .{0}".format(path),
+                                  output_on_error=True,
+                                  output_rstrip=False)
 
     def diff(self, path="/"):
         return self._diff(path) if self.is_cloned() else ""
+
+    def patch(self, patch):
+        if not patch:
+            return
+        with self.tools.cwd(self.path), self.tools.tmpdir("git") as t:
+            patchfile = fs.path.join(t.path, "jolt.diff")
+            with open(patchfile, "wb") as f:
+                f.write(patch.encode())
+            log.info("Applying patch to {0}", self.path)
+            self.tools.run("git apply --whitespace=nowarn {patchfile}", patchfile=patchfile)
 
     @utils.cached.instance
     def _head(self):
@@ -88,7 +100,7 @@ class GitRepository(object):
                            refspec=refspec or '')
 
     def checkout(self, rev):
-        log.info("Checkout out {0} in {1}", rev, self.path)
+        log.info("Checking out {0} in {1}", rev, self.path)
         with self.tools.cwd(self.path):
             try:
                 return self.tools.run("git checkout -f {rev}", rev=rev, output=False)
@@ -164,6 +176,7 @@ class GitSrc(Resource):
     sha = Parameter(required=False, help="Specific commit or tag to be checked out. Optional.")
     path = Parameter(required=False, help="Local path where the repository should be cloned.")
     _revision = Export(value=lambda self: self._get_revision() or self.git.head())
+    _diff = Export(value=lambda self: self.git.diff(), encoded=True)
 
     def __init__(self, *args, **kwargs):
         super(GitSrc, self).__init__(*args, **kwargs)
@@ -186,6 +199,9 @@ class GitSrc(Resource):
             return self.sha.get_value()
         return None
 
+    def _get_diff(self):
+        return self._diff.value
+
     def acquire(self, artifact, env, tools):
         if not self.git.is_cloned():
             self.git.clone()
@@ -197,6 +213,8 @@ class GitSrc(Resource):
             # Should be safe to do this now
             self.git.checkout(rev)
             self.git.clean()
+            self.git.patch(self._get_diff())
+
 
 TaskRegistry.get().add_task_class(GitSrc)
 
@@ -213,6 +231,7 @@ class Git(GitSrc, HashInfluenceProvider):
     sha = Parameter(required=False, help="Specific commit or tag to be checked out. Optional.")
     path = Parameter(required=False, help="Local path where the repository should be cloned.")
     _revision = Export(value=lambda self: self._get_revision())
+    _diff = Export(value=lambda self: self.git.diff(), encoded=True)
 
     def __init__(self, *args, **kwargs):
         super(Git, self).__init__(*args, **kwargs)
@@ -226,34 +245,9 @@ class Git(GitSrc, HashInfluenceProvider):
         if rev is not None:
             return self.git.tree_hash(rev)
         return "{0}:{1}:{2}".format(
-            fs.path.join(self.git.relpath, str(self.path)),
+            self.git.relpath,
             self.git.tree_hash(),
             self.git.diff_hash()[:8])
 
 TaskRegistry.get().add_task_class(Git)
 
-
-class GitNetworkExecutorExtension(NetworkExecutorExtension):
-    """ Sanity check that a local git repo can be built remotely """
-
-    def get_parameters(self, task):
-        return {}
-        for child in task.children:
-            if isinstance(child.task, GitSrc):
-                task = child.task
-                if task.git.is_cloned() and task.sha.is_unset():
-                    assert task._is_synced(),\
-                        "local commit found in git repo '{0}'; "\
-                        "push before building remotely"\
-                        .format(task._get_name())
-                    assert not task._get_diff(task),\
-                        "local changes found in git repo '{0}'; "\
-                        "commit and push before building remotely"\
-                        .format(task._get_name())
-        return {}
-
-
-@NetworkExecutorExtensionFactory.Register
-class GitNetworkExecutorExtensionFactory(NetworkExecutorExtensionFactory):
-    def create(self):
-        return GitNetworkExecutorExtension()

@@ -5,6 +5,7 @@ from contextlib import contextmanager
 import unittest as ut
 import functools as ft
 import types
+import base64
 
 from jolt import utils
 from jolt.cache import *
@@ -13,15 +14,20 @@ from jolt.influence import TaskSourceInfluence
 
 
 class Export(object):
-    def __init__(self, value):
+    def __init__(self, value, encoded=False):
         self.value = None
         self.exported_value = value
+        self.encoded = encoded
 
     def assign(self, value):
-        self.value = value
+        value = value or ""
+        self.value = base64.decodestring(value.encode()).decode() if self.encoded else value
 
     def export(self, task):
-        return self.value if self.value is not None else self.exported_value(task)
+        value = self.value if self.value is not None else self.exported_value(task)
+        if value:
+            value = base64.encodestring(value.encode()).decode() if self.encoded else value
+        return value
 
 
 class Parameter(object):
