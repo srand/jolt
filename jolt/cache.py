@@ -5,6 +5,7 @@ import os
 from tempfile import mkdtemp
 import time
 from threading import RLock, current_thread
+import fcntl
 
 from jolt import filesystem as fs
 from jolt import log
@@ -664,6 +665,9 @@ class ArtifactCache(StorageProvider):
             factory.create(self)
             for factory in ArtifactCache.storage_provider_factories]
         self._options = options or JoltOptions()
+        self._lockfile = utils.LockFile(
+            fs.path.join(self.root),
+            "Another instance of Jolt is already running, waiting for it to complete...")
 
     def get_path(self, node):
         return fs.path.join(self.root, node.canonical_name, node.identity)

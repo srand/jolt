@@ -6,6 +6,10 @@ from string import *
 import os
 import hashlib
 import sys
+import fcntl
+import errno
+
+from jolt import log
 
 
 if sys.version_info[0] == 3:
@@ -225,6 +229,27 @@ def Singleton(cls):
         return cls._instance
     cls.get = get
     return cls
+
+
+class LockFile(object):
+    def __init__(self, path, busymsg=None):
+        self._file = open(os.path.join(path, "lock"), "wb")
+        try:
+            fcntl.lockf(self._file, fcntl.LOCK_EX|fcntl.LOCK_NB)
+        except IOError as e:
+            if e.errno in [errno.EAGAIN, errno.EACCES]:
+                if busymsg is not None:
+                    log.info(busymsg)
+                fcntl.lockf(self._file, fcntl.LOCK_EX)
+            else:
+                raise
+
+    def __enter__(self, *args, **kwargs):
+        return self
+
+    def __exit__(self, *args, **kwargs):
+        self._file.close()
+
 
 def map_consecutive(method, iterable):
     return list(map(method, iterable))
