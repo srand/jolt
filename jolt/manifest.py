@@ -1,5 +1,8 @@
+import os
+
 from jolt.xmldom import *
 from jolt import filesystem as fs
+from jolt import log
 
 
 @Attribute('name')
@@ -41,11 +44,19 @@ class JoltManifest(ElementTree):
         self.getroot().set(key, value)
 
     def parse(self, filename="default.joltxmanifest"):
-        with open(filename) as f:
+        path = os.getcwd()
+        filepath = fs.path.join(path, filename)
+        while not fs.path.exists(filepath) and path != fs.sep:
+            path = fs.path.dirname(path)
+            filepath = fs.path.join(path, filename)
+        if path == fs.sep:
+            raise Exception("couldn't find manifest file")
+        with open(filepath) as f:
             data = f.read().replace("\n  ", "")
             data = data.replace("\n", "")
             root = ET.fromstring(data)
             self._setroot(root)
+            log.verbose("Loaded: {0}", filepath)
             return self
         raise Exception("failed to parse xml file")
 

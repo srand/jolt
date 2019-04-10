@@ -271,7 +271,7 @@ def docs(follow, delete):
 @cli.command(hidden=True)
 @click.argument("task", type=str, nargs=-1, required=True)
 @click.option("-d", "--default", type=str, multiple=True, help="Override default parameter values.")
-@click.option("-o", "--output", type=str, default="default.joltmanifestx", help="Manifest filename.")
+@click.option("-o", "--output", type=str, default="default.joltxmanifest", help="Manifest filename.")
 @click.pass_context
 def freeze(ctx, task, default, output):
     """
@@ -305,7 +305,7 @@ def freeze(ctx, task, default, output):
             manifest_task.name = task.qualified_name
             manifest_task.identity = task.identity
 
-    manifest.write(output)
+    manifest.write(fs.path.join(JoltLoader.get().joltdir, output))
 
 
 @cli.command(name="list")
