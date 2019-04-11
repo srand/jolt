@@ -413,8 +413,9 @@ class Artifact(object):
                 dest = fs.path.join(dirname, src) \
                        if not flatten else \
                           fs.path.join(dirname, fs.path.basename(src))
-                self.tools.copy(src, dest, symlinks=symlinks)
-                log.verbose("Collected {0} -> {1}", src, dest[len(self._temp):])
+                if symlinks or fs.path.exists(self.tools.expand_path(src)):
+                    self.tools.copy(src, dest, symlinks=symlinks)
+                    log.verbose("Collected {0} -> {1}", src, dest[len(self._temp):])
 
     def copy(self, pathname, dest, flatten=False, symlinks=False):
         """ Copy files from the artifact.

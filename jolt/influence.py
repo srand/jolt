@@ -290,14 +290,27 @@ def environ(variable):
 class FileInfluence(HashInfluenceProvider):
     def __init__(self, path):
         self.path = path
-        self.name = "File:" + fs.path.basename(path)
+        self.name = "File"
 
-    def get_influence(self, task):
+    def get_file_influence(self, task, path):
         sha = hashlib.sha1()
-        with open(task.tools.expand_path(self.path), "rb") as f:
+        with open(path, "rb") as f:
             for data in iter(lambda: f.read(0x10000), b''):
                 sha.update(data)
         return sha.hexdigest()
+
+    def get_influence(self, task):
+        result = []
+        files = task.tools.glob(self.path)
+        files.sort()
+        for f in files:
+            f = task.tools.expand_path(f)
+            if fs.path.exists(f):
+                result.append(fs.path.basename(f) + ":" + self.get_file_influence(task, f))
+            elif fs.path.lexists(f):
+                result.append(fs.path.basename(f) + ": Symlink (broken)")
+
+        return "\n".join(result)
 
 
 def files(pathname):
@@ -324,12 +337,7 @@ def files(pathname):
         _old_init = cls.__init__
         def _init(self, *args, **kwargs):
             _old_init(self, *args, **kwargs)
-            f = []
-            with Tools(self, self.joltdir) as tools:
-                f = tools.glob(pathname)
-            f.sort()
-            for i in f:
-                self.influence.append(FileInfluence(i))
+            self.influence.append(FileInfluence(pathname))
         cls.__init__ = _init
         return cls
 
