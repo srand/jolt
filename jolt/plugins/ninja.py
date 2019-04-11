@@ -418,11 +418,14 @@ class CXXProject(Task):
             setattr(self, name, rule)
 
     def _init_sources(self):
-        sources = utils.as_list(utils.call_or_return(self, self.__class__._sources))
-        self.sources = []
-        for l in map(self.tools.glob, sources):
-            self.sources += l
-        self.sources.sort()
+        self.sources = utils.as_list(utils.call_or_return(self, self.__class__._sources))
+
+    def _expand_sources(self):
+        sources = []
+        for l in map(self.tools.glob, self.sources):
+            sources += l
+        sources.sort()
+        self.sources = sources
 
     def _write_ninja_file(self, basedir, deps, tools):
         with open(fs.path.join(basedir, "build.ninja"), "w") as fobj:
@@ -490,6 +493,7 @@ class CXXProject(Task):
         return utils.call_or_return(self, self.__class__.depimports)
 
     def run(self, deps, tools):
+        self._expand_sources()
         self.outdir = tools.builddir("build/ninja", self.incremental)
         self._write_ninja_file(self.outdir, deps, tools)
         tools.run("ninja -C {0}", self.outdir)
