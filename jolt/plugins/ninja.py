@@ -376,6 +376,7 @@ toolchain = GNUToolchain()
 @influence.attribute("macros")
 @influence.attribute("sources")
 @influence.attribute("binary")
+@influence.attribute("publishdir")
 class CXXProject(Task):
     incpaths = []
     macros = []
@@ -384,6 +385,7 @@ class CXXProject(Task):
     cflags = []
     cxxflags = []
     depimports = []
+    publishdir = None
     source_influence = True
     binary = None
     incremental = True
@@ -399,6 +401,7 @@ class CXXProject(Task):
         self.macros = utils.as_list(utils.call_or_return(self, self.__class__._macros))
         self.incpaths = utils.as_list(utils.call_or_return(self, self.__class__._incpaths))
         self.binary = self.__class__.binary or self.canonical_name
+        self.publishdir = self.__class__.publishdir
         if self.source_influence:
             for source in self.sources:
                 self.influence.append(influence.FileInfluence(source))
@@ -503,6 +506,7 @@ class CXXProject(Task):
 class CXXLibrary(CXXProject):
     abstract = True
     shared = False
+    publishdir = "lib/"
 
     def __init__(self, *args, **kwargs):
         super(CXXLibrary, self).__init__(*args, **kwargs)
@@ -531,6 +535,7 @@ class CXXExecutable(CXXProject):
     libpaths = []
     libraries = []
     ldflags = []
+    publishdir = "bin/"
 
     def __init__(self, *args, **kwargs):
         super(CXXExecutable, self).__init__(*args, **kwargs)
@@ -557,8 +562,8 @@ class CXXExecutable(CXXProject):
     def publish(self, artifact, tools):
         with tools.cwd(self.outdir):
             if platform.system() == "Windows":
-                artifact.collect(self.binary + '.exe', "bin/")
+                artifact.collect(self.binary + '.exe', self.publishdir)
             else:
-                artifact.collect(self.binary, "bin/")
-                artifact.collect(".debug", "bin/")
-        artifact.environ.PATH.append("bin")
+                artifact.collect(self.binary, self.publishdir)
+                artifact.collect(".debug", self.publishdir)
+        artifact.environ.PATH.append(self.publishdir)
