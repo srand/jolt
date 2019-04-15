@@ -103,32 +103,32 @@ def build(ctx, task, network, keep_going, identity, default, local,
     duration = utils.duration()
 
     if network:
-        download = config.getboolean("network", "download", True)
-        upload = config.getboolean("network", "upload", True)
+        _download = config.getboolean("network", "download", True)
+        _upload = config.getboolean("network", "upload", True)
     else:
-        download = config.getboolean("jolt", "download", True)
-        upload = config.getboolean("jolt", "upload", True)
-
-    if no_download:
-        download = False
-    if no_upload:
-        upload = False
-    if download:
-        download = True
-    if upload:
-        upload = True
+        _download = config.getboolean("jolt", "download", True)
+        _upload = config.getboolean("jolt", "upload", True)
 
     if local:
-        download = False
-        upload = False
+        _download = False
+        _upload = False
+    else:
+        if no_download:
+            _download = False
+        if no_upload:
+            _upload = False
+        if download:
+            _download = True
+        if upload:
+            _upload = True
 
     if force:
         taint()
 
     options = JoltOptions(network=network,
                           local=local,
-                          download=download,
-                          upload=upload,
+                          download=_download,
+                          upload=_upload,
                           keep_going=keep_going,
                           default=default,
                           worker=worker)
