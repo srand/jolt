@@ -6,12 +6,6 @@
   <properties>
     <hudson.model.ParametersDefinitionProperty>
       <parameterDefinitions>
-        <hudson.model.TextParameterDefinition>
-          <name>joltfile</name>
-          <description></description>
-          <defaultValue></defaultValue>
-          <trim>false</trim>
-        </hudson.model.TextParameterDefinition>
         <hudson.model.StringParameterDefinition>
           <name>task</name>
           <description></description>
@@ -42,22 +36,14 @@
           <defaultValue></defaultValue>
           <trim>false</trim>
         </hudson.model.StringParameterDefinition>
-        <hudson.model.TextParameterDefinition>
-          <name>jolt_manifest</name>
+        <hudson.model.FileParameterDefinition>
+          <name>default.joltxmanifest</name>
           <description></description>
-          <defaultValue></defaultValue>
-          <trim>false</trim>
-        </hudson.model.TextParameterDefinition>
+        </hudson.model.FileParameterDefinition>
         <hudson.model.TextParameterDefinition>
           <name>config</name>
           <description></description>
           <defaultValue>{{ config }}</defaultValue>
-          <trim>false</trim>
-        </hudson.model.TextParameterDefinition>
-        <hudson.model.TextParameterDefinition>
-          <name>repo_manifest</name>
-          <description></description>
-          <defaultValue></defaultValue>
           <trim>false</trim>
         </hudson.model.TextParameterDefinition>
       </parameterDefinitions>
@@ -97,11 +83,8 @@ if [ -n "$jolt_url" ]; then
 fi
 
 /bin/echo -E &quot;$config&quot; &gt; jolt.conf
-/bin/echo -E &quot;$jolt_manifest&quot; &gt; default.joltxmanifest
 set -x
 
-rm -f *.jolt
-jolt -vv -c jolt.conf info $task -a
 rm -f *.jolt
 jolt -vv -c jolt.conf build -i $task_identity --worker $task_default $task</command>
     </hudson.tasks.Shell>
