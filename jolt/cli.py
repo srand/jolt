@@ -13,7 +13,7 @@ from jolt import graph
 from jolt import cache
 from jolt import filesystem as fs
 from jolt import log
-from jolt.log import path as log_path
+from jolt.log import logfile
 from jolt import config
 from jolt import plugins
 from jolt.plugins import cxxinfo, environ, strings
@@ -42,7 +42,7 @@ def cli(ctx, verbose, extra_verbose, config_file, debug):
     if verbose:
         log.set_level(log.VERBOSE)
     if extra_verbose:
-        log.set_level(log.HYSTERICAL)
+        log.set_level(log.DEBUG)
     if config_file:
         config.load(config_file)
 
@@ -198,12 +198,12 @@ def build(ctx, task, network, keep_going, identity, default, local,
                  str(duration),
                  str(queue.duration_acc) if network else '')
     except KeyboardInterrupt:
-        log.warn("Interrupted by user")
+        log.warning("Interrupted by user")
         try:
             queue.abort()
             return
         except KeyboardInterrupt:
-            log.warn("Interrupted again, exiting")
+            log.warning("Interrupted again, exiting")
             os._exit(1)
 
 
@@ -357,11 +357,11 @@ def _log(follow, delete):
     <WIP>
     """
     if follow:
-        subprocess.call("tail -f {0}".format(log_path), shell=True)
+        subprocess.call("tail -f {0}".format(logfile), shell=True)
     elif delete:
-        fs.unlink(log_path)
+        fs.unlink(logfile)
     else:
-        subprocess.call("less {0}".format(log_path), shell=True)
+        subprocess.call("less {0}".format(logfile), shell=True)
 
 
 @cli.command()

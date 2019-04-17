@@ -4,120 +4,190 @@ import sys
 import tqdm
 import traceback
 from datetime import datetime
+import threading
+import logging
+import logging.handlers
+import time
+from contextlib import contextmanager
+try:
+    from StringIO import StringIO
+except:
+    from io import StringIO
 
 from jolt import config
 from jolt import filesystem as fs
 from jolt import colors
 
 
-_stdout = os.fdopen(os.dup(sys.__stdout__.fileno()), "w")
-_stderr = os.fdopen(os.dup(sys.__stderr__.fileno()), "w")
-
-
-ERROR = 0
-WARN = 1
-NORMAL = 2
-VERBOSE = 3
-HYSTERICAL = 4
-
-_levelstr = ["ERROR", "WARNING", "INFO", "VERBOSE", "HYSTERICAL"]
-
 default_path = fs.path.join(fs.path.expanduser("~"), ".jolt", "jolt.log")
-path = config.get("jolt", "logfile", default_path)
+logfile = config.get("jolt", "logfile", default_path)
+logsize = config.getsize("jolt", "logsize", os.environ.get("JOLT_LOGSIZE", 10*1024**2))  # 10MiB
+logcount = config.getint("jolt", "logcount", os.environ.get("JOLT_LOGCOUNT", 1))
 
-_loglevel = NORMAL
-try:
-    dirpath = fs.path.dirname(path)
-    if not fs.path.exists(dirpath):
-        fs.makedirs(dirpath)
-    _file = open(path, "a")
-except:
-    print("[ERROR] " + colors.red("could not open logfile: {0}".format(path)))
-    print("[ERROR] " + colors.red("please set 'jolt.logfile' to an alternate path"))
-    sys.exit(1)
+dirpath = fs.path.dirname(logfile)
+if not fs.path.exists(dirpath):
+    fs.makedirs(dirpath)
+with open(logfile, "a") as f:
+    f.write("--------------------------------------------------------------------------------\n")
+
+################################################################################
+
+ERROR = logging.ERROR
+WARNING = logging.WARNING
+INFO = logging.INFO
+VERBOSE = 15
+DEBUG = logging.DEBUG
+EXCEPTION = logging.DEBUG + 1
+STDOUT = logging.INFO + 1
+STDERR = logging.ERROR + 1
+logging.addLevelName(VERBOSE, "VERBOSE")
+logging.addLevelName(STDOUT, "STDOUT")
+logging.addLevelName(STDERR, "STDERR")
+logging.addLevelName(EXCEPTION, "EXCEPT")
 
 
-def _prefix(level, **kwargs):
-    if type(level) == int:
-        level = "[{}]".format(_levelstr[level])
-    elif type(level) == str:
-        level = "[{}]".format(level)
-    else:
-        level = ""
-    context = kwargs.get("log_context")
-    context = "[{}]".format(context) if context else ""
-    pad = " " if level and context else ""
-    return context + pad + level + " "
+class Formatter(logging.Formatter):
+    def __init__(self, fmt, *args, **kwargs):
+        super(Formatter, self).__init__(*args, **kwargs)
+        self.fmt = fmt
 
-def _line(level, fmt, *args, **kwargs):
-    from jolt.utils import expand
-    return _prefix(level, **kwargs) + expand(fmt, *args, ignore_errors=True, **kwargs)
+    def format(self, record):
+        record.message = record.msg.format(*record.args)
+        record.asctime = datetime.fromtimestamp(record.created).strftime("%Y-%m-%d %H:%M:%S.%f")
+        return self.fmt.format(
+            levelname=record.levelname,
+            message=record.message,
+            asctime=record.asctime
+        )
 
-def _streamwrite(stream, line):
-    stream.write(line + "\r\n")
-    stream.flush()
 
-def _streamwrite_file(stream, line):
-    ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")
-    _streamwrite(stream, ts + " " + line)
+class ConsoleFormatter(logging.Formatter):
+    def __init__(self, fmt, *args, **kwargs):
+        super(ConsoleFormatter, self).__init__(*args, **kwargs)
+        self.fmt = fmt
 
-def _log(level, stream, fmt, *args, **kwargs):
-    line = _line(level, fmt, *args, **kwargs)
-    if level <= _loglevel:
-        _streamwrite(stream, line)
-    _streamwrite_file(_file, line)
+    def format(self, record):
+        msg = record.msg.format(*record.args)
+        if sys.stdout.isatty() and sys.stderr.isatty():
+            if record.levelno >= ERROR:
+                msg = colors.red(msg)
+            elif record.levelno >= WARNING:
+                msg = colors.yellow(msg)
+        record.message = msg
+        record.asctime = datetime.fromtimestamp(record.created).strftime("%Y-%m-%d %H:%M:%S.%f")
+        return self.fmt.format(
+            levelname=record.levelname,
+            message=record.message,
+            asctime=record.asctime
+        )
 
-def set_level(level):
-    global _loglevel
-    _loglevel = level
+
+class Filter(logging.Filter):
+    def __init__(self, filterfn):
+        self.filterfn = filterfn
+
+    def filter(self, record):
+        return self.filterfn(record)
+
+
+# create logger
+_logger = logging.getLogger('jolt')
+_logger.setLevel(logging.DEBUG)
+
+_console_formatter = ConsoleFormatter('[{levelname:>7}] {message}')
+
+_stdout = logging.StreamHandler(sys.stdout)
+_stdout.setLevel(INFO)
+_stdout.setFormatter(_console_formatter)
+_stdout.addFilter(Filter(lambda r: r.levelno < ERROR))
+
+_stderr = logging.StreamHandler(sys.stderr)
+_stderr.setLevel(INFO)
+_stderr.setFormatter(_console_formatter)
+_stderr.addFilter(Filter(lambda r: r.levelno >= ERROR))
+_stderr.addFilter(Filter(lambda r: r.levelno != EXCEPTION))
+
+_file = logging.handlers.RotatingFileHandler(logfile, maxBytes=logsize, backupCount=logcount)
+_file.setLevel(logging.DEBUG)
+_file_formatter = Formatter('{asctime} [{levelname:>7}] {message}')
+_file.setFormatter(_file_formatter)
+
+_logger.addHandler(_stdout)
+_logger.addHandler(_stderr)
+_logger.addHandler(_file)
+
+
 
 def info(fmt, *args, **kwargs):
-    _log(NORMAL, _stdout, fmt, *args, **kwargs)
+    _logger.info(fmt, *args, **kwargs)
 
-def warn(fmt, *args, **kwargs):
-    _log(WARN, _stdout, colors.yellow(fmt), *args, **kwargs)
+def warning(fmt, *args, **kwargs):
+    _logger.warning(fmt, *args, **kwargs)
 
 def verbose(fmt, *args, **kwargs):
-    _log(VERBOSE, _stdout, fmt, *args, **kwargs)
+    _logger.log(VERBOSE, fmt, *args, **kwargs)
 
-def hysterical(fmt, *args, **kwargs):
-    _log(HYSTERICAL, _stdout, fmt, *args, **kwargs)
+def debug(fmt, *args, **kwargs):
+    _logger.debug(fmt, *args, **kwargs)
 
 def error(fmt, *args, **kwargs):
-    _log(ERROR, _stdout, colors.red(fmt), *args, **kwargs)
+    _logger.error(fmt, *args, **kwargs)
+
+def stdout(fmt, *args, **kwargs):
+    _logger.log(STDOUT, fmt, *args, **kwargs)
+
+def stderr(fmt, *args, **kwargs):
+    _logger.log(STDERR, fmt, *args, **kwargs)
 
 def exception(exc=None):
     if exc:
-        _streamwrite(_stderr, "[ERROR] " + colors.red(str(exc)))
-        _streamwrite_file(_file, "[ERROR] " + str(exc))
+        _logger.error(str(exc))
     backtrace = traceback.format_exc()
     for line in backtrace.splitlines():
-        _streamwrite_file(_file, "[ERROR] " + line)
-        if _loglevel >= HYSTERICAL:
-            _streamwrite(_stderr, "[HYSTERICAL] " + line)
+        line = line.replace("{", "{{")
+        line = line.replace("}", "}}")
+        _logger.log(EXCEPTION, line)
 
-def stdout(fmt, *args, **kwargs):
-    try:
-        line = utils.expand(fmt, *args, ignore_errors=True, **kwargs)
-    except:
-        line = fmt
-    _streamwrite(_stdout, _prefix(None, **kwargs) + line)
-    _streamwrite_file(_file, _prefix("STDOUT", **kwargs) + line)
-
-def stderr(fmt, *args, **kwargs):
-    try:
-        line = utils.expand(fmt, *args, ignore_errors=True, **kwargs)
-    except:
-        line = fmt
-    _streamwrite(_stderr, line)
-    _streamwrite_file(_file, "[STDERR] " + line)
+def transfer(line, context):
+    context = "[{}] ".format(context)
+    outline1 = context + line[10:]
+    outline2 = context + line
+    if line.startswith("[  ERROR]"):
+        error(outline1)
+    elif line.startswith("[VERBOSE]"):
+        verbose(outline1)
+    elif line.startswith("[  DEBUG]"):
+        debug(outline1)
+    elif line.startswith("[   INFO]"):
+        info(outline1)
+    elif line.startswith("[ EXCEPT]"):
+        outline1 = outline1.replace("{", "{{")
+        outline1 = outline1.replace("}", "}}")
+        _logger.log(EXCEPTION, outline1)
+    elif line.startswith("[ STDERR]"):
+        stderr(outline1)
+    elif line.startswith("[ STDOUT]"):
+        stdout(outline1)
+    else:
+        stdout(outline2)
 
 def progress(desc, count, unit):
-    _streamwrite_file(_file, "[INFO] " + desc)
     p = tqdm.tqdm(total=count, unit=unit, unit_scale=True)
     p.set_description(desc)
     return p
 
+def set_level(level):
+    _stdout.setLevel(level)
+    _stderr.setLevel(level)
 
-_file.write("================================================================================\n")
-_file.flush()
+@contextmanager
+def threadsink():
+    threadid = threading.get_ident()
+    stringbuf = StringIO()
+    handler = logging.StreamHandler(stringbuf)
+    handler.setLevel(DEBUG)
+    handler.setFormatter(_file_formatter)
+    handler.addFilter(Filter(lambda record: record.thread == threadid))
+    _logger.addHandler(handler)
+    yield stringbuf
+    _logger.removeHandler(handler)

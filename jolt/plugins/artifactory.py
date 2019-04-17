@@ -99,11 +99,11 @@ class Artifactory(cache.StorageProvider):
                 response = requests.head(url, stream=True, timeout=TIMEOUT)
             except ConnectTimeout as e:
                 self._disabled = True
-                log.warn("[ARTIFACTORY] failed to establish server connection, disabled")
+                log.warning("[ARTIFACTORY] failed to establish server connection, disabled")
                 return False
 
-            log.hysterical("[ARTIFACTORY] Head: {0}", url)
-            log.hysterical("[ARTIFACTORY] Response: {0}", response.status_code)
+            log.debug("[ARTIFACTORY] Head: {0}", url)
+            log.debug("[ARTIFACTORY] Response: {0}", response.status_code)
             return url if response.status_code == 200 else ''
         return False
 

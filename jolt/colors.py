@@ -1,10 +1,13 @@
-from colorama import Fore, Style
+import sys
 
+from colorama import Fore, Style
 from jolt import config
 
 
+_tty = sys.stdout.isatty() and sys.stderr.isatty()
+
 def enabled():
-    return config.getboolean("jolt", "colors", True)
+    return _tty and config.getboolean("jolt", "colors", True)
 
 def red(s):
     return Fore.RED + Style.BRIGHT + s + Style.RESET_ALL if enabled() else s

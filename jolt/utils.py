@@ -214,7 +214,7 @@ class retried:
                             raise e
                         if pattern is None or pattern in str(e):
                             from jolt import log
-                            log.hysterical("Exception caught, retrying : " + str(e))
+                            log.debug("Exception caught, retrying : " + str(e))
                             continue
             return _f
         return _decorate

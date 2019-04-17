@@ -17,7 +17,7 @@ def main():
     try:
         cli.cli(obj=dict())
     except KeyboardInterrupt as e:
-        log.warn("Interrupted by user")
+        log.warning("Interrupted by user")
         sys.exit(1)
     except Exception as e:
         log.exception(e)

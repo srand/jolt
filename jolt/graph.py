@@ -261,18 +261,21 @@ class TaskProxy(object):
                     available_locally = cache.download(self)
 
             if force_build or not available_locally:
-                with cache.get_context(self) as context:
-                    with self.tools.cwd(self.task.joltdir):
-                        self.task.run(context, self.tools)
+                with log.threadsink() as buildlog:
+                    with cache.get_context(self) as context:
+                        with self.tools.cwd(self.task.joltdir):
+                            self.task.run(context, self.tools)
 
-                if cache.is_available_locally(self):
+                    if cache.is_available_locally(self):
+                        with cache.get_artifact(self) as artifact:
+                            artifact.discard()
+
                     with cache.get_artifact(self) as artifact:
-                        artifact.discard()
-
-                with cache.get_artifact(self) as artifact:
-                    with self.tools.cwd(self.task.joltdir):
-                        self.task.publish(artifact, self.tools)
-                    artifact.commit()
+                        with self.tools.cwd(self.task.joltdir):
+                            self.task.publish(artifact, self.tools)
+                        self.tools.write_file(fs.path.join(artifact.path, ".build.log"),
+                                              buildlog.getvalue())
+                        artifact.commit()
 
             if force_build or force_upload or not available_remotely:
                 assert cache.upload(self, force=force_upload) or \
@@ -317,11 +320,11 @@ class Graph(nx.DiGraph):
         with self._mutex:
             for node in nx.topological_sort(self):
                 if func(self, node):
-                    log.hysterical("[GRAPH] Pruned {0} ({1})", node.name, node.identity)
+                    log.debug("[GRAPH] Pruned {0} ({1})", node.name, node.identity)
                     self.remove_node(node)
 
             for node in self.nodes:
-                log.hysterical("[GRAPH] Keeping {0} ({1})", node.qualified_name, node.identity)
+                log.debug("[GRAPH] Keeping {0} ({1})", node.qualified_name, node.identity)
 
     def select(self, func):
         with self._mutex:

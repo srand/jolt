@@ -44,7 +44,7 @@ class JenkinsServer(object):
             self._ok = self._check_job()
         except:
             log.exception()
-            log.warn("[JENKINS] failed to establish server connection, disabled")
+            log.warning("[JENKINS] failed to establish server connection, disabled")
             self._ok = False
 
     def _get_auth(self):
@@ -159,14 +159,7 @@ class JenkinsExecutor(scheduler.NetworkExecutor):
             return
         logtext = self.server.get_build_console_output(self.job, build_id)
         for line in logtext.splitlines():
-            if line.startswith("[ERROR]"):
-                log.error(line[8:], log_context=self.task.identity[:8])
-            elif line.startswith("[VERBOSE]"):
-                log.verbose(line[10:], log_context=self.task.identity[:8])
-            elif line.startswith("[HYSTERICAL]"):
-                log.hysterical(line[13:], log_context=self.task.identity[:8])
-            else:
-                log.stdout(line, log_context=self.task.identity[:8])
+            log.transfer(line, self.task.identity[:8])
 
     def _run(self, env):
         task = [self.task.qualified_name]

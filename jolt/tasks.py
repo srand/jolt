@@ -524,10 +524,10 @@ class Task(TaskBase):
         fmt = self.tools.expand(fmt, *args, **kwargs)
         log.info(fmt, *args, **kwargs)
 
-    def warn(self, fmt, *args, **kwargs):
+    def warning(self, fmt, *args, **kwargs):
         """ Log a warning concerning the task """
         fmt = self.tools.expand(fmt, *args, **kwargs)
-        log.warn(fmt, *args, **kwargs)
+        log.warning(fmt, *args, **kwargs)
 
     def error(self, fmt, *args, **kwargs):
         """ Log an error concerning the task """

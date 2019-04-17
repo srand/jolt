@@ -79,7 +79,7 @@ class FtpStorage(cache.StorageProvider):
             return ftp
         except:
             log.exception()
-            log.warn("[FTP] failed to establish server connection, disabled")
+            log.warning("[FTP] failed to establish server connection, disabled")
             self._disabled = True
         return None
 
@@ -167,7 +167,7 @@ class FtpStorage(cache.StorageProvider):
                         path=self._path,
                         taskname=node.canonical_name,
                         archive=name)
-                    log.hysterical("[FTP] {0}", url)
+                    log.debug("[FTP] {0}", url)
                     return url
             except:
                 return False

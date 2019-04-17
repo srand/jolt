@@ -76,7 +76,7 @@ class Cli(Test):
     name = "test/cli"
 
     def jolt(self, cmd, *args, **kwargs):
-        return self.tools.run("jolt " + cmd, *args, **kwargs)
+        return self.tools.run("jolt -c test.conf " + cmd, *args, **kwargs)
 
     def test_return_value(self):
         self.jolt("build -l pass")
