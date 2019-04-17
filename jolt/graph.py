@@ -13,7 +13,7 @@ from jolt import log
 from jolt import utils
 from jolt import colors
 from jolt import hooks
-
+from jolt.error import *
 
 class TaskProxy(object):
     def __init__(self, task, graph):
@@ -248,9 +248,9 @@ class TaskProxy(object):
                 if not child.has_artifact():
                     continue
                 if not cache.is_available_locally(child):
-                    assert cache.download(child), \
-                        "no artifact of task '{0} ({1})' available"\
-                        .format(child.qualified_name, child.identity[:8])
+                    raise_task_error_if(
+                        not cache.download(child),
+                        child, "failed to download task artifact")
 
             if not force_build:
                 available_locally = all(map(cache.is_available_locally, tasks))
@@ -278,9 +278,9 @@ class TaskProxy(object):
                         artifact.commit()
 
             if force_build or force_upload or not available_remotely:
-                assert cache.upload(self, force=force_upload) or \
-                    not cache.upload_enabled(), \
-                    "Failed to upload artifact for {0}".format(self.name)
+                raise_task_error_if(
+                    not cache.upload(self, force=force_upload) and cache.upload_enabled(),
+                    self, "failed to upload task artifact")
 
             for extension in self.extensions:
                 try:
@@ -390,7 +390,8 @@ class GraphBuilder(object):
 
     def build(self, task_list):
         proxies = [self._get_node(task) for task in task_list]
-        assert nx.is_directed_acyclic_graph(self.graph), "cyclic graph"
+        raise_error_if(not nx.is_directed_acyclic_graph(self.graph),
+                       "there are cyclic task dependencies")
         self.graph._nodes_by_name = self.nodes
         return self.graph
 

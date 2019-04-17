@@ -16,6 +16,7 @@ from contextlib import contextmanager
 from jolt import filesystem as fs
 from jolt import log
 from jolt import utils
+from jolt.error import *
 
 
 def _run(cmd, cwd, env, *args, **kwargs):
@@ -70,7 +71,7 @@ def _run(cmd, cwd, env, *args, **kwargs):
         for line in stderr.buffer:
             log.stderr(line)
 
-    assert p.returncode == 0, "command failed: {0}".format(cmd.format(*args, **kwargs))
+    raise_error_if(p.returncode != 0, "command failed: {0}", cmd.format(*args, **kwargs))
     return "\n".join(stdout.buffer) if output_rstrip else "".join(stdout.buffer)
 
 
@@ -117,7 +118,7 @@ class _tmpdir(object):
             self._path = fs.mkdtemp(prefix=self._name + "-", dir=dirname)
         except:
             raise
-        assert self._path, "failed to create temporary directory"
+        raise_error_if(not self._path, "failed to create temporary directory")
         return self
 
     def __exit__(self, type, value, tb):
@@ -297,12 +298,14 @@ class Tools(object):
         elif filename.endswith(".tar.xz"):
             fmt = "xztar"
             basename = filename[:-8]
-        assert fmt, "unknown filetype '{0}': {1}".format(ext, fs.path.basename(filename))
+        raise_task_error_if(
+            not fmt, self._task,
+            "unknown archive type '{0}'", fs.path.basename(filename))
         try:
             shutil.make_archive(basename, fmt, root_dir=pathname)
             return filename
         except Exception as e:
-            assert False, "failed to archive directory: {0}".format(pathname)
+            raise_task_error(self._task, "failed to create archive from directory '{0}'", pathname)
 
     def autotools(self, deps=None):
         """ Creates an AutoTools invokation helper """
@@ -405,9 +408,10 @@ class Tools(object):
         path = self.expand_path(pathname, *args, **kwargs)
         prev = self._cwd
         try:
-            assert fs.path.exists(self._cwd) and fs.path.isdir(self._cwd), \
-                "failed to change directory to {0}" \
-                .format(self._cwd)
+            raise_task_error_if(
+                not fs.path.exists(self._cwd) or not fs.path.isdir(self._cwd),
+                self._task,
+                "failed to change directory to '{0}'", self._cwd)
             self._cwd = path
             yield fs.path.normpath(self._cwd)
         finally:
@@ -584,10 +588,10 @@ class Tools(object):
                     else:
                         tar.extractall(filepath)
             else:
-                assert False, "unknown filetype: {0}".format(fs.path.basename(filename))
+                raise_task_error(self._task, "unknown archive type '{0}'", fs.path.basename(filename))
         except Exception as e:
             log.exception()
-            assert False, "failed to extract archive: {0}".format(filename)
+            raise_task_error(self._task, "failed to extract archive '{0}'", filename)
 
     def file_size(self, pathname):
         """ Determines the size of a file.
@@ -602,7 +606,7 @@ class Tools(object):
         try:
             stat = os.stat(pathname)
         except:
-            assert False, "file not found: {0}".format(pathname)
+            raise_task_error(self._task, "file not found '{0}'", pathname)
         else:
             return stat.st_size
 
@@ -712,7 +716,7 @@ class Tools(object):
             with open(pathname, "wb") as f:
                 f.write(data.encode())
         except:
-            assert False, "failed to replace string in file: {0}".format(path)
+            raise_task_error(self._task, "failed to replace string in file '{0}'", path)
 
     def rmtree(self, pathname, *args, **kwargs):
         """Removes a directory tree from disk.

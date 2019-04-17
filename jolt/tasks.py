@@ -11,6 +11,7 @@ from jolt import utils
 from jolt.cache import *
 from jolt.tools import Tools
 from jolt.influence import TaskSourceInfluence
+from jolt.error import *
 
 
 class Export(object):
@@ -48,8 +49,8 @@ class Parameter(object):
                 associated task.
 
         Raises:
-            AssertionError: If the parameter is assigned an illegal value
-                during task execution.
+            ValueError: If the parameter is assigned an illegal value.
+
         """
 
         self._default = default
@@ -65,9 +66,8 @@ class Parameter(object):
         return str(self._value) if self._value is not None else ''
 
     def _validate(self, value):
-        assert self._accepted_values is None or value in self._accepted_values, \
-            "illegal value '{0}' assigned to parameter"\
-            .format(value)
+        if self._accepted_values is not None and value not in self._accepted_values:
+            raise ValueError(value)
 
     def get_default(self):
         """ Get the default value of the parameter.
@@ -131,7 +131,7 @@ class Parameter(object):
             value (str): The new parameter value.
 
         Raises:
-            AssertionError: If the parameter is assigned an illegal value.
+            ValueError: If the parameter is assigned an illegal value.
         """
         self._validate(value)
         self._value = value
@@ -153,18 +153,13 @@ class BooleanParameter(Parameter):
                 associated task.
 
         Raises:
-            AssertionError: If the parameter is assigned an illegal value
-                during task execution.
+            ValueError: If the parameter is assigned an illegal value.
+
         """
         default = str(default).lower() if default is not None else None
         super(BooleanParameter, self).__init__(
             default, values=["false", "true", "0", "1"],
             required=required, help=help)
-
-    def _validate(self, value):
-        assert self._accepted_values is None or value in self._accepted_values, \
-            "illegal value '{0}' assigned to boolean parameter"\
-            .format(value)
 
     def set_value(self, value):
         """ Set the parameter value.
@@ -174,7 +169,7 @@ class BooleanParameter(Parameter):
                 False, True, "false, and "true", 0 and 1.
 
         Raises:
-            AssertionError: If the parameter is assigned an illegal value.
+            ValueError: If the parameter is assigned an illegal value.
         """
         value = str(value).lower()
         super(BooleanParameter, self).set_value(value)
@@ -250,7 +245,7 @@ class TaskRegistry(object):
             self.instances[full_name] = task
             return task
 
-        assert task, "no such task: {0}".format(full_name)
+        raise_task_error_if(not task, full_name, "no such task")
 
     def set_default_parameters(self, task):
         name, params = utils.parse_task_name(task)
@@ -258,7 +253,7 @@ class TaskRegistry(object):
         cls = self.tasks.get(name)
         if not cls:
             cls = self.tests.get(name)
-        assert cls, "no such task: {0}".format(task)
+        raise_task_error_if(not cls, task, "no such task")
         cls._set_default_parameters(cls, params)
 
     def _create_parents(self, name):
@@ -356,9 +351,15 @@ class TaskBase(object):
         for key, value in params.items():
             param = utils.getattr_safe(self, key)
             if isinstance(param, Parameter):
-                param.set_value(value)
+                try:
+                    param.set_value(value)
+                except ValueError as e:
+                    raise_task_error(
+                        self,
+                        "illegal value '{0}' assigned to parameter '{1}'",
+                        str(e), key)
                 continue
-            assert False, "no such parameter for task {0}: {1}".format(self.name, key)
+            raise_task_error(self, "no such parameter '{0}'", key)
         self._assert_required_parameters_assigned()
 
     @staticmethod
@@ -371,12 +372,13 @@ class TaskBase(object):
                 param.set_default(value)
                 setattr(cls, key, param)
                 continue
-            assert False, "no such parameter for task {0}: {1}".format(cls.name, key)
+            raise_task_error(self, "no such parameter '{0}'", key)
 
     def _assert_required_parameters_assigned(self):
         for key, param in self._get_parameter_objects().items():
-            assert not param.is_required() or not param.is_unset(), \
-                "required parameter '{0}' has not been set for '{1}'".format(key, self.name)
+            raise_task_error_if(
+                param.is_required() and param.is_unset(), self,
+                "required parameter '{0}' has not been set", key)
 
     @utils.cached.instance
     def _get_export_objects(self):
@@ -402,6 +404,9 @@ class TaskBase(object):
         return {key: str(getattr(self, key))
                 for key in dir(self)
                 if utils.is_str(getattr(self, key)) }
+
+    def __str__(self):
+        return str(self.name)
 
 
 class Task(TaskBase):
@@ -463,7 +468,9 @@ class Task(TaskBase):
         self.influence = utils.as_list(self.__class__.influence)
         self.requires = utils.as_list(utils.call_or_return(self, self.__class__._requires))
         self.extends = utils.as_list(utils.call_or_return(self, self.__class__.extends))
-        assert len(self.extends) == 1, "{0} extends multiple tasks, only one allowed".format(self.name)
+        raise_task_error_if(
+            len(self.extends) != 1, self,
+            "multiple tasks extended, only one allowed")
         self.extends = self.extends[0]
         self.influence.append(TaskSourceInfluence("publish"))
         self.influence.append(TaskSourceInfluence("run"))
@@ -489,15 +496,13 @@ class Task(TaskBase):
         try:
             return [self._get_expansion(req) for req in self.requires]
         except KeyError as e:
-            assert False, "invalid macro expansion used in task {0}: {1} - "\
-                "forgot to set the parameter?".format(self.name, e)
+            raise_task_error(self, "invalid macro '{0}' encountered - forgot to set a parameter?", e)
 
     def _get_extends(self):
         try:
             return self._get_expansion(self.extends)
         except KeyError as e:
-            assert False, "invalid macro expansion used in task {0}: {1} - "\
-                "forgot to set the parameter?".format(self.name, e)
+            raise_task_error(self, "invalid macro '{0}' encountered - forgot to set a parameter?", e)
 
     def _get_expansion(self, string, *args, **kwargs):
         try:
@@ -505,8 +510,8 @@ class Task(TaskBase):
             kwargs.update(**self._get_properties())
             return utils.expand(string, *args, **kwargs)
         except KeyError as e:
-            assert False, "invalid macro expansion used in task {0}: {1} - "\
-                "forgot to set the parameter?".format(self.name, e)
+            raise_task_error(self, "invalid macro '{0}' encountered - forgot to set a parameter?", e)
+
     @property
     def canonical_name(self):
         return self.name.replace("/", "_")
@@ -700,7 +705,7 @@ class _Test(Task):
             testsuite.addTest(self.test_cls(
                 test, parameters=self._get_parameters(), deps=deps, tools=tools))
         self.testresult = ut.TextTestRunner(verbosity=2).run(testsuite)
-        assert self.testresult.wasSuccessful(), "tests failed"
+        raise_task_error_if(not self.testresult.wasSuccessful(), self, "tests failed")
 
 
 class Test(ut.TestCase, TaskBase):
@@ -724,7 +729,9 @@ class Test(ut.TestCase, TaskBase):
         self.influence = utils.as_list(self.__class__.influence)
         self.requires = utils.as_list(utils.call_or_return(self, self.__class__.requires))
         self.extends = utils.as_list(utils.call_or_return(self, self.__class__.extends))
-        assert len(self.extends) == 1, "{0} extends multiple tasks, only one allowed".format(self.name)
+        raise_task_error_if(
+            len(self.extends) != 1, self,
+            "multiple tasks extended, only one allowed")
         self.extends = self.extends[0]
         self.name = self.__class__.name
         self._create_exports()

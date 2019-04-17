@@ -15,6 +15,7 @@ from jolt import log
 from jolt import utils
 from jolt.options import JoltOptions
 from jolt.manifest import *
+from jolt.error import *
 
 
 class JoltEnvironment(object):
@@ -35,8 +36,10 @@ class TaskQueue(object):
 
         env = JoltEnvironment(cache=cache)
         executor = self.strategy.create_executor(task)
-        assert executor, "no executor can execute the task; "\
-            "requesting a network build without proper configuration?"
+        raise_task_error_if(
+            not executor, task,
+            "no executor can execute the task; "
+            "requesting a distributed network build without proper configuration?")
 
         task.set_in_progress()
         future = executor.submit(env)
@@ -135,9 +138,9 @@ class Downloader(Executor):
     def _download(self, env, task):
         try:
             task.started("Download")
-            assert env.cache.download(task), \
-                "failed to download artifact of task '{0} ({1})'"\
-                .format(task.qualified_name, task.identity[:8])
+            raise_task_error_if(
+                not env.cache.download(task),
+                task, "failed to download task artifact")
         except Exception as e:
             task.failed("Download")
             raise e
@@ -159,9 +162,9 @@ class Uploader(Executor):
     def _upload(self, env, task):
         try:
             task.started("Upload")
-            assert env.cache.upload(task), \
-                "failed to upload artifact of task '{0} ({1})'"\
-                .format(task.qualified_name, task.identity[:8])
+            raise_task_error_if(
+                not env.cache.upload(task),
+                task, "failed to upload task artifact")
         except Exception as e:
             task.failed("Upload")
             raise e
@@ -220,7 +223,6 @@ class ExecutorRegistry(object):
 class NetworkExecutorExtensionFactory(object):
     @staticmethod
     def Register(cls):
-        # assert cls is Factory
         ExecutorRegistry.extension_factories.insert(0, cls)
         return cls
 
@@ -236,7 +238,6 @@ class NetworkExecutorExtension(object):
 class ExecutorFactory(object):
     @staticmethod
     def Register(cls):
-        # assert cls is Factory
         ExecutorRegistry.executor_factories.insert(0, cls)
         return cls
 
@@ -259,7 +260,7 @@ class ExecutorFactory(object):
             if not self.is_aborted():
                 executor.run(env)
         except KeyboardInterrupt:
-            assert False, "Interrupted by user"
+            raise_error("Interrupted by user")
 
     def submit(self, executor, env):
         return self.pool.submit(partial(self._run, executor, env))
@@ -356,8 +357,9 @@ class WorkerStrategy(ExecutionStrategy):
         if task.is_resource():
             return self.executors.create_local(task)
 
-        assert self.cache.upload_enabled(),\
-            "artifact upload must be enabled for workers, fix configuration"
+        raise_task_error_if(
+            not self.cache.upload_enabled(), task,
+            "artifact upload must be enabled for workers, fix configuration")
 
         if not task.is_cacheable():
             return self.executors.create_local(task)

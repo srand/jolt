@@ -14,6 +14,7 @@ from jolt import influence
 from jolt import config
 from jolt import utils
 from jolt.options import JoltOptions
+from jolt.error import *
 
 
 DEFAULT_ARCHIVE_TYPE = ".tar.gz"
@@ -248,8 +249,7 @@ class Artifact(object):
             self._read_manifest()
         except:
             self.discard()
-            assert False, "Unable to read artifact manifest for '{0} ({1})'"\
-                .format(self._node.qualified_name, self._node.identity[:8])
+            raise_task_error(node, "unable to read task artifact manifest")
 
     def __enter__(self):
         return self
@@ -261,8 +261,7 @@ class Artifact(object):
             fs.rmtree(self._temp)
 
     def __getattr__(self, name):
-        assert False, "no attribute '{0}' in artifact for '{1} ({2})'"\
-            .format(name, self._node.qualified_name, self._node.identity[:8])
+        raise_task_error(self._node, "attempt to access invalid artifact attribute '{0}'", name)
 
     def _write_manifest(self):
         content = {}
@@ -349,11 +348,10 @@ class Artifact(object):
             fs.rmtree(self._path)
 
     def modify(self):
-        assert not self._temp, \
-            "attempting to unpack absent artifact of task '{0} ({1})'"\
-            .format(self._node.qualified_name, self._node.identity[:8])
-        #self._temp = self._cache.get_path(self._node) + ".unpack"
-        #fs.move(self._path, self._temp)
+        raise_task_error_if(
+            self._temp,
+            self._node,
+            "attempting to unpack missing task artifact")
         self._temp = self._path
         self._unpacked = True
 
@@ -399,9 +397,11 @@ class Artifact(object):
 
         """
 
-        assert self._temp, \
-            "can't collect files into already published artifact of task '{0} ({1})'"\
-            .format(self._node.qualified_name, self._node.identity[:8])
+        raise_task_error_if(
+            not self._temp,
+            self._node,
+            "can't collect files into an already published task artifact")
+
         files = self._node.task._get_expansion(files)
         dest = self._node.task._get_expansion(dest) if dest is not None else None
 
@@ -440,9 +440,11 @@ class Artifact(object):
 
         """
 
-        assert self._temp, \
-            "can't copy files from the unpublished artifact of task '{0} ({1})'"\
-            .format(self._node.qualified_name, self._node.identity[:8])
+        raise_task_error_if(
+            self._temp,
+            self._node,
+            "can't copy files from an unpublished task artifact")
+
         pathname = self._node.task._get_expansion(pathname)
         dest = self._node.task._get_expansion(dest)
 
@@ -459,9 +461,11 @@ class Artifact(object):
                 log.verbose("Copied {0} -> {1}", src, destfile)
 
     def compress(self):
-        assert not self._temp, \
-            "can't compress the unpublished artifact of task '{0} ({1})'"\
-            .format(self._node.qualified_name, self._node.identity[:8])
+        raise_task_error_if(
+            self._temp,
+            self._node,
+            "can't compress an unpublished task artifact")
+
         if not self.get_archive():
             self._archive = self.tools.archive(
                 self._path, self._path + DEFAULT_ARCHIVE_TYPE)
@@ -472,8 +476,10 @@ class Artifact(object):
             self.tools.extract(archive, self._path)
         except:
             self.discard()
-            assert False, "Failed to extract artifact archive for '{0} ({1})'"\
-                .format(self._node.qualified_name, self._node.identity[:8])
+            raise_task_error(
+                self._node,
+                "failed to extract task artifact archive")
+
         self.tools.unlink(archive)
         if self._temp:
             fs.rmtree(self._temp)
@@ -565,9 +571,10 @@ class Context(object):
         """
 
         key = self._node.task._get_expansion(key)
-        assert key in self._artifacts_index, \
-            "no such dependency '{0}' for task '{1} ({2})'"\
-            .format(key, self._node.qualified_name, self._node.identity[:8])
+        raise_task_error_if(
+            key not in self._artifacts_index,
+            self._node,
+            "no such dependency '{0}'", key)
         return self._artifacts_index[key]
 
     def items(self):
@@ -657,7 +664,7 @@ class ArtifactCache(StorageProvider):
             self.root = config.get("jolt", "cachedir") or ArtifactCache.root
             fs.makedirs(self.root)
         except:
-            assert False, "failed to create cache directory"
+            raise_error("failed to create cache directory '{0}'", self.root)
 
         self.max_size = config.getsize(
             "jolt", "cachesize", os.environ.get("JOLT_CACHESIZE", 1*1024**3))
@@ -695,8 +702,9 @@ class ArtifactCache(StorageProvider):
             path = mkdtemp(prefix=node.identity, dir=dirname)
         except:
             pass
-        assert path, "couldn't create temporary artifact directory for task '{0} ({1})'"\
-            .format(node.qualified_name, node.identity[:8])
+        raise_task_error_if(
+            not path, node,
+            "couldn't create temporary task artifact directory")
         return path
 
     def is_available_locally(self, node):
@@ -754,9 +762,9 @@ class ArtifactCache(StorageProvider):
             return False
         if not node.task.is_cacheable():
             return True
-        assert self.is_available_locally(node), \
-            "can't upload artifact of task '{0} ({1})', absent in the local cache"\
-            .format(node.qualified_name, node.identity[:8])
+        raise_task_error_if(
+            not self.is_available_locally(node), node,
+            "can't upload task artifact, no artifact present in the local cache")
         if self.storage_providers:
             with self.get_artifact(node) as artifact:
                 artifact.compress()

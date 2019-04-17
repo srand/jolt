@@ -5,6 +5,8 @@ from jolt.graph import *
 from jolt.scheduler import *
 from jolt.loader import JoltLoader
 from jolt import config
+from jolt.error import *
+
 
 log.verbose("SelfDeploy loaded")
 
@@ -67,7 +69,7 @@ class SelfDeployExtension(NetworkExecutorExtension):
             executor = LocalExecutor(factory, task, force_upload=True)
             executor.run(env)
         jolt_url = acache.location(task)
-        assert jolt_url, "failed to selfdeploy jolt to remote cache"
+        raise_error_if(not jolt_url, "failed to deploy jolt to a remote cache")
         return { "jolt_url":  jolt_url, "jolt_identity": task.identity[:8] }
 
 

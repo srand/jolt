@@ -6,7 +6,7 @@ except:
 
 from jolt import filesystem as fs
 from jolt import utils
-
+from jolt.error import *
 
 location = fs.path.join(fs.path.expanduser("~"), ".config", "jolt", "config")
 
@@ -37,12 +37,13 @@ def getsize(section, key, default=None):
         if len(value) == 1 and value[0][-1] in units:
             size, unit = value[0][:-1], value[0][-1]
         else:
-            assert len(value) == 2, "invalid size format for {0}.{1}, "\
-                "expected '<size> <unit>'"\
-                .format(section, key)
+            raise_error_if(
+                len(value) != 2,
+                "config: size invalid for '{0}.{1}', expected '<size> <unit>'", section, key)
             size, unit = value[0], value[1]
-        assert unit in units, "invalid unit requested for {0}.{1}"\
-            .format(section, key)
+        raise_error_if(
+            unit not in units,
+            "config: unit invalid for '{0}.{1}', expected [B,K,M,G,T]", section, key)
         return int(size)*units[unit]
     except NoOptionError:
         return default

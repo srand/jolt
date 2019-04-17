@@ -23,6 +23,7 @@ from jolt.influence import *
 from jolt.options import JoltOptions
 from jolt.hooks import TaskHookRegistry
 from jolt.manifest import JoltManifest
+from jolt.error import *
 
 debug_enabled = False
 
@@ -162,7 +163,7 @@ def build(ctx, task, network, keep_going, identity, default, local,
 
     if identity:
         root = dag.select(lambda graph, task: task.identity.startswith(identity))
-        assert len(root) >= 1, "unknown hash identity, no such task: {0}".format(identity)
+        raise_error_if(len(root) < 1, "unknown hash identity, no such task '{0}'", identity)
 
     goal_tasks = dag.select(
         lambda graph, node: node.short_qualified_name in task or \
@@ -183,7 +184,7 @@ def build(ctx, task, network, keep_going, identity, default, local,
             task, error = queue.wait()
             if not task:
                 dag.debug()
-                assert task, "no more tasks in progress, only blocked tasks remain"
+                raise_error_if(not task, "no more tasks in progress, only blocked tasks remain")
 
             if not keep_going and error is not None:
                 queue.abort()
@@ -250,10 +251,11 @@ def display(ctx, task, prune):
     if dag.has_tasks():
         try:
             gb.display()
+        except JoltError as e:
+            raise e
         except Exception as e:
-            if "requires pygraphviz" in str(e):
-                assert False, "this features requires pygraphviz, please install it"
-            assert False, "an exception occurred during task dependency evaluation, see log for details"
+            raise_error_if("requires pygraphviz" in str(e), "this features requires pygraphviz, please install it")
+            raise_error("an exception occurred during task dependency evaluation, see log for details")
     else:
         log.info("no tasks to display")
 
@@ -293,11 +295,14 @@ def freeze(ctx, task, default, output):
     dag = gb.build(task)
 
     available_in_cache = [
-        (t.is_available_locally(acache) or t.is_available_remotely(acache), t.name)
+        (t.is_available_locally(acache) or (
+            t.is_available_remotely(acache) and acache.download_enabled()), t)
         for t in dag.tasks if t.is_cacheable()]
-    assert all(available_in_cache),\
-        "can't freeze '{0}': not available in any cache, build it first"\
-        .format(" ".join(task))
+
+    for available, task in available_in_cache:
+        raise_task_error_if(
+            not available, task,
+            "task artifact is not available in any cache, build it first")
 
     for task in dag.tasks:
         if not manifest.has_task(task):
@@ -332,8 +337,10 @@ def _list(ctx, task=None, reverse=False):
 
     try:
         dag = graph.GraphBuilder(registry, ctx.obj["manifest"]).build(task)
+    except JoltError as e:
+        raise e
     except:
-        assert False, "an exception occurred during task dependency evaluation, see log for details"
+        raise_error("an exception occurred during task dependency evaluation, see log for details")
 
     tasks = dag.select(lambda graph, node: \
                        node.short_qualified_name in task or \
@@ -379,7 +386,7 @@ def info(ctx, task, influence=False, artifacts=False):
     task_cls_name, task_params = utils.parse_task_name(task_name)
     task_registry = TaskRegistry.get()
     task = task_registry.get_task_class(task_cls_name)
-    assert task, "no such task: {0}".format(task_name)
+    raise_task_error_if(not task, task_name, "no such task")
 
     click.echo()
     click.echo("  {0}".format(task.name))

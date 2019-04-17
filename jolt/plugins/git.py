@@ -5,6 +5,8 @@ from jolt.scheduler import *
 from jolt.loader import JoltLoader
 from jolt import utils
 from jolt import filesystem as fs
+from jolt.error import *
+
 
 try:
     import pygit2
@@ -35,13 +37,15 @@ class GitRepository(object):
         return True
 
     def clone(self):
-        assert not fs.path.exists(self.path), \
-            "destination folder '{0}' already exists but is not a git repo"\
-            .format(self.path)
+        raise_error_if(
+            fs.path.exists(self.path),
+            "git: destination folder '{0}' already exists and is not a git repository",
+            self.path)
         log.info("Cloning into {0}", self.path)
         self.tools.run("git clone {0} {1}", self.url, self.path, output_on_error=True)
-        assert fs.path.exists(self._get_git_folder()),\
-            "failed to clone git repo '{0}'".format(self.relpath)
+        raise_error_if(
+            not fs.path.exists(self._get_git_folder()),
+            "git: failed to clone repository '{0}'", self.relpath)
 
     @utils.cached.instance
     def _diff(self, path="/"):
@@ -207,9 +211,9 @@ class GitSrc(Resource):
             self.git.clone()
         rev = self._get_revision()
         if rev is not None:
-            assert self.sha.is_unset() or not self.git.diff(), \
-                "explicit sha requested but git repo '{0}' has local changes"\
-                .format(self.git.relpath)
+            raise_task_error_if(
+                not self.sha.is_unset() and self.git.diff(), self,
+                "explicit sha requested but git repo '{0}' has local changes", self.git.relpath)
             # Should be safe to do this now
             self.git.checkout(rev)
             self.git.clean()

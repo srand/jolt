@@ -22,6 +22,11 @@ class Pass(Task):
     cacheable = False
 
 
+class FailTest(Test):
+    def test_fail(self):
+        self.assertFalse(True)
+
+
 class Fail(Task):
     def run(self, deps, tools):
         assert False, "This task always fails"

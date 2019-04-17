@@ -20,6 +20,7 @@ from jolt import log
 from jolt import loader
 from jolt import filesystem as fs
 from jolt.manifest import JoltManifest
+from jolt.error import *
 
 
 NAME = "jenkins"
@@ -59,7 +60,7 @@ class JenkinsServer(object):
         username = config.get(NAME, "keyring.username")
         if not username:
             username = utils.read_input(NAME + " username: ")
-            assert username, "no username configured for " + NAME
+            raise_error_if(not username, "no username configured for " + NAME)
             config.set(NAME, "keyring.username", username)
             config.save()
 
@@ -67,7 +68,7 @@ class JenkinsServer(object):
                    keyring.get_password(NAME, username)
         if not password:
             password = getpass.getpass(NAME + " password: ")
-            assert password, "no password in keyring for " + NAME
+            raise_error_if(not password, "no password in keyring for " + NAME)
             keyring.set_password(service, username, password)
         return username, password
 
@@ -100,9 +101,10 @@ class JenkinsServer(object):
                 self._add_job_to_view(view, self.job_name)
             return True
         if self._get_sha(job_xml) != template_sha:
-            assert self._create_job(
-                self.job_name, template_xml, self._server.reconfig_job), \
-                "[JENKINS] failed to change misconfigured job"
+            raise_error_if(
+                not self._create_job(
+                    self.job_name, template_xml, self._server.reconfig_job),
+                "failed to update {0} job configuration", NAME)
         return True
 
     def ok(self):
@@ -175,19 +177,19 @@ class JenkinsExecutor(scheduler.NetworkExecutor):
         files = {}
         files["default.joltxmanifest"] = ("default.joltxmanifest", StringIO(JoltManifest.export(self.task).format()))
 
-        assert not self.is_aborted(), "[JENKINS] execution cancelled"
+        raise_task_error_if(self.is_aborted(), self.task, "execution aborted by user")
         queue_id = self._build_job(parameters, files)
 
         log.verbose("[JENKINS] Queued {0}", self.task.qualified_name)
 
         queue_info = self._get_queue_item(queue_id)
         while not queue_info.get("executable"):
-            assert not queue_info.get("cancelled"),\
-            "[JENKINS] {0} failed with status CANCELLED".format(
-                self.task.qualified_name)
+            raise_task_error_if(
+                queue_info.get("cancelled"), self.task,
+                "execution aborted by user")
             if self.is_aborted():
                 self._cancel_queue(queue_id)
-                assert False, "[JENKINS] execution cancelled"
+                raise_task_error(self.task, "execution aborted by user")
             time.sleep(POLL_INTERVAL)
             queue_info = self._get_queue_item(queue_id)
 
@@ -213,24 +215,22 @@ class JenkinsExecutor(scheduler.NetworkExecutor):
         if build_info["result"] != "SUCCESS":
             self._get_console_log(build_id)
 
-        assert build_info["result"] == "SUCCESS", \
-            "[JENKINS] {1} failed with status {0}".format(
-                build_info["result"], self.task.qualified_name)
+        raise_task_error_if(
+            build_info["result"] == "SUCCESS", self.task,
+            "execution failed with status '{0}'", build_info["result"])
 
-        assert env.cache.is_available_remotely(self.task), \
-            "[JENKINS] no artifact produced for {0}, check configuration"\
-            .format(self.task.qualified_name)
+        raise_task_error_if(
+            not env.cache.is_available_remotely(self.task), self.task,
+            "no task artifact available in any cache, check configuration")
 
-        assert env.cache.download(self.task) or \
-            not env.cache.download_enabled(), \
-            "[JENKINS] failed to download artifact for {0}"\
-            .format(self.task.qualified_name)
+        raise_task_error_if(
+            not env.cache.download(self.task) and env.cache.download_enabled(),
+            self.task, "failed to download task artifact")
 
         for extension in self.task.extensions:
-            assert env.cache.download(extension) or \
-                not env.cache.download_enabled(), \
-                "[JENKINS] failed to download artifact for {0}"\
-                .format(extension.qualified_name)
+            raise_task_error_if(
+                not env.cache.download(extension) and env.cache.download_enabled(),
+                self.task, "failed to download task artifact")
 
         return self.task
 

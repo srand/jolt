@@ -2,6 +2,7 @@ import platform
 from jolt.tasks import *
 from jolt import influence
 from jolt import utils
+from jolt.error import *
 
 import ninja_syntax as ninja
 
@@ -207,9 +208,7 @@ class Toolchain(object):
                 if isinstance(utils.getattr_safe(cls, key), Rule)]
 
     def find_rule(self, ext):
-        rule = self._rule_map.get(ext)
-        assert rule, "no build rule match for file with extension '{0}'".format(ext)
-        return rule
+        return self._rule_map.get(ext)
 
     @staticmethod
     def all_variables(cls):
@@ -425,7 +424,11 @@ class CXXProject(Task):
 
     def _expand_sources(self):
         sources = []
-        for l in map(self.tools.glob, self.sources):
+        for source in self.sources:
+            l = self.tools.glob(source)
+            raise_task_error_if(
+                not l and not ('*' in source or '?' in source), self,
+                "source file '{0}' not found", fs.path.basename(source))
             sources += l
         sources.sort()
         self.sources = sources
@@ -443,7 +446,9 @@ class CXXProject(Task):
         rule = self._rule_map.get(ext)
         if rule is None:
             rule = toolchain.find_rule(ext)
-        assert rule, "no build rule match for file with extension '{0}'".format(ext)
+        raise_task_error_if(
+            not rule, self,
+            "no build rule available for files with extension '{0}'", ext)
         return rule
 
     def _populate_variables(self, writer, deps, tools):

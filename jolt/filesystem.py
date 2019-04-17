@@ -61,28 +61,6 @@ def scandir(scanpath):
             for path, dirs, files in os.walk(scanpath)
             for f in files]
 
-make_archive = shutil.make_archive
-
-def make_archive(file, path, remove=False):
-    shutil.make_archive(file, "gztar", root_dir=path)
-    if remove:
-        rmtree(path)
-    return get_archive(path)
-
-def extract_archive(file, path, remove=False):
-    name, ext = os.path.splitext(file)
-    if not ext:
-        ext = ".tar.gz"
-        file += ext
-    if ext == ".tar.gz":
-        with tarfile.open(file, 'r:gz') as tar:
-            makedirs(path)
-            tar.extractall(path)
-        if remove:
-            os.unlink(file)
-        return
-    assert False, "unsupported file extension: {0}".format(ext)
-
 
 def get_archive(path):
     return path + ".tar.gz"

@@ -13,6 +13,8 @@ from jolt import log
 from jolt import config
 from jolt import filesystem as fs
 from jolt.tools import Tools
+from jolt.error import *
+
 
 NAME = "ftp"
 CONNECT_TIMEOUT = 3.5
@@ -31,7 +33,7 @@ class FtpStorage(cache.StorageProvider):
         super(FtpStorage, self).__init__()
         self._cache = cache
         self._uri = config.get(NAME, "host")
-        assert self._uri, "ftp URI not configured"
+        raise_error_if(not self._uri, "ftp URI not configured")
         self._path = config.get(NAME, "path", "")
         self._upload = config.getboolean(NAME, "upload", True)
         self._download = config.getboolean(NAME, "download", True)
@@ -46,7 +48,7 @@ class FtpStorage(cache.StorageProvider):
         username = config.get(NAME, "keyring.username")
         if not username:
             username = raw_input(NAME + " username: ")
-            assert username, "no username configured for " + NAME
+            raise_error_if(not username, "no username configured for " + NAME)
             config.set(NAME, "keyring.username", username)
             config.save()
 
@@ -54,7 +56,7 @@ class FtpStorage(cache.StorageProvider):
                    keyring.get_password(NAME, username)
         if not password:
             password = getpass.getpass(NAME + " password: ")
-            assert password, "no password in keyring for " + NAME
+            raise_error_if(not password, "no password in keyring for " + NAME)
             keyring.set_password(service, username, password)
         return username, password
 

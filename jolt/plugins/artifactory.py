@@ -10,6 +10,8 @@ from jolt import cache
 from jolt import log
 from jolt import config
 from jolt import filesystem as fs
+from jolt.error import *
+
 
 NAME = "artifactory"
 TIMEOUT = (3.5, 27)
@@ -20,7 +22,7 @@ class Artifactory(cache.StorageProvider):
         super(Artifactory, self).__init__()
         self._cache = cache
         self._uri = config.get(NAME, "uri")
-        assert self._uri, "artifactory URI not configured"
+        raise_error_if(not self._uri, "artifactory URI not configured")
         if self._uri[-1] != "/":
             self._uri += "/"
         self._repository = config.get(NAME, "repository", "jolt")
@@ -40,7 +42,7 @@ class Artifactory(cache.StorageProvider):
         username = config.get(NAME, "keyring.username")
         if not username:
             username = utils.read_input(NAME + " username: ")
-            assert username, "no username configured for " + NAME
+            raise_error_if(not username, "no username configured for " + NAME)
             config.set(NAME, "keyring.username", username)
             config.save()
 
@@ -48,7 +50,7 @@ class Artifactory(cache.StorageProvider):
                    keyring.get_password(NAME, username)
         if not password:
             password = getpass.getpass(NAME + " password: ")
-            assert password, "no password in keyring for " + NAME
+            raise_error_if(not password, "no password in keyring for " + NAME)
             keyring.set_password(service, username, password)
         return HTTPBasicAuth(username, password)
 
