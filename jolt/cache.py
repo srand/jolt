@@ -1,5 +1,6 @@
 import glob
 import json
+import yaml
 import copy
 import os
 from tempfile import mkdtemp
@@ -275,21 +276,32 @@ class Artifact(object):
         content["influence"] = influence.HashInfluenceRegistry.get().get_strings(self._node.task)
         ArtifactAttributeSetRegistry.format_all(self, content)
 
-        manifest = fs.path.join(self._temp, ".manifest.json")
+        manifest = fs.path.join(self._temp or self._path, ".manifest.yaml")
         with open(manifest, "wb") as f:
-            f.write(json.dumps(content, indent=3).encode())
+            f.write(yaml.dump(content, default_flow_style=False).encode())
 
     def _read_manifest(self):
         if self._temp:
             return
-        manifest = fs.path.join(self._path, ".manifest.json")
-        with open(manifest, "rb") as f:
-            data = utils.decode_str(f.read())
-            content = json.loads(data)
-            self._size = content["size"]
-            self._unpacked = content["unpacked"]
-            self._uploadable = content.get("uploadable", True)
-            ArtifactAttributeSetRegistry.parse_all(self, content)
+        old = False
+        try:
+            manifest = fs.path.join(self._path, ".manifest.yaml")
+            with open(manifest, "rb") as f:
+                data = utils.decode_str(f.read())
+                content = yaml.load(data)
+        except:
+            manifest = fs.path.join(self._path, ".manifest.json")
+            with open(manifest, "rb") as f:
+                data = utils.decode_str(f.read())
+                content = json.loads(data)
+            old = True
+        self._size = content["size"]
+        self._unpacked = content["unpacked"]
+        self._uploadable = content.get("uploadable", True)
+        ArtifactAttributeSetRegistry.parse_all(self, content)
+        if old:
+            self._write_manifest()
+            fs.unlink(manifest)
 
     def _get_size(self):
         counted_inodes = {}
