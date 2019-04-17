@@ -187,7 +187,7 @@ class TaskProxy(object):
                    dag.are_neighbors(self, n),
                    self.descendants))
 
-        self.anestors = nx.ancestors(dag, self)
+        self.ancestors = nx.ancestors(dag, self)
 
         task = self.manifest.find_task(self.qualified_name)
         if task is not None:
@@ -237,12 +237,9 @@ class TaskProxy(object):
             self.warn("Pruned task was executed")
 
     def run(self, cache, force_upload=False, force_build=False):
-        #if self.is_frozen():
-        #    return
-
         with self.tools:
             tasks = [self] + self.extensions
-            available_locally = available_remotely = False, False
+            available_locally = available_remotely = False
 
             for child in self.children:
                 if not child.has_artifact():

@@ -297,7 +297,7 @@ class Tools(object):
             basename = filename[:-8]
         elif filename.endswith(".tar.xz"):
             fmt = "xztar"
-            basename = filename[:-8]
+            basename = filename[:-7]
         raise_task_error_if(
             not fmt, self._task,
             "unknown archive type '{0}'", fs.path.basename(filename))
