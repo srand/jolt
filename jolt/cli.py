@@ -480,8 +480,8 @@ def info(ctx, task, influence=False, artifacts=False):
             click.echo("    Remote            {0}".format(acache.is_available_remotely(proxy)))
             click.echo()
 
-        if influence:
-            click.echo("  Influence")
-            for string in HashInfluenceRegistry.get().get_strings(task):
-                click.echo("    " + string)
-                click.echo()
+    if influence:
+        click.echo("  Influence")
+        for string in HashInfluenceRegistry.get().get_strings(task):
+            click.echo("    " + string)
+            click.echo()
