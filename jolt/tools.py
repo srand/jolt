@@ -1,6 +1,5 @@
 import subprocess
 import os
-import threading
 import sys
 import threading
 import termios
@@ -35,30 +34,33 @@ def _run(cmd, cwd, env, *args, **kwargs):
         env=env)
 
     class Reader(threading.Thread):
-        def __init__(self, stream, output=None):
+        def __init__(self, parent, stream, output=None):
             super(Reader, self).__init__()
             self.output = output
+            self.parent = parent
             self.stream = stream
             self.buffer = []
             self.start()
 
         def run(self):
+            line = ""
             try:
-                for line in iter(self.stream.readline, b''):
-                    if output_rstrip:
-                        line = line.rstrip()
-                    line = line.decode(errors='ignore')
-                    if self.output:
-                        self.output(line)
-                    self.buffer.append(line)
+                with log.map_thread(self, self.parent):
+                    for line in iter(self.stream.readline, b''):
+                        if output_rstrip:
+                            line = line.rstrip()
+                        line = line.decode(errors='ignore')
+                        if self.output:
+                            self.output(line)
+                        self.buffer.append(line)
             except Exception as e:
                 if self.output:
                     self.output("{0}", str(e))
                     self.output(line)
                 self.buffer.append(line)
 
-    stdout = Reader(p.stdout, output=log.stdout if output else None)
-    stderr = Reader(p.stderr, output=log.stderr if output else None)
+    stdout = Reader(threading.current_thread(), p.stdout, output=log.stdout if output else None)
+    stderr = Reader(threading.current_thread(), p.stderr, output=log.stderr if output else None)
     p.wait()
     stdout.join()
     stderr.join()

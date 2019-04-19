@@ -180,6 +180,24 @@ def set_level(level):
     _stdout.setLevel(level)
     _stderr.setLevel(level)
 
+
+class _ThreadMapper(Filter):
+    def __init__(self):
+        self.thread_map = {}
+
+    def map(self, fr, to):
+        self.thread_map[fr] = to
+
+    def unmap(self, fr):
+        del self.thread_map[fr]
+
+    def filter(self, record):
+        record.thread = self.thread_map.get(record.thread, record.thread)
+        return True
+
+_thread_map = _ThreadMapper()
+
+
 @contextmanager
 def threadsink():
     threadid = threading.get_ident()
@@ -187,7 +205,16 @@ def threadsink():
     handler = logging.StreamHandler(stringbuf)
     handler.setLevel(DEBUG)
     handler.setFormatter(_file_formatter)
+    handler.addFilter(_thread_map)
     handler.addFilter(Filter(lambda record: record.thread == threadid))
     _logger.addHandler(handler)
     yield stringbuf
     _logger.removeHandler(handler)
+
+
+@contextmanager
+def map_thread(thread_from, thread_to):
+    tid = thread_from.ident
+    _thread_map.map(tid, thread_to.ident)
+    yield
+    _thread_map.unmap(tid)
