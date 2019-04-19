@@ -318,21 +318,119 @@ class TaskGenerator(object):
 
 
 class TaskBase(object):
+    """ Task base class """
+
     cacheable = True
     """ Whether the task produces an artifact or not. """
 
-    def __init__(self, *args, **kwargs):
-        super(TaskBase, self).__init__(*args, **kwargs)
-        self.cacheable = self.__class__.cacheable
+    expires = Immediately()
+    """An expiration strategy, defining when the artifact may be evicted from the cache.
+
+    When the size of the artifact cache exceeds the configured limit
+    an attempt will be made to evict artifacts from the cache. The eviction
+    algorithm processes artifacts in least recently used (LRU) order until
+    an expired artifact is found.
+
+    By default, an artifact expires immediately and may be evicted at any time
+    (in LRU order). An exception to this rule is if the artifact is required by
+    a task in the active task set. For example, if a task A requires the output
+    of task B, B will never be evicted by A while A is being executed.
+
+    There are several expiration strategies to choose from:
+
+     - :class:`jolt.expires.WhenUnusedFor`
+     - :class:`jolt.expires.After`
+     - :class:`jolt.expires.Never`
+
+    Examples:
+
+        .. code-block:: python
+
+          # May be evicted if it hasn't been used for 15 days
+          expires = WhenUnusedFor(days=15)
+
+        .. code-block:: python
+
+          # May be evicted 1h after creation
+          expires = After(hours=1)
+
+        .. code-block:: python
+
+          # Never evicted
+          expires = Never()
+
+    """
+
+    extends = ""
+    """
+    Name of extended task.
+
+    A task with this attribute set is called an extension. An extension
+    is executed in the context of the extended task, immediately after
+    the extended task has executed.
+
+    A common use-case for extensions is to produce additional artifacts
+    from the output of another task. Also, for long-running tasks, it is
+    sometimes beneficial to utilize the intermediate output from an extended
+    task. The extension artifact can then be acquired more cheaply than if the
+    extension had performed all of the work from scratch.
+
+    An extension can only extend one other task.
+    """
+
+    fast = False
+    """
+    Indication of task speed.
+
+    The information is used by the distributed execution strategy to
+    optimize how tasks are scheduled. Scheduling tasks remotely is always
+    associated with some overhead and sometimes it's beneficial to instead
+    schedule fast tasks locally if possible.
+
+    An extended task is only considered fast if all extensions are fast.
+    """
+
+    influence = []
+    """ List of influence provider objects """
+
+    joltdir = "."
+    """ Path to the directory of the .jolt file where the task was defined. """
+
+    name = None
+    """ Name of the task. Derived from class name if not set. """
+
+    requires = []
+    """ List of dependencies to other tasks. """
+
+
+    def __init__(self, parameters=None, **kwargs):
+        super(TaskBase, self).__init__(**kwargs)
         self._identity = None
+        self.name = self.__class__.name
 
-    @property
-    def identity(self):
-        return self._identity
+        self._create_exports()
+        self._create_parameters()
+        self._set_parameters(parameters)
 
-    @identity.setter
-    def identity(self, identity):
-        self._identity = identity
+        self.cacheable = self.__class__.cacheable
+        self.extends = self.expand(utils.call_or_return_list(self, self.__class__.extends))
+        raise_task_error_if(
+            len(self.extends) != 1, self,
+            "multiple tasks extended, only one allowed")
+        self.extends = self.extends[0]
+        self.influence = utils.as_list(self.__class__.influence)
+        self.influence.append(TaskSourceInfluence("publish"))
+        self.influence.append(TaskSourceInfluence("run"))
+        self.influence.append(TaskSourceInfluence("unpack"))
+        self.requires = self.expand(utils.call_or_return_list(self, self.__class__._requires))
+        self.tools = Tools(self, self.joltdir)
+
+    def _requires(self):
+        return utils.call_or_return_list(self, self.__class__.requires)
+
+    def _get_source(self, func):
+        source, lines = inspect.getsourcelines(func)
+        return "\n".join(source)
 
     def _create_exports(self):
         for key, export in self.__class__.__dict__.items():
@@ -409,75 +507,42 @@ class TaskBase(object):
     def __str__(self):
         return str(self.name)
 
+    @property
+    def canonical_name(self):
+        return utils.canonical(self.name)
+
+    def expand(self, string_or_list, *args, **kwargs):
+        """ Expands keyword arguments/macros in a format string.
+
+        See :func:`jolt.Tools.expand` for details.
+        """
+
+        try:
+            kwargs.update(**self._get_parameters())
+            kwargs.update(**self._get_properties())
+            if type(string_or_list) == list:
+                return [utils.expand(string, *args, **kwargs) for string in string_or_list]
+            return utils.expand(string_or_list, *args, **kwargs)
+        except KeyError as e:
+            raise_task_error(self, "invalid macro '{0}' encountered - forgot to set a parameter?", e)
+
+    @property
+    def identity(self):
+        return self._identity
+
+    @identity.setter
+    def identity(self, identity):
+        self._identity = identity
+
+    def is_cacheable(self):
+        return self.cacheable
+
+    def is_runnable(self):
+        return True
+
 
 class Task(TaskBase):
     #: Path to the .jolt file where the task was defined.
-    joltdir = "."
-    """ Path to the .jolt file where the task was defined. """
-
-    name = None
-    """ Name of the task. Derived from class name if not set. """
-
-    requires = []
-    """ List of dependencies to other tasks. """
-
-    extends = ""
-    """
-    Name of extended task.
-
-    A task with this attribute set is called an extension. An extension
-    is executed in the context of the extended task, immediately after
-    the extended task has executed.
-
-    A common use-case for extensions is to produce additional artifacts
-    from the output of another task. Also, for long-running tasks, it is
-    sometimes beneficial to utilize the intermediate output from an extended
-    task. The extension artifact can then be acquired more cheaply than if the
-    extension had performed all of the work from scratch.
-
-    An extension can only extend one other task.
-    """
-
-    expires = Immediately()
-    """
-    An expiration strategy, defining when the artifact may be evicted from the cache.
-
-    When the size of the artifact cache exceeds the configured limit
-    an attempt will be made to evict artifacts from the cache. The eviction
-    algorithm processes artifacts in least recently used (LRU) order until
-    an expired artifact is found.
-
-    By default, an artifact expires immediately and may be evicted at any time
-    (in LRU order). An exception to this rule is if the artifact is required by
-    a task in the active task set. For example, if a task A requires the output
-    of task B, B will never be evicted by A while A is being executed.
-
-    There are several expiration strategies to choose from:
-
-     - :class:`jolt.expires.WhenUnusedFor`
-     - :class:`jolt.expires.After`
-     - :class:`jolt.expires.Never`
-
-    Examples:
-
-        .. code-block:: python
-
-          # May be evicted if it hasn't been used for 15 days
-          expires = WhenUnusedFor(days=15)
-
-        .. code-block:: python
-
-          # May be evicted 1h after creation
-          expires = After(hours=1)
-
-        .. code-block:: python
-
-          # Never evicted
-          expires = Never()
-
-
-    """
-
 
     abstract = True
     """ An abstract task class indended to be subclassed.
@@ -485,84 +550,8 @@ class Task(TaskBase):
     Abstract tasks can't be executed and won't be listed.
     """
 
-
-    fast = False
-    """
-    Indication of task speed.
-
-    The information is used by the distributed execution strategy to
-    optimize how tasks are scheduled. Scheduling tasks remotely is always
-    associated with some overhead and sometimes it's beneficial to instead
-    schedule fast tasks locally if possible.
-
-    An extended task is only considered fast if all extensions are fast.
-    """
-
-    influence = []
-
     def __init__(self, parameters=None, **kwargs):
-        super(Task, self).__init__()
-        self.name = self.__class__.name
-        self.tools = Tools(self, self.joltdir)
-        self._create_exports()
-        self._create_parameters()
-        self._set_parameters(parameters)
-        self.influence = utils.as_list(self.__class__.influence)
-        self.requires = utils.as_list(utils.call_or_return(self, self.__class__._requires))
-        self.extends = utils.as_list(utils.call_or_return(self, self.__class__.extends))
-        raise_task_error_if(
-            len(self.extends) != 1, self,
-            "multiple tasks extended, only one allowed")
-        self.extends = self.extends[0]
-        self.influence.append(TaskSourceInfluence("publish"))
-        self.influence.append(TaskSourceInfluence("run"))
-        self.influence.append(TaskSourceInfluence("unpack"))
-
-    def _requires(self):
-        return utils.as_list(utils.call_or_return(self, self.__class__.requires))
-
-    def _get_source(self, func):
-        source, lines = inspect.getsourcelines(func)
-        return "\n".join(source)
-
-    def _get_source_functions(self):
-        return [self.run, self.publish, self.unpack]
-
-    def _get_source_hash(self):
-        sha = hashlib.sha1()
-        for func in self._get_source_functions():
-            sha.update(self._get_source(func).encode())
-        return sha.hexdigest()
-
-    def _get_requires(self):
-        try:
-            return [self._get_expansion(req) for req in self.requires]
-        except KeyError as e:
-            raise_task_error(self, "invalid macro '{0}' encountered - forgot to set a parameter?", e)
-
-    def _get_extends(self):
-        try:
-            return self._get_expansion(self.extends)
-        except KeyError as e:
-            raise_task_error(self, "invalid macro '{0}' encountered - forgot to set a parameter?", e)
-
-    def _get_expansion(self, string, *args, **kwargs):
-        try:
-            kwargs.update(**self._get_parameters())
-            kwargs.update(**self._get_properties())
-            return utils.expand(string, *args, **kwargs)
-        except KeyError as e:
-            raise_task_error(self, "invalid macro '{0}' encountered - forgot to set a parameter?", e)
-
-    @property
-    def canonical_name(self):
-        return self.name.replace("/", "_")
-
-    def is_cacheable(self):
-        return self.cacheable
-
-    def is_runnable(self):
-        return True
+        super(Task, self).__init__(parameters, **kwargs)
 
     def info(self, fmt, *args, **kwargs):
         """
@@ -648,6 +637,7 @@ class Resource(Task):
     """
 
     cacheable = False
+
     abstract = True
     """ An abstract resource class indended to be subclassed. """
 
@@ -713,11 +703,16 @@ class _Test(Task):
 
     def __init__(self, test_cls, *args, **kwargs):
         self.test_cls = test_cls
-        self.__class__.name = test_cls.name
-        self.__class__.joltdir = test_cls.joltdir
-        self.__class__.requires = test_cls.requires
+        self.__class__.cacheable = test_cls.cacheable
+        self.__class__.extends = test_cls.extends
+        self.__class__.expires = test_cls.expires
         self.__class__.influence = test_cls.influence
+        self.__class__.joltdir = test_cls.joltdir
+        self.__class__.name = test_cls.name
+        self.__class__.requires = test_cls.requires
+
         super(_Test, self).__init__(*args, **kwargs)
+
         self.influence.append(TaskSourceInfluence("setup", self.test_cls))
         self.influence.append(TaskSourceInfluence("cleanup", self.test_cls))
         for name in self._get_test_names():
@@ -730,12 +725,6 @@ class _Test(Task):
     @identity.setter
     def identity(self, identity):
         self.test_cls.identity = identity
-
-    def _create_parameters(self):
-        for key, param in self.test_cls.__dict__.items():
-            if isinstance(param, Parameter):
-                param = copy.copy(param)
-                setattr(self, key, param)
 
     def _get_test_names(self):
         return [attrib for attrib in dir(self.test_cls)
@@ -751,11 +740,30 @@ class _Test(Task):
 
 
 class Test(ut.TestCase, TaskBase):
-    joltdir = "."
-    name = None
-    requires = []
-    extends = ""
-    influence = []
+    """ A test task.
+
+    The test task combines a regular Jolt task with a Python ``unittest.TestCase``.
+    As such, a test task is a collection of similar test-cases where each test-case
+    is implemented as an instancemethod named with a ``test_`` prefix. When executed,
+    the task runs all test-case methods and summarizes the result.
+
+    All regular ``unittest`` assertions and decorators can be used in the test methods.
+    For details about inherited task attributes, see :class:`jolt.tasks.Task` and
+    Python unittest.TestCase.
+
+    Example:
+
+    .. code-block:: python
+
+      class OperatorTest(Test):
+
+          def test_add(self):
+              self.assertEqual(1+1, 2)
+
+          def test_sub(self):
+              self.assertEqual(2-1, 1)
+
+    """
 
     abstract = True
     """ An abstract test class indended to be subclassed.
@@ -768,17 +776,6 @@ class Test(ut.TestCase, TaskBase):
         TaskBase.__init__(self)
         self.deps = deps
         self.tools = tools
-        self.influence = utils.as_list(self.__class__.influence)
-        self.requires = utils.as_list(utils.call_or_return(self, self.__class__.requires))
-        self.extends = utils.as_list(utils.call_or_return(self, self.__class__.extends))
-        raise_task_error_if(
-            len(self.extends) != 1, self,
-            "multiple tasks extended, only one allowed")
-        self.extends = self.extends[0]
-        self.name = self.__class__.name
-        self._create_exports()
-        self._create_parameters()
-        self._set_parameters(parameters)
 
     def setUp(self):
         self.setup(self.deps, self.tools)

@@ -181,7 +181,7 @@ class RepoInfluenceProvider(HashInfluenceProvider):
     def get_influence(self, task):
         self.tools = Tools(task, task.joltdir)
         try:
-            manifest_path = fs.path.join(task.joltdir, task._get_expansion(self.path))
+            manifest_path = fs.path.join(task.joltdir, task.expand(self.path))
             manifest = RepoManifest(task, manifest_path)
             manifest.parse(fs.path.join(manifest_path, ".repo", "manifest.xml"))
 
@@ -206,7 +206,7 @@ class RepoInfluenceProvider(HashInfluenceProvider):
         assert False, "failed to calculate hash influence for repo manifest at {0}".format(self.path)
 
     def get_manifest(self, task):
-        manifest_path = fs.path.join(task.joltdir, task._get_expansion(self.path))
+        manifest_path = fs.path.join(task.joltdir, task.expand(self.path))
         with _repo_manifest_lock:
             manifest = _repo_manifests.get(manifest_path)
             if manifest is None:

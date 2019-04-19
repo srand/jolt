@@ -368,9 +368,8 @@ class GraphBuilder(object):
     def _build_node(self, node):
         self.graph.add_node(node)
 
-        extended = node.task._get_extends()
-        if extended:
-            extended_node = self._get_node(extended)
+        if node.task.extends:
+            extended_node = self._get_node(node.task.extends)
             self.graph.add_edges_from([(node, extended_node)])
             node.set_extended_task(extended_node)
             extended_node.add_extension(node)
@@ -378,7 +377,7 @@ class GraphBuilder(object):
         else:
             parent = node
 
-        for requirement in node.task._get_requires():
+        for requirement in node.task.requires:
             child = self._get_node(requirement)
             self.graph.add_edges_from([(parent, child)])
 

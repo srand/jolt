@@ -276,7 +276,7 @@ class Artifact(object):
         content["unpacked"] = self._unpacked
         content["uploadable"] = self._uploadable
         content["identity"] = self._node.identity
-        content["requires"] = self._node.task._get_requires()
+        content["requires"] = self._node.task.requires
         content["parameters"] = self._node.task._get_parameters()
         content["influence"] = influence.HashInfluenceRegistry.get().get_strings(self._node.task)
         content["created"] = self._created
@@ -435,8 +435,8 @@ class Artifact(object):
             self._node,
             "can't collect files into an already published task artifact")
 
-        files = self._node.task._get_expansion(files)
-        dest = self._node.task._get_expansion(dest) if dest is not None else None
+        files = self._node.task.expand(files)
+        dest = self._node.task.expand(dest) if dest is not None else None
 
         files = self.tools.glob(files)
         dirname = fs.path.join(self._temp, dest) if dest else self._temp + fs.sep
@@ -478,8 +478,8 @@ class Artifact(object):
             self._node,
             "can't copy files from an unpublished task artifact")
 
-        pathname = self._node.task._get_expansion(pathname)
-        dest = self._node.task._get_expansion(dest)
+        pathname = self._node.task.expand(pathname)
+        dest = self._node.task.expand(dest)
 
         files = []
         with self.tools.cwd(self._path):
@@ -603,7 +603,7 @@ class Context(object):
 
         """
 
-        key = self._node.task._get_expansion(key)
+        key = self._node.task.expand(key)
         raise_task_error_if(
             key not in self._artifacts_index,
             self._node,

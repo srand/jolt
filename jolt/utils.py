@@ -61,6 +61,9 @@ def as_human_size(size):
 def call_or_return(obj, t):
     return t(obj) if callable(t) else t
 
+def call_or_return_list(obj, t):
+    return as_list(call_or_return(obj, t))
+
 def call_and_catch(f, *args, **kwargs):
     try:
         return f(*args, **kwargs)

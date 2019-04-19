@@ -506,7 +506,7 @@ class Tools(object):
                     print(tools.expand("make {target} VERBOSE={verbose}"))  # "make all VERBOSE=yes"
 
         """
-        return self._task._get_expansion(string, *args, **kwargs) \
+        return self._task.expand(string, *args, **kwargs) \
             if self._task is not None \
             else utils.expand(string, *args, **kwargs)
 
