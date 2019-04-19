@@ -9,8 +9,6 @@ import sys
 import fcntl
 import errno
 
-from jolt import log
-
 
 if sys.version_info[0] == 3:
     read_input = input
@@ -232,14 +230,14 @@ def Singleton(cls):
 
 
 class LockFile(object):
-    def __init__(self, path, busymsg=None):
+    def __init__(self, path, logfunc=None, *args, **kwargs):
         self._file = open(os.path.join(path, "lock"), "wb")
         try:
             fcntl.lockf(self._file, fcntl.LOCK_EX|fcntl.LOCK_NB)
         except IOError as e:
             if e.errno in [errno.EAGAIN, errno.EACCES]:
-                if busymsg is not None:
-                    log.info(busymsg)
+                if logfunc is not None:
+                    logfunc(*args, **kwargs)
                 fcntl.lockf(self._file, fcntl.LOCK_EX)
             else:
                 raise

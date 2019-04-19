@@ -687,7 +687,7 @@ class ArtifactCache(StorageProvider):
         self._options = options or JoltOptions()
         self._lockfile = utils.LockFile(
             fs.path.join(self.root),
-            "Another instance of Jolt is already running, waiting for it to complete...")
+            log.info, "Another instance of Jolt is already running, waiting for it to complete...")
 
     def get_path(self, node):
         return fs.path.join(self.root, node.canonical_name, node.identity)
