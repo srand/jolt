@@ -298,7 +298,7 @@ class Artifact(object):
             manifest = fs.path.join(path, ".manifest.yaml")
             with open(manifest, "rb") as f:
                 data = utils.decode_str(f.read())
-                content = yaml.load(data)
+                content = yaml.load(data, Loader=yaml.FullLoader)
         except:
             manifest = fs.path.join(path, ".manifest.json")
             with open(manifest, "rb") as f:
@@ -636,7 +636,7 @@ class CacheStats(object):
         try:
             with open(self.path) as f:
                 data = utils.decode_str(f.read())
-                self.stats = yaml.load(data)
+                self.stats = yaml.load(data, Loader=yaml.FullLoader)
         except:
             # Load legacy file and convert data to new format
             path = fs.path.join(self.cache.root, ".stats.json")
