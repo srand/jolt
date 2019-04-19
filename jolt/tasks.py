@@ -735,8 +735,9 @@ class _Test(Task):
         for test in self._get_test_names():
             testsuite.addTest(self.test_cls(
                 test, parameters=self._get_parameters(), deps=deps, tools=tools))
-        self.testresult = ut.TextTestRunner(verbosity=2).run(testsuite)
-        raise_task_error_if(not self.testresult.wasSuccessful(), self, "tests failed")
+        with log.stream() as logstream:
+            self.testresult = ut.TextTestRunner(stream=logstream, verbosity=2).run(testsuite)
+            raise_task_error_if(not self.testresult.wasSuccessful(), self, "tests failed")
 
 
 class Test(ut.TestCase, TaskBase):

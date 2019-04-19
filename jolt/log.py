@@ -218,3 +218,30 @@ def map_thread(thread_from, thread_to):
     _thread_map.map(tid, thread_to.ident)
     yield
     _thread_map.unmap(tid)
+
+
+class _LogStream(object):
+    def __init__(self):
+        self.buf = ""
+
+    def write(self, data):
+        self.buf += data
+        lines = self.buf.splitlines()
+        if data[-1] != "\n":
+            self.buf = lines[-1]
+            lines = lines[:-1]
+        else:
+            self.buf = ""
+        for line in lines:
+            stdout(line)
+
+    def flush(self):
+        line = self.buf
+        self.buf = ""
+        if line:
+            stdout(line)
+
+
+@contextmanager
+def stream():
+    yield _LogStream()
