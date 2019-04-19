@@ -12,6 +12,7 @@ from jolt.cache import *
 from jolt.tools import Tools
 from jolt.influence import TaskSourceInfluence
 from jolt.error import *
+from jolt.expires import Immediately
 
 
 class Export(object):
@@ -436,6 +437,47 @@ class Task(TaskBase):
 
     An extension can only extend one other task.
     """
+
+    expires = Immediately()
+    """
+    An expiration strategy, defining when the artifact may be evicted from the cache.
+
+    When the size of the artifact cache exceeds the configured limit
+    an attempt will be made to evict artifacts from the cache. The eviction
+    algorithm processes artifacts in least recently used (LRU) order until
+    an expired artifact is found.
+
+    By default, an artifact expires immediately and may be evicted at any time
+    (in LRU order). An exception to this rule is if the artifact is required by
+    a task in the active task set. For example, if a task A requires the output
+    of task B, B will never be evicted by A while A is being executed.
+
+    There are several expiration strategies to choose from:
+
+     - :class:`jolt.expires.WhenUnusedFor`
+     - :class:`jolt.expires.After`
+     - :class:`jolt.expires.Never`
+
+    Examples:
+
+        .. code-block:: python
+
+          # May be evicted if it hasn't been used for 15 days
+          expires = WhenUnusedFor(days=15)
+
+        .. code-block:: python
+
+          # May be evicted 1h after creation
+          expires = After(hours=1)
+
+        .. code-block:: python
+
+          # Never evicted
+          expires = Never()
+
+
+    """
+
 
     abstract = True
     """ An abstract task class indended to be subclassed.

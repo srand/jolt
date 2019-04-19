@@ -26,6 +26,8 @@ class HelloWorld(Task):
     requires = "gerrit-src:url=https://github.com/gideont/hello_world.git,sha=d80bb20", "resource", "toolchain"
     flavor = Parameter(default="hello_01", help="Flavor of the hello world application")
 
+    expires = expires.WhenUnusedFor(minutes=2)
+
     def run(self, deps, tools):
         with tools.cwd("hello_world/{flavor}"):
             tools.run("make")

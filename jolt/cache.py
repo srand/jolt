@@ -7,6 +7,7 @@ from tempfile import mkdtemp
 import time
 from threading import RLock, current_thread
 import fcntl
+from datetime import datetime, timedelta
 
 from jolt import filesystem as fs
 from jolt import log
@@ -16,6 +17,7 @@ from jolt import config
 from jolt import utils
 from jolt.options import JoltOptions
 from jolt.error import *
+from jolt.expires import *
 
 
 DEFAULT_ARCHIVE_TYPE = ".tar.gz"
@@ -244,6 +246,9 @@ class Artifact(object):
         self._archive = None
         self._unpacked = False
         self._uploadable = True
+        self._created = datetime.now()
+        self._modified = datetime.now()
+        self._expires = node.task.expires
         self._size = 0
         ArtifactAttributeSetRegistry.create_all(self)
         try:
@@ -274,32 +279,48 @@ class Artifact(object):
         content["requires"] = self._node.task._get_requires()
         content["parameters"] = self._node.task._get_parameters()
         content["influence"] = influence.HashInfluenceRegistry.get().get_strings(self._node.task)
+        content["created"] = self._created
+        content["modified"] = datetime.now()
+        content["expires"] = self._expires.value
+        self._created = content.get("created", datetime.now())
+        self._modified = content.get("modified", datetime.now())
+
         ArtifactAttributeSetRegistry.format_all(self, content)
 
         manifest = fs.path.join(self._temp or self._path, ".manifest.yaml")
         with open(manifest, "wb") as f:
             f.write(yaml.dump(content, default_flow_style=False).encode())
 
-    def _read_manifest(self):
-        if self._temp:
-            return
-        old = False
+    @staticmethod
+    def load_manifest(path):
+        content_type = "yaml"
         try:
-            manifest = fs.path.join(self._path, ".manifest.yaml")
+            manifest = fs.path.join(path, ".manifest.yaml")
             with open(manifest, "rb") as f:
                 data = utils.decode_str(f.read())
                 content = yaml.load(data)
         except:
-            manifest = fs.path.join(self._path, ".manifest.json")
+            manifest = fs.path.join(path, ".manifest.json")
             with open(manifest, "rb") as f:
                 data = utils.decode_str(f.read())
                 content = json.loads(data)
-            old = True
+            content_type = "json"
+        return content, content_type
+
+    def _read_manifest(self):
+        if self._temp:
+            return
+        content, content_type = Artifact.load_manifest(self._path)
         self._size = content["size"]
         self._unpacked = content["unpacked"]
         self._uploadable = content.get("uploadable", True)
+        self._created = content.get("created", datetime.now())
+        self._modified = content.get("modified", datetime.now())
+        self._evictable = content.get("evictable", True)
+        self._expires = ArtifactEvictionStrategyRegister.get().find(
+            content.get("expires", "immediately"))
         ArtifactAttributeSetRegistry.parse_all(self, content)
-        if old:
+        if content_type != "yaml":
             self._write_manifest()
             fs.unlink(manifest)
 
@@ -603,7 +624,7 @@ class CacheStats(object):
     def __init__(self, cache):
         self._lock = RLock()
         self.cache = cache
-        self.path = fs.path.join(cache.root, ".stats.json")
+        self.path = fs.path.join(cache.root, "stats.yaml")
         try:
             self.load()
         except:
@@ -612,9 +633,20 @@ class CacheStats(object):
         log.verbose("Cache size is {0}", utils.as_human_size(self.get_size()))
 
     def load(self):
-        with open(self.path) as f:
-            data = utils.decode_str(f.read())
-            self.stats = json.loads(data)
+        try:
+            with open(self.path) as f:
+                data = utils.decode_str(f.read())
+                self.stats = yaml.load(data)
+        except:
+            # Load legacy file and convert data to new format
+            path = fs.path.join(self.cache.root, ".stats.json")
+            with open(path) as f:
+                data = utils.decode_str(f.read())
+                self.stats = json.loads(data)
+                for ident, artifact in self.stats.items():
+                    artifact["used"] = datetime.fromtimestamp(artifact["used"])
+            self.save()
+            fs.unlink(path)
 
         deleted = []
         for artifact, stats in self.stats.items():
@@ -629,7 +661,7 @@ class CacheStats(object):
     @locked
     def save(self):
         with open(self.path, "wb") as f:
-            f.write(json.dumps(self.stats, indent=3).encode())
+            f.write(yaml.dump(self.stats, default_flow_style=False).encode())
 
     @locked
     def update(self, artifact, save=True):
@@ -637,7 +669,7 @@ class CacheStats(object):
             return
         stats = {}
         stats["name"] = artifact.get_task().canonical_name
-        stats["used"] = time.time()
+        stats["used"] = datetime.now()
         stats["size"] = artifact.get_size()
         self.stats[artifact.get_identity()] = stats
         self.active.add(artifact.get_identity())
@@ -658,12 +690,22 @@ class CacheStats(object):
 
     @locked
     def get_lru(self):
-        assert self.stats, "can't evict LRU artifact, no artifacts in cache"
+        assert self.stats, "can't evict artifact, no artifacts in cache"
         nt = [dict(identity=artifact, **stats) for artifact, stats in self.stats.items()]
-        nt = sorted(nt, key=lambda x: x["used"])
-        # Don't evict artifacts in the current working set
+        # Don't evict artifacts in the current active working set
         nt = list(filter(lambda x: x["identity"] not in self.active, nt))
-        return nt[0] if len(nt) > 0 else None
+        nt = sorted(nt, key=lambda x: x["used"])
+
+        for target in nt:
+            path = fs.path.join(self.cache.root, target["name"], target["identity"])
+            content, _ = Artifact.load_manifest(path)
+            content["used"] = target["used"]
+            strategy = ArtifactEvictionStrategyRegister.get().find(
+                content.get("expires", "immediately"))
+            if strategy.is_evictable(content):
+                return target
+
+        return None
 
 
 @utils.Singleton
