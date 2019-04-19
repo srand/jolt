@@ -1,4 +1,7 @@
-from jolt.cache import *
+from jolt import filesystem as fs
+from jolt.cache import ArtifactStringAttribute
+from jolt.cache import ArtifactAttributeSet
+from jolt.cache import ArtifactAttributeSetProvider
 
 
 class CppInfoVariable(ArtifactStringAttribute):

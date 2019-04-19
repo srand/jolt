@@ -1,31 +1,29 @@
-import glob
 import json
 import yaml
-import copy
 import os
 from tempfile import mkdtemp
-import time
-from threading import RLock, current_thread
-import fcntl
-from datetime import datetime, timedelta
+from threading import RLock
+from datetime import datetime
 
+from jolt import config
 from jolt import filesystem as fs
+from jolt import influence
 from jolt import log
 from jolt import tools
-from jolt import influence
-from jolt import config
 from jolt import utils
 from jolt.options import JoltOptions
-from jolt.error import *
-from jolt.expires import *
+from jolt.error import raise_error
+from jolt.error import raise_task_error, raise_task_error_if
+from jolt.expires import ArtifactEvictionStrategyRegister
 
 
 DEFAULT_ARCHIVE_TYPE = ".tar.gz"
 
-def locked(f):
+
+def locked(func):
     def _f(self, *args, **kwargs):
-        with self._lock:
-            return f(self, *args, **kwargs)
+        with self.lock:
+            return func(self, *args, **kwargs)
     return _f
 
 
@@ -49,6 +47,7 @@ class StorageProvider(object):
 class StorageProviderFactory(StorageProvider):
     def create(self):
         pass
+
 
 def RegisterStorage(cls):
     ArtifactCache.storage_provider_factories.append(cls)
@@ -191,8 +190,8 @@ class Artifact(object):
     An artifact is a collection of files and metadata produced by a task.
 
     Task implementors call artifact methods to collect files to be published.
-    In addition to files, other metadata can be provided as well, such as variables
-    that should be set in the environment of consumer tasks.
+    In addition to files, other metadata can be provided as well, such as
+    variables that should be set in the environment of consumer tasks.
 
     """
 
@@ -322,7 +321,7 @@ class Artifact(object):
         ArtifactAttributeSetRegistry.parse_all(self, content)
         if content_type != "yaml":
             self._write_manifest()
-            fs.unlink(manifest)
+            fs.unlink(fs.path.join(self._path, ".manifest.json"))
 
     def _get_size(self):
         counted_inodes = {}
@@ -622,7 +621,7 @@ class Context(object):
 
 class CacheStats(object):
     def __init__(self, cache):
-        self._lock = RLock()
+        self.lock = RLock()
         self.cache = cache
         self.path = fs.path.join(cache.root, "stats.yaml")
         try:

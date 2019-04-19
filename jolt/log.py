@@ -7,7 +7,6 @@ from datetime import datetime
 import threading
 import logging
 import logging.handlers
-import time
 from contextlib import contextmanager
 try:
     from StringIO import StringIO

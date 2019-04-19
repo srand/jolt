@@ -6,7 +6,8 @@ except:
 
 from jolt import filesystem as fs
 from jolt import utils
-from jolt.error import *
+from jolt.error import raise_error_if
+
 
 location = fs.path.join(fs.path.expanduser("~"), ".config", "jolt", "config")
 
@@ -14,6 +15,12 @@ _file = SafeConfigParser()
 _file.read(location)
 if not _file.has_section("jolt"):
     _file.add_section("jolt")
+if not _file.has_section("cxxinfo"):
+    _file.add_section("cxxinfo")
+if not _file.has_section("environ"):
+    _file.add_section("environ")
+if not _file.has_section("strings"):
+    _file.add_section("strings")
 
 def get(section, key, default=None, expand=True):
     try:

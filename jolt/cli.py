@@ -1,13 +1,10 @@
 import click
 import imp
-import traceback
 import subprocess
-import signal
-import sys
 import webbrowser
+from os import _exit
 
-
-from jolt.tasks import Task, TaskRegistry, Parameter
+from jolt.tasks import TaskRegistry, Parameter
 from jolt import scheduler
 from jolt import graph
 from jolt import cache
@@ -15,15 +12,17 @@ from jolt import filesystem as fs
 from jolt import log
 from jolt.log import logfile
 from jolt import config
-from jolt import plugins
-from jolt.plugins import cxxinfo, environ, strings
 from jolt.loader import JoltLoader
 from jolt import utils
-from jolt.influence import *
+from jolt.influence import HashInfluenceRegistry, taint
 from jolt.options import JoltOptions
 from jolt.hooks import TaskHookRegistry
 from jolt.manifest import JoltManifest
-from jolt.error import *
+from jolt.error import JoltError
+from jolt.error import raise_error
+from jolt.error import raise_error_if
+from jolt.error import raise_task_error_if
+
 
 debug_enabled = False
 
@@ -33,8 +32,9 @@ debug_enabled = False
 @click.option("-vv", "--extra-verbose", is_flag=True, help="Verbose.")
 @click.option("-c", "--config-file", type=str, help="Configuration file")
 @click.option("-d", "--debug", is_flag=True, help="Attach debugger on exception", hidden=True)
+@click.option("-p", "--profile", is_flag=True, help="Profile code while running", hidden=True)
 @click.pass_context
-def cli(ctx, verbose, extra_verbose, config_file, debug):
+def cli(ctx, verbose, extra_verbose, config_file, debug, profile):
     """ Jolt - a task execution tool. """
 
     global debug_enabled
@@ -48,6 +48,7 @@ def cli(ctx, verbose, extra_verbose, config_file, debug):
         config.load(config_file)
 
     # Load configured plugins
+    imp.new_module("jolt.plugins")
     for section in config.sections():
         path = fs.path.dirname(__file__)
         path = fs.path.join(path, "plugins", section + ".py")
@@ -70,7 +71,7 @@ def cli(ctx, verbose, extra_verbose, config_file, debug):
 
 
 def _autocomplete_tasks(ctx, args, incomplete):
-    tasks, tests = loader.JoltLoader.get().load()
+    tasks, tests = JoltLoader.get().load()
     tasks = [task.name for task in tasks + tests if task.name.startswith(incomplete or '')]
     return sorted(tasks)
 
@@ -147,7 +148,7 @@ def build(ctx, task, network, keep_going, identity, default, local,
         log.verbose("Local build as a user")
         strategy = scheduler.LocalStrategy(executors, acache)
 
-    hooks = TaskHookRegistry.get(options)
+    TaskHookRegistry.get(options)
     registry = TaskRegistry.get(options)
 
     for params in default:
@@ -205,7 +206,7 @@ def build(ctx, task, network, keep_going, identity, default, local,
             return
         except KeyboardInterrupt:
             log.warning("Interrupted again, exiting")
-            os._exit(1)
+            _exit(1)
 
 
 @cli.command()
@@ -241,7 +242,6 @@ def display(ctx, task, prune):
 
     <WIP>
     """
-    options = JoltOptions()
     registry = TaskRegistry.get()
     gb = graph.GraphBuilder(registry, ctx.obj["manifest"])
     dag = gb.build(task)
@@ -285,7 +285,7 @@ def freeze(ctx, task, default, output):
 
     options = JoltOptions(default=default)
     acache = cache.ArtifactCache.get(options)
-    executors = scheduler.ExecutorRegistry.get(options)
+    scheduler.ExecutorRegistry.get(options)
     registry = TaskRegistry.get()
 
     for params in default:

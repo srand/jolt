@@ -1,4 +1,6 @@
-from jolt.cache import *
+from jolt.cache import ArtifactAttributeSet
+from jolt.cache import ArtifactAttributeSetProvider
+from jolt.cache import ArtifactStringAttribute
 
 
 class StringVariable(ArtifactStringAttribute):

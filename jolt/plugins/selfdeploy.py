@@ -1,11 +1,20 @@
-from jolt.tasks import *
-from jolt.plugins import directory
-from jolt.cache import *
-from jolt.graph import *
-from jolt.scheduler import *
+from jolt.tasks import Task, TaskRegistry
+from jolt.cache import ArtifactCache
+from jolt.graph import GraphBuilder
+from jolt.error import raise_error_if
+from jolt.manifest import JoltManifest
+from jolt.scheduler import JoltEnvironment
+from jolt.scheduler import LocalExecutor
+from jolt.scheduler import LocalExecutorFactory
+from jolt.scheduler import NetworkExecutorExtension
+from jolt.scheduler import NetworkExecutorExtensionFactory
 from jolt.loader import JoltLoader
 from jolt import config
-from jolt.error import *
+from jolt import filesystem as fs
+from jolt import influence
+from jolt import log
+from jolt import utils
+
 
 
 log.verbose("SelfDeploy loaded")
@@ -16,15 +25,16 @@ _path = fs.path.dirname(_path)
 _path = fs.path.dirname(_path)
 
 
-@directory.influence(_path, pattern="*.py")
+@influence.files(fs.path.join(_path, "**", "*.py"))
 class Jolt(Task):
     name = "jolt"
 
     def __init__(self, *args, **kwargs):
         super(Jolt, self).__init__(*args, **kwargs)
-        with Tools(self) as tools:
-            for e in self.extras:
-                self.influence.append(directory.DirectoryInfluenceProvider(e, pattern='*.py'))
+        for e in self.extras:
+            self.influence.append(
+                influence.FileInfluenceProvider(
+                    fs.path.join(e, "**", "*.py")))
 
     @property
     def loaderdir(self):
@@ -64,7 +74,6 @@ class SelfDeployExtension(NetworkExecutorExtension):
         assert len(task) == 1, "too many selfdeploy tasks found"
         task = task[0]
         if not acache.is_available_remotely(task):
-            duration = utils.duration()
             factory = LocalExecutorFactory()
             executor = LocalExecutor(factory, task, force_upload=True)
             executor.run(env)

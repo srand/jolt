@@ -1,18 +1,14 @@
-from jolt.tasks import *
-from jolt.influence import *
-from jolt.tools import *
-from jolt.scheduler import *
+import copy
+
+from jolt.tasks import Resource, Parameter, Export, TaskRegistry
+from jolt.influence import HashInfluenceProvider, HashInfluenceRegistry
+from jolt.tools import Tools
 from jolt.loader import JoltLoader
-from jolt import utils
 from jolt import filesystem as fs
-from jolt.error import *
-
-
-try:
-    import pygit2
-    has_pygit = True
-except:
-    has_pygit = False
+from jolt import log
+from jolt import utils
+from jolt.error import raise_error_if
+from jolt.error import raise_task_error_if
 
 
 
@@ -254,4 +250,3 @@ class Git(GitSrc, HashInfluenceProvider):
             self.git.diff_hash()[:8])
 
 TaskRegistry.get().add_task_class(Git)
-

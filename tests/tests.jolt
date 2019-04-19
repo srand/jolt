@@ -2,11 +2,11 @@ import os
 
 from jolt import *
 from jolt import utils
-from jolt.plugins import directory
+from jolt import influence
 
 
-directory.global_influence("..", "*.py")
-directory.global_influence("../jolt/plugins", "*.py")
+influence.global_files("../jolt/*.py")
+influence.global_files("../jolt/plugins/*.py")
 
 
 class Tests(Task):

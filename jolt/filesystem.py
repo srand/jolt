@@ -1,9 +1,7 @@
 import os
 import errno
 import shutil
-import zipfile
 import tempfile
-import tarfile
 
 
 path = os.path

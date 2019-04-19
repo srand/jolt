@@ -1,16 +1,16 @@
-import shutil
 import requests
 from requests.auth import HTTPBasicAuth
 from requests.exceptions import ConnectionError, ConnectTimeout, ReadTimeout
 import keyring
 import getpass
 
+
 from jolt import utils
 from jolt import cache
 from jolt import log
 from jolt import config
 from jolt import filesystem as fs
-from jolt.error import *
+from jolt.error import raise_error_if
 
 
 NAME = "artifactory"
@@ -99,7 +99,7 @@ class Artifactory(cache.StorageProvider):
             url = self._get_url(node, artifact)
             try:
                 response = requests.head(url, stream=True, timeout=TIMEOUT)
-            except ConnectTimeout as e:
+            except ConnectTimeout:
                 self._disabled = True
                 log.warning("[ARTIFACTORY] failed to establish server connection, disabled")
                 return False

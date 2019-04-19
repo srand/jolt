@@ -1,18 +1,15 @@
-import hashlib
-import inspect
-import copy
-from contextlib import contextmanager
-import unittest as ut
-import functools as ft
-import types
 import base64
+import copy
+import inspect
+import unittest as ut
 
+from jolt import log
 from jolt import utils
-from jolt.cache import *
-from jolt.tools import Tools
-from jolt.influence import TaskSourceInfluence
-from jolt.error import *
+from jolt.cache import ArtifactAttributeSetProvider
+from jolt.error import raise_task_error, raise_task_error_if
 from jolt.expires import Immediately
+from jolt.influence import TaskSourceInfluence
+from jolt.tools import Tools
 
 
 class Export(object):
@@ -471,7 +468,7 @@ class TaskBase(object):
                 param.set_default(value)
                 setattr(cls, key, param)
                 continue
-            raise_task_error(self, "no such parameter '{0}'", key)
+            raise_task_error(cls.name, "no such parameter '{0}'", key)
 
     def _assert_required_parameters_assigned(self):
         for key, param in self._get_parameter_objects().items():
@@ -481,28 +478,38 @@ class TaskBase(object):
 
     @utils.cached.instance
     def _get_export_objects(self):
-        return { key: getattr(self, key) for key in dir(self)
-                 if isinstance(utils.getattr_safe(self, key), Export) }
+        return {
+            key: getattr(self, key) for key in dir(self)
+            if isinstance(utils.getattr_safe(self, key), Export)
+        }
 
     @utils.cached.instance
     def _get_parameter_objects(self, unset=False):
-        return { key: getattr(self, key) for key in dir(self)
-                 if isinstance(utils.getattr_safe(self, key), Parameter) }
+        return {
+            key: getattr(self, key) for key in dir(self)
+            if isinstance(utils.getattr_safe(self, key), Parameter)
+        }
 
     def _get_parameters(self, unset=False):
-        return {key: param.get_value()
-                for key, param in self._get_parameter_objects().items()
-                if unset or not param.is_unset() }
+        return {
+            key: param.get_value()
+            for key, param in self._get_parameter_objects().items()
+            if unset or not param.is_unset()
+        }
 
     def _get_explicitly_set_parameters(self):
-        return {key: param.get_value()
-                for key, param in self._get_parameter_objects().items()
-                if param.is_set() }
+        return {
+            key: param.get_value()
+            for key, param in self._get_parameter_objects().items()
+            if param.is_set()
+        }
 
     def _get_properties(self):
-        return {key: str(getattr(self, key))
-                for key in dir(self)
-                if utils.is_str(getattr(self, key)) }
+        return {
+            key: str(getattr(self, key))
+            for key in dir(self)
+            if utils.is_str(getattr(self, key))
+        }
 
     def __str__(self):
         return str(self.name)

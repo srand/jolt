@@ -1,16 +1,15 @@
 import inspect
 import imp
-import copy
 import glob
 import os
 import base64
 
-from jolt.tasks import Task, TaskGenerator, Test, Resource
+from jolt.tasks import Task, TaskGenerator, Test
 from jolt import filesystem as fs
 from jolt import log
 from jolt import utils
-from jolt import scheduler
-from jolt.manifest import *
+from jolt.manifest import ManifestExtension
+from jolt.manifest import ManifestExtensionRegistry
 
 
 @utils.Singleton

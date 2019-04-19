@@ -1,7 +1,5 @@
 import keyring
-import sys
 import getpass
-import inspect
 import hashlib
 from jinja2 import Template
 import time
@@ -17,10 +15,11 @@ from jolt import utils
 from jolt import scheduler
 from jolt.tps.jenkins import Jenkins
 from jolt import log
-from jolt import loader
 from jolt import filesystem as fs
 from jolt.manifest import JoltManifest
-from jolt.error import *
+from jolt.error import raise_error_if
+from jolt.error import raise_task_error
+from jolt.error import raise_task_error_if
 
 
 NAME = "jenkins"

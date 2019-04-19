@@ -15,7 +15,8 @@ from contextlib import contextmanager
 from jolt import filesystem as fs
 from jolt import log
 from jolt import utils
-from jolt.error import *
+from jolt.error import raise_error_if
+from jolt.error import raise_task_error, raise_task_error_if
 
 
 def _run(cmd, cwd, env, *args, **kwargs):
@@ -259,7 +260,7 @@ class Tools(object):
 
         pathname = self.expand_path(pathname)
         content = self.expand(content)
-        with open(path, "ab") as f:
+        with open(pathname, "ab") as f:
             f.write(content.encode())
 
     def archive(self, pathname, filename):
@@ -306,7 +307,7 @@ class Tools(object):
         try:
             shutil.make_archive(basename, fmt, root_dir=pathname)
             return filename
-        except Exception as e:
+        except Exception:
             raise_task_error(self._task, "failed to create archive from directory '{0}'", pathname)
 
     def autotools(self, deps=None):
@@ -591,7 +592,7 @@ class Tools(object):
                         tar.extractall(filepath)
             else:
                 raise_task_error(self._task, "unknown archive type '{0}'", fs.path.basename(filename))
-        except Exception as e:
+        except Exception:
             log.exception()
             raise_task_error(self._task, "failed to extract archive '{0}'", filename)
 
@@ -604,7 +605,7 @@ class Tools(object):
         Returns:
             int: The size of the file in bytes.
         """
-        filepath = self.expand_path(pathname)
+        pathname = self.expand_path(pathname)
         try:
             stat = os.stat(pathname)
         except:
@@ -718,7 +719,7 @@ class Tools(object):
             with open(pathname, "wb") as f:
                 f.write(data.encode())
         except:
-            raise_task_error(self._task, "failed to replace string in file '{0}'", path)
+            raise_task_error(self._task, "failed to replace string in file '{0}'", pathname)
 
     def rmtree(self, pathname, *args, **kwargs):
         """Removes a directory tree from disk.
@@ -729,7 +730,7 @@ class Tools(object):
                 The default is ``False``.
 
         """
-        cmd = self.expand_path(pathname, *args, **kwargs)
+        pathname = self.expand_path(pathname, *args, **kwargs)
         return fs.rmtree(pathname, **kwargs)
 
     def run(self, cmd, *args, **kwargs):
@@ -845,7 +846,7 @@ class Tools(object):
             pathname (str): Path to the file to be removed.
 
         """
-        cmd = self.expand_path(pathname, *args, **kwargs)
+        pathname = self.expand_path(pathname, *args, **kwargs)
         return fs.unlink(pathname)
 
     def upload(self, pathname, url, auth=None, **kwargs):

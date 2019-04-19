@@ -1,13 +1,14 @@
 from copy import copy
 from threading import RLock
+from xml.dom import minidom
 
-from jolt.influence import *
+from jolt.influence import HashInfluenceProvider, HashInfluenceRegistry
 from jolt.tools import Tools
-from jolt import utils
 from jolt import filesystem as fs
+from jolt import log
 from jolt.plugins import git
-from jolt.scheduler import *
-from jolt.xmldom import *
+from jolt.scheduler import NetworkExecutorExtension, NetworkExecutorExtensionFactory
+from jolt.xmldom import Attribute, Composition, SubElement, Element, ElementTree
 
 
 @Attribute('name')
@@ -110,7 +111,7 @@ class RepoManifest(ElementTree):
 
     def parse(self, filename=".repo/manifest.xml"):
         with open(fs.path.join(self.tools.getcwd(), filename)) as f:
-            root = ET.fromstring(f.read())
+            root = ElementTree.fromstring(f.read())
             self._setroot(root)
             for project in self.projects:
                 project.tools = self.tools
@@ -118,7 +119,7 @@ class RepoManifest(ElementTree):
         raise Exception("failed to parse xml file")
 
     def format(self):
-        return minidom.parseString(ET.tostring(self.getroot())).toprettyxml(indent="  ")
+        return minidom.parseString(ElementTree.tostring(self.getroot())).toprettyxml(indent="  ")
 
     def write(self, filename):
         with open(filename, 'w') as f:
@@ -201,7 +202,7 @@ class RepoInfluenceProvider(HashInfluenceProvider):
 
             return "\n".join(result)
 
-        except KeyError as e:
+        except KeyError:
             log.exception()
         assert False, "failed to calculate hash influence for repo manifest at {0}".format(self.path)
 

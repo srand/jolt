@@ -1,10 +1,14 @@
+import copy
+import ninja_syntax as ninja
 import platform
-from jolt.tasks import *
+
+
+from jolt.tasks import Task
 from jolt import influence
 from jolt import utils
-from jolt.error import *
+from jolt import filesystem as fs
+from jolt.error import raise_task_error_if
 
-import ninja_syntax as ninja
 
 
 class Variable(object):
@@ -275,9 +279,9 @@ class GNUFlags(object):
     def set(flags, flag, fixup=None):
         flags = flags.split(" ")
         fixup = fixup or []
-        flags = [flag for flag in flags if flag not in fixup]
-        flags.append(flag)
-        return " ".join(flags)
+        flags_out = [flag_out for flag_out in flags if flag_out not in fixup]
+        flags_out.append(flag)
+        return " ".join(flags_out)
 
 
 class GNUOptFlags(GNUFlags):

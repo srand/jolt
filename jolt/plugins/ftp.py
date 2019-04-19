@@ -1,10 +1,7 @@
-import shutil
-import requests
-from requests.auth import HTTPBasicAuth
-from requests.exceptions import ConnectionError, ConnectTimeout, ReadTimeout
 import keyring
 import getpass
 from ftplib import FTP, FTP_TLS
+from requests.exceptions import ConnectionError, ReadTimeout
 
 
 from jolt import utils
@@ -13,7 +10,7 @@ from jolt import log
 from jolt import config
 from jolt import filesystem as fs
 from jolt.tools import Tools
-from jolt.error import *
+from jolt.error import raise_error_if
 
 
 NAME = "ftp"

@@ -7,7 +7,7 @@ import uuid
 from jolt import utils
 from jolt import log
 from jolt import filesystem as fs
-from jolt.tools import Tools
+
 
 _providers = []
 
@@ -342,3 +342,7 @@ def files(pathname):
         return cls
 
     return _decorate
+
+
+def global_files(pathname, cls=FileInfluence):
+    HashInfluenceRegistry.get().register(cls(pathname))

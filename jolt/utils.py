@@ -1,8 +1,8 @@
 import time
-from concurrent.futures import ThreadPoolExecutor, Future, as_completed
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from functools import partial
 from threading import RLock
-from string import *
+from string import Formatter
 import os
 import hashlib
 import sys
@@ -258,7 +258,6 @@ def map_consecutive(method, iterable):
 def map_concurrent(method, iterable, *args, **kwargs):
     max_workers = kwargs.get("max_workers", None)
     callables = [partial(method, item) for item in iterable]
-    results = []
     futures = []
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         for call in callables:
@@ -266,8 +265,9 @@ def map_concurrent(method, iterable, *args, **kwargs):
         for future in as_completed(futures):
             try:
                 future.result()
-            except Exception as exc:
-                map(Future.cancel, futures)
+            except Exception:
+                for future in futures:
+                    future.cancel()
     return [future.result() for future in futures]
 
 def sha1(string):

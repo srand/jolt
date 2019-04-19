@@ -1,8 +1,5 @@
-from concurrent.futures import ThreadPoolExecutor, Future, as_completed
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from functools import partial
-import traceback
-import sys
-import inspect
 try:
     import asyncio
     has_asyncio = True
@@ -10,12 +7,13 @@ except:
     has_asyncio = False
 
 
-from jolt import cache
 from jolt import log
 from jolt import utils
 from jolt.options import JoltOptions
-from jolt.manifest import *
-from jolt.error import *
+from jolt.manifest import ManifestExtension
+from jolt.manifest import ManifestExtensionRegistry
+from jolt.error import raise_error
+from jolt.error import raise_task_error_if
 
 
 class JoltEnvironment(object):
@@ -50,7 +48,7 @@ class TaskQueue(object):
         for future in as_completed(self.futures):
             task = self.futures[future]
             try:
-                result = future.result()
+                future.result()
             except Exception as error:
                 log.exception()
                 return task, error

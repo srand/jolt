@@ -1,19 +1,18 @@
-from copy import copy
 import hashlib
 import networkx as nx
-from networkx.drawing.nx_agraph import write_dot
-import traceback
 from threading import RLock
 
-from jolt.tasks import *
-from jolt.utils import *
-from jolt.influence import *
-from jolt.tools import Tools
+from jolt.tasks import Resource, Export
+#from jolt.utils import *
+from jolt.influence import HashInfluenceRegistry
 from jolt import log
 from jolt import utils
 from jolt import colors
 from jolt import hooks
-from jolt.error import *
+from jolt import tools
+from jolt import filesystem as fs
+from jolt.error import raise_error_if
+from jolt.error import raise_task_error_if
 
 class TaskProxy(object):
     def __init__(self, task, graph):
@@ -385,13 +384,15 @@ class GraphBuilder(object):
         return node
 
     def build(self, task_list):
-        proxies = [self._get_node(task) for task in task_list]
+        [self._get_node(task) for task in task_list]
         raise_error_if(not nx.is_directed_acyclic_graph(self.graph),
                        "there are cyclic task dependencies")
         self.graph._nodes_by_name = self.nodes
         return self.graph
 
     def display(self):
+        from networkx.drawing.nx_agraph import write_dot
+
         t = tools.Tools()
         with t.tmpdir("dot") as tmpdir, t.cwd(tmpdir.get_path()):
             write_dot(self.graph, fs.path.join(t.getcwd(), 'graph.dot'))

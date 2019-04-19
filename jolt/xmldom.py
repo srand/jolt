@@ -1,7 +1,5 @@
-from xml.etree import ElementTree as ET
 from xml.etree.ElementTree import Element
 from xml.etree.ElementTree import ElementTree
-from xml.dom import minidom
 
 from jolt.utils import cached
 
@@ -108,7 +106,7 @@ class Attribute(object):
 class Composition(object):
     def __init__(self, cls, name):
         self.cls = cls
-        self.name = name if name is not None else attribute.lower()
+        self.name = name if name is not None else cls.__name__.lower()
 
     def __call__(self, cls):
         def decorate(cls, comp_cls, name):

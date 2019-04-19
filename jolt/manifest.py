@@ -1,6 +1,7 @@
+from xml.dom import minidom
 import os
 
-from jolt.xmldom import *
+from jolt.xmldom import Attribute, Composition, SubElement, Element, ElementTree
 from jolt import filesystem as fs
 from jolt import log
 
@@ -54,14 +55,14 @@ class JoltManifest(ElementTree):
         with open(filepath) as f:
             data = f.read().replace("\n  ", "")
             data = data.replace("\n", "")
-            root = ET.fromstring(data)
+            root = ElementTree.fromstring(data)
             self._setroot(root)
             log.verbose("Loaded: {0}", filepath)
             return self
         raise Exception("failed to parse xml file")
 
     def format(self):
-        return minidom.parseString(ET.tostring(self.getroot())).toprettyxml(indent="  ")
+        return minidom.parseString(ElementTree.tostring(self.getroot())).toprettyxml(indent="  ")
 
     def write(self, filename):
         with open(filename, 'w') as f:
