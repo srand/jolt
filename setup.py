@@ -63,7 +63,7 @@ setup(
     # https://packaging.python.org/en/latest/requirements.html
     install_requires=["requests", "click>=7.0", "networkx", "keyring", "keyrings.alt",
                       "jinja2", "futures", "python-jenkins", "multi_key_dict",
-                      "tqdm<=4.29.1", "bz2file", "colorama", "ninja-syntax"],
+                      "tqdm<=4.29.1", "bz2file", "colorama", "ninja-syntax", "pyyaml"],
 
     dependency_links=[],
 
