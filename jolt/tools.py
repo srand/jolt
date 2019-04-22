@@ -74,7 +74,10 @@ def _run(cmd, cwd, env, *args, **kwargs):
         for line in stderr.buffer:
             log.stderr(line)
 
-    raise_error_if(p.returncode != 0, "command failed: {0}", cmd.format(*args, **kwargs))
+    if p.returncode != 0:
+        raise JoltCommandError(
+            "command failed: {0}".format(cmd.format(*args, **kwargs)),
+            stdout.buffer, stderr.buffer, p.returncode)
     return "\n".join(stdout.buffer) if output_rstrip else "".join(stdout.buffer)
 
 

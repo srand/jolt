@@ -8,7 +8,7 @@ from jolt import filesystem as fs
 from jolt import log
 from jolt.plugins import git
 from jolt.scheduler import NetworkExecutorExtension, NetworkExecutorExtensionFactory
-from jolt.xmldom import Attribute, Composition, SubElement, Element, ElementTree
+from jolt.xmldom import Attribute, Composition, SubElement, Element, ElementTree, ET
 
 
 @Attribute('name')
@@ -111,7 +111,7 @@ class RepoManifest(ElementTree):
 
     def parse(self, filename=".repo/manifest.xml"):
         with open(fs.path.join(self.tools.getcwd(), filename)) as f:
-            root = ElementTree.fromstring(f.read())
+            root = ET.fromstring(f.read())
             self._setroot(root)
             for project in self.projects:
                 project.tools = self.tools
@@ -119,7 +119,7 @@ class RepoManifest(ElementTree):
         raise Exception("failed to parse xml file")
 
     def format(self):
-        return minidom.parseString(ElementTree.tostring(self.getroot())).toprettyxml(indent="  ")
+        return minidom.parseString(ET.tostring(self.getroot())).toprettyxml(indent="  ")
 
     def write(self, filename):
         with open(filename, 'w') as f:

@@ -401,7 +401,6 @@ class TaskBase(object):
 
 
     def __init__(self, parameters=None, **kwargs):
-        super(TaskBase, self).__init__(**kwargs)
         self._identity = None
         self.name = self.__class__.name
 

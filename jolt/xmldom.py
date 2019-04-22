@@ -1,8 +1,6 @@
 from xml.etree.ElementTree import Element
 from xml.etree.ElementTree import ElementTree
-
-from jolt.utils import cached
-
+from xml.etree import ElementTree as ET
 
 
 class SubElement(object):
@@ -116,7 +114,6 @@ class Composition(object):
                 return child
 
             @property
-            @cached.instance
             def get(self):
                 children = list(self.getroot()) if isinstance(self, ElementTree) else list(self._elem)
                 children = [n for n in children if n.tag == name]

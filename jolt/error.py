@@ -5,6 +5,14 @@ class JoltError(Exception):
         super(JoltError, self).__init__(*args, **kwargs)
 
 
+class JoltCommandError(JoltError):
+    def __init__(self, what, stdout, stderr, returncode, *args, **kwargs):
+        super(JoltCommandError, self).__init__(what, *args, **kwargs)
+        self.stdout = stdout
+        self.stderr = stderr
+        self.returncode = returncode
+
+
 def raise_error(msg, *args, **kwargs):
     raise JoltError(msg.format(*args, **kwargs))
 

@@ -1,7 +1,7 @@
 from xml.dom import minidom
 import os
 
-from jolt.xmldom import Attribute, Composition, SubElement, Element, ElementTree
+from jolt.xmldom import Attribute, Composition, SubElement, Element, ElementTree, ET
 from jolt import filesystem as fs
 from jolt import log
 
@@ -28,12 +28,28 @@ class _JoltTask(SubElement):
         super(_JoltTask, self).__init__('task', elem=elem)
 
 
+@Attribute('name')
+class _JoltDefault(SubElement):
+    def __init__(self, elem=None):
+        super(_JoltDefault, self).__init__('default', elem=elem)
+
+
+@Composition(_JoltDefault, "default")
+@Composition(_JoltTask, "task")
+class _JoltBuild(SubElement):
+    def __init__(self, elem=None):
+        super(_JoltBuild, self).__init__('build', elem=elem)
+
+
+@Attribute("config", child=True)
 @Composition(_JoltRecipe, "recipe")
 @Composition(_JoltTask, "task")
+@Composition(_JoltBuild, "build")
 class JoltManifest(ElementTree):
     def __init__(self):
         super(JoltManifest, self).__init__(element=Element('jolt-manifest'))
         self._identities = None
+        self._elem = self.getroot()
 
     def append(self, element):
         SubElement(elem=self.getroot()).append(element)
@@ -55,27 +71,28 @@ class JoltManifest(ElementTree):
         with open(filepath) as f:
             data = f.read().replace("\n  ", "")
             data = data.replace("\n", "")
-            root = ElementTree.fromstring(data)
+            root = ET.fromstring(data)
             self._setroot(root)
+            self._elem = root
             log.verbose("Loaded: {0}", filepath)
             return self
         raise Exception("failed to parse xml file")
 
     def format(self):
-        return minidom.parseString(ElementTree.tostring(self.getroot())).toprettyxml(indent="  ")
+        return minidom.parseString(ET.tostring(self.getroot())).toprettyxml(indent="  ")
 
     def write(self, filename):
         with open(filename, 'w') as f:
             f.write(self.format())
 
     def has_task(self, task):
-        return len(self.getroot().findall(".//task[@identity='{}']".format(task.identity))) != 0
+        return self.find("./task[@identity='{}']".format(task.identity)) is not None
 
     def find_task(self, task):
-        matches = self.getroot().findall(".//task[@name='{0}']".format(task))
-        if not matches or len(matches) > 1:
+        match = self.find("./task[@name='{0}']".format(task))
+        if not match:
             return None
-        return _JoltTask(elem=matches[0])
+        return _JoltTask(elem=match)
 
     @property
     def task_identities(self):
@@ -91,6 +108,9 @@ class JoltManifest(ElementTree):
         manifest = JoltManifest()
         ManifestExtensionRegistry.export_manifest(manifest, task)
         return manifest
+
+    def process_import(self):
+        ManifestExtensionRegistry.import_manifest(self)
 
 
 class ManifestExtensionRegistry(object):
@@ -108,7 +128,7 @@ class ManifestExtensionRegistry(object):
     @staticmethod
     def import_manifest(manifest):
         for extension in ManifestExtensionRegistry.extensions:
-            extension.omport_manifest(manifest)
+            extension.import_manifest(manifest)
 
 
 class ManifestExtension(object):

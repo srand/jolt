@@ -1,9 +1,12 @@
 #!/usr/bin/python
+import imp
 import sys
 import signal
 
 from jolt import cli
 from jolt import log
+from jolt import config
+from jolt import filesystem as fs
 
 
 def start_pdb(sig, frame):

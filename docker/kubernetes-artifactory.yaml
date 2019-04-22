@@ -1,0 +1,33 @@
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  labels:
+    component: artifactory
+  name: artifactory-controller
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: artifactory
+        component: artifactory
+    spec:
+      containers:
+      - image: docker.bintray.io/jfrog/artifactory-cpp-ce:latest
+        name: artifactory
+        ports:
+        - containerPort: 8081
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    component: artifactory
+  name: artifactory-service
+spec:
+  ports:
+  - port: 8081
+  selector:
+    app: artifactory
+    component: artifactory
+  type: LoadBalancer

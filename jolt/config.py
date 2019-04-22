@@ -1,3 +1,4 @@
+import base64
 from configparser import SafeConfigParser, NoOptionError
 try:
     from StringIO import StringIO
@@ -7,6 +8,7 @@ except:
 from jolt import filesystem as fs
 from jolt import utils
 from jolt.error import raise_error_if
+from jolt.manifest import ManifestExtension, ManifestExtensionRegistry
 
 
 location = fs.path.join(fs.path.expanduser("~"), ".config", "jolt", "config")
@@ -84,3 +86,14 @@ def save():
 
 def sections():
     return _file.sections()
+
+
+class ConfigExtension(ManifestExtension):
+    def export_manifest(self, manifest, task):
+        manifest.config = base64.encodestring(get("network", "config", "").encode()).decode()
+
+    def import_manifest(self, manifest):
+        _file.read_string(base64.decodestring(manifest.config.encode()).decode())
+
+
+ManifestExtensionRegistry.add(ConfigExtension())

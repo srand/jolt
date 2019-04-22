@@ -84,18 +84,8 @@ class JoltLoader(object):
                 break
         return self._tasks, self._tests
 
-    def _load_manifest(self, manifest):
-        for recipe in manifest.recipes:
-            with open(recipe.path, "w") as f:
-                f.write(base64.decodestring(recipe.source.encode()).decode())
-            self._load_file(fs.path.join(os.getcwd(), recipe.path))
-        if self._path is None:
-            self._path = os.getcwd()
-
     def load(self, manifest=None):
         self._load_files()
-        if manifest is not None:
-            self._load_manifest(manifest)
         return self._tasks, self._tests
 
     def get_sources(self):
@@ -113,5 +103,11 @@ class RecipeExtension(ManifestExtension):
             manifest_recipe = manifest.create_recipe()
             manifest_recipe.path = fs.path.basename(path)
             manifest_recipe.source = base64.encodestring(source.encode()).decode()
+
+    def import_manifest(self, manifest):
+        for recipe in manifest.recipes:
+            with open(recipe.path, "w") as f:
+                f.write(base64.decodestring(recipe.source.encode()).decode())
+
 
 ManifestExtensionRegistry.add(RecipeExtension())

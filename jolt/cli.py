@@ -1,6 +1,7 @@
 import click
 import imp
 import subprocess
+import sys
 import webbrowser
 from os import _exit
 
@@ -27,7 +28,42 @@ from jolt.error import raise_task_error_if
 debug_enabled = False
 
 
-@click.group()
+class ArgRequiredUnless(click.Argument):
+    def __init__(self, *args, **kwargs):
+        self.required_unless = kwargs.pop('required_unless')
+        assert self.required_unless, "'required_unless' parameter required"
+        super(ArgRequiredUnless, self).__init__(*args, **kwargs)
+
+    def handle_parse_result(self, ctx, opts, args):
+        if self.required_unless not in opts:
+            if not opts.get(self.name, None):
+                self.required = True
+        return super(ArgRequiredUnless, self).handle_parse_result(
+            ctx, opts, args)
+
+
+class PluginGroup(click.Group):
+    def get_command(self, ctx, cmd_name):
+
+        if ctx.params.get("verbose", False):
+            log.set_level(log.VERBOSE)
+        if ctx.params.get("extra_verbose", False):
+            log.set_level(log.DEBUG)
+        if ctx.params.get("config_file"):
+            config.load(ctx.params.get("config_file"))
+
+        # Load configured plugins
+        imp.new_module("jolt.plugins")
+        for section in config.sections():
+            path = fs.path.dirname(__file__)
+            path = fs.path.join(path, "plugins", section + ".py")
+            if fs.path.exists(path):
+                imp.load_source("jolt.plugins." + section, path)
+
+        return click.Group.get_command(self, ctx, cmd_name)
+
+
+@click.group(cls=PluginGroup)
 @click.option("-v", "--verbose", is_flag=True, help="Verbose.")
 @click.option("-vv", "--extra-verbose", is_flag=True, help="Verbose.")
 @click.option("-c", "--config-file", type=str, help="Configuration file")
@@ -40,30 +76,25 @@ def cli(ctx, verbose, extra_verbose, config_file, debug, profile):
     global debug_enabled
     debug_enabled = debug
 
-    if verbose:
-        log.set_level(log.VERBOSE)
-    if extra_verbose:
-        log.set_level(log.DEBUG)
-    if config_file:
-        config.load(config_file)
-
-    # Load configured plugins
-    imp.new_module("jolt.plugins")
-    for section in config.sections():
-        path = fs.path.dirname(__file__)
-        path = fs.path.join(path, "plugins", section + ".py")
-        if fs.path.exists(path):
-            imp.load_source("jolt.plugins." + section, path)
-
     manifest = JoltManifest()
     try:
         manifest.parse()
+        manifest.process_import()
     except:
         pass
     ctx.obj["manifest"] = manifest
 
+    # Load additional plugins configured through manifest
+    for section in config.sections():
+        path = fs.path.dirname(__file__)
+        path = fs.path.join(path, "plugins", section + ".py")
+        if fs.path.exists(path):
+            mod = "jolt.plugins." + section
+            if mod not in sys.modules:
+                imp.load_source(mod, path)
+
     loader = JoltLoader.get()
-    tasks, tests = loader.load(manifest)
+    tasks, tests = loader.load()
     for cls in tasks:
         TaskRegistry.get().add_task_class(cls)
     for cls in tests:
@@ -77,7 +108,7 @@ def _autocomplete_tasks(ctx, args, incomplete):
 
 
 @cli.command()
-@click.argument("task", type=str, nargs=-1, required=True, autocompletion=_autocomplete_tasks)
+@click.argument("task", type=str, nargs=-1, autocompletion=_autocomplete_tasks, cls=ArgRequiredUnless, required_unless="worker")
 @click.option("-n", "--network", is_flag=True, default=False, help="Build on network.")
 @click.option("-l", "--local", is_flag=True, default=False, help="Disable all network operations.")
 @click.option("-k", "--keep-going", is_flag=True, default=False, help="Build as many tasks as possible, don't abort on first failure.")
@@ -103,6 +134,8 @@ def build(ctx, task, network, keep_going, identity, default, local,
     <WIP>
     """
     duration = utils.duration()
+
+    task = list(task)
 
     if network:
         _download = config.getboolean("network", "download", True)
@@ -155,6 +188,12 @@ def build(ctx, task, network, keep_going, identity, default, local,
         registry.set_default_parameters(params)
 
     manifest = ctx.obj["manifest"]
+
+    for mb in manifest.builds:
+        for mt in mb.tasks:
+            task.append(mt.name)
+        for mt in mb.defaults:
+            registry.set_default_parameters(mt.name)
 
     gb = graph.GraphBuilder(registry, manifest)
     dag = gb.build(task)

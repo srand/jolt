@@ -1,0 +1,6 @@
+FROM jolt:latest
+RUN pip3 install pika
+ENV RABBITMQ_HOST=rabbitmq-service
+WORKDIR /tmp/jolt-workspace
+COPY docker/rabbitmq.conf /home/root/.config/jolt/config
+CMD ["jolt", "-c", "/opt/jolt/docker/rabbitmq.conf", "amqp-worker"]
