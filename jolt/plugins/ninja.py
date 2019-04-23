@@ -46,17 +46,22 @@ class ProjectVariable(Variable):
 
 class Rule(object):
     def __init__(self, command, variables=None, depfile=None, suffix=None,
-                 prefix=None, files=None, ):
+                 prefix=None, files=None, dropext=False):
         self.command = command
         self.variables = variables
         self.depfile = depfile
         self.files = files or []
         self.prefix = prefix or ''
         self.suffix = suffix or ''
+        self.dropext = dropext
 
     def outfile(self, project, infile):
         dirname, basename = fs.path.split(infile)
-        basename = self.prefix + basename + self.suffix
+        if not self.dropext:
+            basename = self.prefix + basename + self.suffix
+        else:
+            base, ext = fs.path.splitext(basename)
+            basename = self.prefix + base + self.suffix
         outfile = fs.path.join(dirname, basename)
         if outfile.startswith(project.joltdir):
             outfile = outfile[len(project.joltdir)+1:]
@@ -250,7 +255,7 @@ class LibraryPaths(Variable):
         self.prefix = prefix or ''
 
     def create(self, project, writer, deps, tools):
-        if isinstance(project, CXXLibrary):
+        if not isinstance(project, CXXExecutable):
             return
         libpaths = [tools.expand_path(path) for path in project.libpaths]
         for name, artifact in deps.items():
@@ -265,7 +270,7 @@ class Libraries(Variable):
         self.prefix = prefix or ''
 
     def create(self, project, writer, deps, tools):
-        if isinstance(project, CXXLibrary):
+        if not isinstance(project, CXXExecutable):
             return
         libraries = [tools.expand(lib) for lib in project._libraries()]
         for name, artifact in deps.items():
