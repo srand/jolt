@@ -20,10 +20,21 @@ from jolt.error import raise_error_if
 from jolt.error import raise_task_error, raise_task_error_if
 
 
+def stdout_write(line):
+    sys.stdout.write(line + "\n")
+    sys.stdout.flush()
+
+
+def stderr_write(line):
+    sys.stderr.write(line + "\n")
+    sys.stderr.flush()
+
+
 def _run(cmd, cwd, env, *args, **kwargs):
     output = kwargs.get("output")
     output_on_error = kwargs.get("output_on_error")
     output_rstrip = kwargs.get("output_rstrip", True)
+    output_stdio = kwargs.get("output_stdio", False)
     output = output if output is not None else True
     output = False if output_on_error else output
     p = subprocess.Popen(
@@ -61,8 +72,11 @@ def _run(cmd, cwd, env, *args, **kwargs):
                     self.output(line)
                 self.buffer.append(line)
 
-    stdout = Reader(threading.current_thread(), p.stdout, output=log.stdout if output else None)
-    stderr = Reader(threading.current_thread(), p.stderr, output=log.stderr if output else None)
+    stdout_func = log.stdout if not output_stdio else stdout_write
+    stderr_func = log.stderr if not output_stdio else stderr_write
+
+    stdout = Reader(threading.current_thread(), p.stdout, output=stdout_func if output else None)
+    stderr = Reader(threading.current_thread(), p.stderr, output=stderr_func if output else None)
     p.wait()
     stdout.join()
     stderr.join()
