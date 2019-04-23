@@ -15,6 +15,7 @@ from contextlib import contextmanager
 from jolt import filesystem as fs
 from jolt import log
 from jolt import utils
+from jolt.error import JoltCommandError
 from jolt.error import raise_error_if
 from jolt.error import raise_task_error, raise_task_error_if
 

@@ -33,7 +33,7 @@ class Jolt(Task):
         super(Jolt, self).__init__(*args, **kwargs)
         for e in self.extras:
             self.influence.append(
-                influence.FileInfluenceProvider(
+                influence.FileInfluence(
                     fs.path.join(e, "**", "*.py")))
 
     @property

@@ -215,8 +215,8 @@ class JenkinsExecutor(scheduler.NetworkExecutor):
             self._get_console_log(build_id)
 
         raise_task_error_if(
-            build_info["result"] == "SUCCESS", self.task,
-            "execution failed with status '{0}'", build_info["result"])
+            build_info["result"] != "SUCCESS", self.task,
+            "Execution failed with status '{0}'", build_info["result"])
 
         raise_task_error_if(
             not env.cache.is_available_remotely(self.task), self.task,

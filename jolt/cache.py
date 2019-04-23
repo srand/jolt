@@ -4,6 +4,10 @@ import os
 from tempfile import mkdtemp
 from threading import RLock
 from datetime import datetime
+try:
+    from yaml import FullLoader as YamlLoader
+except:
+    from yaml import Loader as YamlLoader
 
 from jolt import config
 from jolt import filesystem as fs
@@ -253,6 +257,7 @@ class Artifact(object):
         try:
             self._read_manifest()
         except:
+            log.exception()
             self.discard()
             raise_task_error(node, "unable to read task artifact manifest")
 
@@ -297,7 +302,7 @@ class Artifact(object):
             manifest = fs.path.join(path, ".manifest.yaml")
             with open(manifest, "rb") as f:
                 data = utils.decode_str(f.read())
-                content = yaml.load(data, Loader=yaml.FullLoader)
+                content = yaml.load(data, Loader=YamlLoader)
         except:
             manifest = fs.path.join(path, ".manifest.json")
             with open(manifest, "rb") as f:
@@ -635,7 +640,7 @@ class CacheStats(object):
         try:
             with open(self.path) as f:
                 data = utils.decode_str(f.read())
-                self.stats = yaml.load(data, Loader=yaml.FullLoader)
+                self.stats = yaml.load(data, Loader=YamlLoader)
         except:
             # Load legacy file and convert data to new format
             path = fs.path.join(self.cache.root, ".stats.json")
