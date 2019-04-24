@@ -45,28 +45,41 @@ class ProjectVariable(Variable):
 
 
 class Rule(object):
-    def __init__(self, command, variables=None, depfile=None, suffix=None,
-                 prefix=None, files=None, dropext=False):
+    def __init__(self, command=None, infiles=None, outfiles=None, depfile=None, variables=None):
         self.command = command
-        self.variables = variables
+        self.variables = variables or {}
         self.depfile = depfile
-        self.files = files or []
-        self.prefix = prefix or ''
-        self.suffix = suffix or ''
-        self.dropext = dropext
+        self.infiles = infiles or []
+        self.outfiles = utils.as_list(outfiles or [])
 
-    def outfile(self, project, infile):
-        dirname, basename = fs.path.split(infile)
-        if not self.dropext:
-            basename = self.prefix + basename + self.suffix
-        else:
-            base, ext = fs.path.splitext(basename)
-            basename = self.prefix + base + self.suffix
-        outfile = fs.path.join(dirname, basename)
-        if outfile.startswith(project.joltdir):
-            outfile = outfile[len(project.joltdir)+1:]
-            outfile = fs.path.join(project.outdir, outfile)
-        return outfile
+    def _out(self, project, infile):
+        in_dirname, in_basename = fs.path.split(infile)
+        in_base, in_ext = fs.path.splitext(in_basename)
+
+        result_files = []
+        for outfile in self.outfiles:
+
+            outfile = project.tools.expand(
+                outfile,
+                in_path=in_dirname,
+                in_base=in_base,
+                in_ext=in_ext)
+
+            if outfile.startswith(project.joltdir) and not outfile.startswith(project.outdir):
+                outfile = outfile[len(project.joltdir)+1:]
+                outfile = fs.path.join(project.outdir, outfile)
+
+            result_files.append(outfile)
+
+        result_vars = {}
+        for key, val in self.variables.items():
+            result_vars[key] = project.tools.expand(
+                val,
+                in_path=in_dirname,
+                in_base=in_base,
+                in_ext=in_ext)
+
+        return result_files, result_vars
 
     def create(self, project, writer, deps, tools):
         if self.command is not None:
@@ -74,17 +87,17 @@ class Rule(object):
             writer.newline()
 
     def build(self, project, writer, infiles):
-        outfiles = []
+        result = []
         for infile in utils.as_list(infiles):
-            outfile = self.outfile(project, infile)
-            writer.build(outfile, self.name, infile)
-            outfiles.append(outfile)
-        return outfiles
+            outfiles, variables = self._out(project, infile)
+            writer.build(outfiles, self.name, infile, variables=variables)
+            result.extend(outfiles)
+        return result
 
 
 class Skip(Rule):
-    def __init__(self, files=None):
-        self.files = files
+    def __init__(self, *args, **kwargs):
+        super(Skip, self).__init__(*args, **kwargs)
         self.command = None
 
     def create(self, project, writer, deps, tools):
@@ -95,8 +108,8 @@ class Skip(Rule):
 
 
 class Objects(Rule):
-    def __init__(self, files=None):
-        self.files = files
+    def __init__(self, *args, **kwargs):
+        super(Objects, self).__init__(*args, **kwargs)
         self.command = None
 
     def create(self, project, writer, deps, tools):
@@ -108,7 +121,8 @@ class Objects(Rule):
 
 
 class GNUCompiler(Rule):
-    pass
+    def __init__(self, *args, **kwargs):
+        super(GNUCompiler, self).__init__(*args, **kwargs)
 
 
 class FileListWriter(Rule):
@@ -147,30 +161,36 @@ class FileListWriter(Rule):
 
 
 class GNULinker(Rule):
+    def __init__(self, *args, **kwargs):
+        super(GNULinker, self).__init__(*args, **kwargs)
+
     def build(self, project, writer, infiles):
         file_list = FileListWriter("objects")
         file_list.build(project, writer, infiles)
 
-        outfile = self.outfile(project, project.binary)
-        writer.build(outfile, self.name, infiles, implicit=project.depimports)
-        return outfile
+        outfiles, variables = self._out(project, project.binary)
+        writer.build(outfiles, self.name, infiles, implicit=project.depimports, variables=variables)
+        return outfiles
 
 
 class GNUArchiver(Rule):
+    def __init__(self, *args, **kwargs):
+        super(GNUArchiver, self).__init__(*args, **kwargs)
+
     def build(self, project, writer, infiles):
         file_list = FileListWriter("objects")
         file_list.build(project, writer, infiles)
 
-        outfile = self.outfile(project, project.binary)
-        writer.build(outfile, self.name, infiles, implicit=project.depimports)
-        return outfile
+        outfiles, variables = self._out(project, project.binary)
+        writer.build(outfiles, self.name, infiles, implicit=project.depimports, variables=variables)
+        return outfiles
 
 
 class GNUDepImporter(Rule):
     def __init__(self, prefix=None, suffix=None):
         self.prefix = prefix
         self.suffix = suffix
-        self.files = []
+        self.infiles = []
         self.command = None
 
     def _build_archives(self, project, writer, deps):
@@ -202,7 +222,7 @@ class Toolchain(object):
         rule_map = {}
         for name, rule in Toolchain.all_rules(cls):
             rule.name = name
-            for ext in rule.files:
+            for ext in rule.infiles:
                 rule_map[ext] = rule
         return rule_map
 
@@ -303,9 +323,10 @@ class GNUOptFlags(GNUFlags):
 
 
 class GNUToolchain(Toolchain):
-    hh = Skip(files=[".h", ".hh", ".hpp", ".hxx"])
-    obj = Objects(files=[".o", ".obj", ".a"])
+    hh = Skip(infiles=[".h", ".hh", ".hpp", ".hxx"])
+    obj = Objects(infiles=[".o", ".obj", ".a"])
 
+    joltdir = ProjectVariable()
     outdir = ProjectVariable()
     binary = ProjectVariable()
 
@@ -333,26 +354,26 @@ class GNUToolchain(Toolchain):
     compile_c = GNUCompiler(
         command="$cc -x c $cflags $extra_cflags $macros $incpaths -MMD -MF $out.d -c $in -o $out",
         depfile="$out.d",
-        files=[".c"],
-        suffix=".o")
+        infiles=[".c"],
+        outfiles=["{outdir}/{in_path}/{in_base}.o"])
 
     compile_cxx = GNUCompiler(
         command="$cxx -x c++ $cxxflags $extra_cxxflags $macros $incpaths -MMD -MF $out.d -c $in -o $out",
         depfile="$out.d",
-        files=[".cc", ".cpp", ".cxx"],
-        suffix=".o")
+        infiles=[".cc", ".cpp", ".cxx"],
+        outfiles=["{outdir}/{in_path}/{in_base}.o"])
 
     compile_asm = GNUCompiler(
         command="$cc -x assembler $asflags $extra_asflags -MMD -MF $out.d -c $in -o $out",
         depfile="$out.d",
-        files=[".s", ".asm"],
-        suffix=".o")
+        infiles=[".s", ".asm"],
+        outfiles=["{outdir}/{in_path}/{in_base}.o"])
 
     compile_asm_with_cpp = GNUCompiler(
         "$cc -x assembler-with-cpp $cflags $extra_cflags $macros $incpaths -MMD -MF $out.d -c $in -o $out",
         depfile="$out.d",
-        files=[".S"],
-        suffix=".o")
+        infiles=[".S"],
+        outfiles=["{outdir}/{in_path}/{in_base}.o"])
 
     link = GNULinker(
         command=" && ".join([
@@ -361,12 +382,12 @@ class GNUToolchain(Toolchain):
             "$objcopy --only-keep-debug $out $outdir/.debug/$binary",
             "$objcopy --strip-all $out",
             "$objcopy --add-gnu-debuglink=$outdir/.debug/$binary $out"
-        ]))
+        ]),
+        outfiles=["{outdir}/lib{in_base}.a"])
 
     archive = GNUArchiver(
         command="rm -f $out && $ar cr $out @objects.list",
-        prefix="lib",
-        suffix=".a")
+        outfiles=["{outdir}/lib{in_base}.a"])
 
     depimport = GNUDepImporter(
         prefix="lib",
