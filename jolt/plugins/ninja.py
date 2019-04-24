@@ -1,7 +1,7 @@
 import copy
 import ninja_syntax as ninja
 import platform
-
+import os
 
 from jolt.tasks import Task
 from jolt import influence
@@ -45,16 +45,20 @@ class ProjectVariable(Variable):
 
 
 class Rule(object):
-    def __init__(self, command=None, infiles=None, outfiles=None, depfile=None, variables=None):
+    def __init__(self, command=None, infiles=None, outfiles=None, depfile=None, deps=None, variables=None):
         self.command = command
         self.variables = variables or {}
         self.depfile = depfile
+        self.deps = deps
         self.infiles = infiles or []
         self.outfiles = utils.as_list(outfiles or [])
 
     def _out(self, project, infile):
         in_dirname, in_basename = fs.path.split(infile)
         in_base, in_ext = fs.path.splitext(in_basename)
+
+        if in_dirname.startswith(project.joltdir):
+            in_dirname = in_dirname[len(project.joltdir)+1:]
 
         result_files = []
         for outfile in self.outfiles:
@@ -83,7 +87,7 @@ class Rule(object):
 
     def create(self, project, writer, deps, tools):
         if self.command is not None:
-            writer.rule(self.name, tools.expand(self.command), depfile=self.depfile)
+            writer.rule(self.name, tools.expand(self.command), depfile=self.depfile, deps=self.deps)
             writer.newline()
 
     def build(self, project, writer, infiles):
@@ -286,8 +290,9 @@ class LibraryPaths(Variable):
 
 
 class Libraries(Variable):
-    def __init__(self, prefix=None):
+    def __init__(self, prefix=None, suffix=None):
         self.prefix = prefix or ''
+        self.suffix = suffix or ''
 
     def create(self, project, writer, deps, tools):
         if not isinstance(project, CXXExecutable):
@@ -295,7 +300,7 @@ class Libraries(Variable):
         libraries = [tools.expand(lib) for lib in project._libraries()]
         for name, artifact in deps.items():
             libraries += artifact.cxxinfo.libraries.items()
-        libraries = ["{0}{1}".format(self.prefix, path) for path in libraries]
+        libraries = ["{0}{1}{2}".format(self.prefix, path, self.suffix) for path in libraries]
         writer.variable(self.name, " ".join(libraries))
 
 
@@ -355,27 +360,27 @@ class GNUToolchain(Toolchain):
         command="$cc -x c $cflags $extra_cflags $macros $incpaths -MMD -MF $out.d -c $in -o $out",
         depfile="$out.d",
         infiles=[".c"],
-        outfiles=["{outdir}/{in_path}/{in_base}.o"])
+        outfiles=["{outdir}/{in_path}/{in_base}.obj"])
 
     compile_cxx = GNUCompiler(
         command="$cxx -x c++ $cxxflags $extra_cxxflags $macros $incpaths -MMD -MF $out.d -c $in -o $out",
         depfile="$out.d",
         infiles=[".cc", ".cpp", ".cxx"],
-        outfiles=["{outdir}/{in_path}/{in_base}.o"])
+        outfiles=["{outdir}/{in_path}/{in_base}.obj"])
 
     compile_asm = GNUCompiler(
         command="$cc -x assembler $asflags $extra_asflags -MMD -MF $out.d -c $in -o $out",
         depfile="$out.d",
         infiles=[".s", ".asm"],
-        outfiles=["{outdir}/{in_path}/{in_base}.o"])
+        outfiles=["{outdir}/{in_path}/{in_base}.obj"])
 
     compile_asm_with_cpp = GNUCompiler(
         "$cc -x assembler-with-cpp $cflags $extra_cflags $macros $incpaths -MMD -MF $out.d -c $in -o $out",
         depfile="$out.d",
         infiles=[".S"],
-        outfiles=["{outdir}/{in_path}/{in_base}.o"])
+        outfiles=["{outdir}/{in_path}/{in_base}.obj"])
 
-    link = GNULinker(
+    linker = GNULinker(
         command=" && ".join([
             "$ld $ldflags $extra_ldflags $libpaths -Wl,--start-group @objects.list -Wl,--end-group -o $out -Wl,--start-group $libraries -Wl,--end-group",
             "mkdir -p $outdir/.debug",
@@ -383,18 +388,83 @@ class GNUToolchain(Toolchain):
             "$objcopy --strip-all $out",
             "$objcopy --add-gnu-debuglink=$outdir/.debug/$binary $out"
         ]),
-        outfiles=["{outdir}/lib{in_base}.a"])
+        outfiles=["{outdir}/{binary}"])
 
-    archive = GNUArchiver(
+    archiver = GNUArchiver(
         command="rm -f $out && $ar cr $out @objects.list",
-        outfiles=["{outdir}/lib{in_base}.a"])
+        outfiles=["{outdir}/lib{binary}.a"])
 
     depimport = GNUDepImporter(
         prefix="lib",
         suffix=".a")
 
 
-toolchain = GNUToolchain()
+MSVCCompiler = GNUCompiler
+MSVCArchiver = GNUArchiver
+MSVCLinker = GNULinker
+MSVCDepImporter = GNUDepImporter
+
+
+class MSVCToolchain(Toolchain):
+    hh = Skip(infiles=[".h", ".hh", ".hpp", ".hxx"])
+    obj = Objects(infiles=[".o", ".obj", ".a"])
+
+    outdir = ProjectVariable()
+    binary = ProjectVariable()
+
+    cl = EnvironmentVariable(default="cl", envname="cl_exe")
+    lib = EnvironmentVariable(default="lib", envname="lib_exe")
+    link = EnvironmentVariable(default="link", envname="link_exe")
+
+    asflags = EnvironmentVariable(default="")
+    cflags = EnvironmentVariable(default="/EHsc")
+    cxxflags = EnvironmentVariable(default="/EHsc")
+    ldflags = EnvironmentVariable(default="")
+
+    extra_asflags = ProjectVariable(attrib="asflags")
+    extra_cflags = ProjectVariable(attrib="cflags")
+    extra_cxxflags = ProjectVariable(attrib="cxxflags")
+    extra_ldflags = ProjectVariable(attrib="ldflags")
+    macros = Macros(prefix="/D")
+    incpaths = IncludePaths(prefix="/I")
+    libpaths = LibraryPaths(prefix="/LIBPATH:")
+    libraries = Libraries(suffix=".lib")
+
+    compile_asm = MSVCCompiler(
+        command="$cl /nologo /showIncludes $asflags $extra_asflags $macros $incpaths /c /Tc$in /Fo$out",
+        deps="msvc",
+        infiles=[".asm", ".s", ".S"],
+        outfiles=["{outdir}/{in_path}/{in_base}.o"])
+
+    compile_c = MSVCCompiler(
+        command="$cl /nologo /showIncludes $cxxflags $extra_cxxflags $macros $incpaths /c /Tc$in /Fo$out",
+        deps="msvc",
+        infiles=[".c"],
+        outfiles=["{outdir}/{in_path}/{in_base}.o"])
+
+    compile_cxx = MSVCCompiler(
+        command="$cl /nologo /showIncludes $cxxflags $extra_cxxflags $macros $incpaths /c /Tp$in /Fo$out",
+        deps="msvc",
+        infiles=[".cc", ".cpp", ".cxx"],
+        outfiles=["{outdir}/{in_path}/{in_base}.o"])
+
+    linker = MSVCLinker(
+        command="$link /nologo $ldflags $extra_ldflags $libpaths @objects.list $libraries /out:$out",
+        outfiles=["{outdir}/{binary}.exe"])
+
+    archiver = MSVCArchiver(
+        command="$lib /nologo /out:$out @objects.list",
+        outfiles=["{outdir}/{binary}.lib"])
+
+    depimport = MSVCDepImporter(
+        prefix="",
+        suffix=".lib")
+
+
+if os.name == "nt":
+    toolchain = MSVCToolchain()
+else:
+    toolchain = GNUToolchain()
 
 
 @influence.attribute("asflags")
@@ -551,13 +621,14 @@ class CXXLibrary(CXXProject):
         super(CXXLibrary, self)._populate_inputs(writer, deps, tools)
 
     def _populate_project(self, writer, deps, tools):
-        toolchain.archive.build(self, writer, self.objects)
+        toolchain.archiver.build(self, writer, self.objects)
 
     def publish(self, artifact, tools):
         with tools.cwd(self.outdir):
             artifact.collect("*{binary}.a", "lib/")
-            artifact.collect("*{binary}.so", "lib/")
             artifact.collect("*{binary}.dll", "lib/")
+            artifact.collect("*{binary}.lib", "lib/")
+            artifact.collect("*{binary}.so", "lib/")
         artifact.cxxinfo.libpaths.append("lib")
         artifact.cxxinfo.libraries.append(self.binary)
 
@@ -583,7 +654,7 @@ class CXXExecutable(CXXProject):
         super(CXXExecutable, self)._populate_inputs(writer, deps, tools)
 
     def _populate_project(self, writer, deps, tools):
-        toolchain.link.build(self, writer, self.objects)
+        toolchain.linker.build(self, writer, self.objects)
 
     def _ldflags(self):
         return utils.call_or_return(self, self.__class__.ldflags)
@@ -596,7 +667,7 @@ class CXXExecutable(CXXProject):
 
     def publish(self, artifact, tools):
         with tools.cwd(self.outdir):
-            if platform.system() == "Windows":
+            if os.name == "nt":
                 artifact.collect(self.binary + '.exe', self.publishdir)
             else:
                 artifact.collect(self.binary, self.publishdir)
