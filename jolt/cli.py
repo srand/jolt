@@ -424,7 +424,8 @@ def info(ctx, task, influence=False, artifacts=False):
     task_name = task
     task_cls_name, task_params = utils.parse_task_name(task_name)
     task_registry = TaskRegistry.get()
-    task = task_registry.get_task_class(task_cls_name)
+    task = task_registry.get_task_class(task_cls_name) or \
+           task_registry.get_test_class(task_cls_name)
     raise_task_error_if(not task, task_name, "no such task")
 
     click.echo()

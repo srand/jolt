@@ -29,6 +29,8 @@ class TasksTask(Task):
 
 
 class TaskTest(Test):
+    """ This is a parameterized test task """
+
     name = "test/parameterized"
 
     param = Parameter()
