@@ -785,9 +785,9 @@ class Test(ut.TestCase, TaskBase):
     Abstract test tasks can't be executed and won't be listed.
     """
 
-    def __init__(self, method="runTest", parameters=None, deps=None, tools=None, *args, **kwargs):
+    def __init__(self, method="runTest", deps=None, tools=None, *args, **kwargs):
         ut.TestCase.__init__(self, method)
-        TaskBase.__init__(self)
+        TaskBase.__init__(self, **kwargs)
         self.deps = deps
         self.tools = tools
 

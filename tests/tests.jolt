@@ -15,7 +15,8 @@ class Tests(Task):
         "test/cli", \
         "test/tasks", \
         "test/tools", \
-        "test/utils"
+        "test/utils", \
+        "test/parameterized:param=test"
 
 
 class TasksTask(Task):
@@ -25,6 +26,15 @@ class TasksTask(Task):
         print(self.identity)
         assert self.identity is not None, \
             "task identity not readable from task"
+
+
+class TaskTest(Test):
+    name = "test/parameterized"
+
+    param = Parameter()
+
+    def test_param(self):
+        self.assertTrue(self.param.get_value())
 
 
 class GeneratedTask(TaskGenerator):
