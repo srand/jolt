@@ -360,7 +360,8 @@ class Artifact(object):
 
     def apply(self):
         fs.unlink(self._stable_path, ignore_errors=True)
-        os.symlink(self._path, self._stable_path)
+        if fs.path.exists(self._path):
+            fs.symlink(self._path, self._stable_path)
 
     def unapply(self):
         fs.unlink(self._stable_path, ignore_errors=True)

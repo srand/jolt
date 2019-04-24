@@ -2,7 +2,8 @@ import subprocess
 import os
 import sys
 import threading
-import termios
+if os.name != "nt":
+    import termios
 import glob
 import multiprocessing
 import shutil

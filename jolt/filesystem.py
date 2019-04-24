@@ -35,7 +35,11 @@ def unlink(path, ignore_errors=False):
             raise
 
 def symlink(src, dest, *args, **kwargs):
-    os.symlink(src, dest, *args, **kwargs)
+    if os.name == "nt":
+        import ntfsutils.junction
+        ntfsutils.junction.create(src, dest)
+    else:
+        os.symlink(src, dest, *args, **kwargs)
 
 def copy(src, dest, symlinks=False):
     if not path.exists(dest):

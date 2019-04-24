@@ -6,7 +6,7 @@ from string import Formatter
 import os
 import hashlib
 import sys
-import fcntl
+from fasteners import process_lock
 import errno
 
 
@@ -133,8 +133,8 @@ class duration(object):
     def __str__(self):
         elapsed = time.time() - self._time
         if elapsed >= 60:
-            return time.strftime("%Mmin %-Ss", time.gmtime(elapsed))
-        return time.strftime("%-Ss", time.gmtime(elapsed))
+            return "%dmin %02ds" % (elapsed/60, elapsed%60)
+        return "%02ds" % elapsed
 
     def __le__(self, d):
         now = time.time()
@@ -234,22 +234,17 @@ def Singleton(cls):
 
 class LockFile(object):
     def __init__(self, path, logfunc=None, *args, **kwargs):
-        self._file = open(os.path.join(path, "lock"), "wb")
-        try:
-            fcntl.lockf(self._file, fcntl.LOCK_EX|fcntl.LOCK_NB)
-        except IOError as e:
-            if e.errno in [errno.EAGAIN, errno.EACCES]:
-                if logfunc is not None:
-                    logfunc(*args, **kwargs)
-                fcntl.lockf(self._file, fcntl.LOCK_EX)
-            else:
-                raise
+        self._file = process_lock.InterProcessLock(os.path.join(path, "lock"))
+        if not self._file.acquire(blocking=False):
+            if logfunc is not None:
+                logfunc(*args, **kwargs)
+            self._file.acquire()
 
     def __enter__(self, *args, **kwargs):
         return self
 
     def __exit__(self, *args, **kwargs):
-        self._file.close()
+        pass
 
 
 def map_consecutive(method, iterable):

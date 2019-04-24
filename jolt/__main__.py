@@ -1,7 +1,7 @@
 #!/usr/bin/python
 import imp
+import os
 import sys
-import signal
 
 from jolt import cli
 from jolt import log
@@ -15,12 +15,18 @@ def start_pdb(sig, frame):
 
 
 def main():
-    signal.signal(signal.SIGUSR1, start_pdb)
+    if os.name == "posix":
+        import signal
+        signal.signal(signal.SIGUSR1, start_pdb)
 
     try:
         cli.cli(obj=dict())
     except KeyboardInterrupt as e:
         log.warning("Interrupted by user")
+        if cli.debug_enabled:
+            import pdb
+            extype, value, tb = sys.exc_info()
+            pdb.post_mortem(tb)
         sys.exit(1)
     except Exception as e:
         log.exception(e)

@@ -63,8 +63,11 @@ class JoltManifest(ElementTree):
     def parse(self, filename="default.joltxmanifest"):
         path = os.getcwd()
         filepath = fs.path.join(path, filename)
-        while not fs.path.exists(filepath) and path != fs.sep:
+        while not fs.path.exists(filepath):
+            opath = path
             path = fs.path.dirname(path)
+            if path == opath:
+                break
             filepath = fs.path.join(path, filename)
         if path == fs.sep:
             raise Exception("couldn't find manifest file")

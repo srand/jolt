@@ -71,7 +71,6 @@ class JoltLoader(object):
     def _load_files(self):
         files = []
         path = os.getcwd()
-        root = fs.path.normpath("/")
         while not files:
             files = glob.glob(fs.path.join(path, JoltLoader.filename))
             for file in files:
@@ -79,8 +78,9 @@ class JoltLoader(object):
             if files:
                 self._path = path
                 break
+            opath = path
             path = fs.path.dirname(path)
-            if path == root:
+            if path == opath:
                 break
         return self._tasks, self._tests
 
