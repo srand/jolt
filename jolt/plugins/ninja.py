@@ -360,25 +360,25 @@ class GNUToolchain(Toolchain):
         command="$cc -x c $cflags $extra_cflags $macros $incpaths -MMD -MF $out.d -c $in -o $out",
         depfile="$out.d",
         infiles=[".c"],
-        outfiles=["{outdir}/{in_path}/{in_base}.obj"])
+        outfiles=["{outdir}/{in_path}/{in_base}.o"])
 
     compile_cxx = GNUCompiler(
         command="$cxx -x c++ $cxxflags $extra_cxxflags $macros $incpaths -MMD -MF $out.d -c $in -o $out",
         depfile="$out.d",
         infiles=[".cc", ".cpp", ".cxx"],
-        outfiles=["{outdir}/{in_path}/{in_base}.obj"])
+        outfiles=["{outdir}/{in_path}/{in_base}.o"])
 
     compile_asm = GNUCompiler(
         command="$cc -x assembler $asflags $extra_asflags -MMD -MF $out.d -c $in -o $out",
         depfile="$out.d",
         infiles=[".s", ".asm"],
-        outfiles=["{outdir}/{in_path}/{in_base}.obj"])
+        outfiles=["{outdir}/{in_path}/{in_base}.o"])
 
     compile_asm_with_cpp = GNUCompiler(
         "$cc -x assembler-with-cpp $cflags $extra_cflags $macros $incpaths -MMD -MF $out.d -c $in -o $out",
         depfile="$out.d",
         infiles=[".S"],
-        outfiles=["{outdir}/{in_path}/{in_base}.obj"])
+        outfiles=["{outdir}/{in_path}/{in_base}.o"])
 
     linker = GNULinker(
         command=" && ".join([
@@ -434,19 +434,19 @@ class MSVCToolchain(Toolchain):
         command="$cl /nologo /showIncludes $asflags $extra_asflags $macros $incpaths /c /Tc$in /Fo$out",
         deps="msvc",
         infiles=[".asm", ".s", ".S"],
-        outfiles=["{outdir}/{in_path}/{in_base}.o"])
+        outfiles=["{outdir}/{in_path}/{in_base}.obj"])
 
     compile_c = MSVCCompiler(
         command="$cl /nologo /showIncludes $cxxflags $extra_cxxflags $macros $incpaths /c /Tc$in /Fo$out",
         deps="msvc",
         infiles=[".c"],
-        outfiles=["{outdir}/{in_path}/{in_base}.o"])
+        outfiles=["{outdir}/{in_path}/{in_base}.obj"])
 
     compile_cxx = MSVCCompiler(
         command="$cl /nologo /showIncludes $cxxflags $extra_cxxflags $macros $incpaths /c /Tp$in /Fo$out",
         deps="msvc",
         infiles=[".cc", ".cpp", ".cxx"],
-        outfiles=["{outdir}/{in_path}/{in_base}.o"])
+        outfiles=["{outdir}/{in_path}/{in_base}.obj"])
 
     linker = MSVCLinker(
         command="$link /nologo $ldflags $extra_ldflags $libpaths @objects.list $libraries /out:$out",
