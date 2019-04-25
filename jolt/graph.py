@@ -269,8 +269,8 @@ class TaskProxy(object):
                     with cache.get_artifact(self) as artifact:
                         with self.tools.cwd(self.task.joltdir):
                             self.task.publish(artifact, self.tools)
-                        self.tools.write_file(fs.path.join(artifact.path, ".build.log"),
-                                              buildlog.getvalue())
+                        with open(fs.path.join(artifact.path, ".build.log"), "w") as f:
+                            f.write(buildlog.getvalue())
                         artifact.commit()
 
             if force_build or force_upload or not available_remotely:

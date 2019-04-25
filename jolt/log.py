@@ -132,11 +132,15 @@ def debug(fmt, *args, **kwargs):
 def error(fmt, *args, **kwargs):
     _logger.error(fmt, *args, **kwargs)
 
-def stdout(fmt, *args, **kwargs):
-    _logger.log(STDOUT, fmt, *args, **kwargs)
+def stdout(line):
+    line = line.replace("{", "{{")
+    line = line.replace("}", "}}")
+    _logger.log(STDOUT, line)
 
-def stderr(fmt, *args, **kwargs):
-    _logger.log(STDERR, fmt, *args, **kwargs)
+def stderr(line):
+    line = line.replace("{", "{{")
+    line = line.replace("}", "}}")
+    _logger.log(STDERR, line)
 
 def exception(exc=None):
     if exc:
