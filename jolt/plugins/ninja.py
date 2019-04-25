@@ -499,8 +499,8 @@ class CXXProject(Task):
         self.depimports = utils.as_list(utils.call_or_return(self, self.__class__._depimports))
         self.macros = utils.as_list(utils.call_or_return(self, self.__class__._macros))
         self.incpaths = utils.as_list(utils.call_or_return(self, self.__class__._incpaths))
-        self.binary = self.__class__.binary or self.canonical_name
-        self.publishdir = self.__class__.publishdir
+        self.binary = self.expand(self.__class__.binary or self.canonical_name)
+        self.publishdir = self.expand(self.__class__.publishdir or '')
         if self.source_influence:
             for source in self.sources:
                 self.influence.append(influence.FileInfluence(source))
