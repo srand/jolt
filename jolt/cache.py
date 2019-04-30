@@ -189,6 +189,16 @@ class ArtifactStringAttribute(ArtifactAttribute):
         return str(self._value)
 
 
+def json_serializer(obj):
+    if isinstance(obj, datetime):
+        return dict(type="datetime", value=obj.strftime("%Y-%m-%d %H:%M:%S.%f"))
+
+def json_deserializer(dct):
+    if dct.get("type") == "datetime":
+        return datetime.strptime(dct["value"], "%Y-%m-%d %H:%M:%S.%f")
+    return dct
+
+
 class Artifact(object):
     """
     An artifact is a collection of files and metadata produced by a task.
@@ -291,24 +301,24 @@ class Artifact(object):
 
         ArtifactAttributeSetRegistry.format_all(self, content)
 
-        manifest = fs.path.join(self._temp or self._path, ".manifest.yaml")
+        manifest = fs.path.join(self._temp or self._path, ".manifest.json")
         with open(manifest, "wb") as f:
-            f.write(yaml.dump(content, default_flow_style=False).encode())
+            f.write(json.dumps(content, indent=2, default=json_serializer).encode())
 
     @staticmethod
     def load_manifest(path):
-        content_type = "yaml"
+        content_type = "json"
         try:
+            manifest = fs.path.join(path, ".manifest.json")
+            with open(manifest, "rb") as f:
+                data = utils.decode_str(f.read())
+                content = json.loads(data, object_hook=json_deserializer)
+        except:
             manifest = fs.path.join(path, ".manifest.yaml")
             with open(manifest, "rb") as f:
                 data = utils.decode_str(f.read())
                 content = yaml.load(data, Loader=YamlLoader)
-        except:
-            manifest = fs.path.join(path, ".manifest.json")
-            with open(manifest, "rb") as f:
-                data = utils.decode_str(f.read())
-                content = json.loads(data)
-            content_type = "json"
+            content_type = "yaml"
         return content, content_type
 
     def _read_manifest(self):
@@ -324,9 +334,9 @@ class Artifact(object):
         self._expires = ArtifactEvictionStrategyRegister.get().find(
             content.get("expires", "immediately"))
         ArtifactAttributeSetRegistry.parse_all(self, content)
-        if content_type != "yaml":
+        if content_type != "json":
             self._write_manifest()
-            fs.unlink(fs.path.join(self._path, ".manifest.json"))
+            fs.unlink(fs.path.join(self._path, ".manifest.yaml"))
 
     def _get_size(self):
         counted_inodes = {}
@@ -629,7 +639,7 @@ class CacheStats(object):
     def __init__(self, cache):
         self.lock = RLock()
         self.cache = cache
-        self.path = fs.path.join(cache.root, "stats.yaml")
+        self.path = fs.path.join(cache.root, "stats.json")
         try:
             self.load()
         except:
@@ -639,17 +649,15 @@ class CacheStats(object):
 
     def load(self):
         try:
+            with open(path) as f:
+                data = utils.decode_str(f.read())
+                self.stats = json.loads(data, object_hook=json_deserializer)
+        except:
+            # Load legacy file and convert data to new format
+            path = fs.path.join(self.cache.root, ".stats.yaml")
             with open(self.path) as f:
                 data = utils.decode_str(f.read())
                 self.stats = yaml.load(data, Loader=YamlLoader)
-        except:
-            # Load legacy file and convert data to new format
-            path = fs.path.join(self.cache.root, ".stats.json")
-            with open(path) as f:
-                data = utils.decode_str(f.read())
-                self.stats = json.loads(data)
-                for ident, artifact in self.stats.items():
-                    artifact["used"] = datetime.fromtimestamp(artifact["used"])
             self.save()
             fs.unlink(path)
 
@@ -666,7 +674,7 @@ class CacheStats(object):
     @locked
     def save(self):
         with open(self.path, "wb") as f:
-            f.write(yaml.dump(self.stats, default_flow_style=False).encode())
+            f.write(json.dumps(self.stats, indent=2, default=json_serializer).encode())
 
     @locked
     def update(self, artifact, save=True):
@@ -871,9 +879,7 @@ class ArtifactCache(StorageProvider):
         return Context(self, node)
 
     def get_artifact(self, node):
-        artifact = Artifact(self, node)
-        self.stats.update(artifact)
-        return artifact
+        return Artifact(self, node)
 
     def get_archive_path(self, node):
         return fs.get_archive(self.get_path(node))
