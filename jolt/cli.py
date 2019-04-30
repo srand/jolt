@@ -195,7 +195,7 @@ def build(ctx, task, network, keep_going, identity, default, local,
         for mt in mb.defaults:
             registry.set_default_parameters(mt.name)
 
-    gb = graph.GraphBuilder(registry, manifest)
+    gb = graph.GraphBuilder(registry, manifest, progress=True)
     dag = gb.build(task)
 
     # Inform cache about what task artifacts we will need.

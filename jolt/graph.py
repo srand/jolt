@@ -1,3 +1,4 @@
+from contextlib import contextmanager
 import hashlib
 import networkx as nx
 from threading import RLock
@@ -350,11 +351,12 @@ class Graph(nx.DiGraph):
 
 
 class GraphBuilder(object):
-    def __init__(self, registry, manifest):
+    def __init__(self, registry, manifest, progress=False):
         self.graph = Graph()
         self.nodes = {}
         self.registry = registry
         self.manifest = manifest
+        self.progress = progress
 
     def _get_node(self, name):
         node = self.nodes.get(name)
@@ -380,14 +382,28 @@ class GraphBuilder(object):
             child = self._get_node(requirement)
             self.graph.add_edges_from([(parent, child)])
 
-        node.finalize(self.graph, self.manifest)
         return node
+
+    @contextmanager
+    def _progress(self, *args, **kwargs):
+        if self.progress:
+            with log.progress(*args, **kwargs) as p:
+                yield p
+        else:
+            with log.progress_log(*args, **kwargs) as p:
+                yield p
 
     def build(self, task_list):
         [self._get_node(task) for task in task_list]
         raise_error_if(not nx.is_directed_acyclic_graph(self.graph),
                        "there are cyclic task dependencies")
         self.graph._nodes_by_name = self.nodes
+
+        with self._progress("Collecting task influence", len(self.graph.tasks), "tasks") as p:
+            for node in reversed(list(nx.topological_sort(self.graph))):
+                node.finalize(self.graph, self.manifest)
+                p.update(1)
+
         return self.graph
 
     def display(self):

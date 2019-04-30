@@ -36,7 +36,7 @@ WARNING = logging.WARNING
 INFO = logging.INFO
 VERBOSE = 15
 DEBUG = logging.DEBUG
-EXCEPTION = logging.DEBUG + 1
+EXCEPTION = VERBOSE + 1
 STDOUT = logging.INFO + 1
 STDERR = logging.ERROR + 1
 logging.addLevelName(VERBOSE, "VERBOSE")
@@ -174,10 +174,32 @@ def transfer(line, context):
     else:
         stdout(outline2)
 
+
+class _Progress(object):
+    def __init__(self, msg):
+        verbose(msg)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, type, value, tb):
+        pass
+
+    def update(self, *args, **kwargs):
+        pass
+
+
+def progress_log(desc, count, unit):
+    return _Progress(desc)
+
+
 def progress(desc, count, unit):
-    p = tqdm.tqdm(total=count, unit=unit, unit_scale=True)
-    p.set_description(desc)
-    return p
+    if sys.stdout.isatty() and sys.stderr.isatty() and _stdout.level > VERBOSE:
+        p = tqdm.tqdm(total=count, unit=unit, unit_scale=True)
+        p.set_description("[   INFO] " + desc)
+        return p
+    return progress_log(desc, count, unit)
+
 
 def set_level(level):
     _stdout.setLevel(level)
