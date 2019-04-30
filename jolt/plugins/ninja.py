@@ -358,24 +358,28 @@ class GNUToolchain(Toolchain):
 
     compile_c = GNUCompiler(
         command="$cc -x c $cflags $extra_cflags $macros $incpaths -MMD -MF $out.d -c $in -o $out",
+        deps="gcc",
         depfile="$out.d",
         infiles=[".c"],
         outfiles=["{outdir}/{in_path}/{in_base}.o"])
 
     compile_cxx = GNUCompiler(
         command="$cxx -x c++ $cxxflags $extra_cxxflags $macros $incpaths -MMD -MF $out.d -c $in -o $out",
+        deps="gcc",
         depfile="$out.d",
         infiles=[".cc", ".cpp", ".cxx"],
         outfiles=["{outdir}/{in_path}/{in_base}.o"])
 
     compile_asm = GNUCompiler(
         command="$cc -x assembler $asflags $extra_asflags -MMD -MF $out.d -c $in -o $out",
+        deps="gcc",
         depfile="$out.d",
         infiles=[".s", ".asm"],
         outfiles=["{outdir}/{in_path}/{in_base}.o"])
 
     compile_asm_with_cpp = GNUCompiler(
         "$cc -x assembler-with-cpp $cflags $extra_cflags $macros $incpaths -MMD -MF $out.d -c $in -o $out",
+        deps="gcc",
         depfile="$out.d",
         infiles=[".S"],
         outfiles=["{outdir}/{in_path}/{in_base}.o"])
