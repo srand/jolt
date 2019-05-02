@@ -157,13 +157,14 @@ def global_influence(path, cls=GitInfluenceProvider):
     HashInfluenceRegistry.get().register(cls(path))
 
 
-def influence(path, cls=GitInfluenceProvider):
-    def _decorate(taskcls):
-        if "influence" not in taskcls.__dict__:
-            taskcls.influence = copy.copy(taskcls.influence)
-        provider = cls(path=path)
-        taskcls.influence.append(provider)
-        return taskcls
+def influence(path, git_cls=GitInfluenceProvider):
+    def _decorate(cls):
+        _old_init = cls.__init__
+        def _init(self, *args, **kwargs):
+            _old_init(self, *args, **kwargs)
+            self.influence.append(git_cls(path=path))
+        cls.__init__ = _init
+        return cls
     return _decorate
 
 
