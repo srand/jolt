@@ -677,3 +677,5 @@ class CXXExecutable(CXXProject):
                 artifact.collect(self.binary, self.publishdir)
                 artifact.collect(".debug", self.publishdir)
         artifact.environ.PATH.append(self.publishdir)
+        artifact.strings.executable = fs.path.join(
+            self.publishdir, self.binary)
