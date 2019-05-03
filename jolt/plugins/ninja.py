@@ -13,7 +13,7 @@ from jolt.error import raise_task_error_if
 
 class Variable(object):
     def __init__(self, value=None):
-        self._value = None
+        self._value = value
 
     def create(self, project, writer, deps, tools):
         writer.variable(self.name, self._value)
@@ -248,6 +248,9 @@ class Toolchain(object):
         return [(key, getattr(cls, key)) for key in dir(cls)
                 if isinstance(utils.getattr_safe(cls, key), Variable)]
 
+    def __str__(self):
+        return self.__class__.__name__
+
 
 class Macros(Variable):
     def __init__(self, prefix=None):
@@ -480,6 +483,7 @@ else:
 @influence.attribute("sources")
 @influence.attribute("binary")
 @influence.attribute("publishdir")
+@influence.attribute("toolchain")
 class CXXProject(Task):
     incpaths = []
     macros = []
@@ -493,10 +497,12 @@ class CXXProject(Task):
     binary = None
     incremental = True
     abstract = True
+    toolchain = None
 
     def __init__(self, *args, **kwargs):
         super(CXXProject, self).__init__(*args, **kwargs)
         self._init_sources()
+        self.toolchain = self.__class__.toolchain() if self.__class__.toolchain else toolchain
         self.asflags = utils.as_list(utils.call_or_return(self, self.__class__._asflags))
         self.cflags = utils.as_list(utils.call_or_return(self, self.__class__._cflags))
         self.cxxflags = utils.as_list(utils.call_or_return(self, self.__class__._cxxflags))
@@ -556,16 +562,22 @@ class CXXProject(Task):
         return rule
 
     def _populate_variables(self, writer, deps, tools):
-        for name, var in Toolchain.all_variables(toolchain):
-            var.create(self, writer, deps, tools)
+        variables = {}
+        for name, var in Toolchain.all_variables(self.toolchain):
+            variables[name] = var
         for name, var in Toolchain.all_variables(self):
+            variables[name] = var
+        for name, var in variables.items():
             var.create(self, writer, deps, tools)
         writer.newline()
 
     def _populate_rules(self, writer, deps, tools):
-        for name, rule in Toolchain.all_rules(toolchain):
-            rule.create(self, writer, deps, tools)
+        rules = {}
+        for name, rule in Toolchain.all_rules(self.toolchain):
+            rules[name] = rule
         for name, rule in Toolchain.all_rules(self):
+            rules[name] = rule
+        for name, rule in rules.items():
             rule.create(self, writer, deps, tools)
         writer.newline()
 
@@ -621,11 +633,11 @@ class CXXLibrary(CXXProject):
         super(CXXLibrary, self).__init__(*args, **kwargs)
 
     def _populate_inputs(self, writer, deps, tools):
-        self.depimports += toolchain.depimport.build(self, writer, deps)
+        self.depimports += self.toolchain.depimport.build(self, writer, deps)
         super(CXXLibrary, self)._populate_inputs(writer, deps, tools)
 
     def _populate_project(self, writer, deps, tools):
-        toolchain.archiver.build(self, writer, self.objects)
+        self.toolchain.archiver.build(self, writer, self.objects)
 
     def publish(self, artifact, tools):
         with tools.cwd(self.outdir):
@@ -654,11 +666,11 @@ class CXXExecutable(CXXProject):
         self.libraries = utils.as_list(utils.call_or_return(self, self.__class__._libraries))
 
     def _populate_inputs(self, writer, deps, tools):
-        self.depimports += toolchain.depimport.build(self, writer, deps)
+        self.depimports += self.toolchain.depimport.build(self, writer, deps)
         super(CXXExecutable, self)._populate_inputs(writer, deps, tools)
 
     def _populate_project(self, writer, deps, tools):
-        toolchain.linker.build(self, writer, self.objects)
+        self.toolchain.linker.build(self, writer, self.objects)
 
     def _ldflags(self):
         return utils.call_or_return(self, self.__class__.ldflags)
