@@ -269,9 +269,19 @@ class IncludePaths(Variable):
         self.prefix = prefix or ''
 
     def create(self, project, writer, deps, tools):
-        incpaths = [tools.expand_path(path) for path in project.incpaths]
+        def expand(path):
+            if path[0] in ['=', fs.sep]:
+                return tools.expand(path)
+            return tools.expand_path(path)
+
+        def expand_artifact(artifact, path):
+            if path[0] in ['=', fs.sep]:
+                return path
+            return fs.path.join(artifact.stable_path, path)
+
+        incpaths = [expand(path) for path in project.incpaths]
         for name, artifact in deps.items():
-            incpaths += [fs.path.join(artifact.stable_path, path)
+            incpaths += [expand_artifact(artifact, path)
                          for path in artifact.cxxinfo.incpaths.items()]
         incpaths = ["{0}{1}".format(self.prefix, path) for path in incpaths]
         writer.variable(self.name, " ".join(incpaths))
