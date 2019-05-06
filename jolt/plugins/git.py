@@ -38,7 +38,7 @@ class GitRepository(object):
             "git: destination folder '{0}' already exists and is not a git repository",
             self.path)
         log.info("Cloning into {0}", self.path)
-        self.tools.run("git clone --recurse {0} {1}", self.url, self.path, output_on_error=True)
+        self.tools.run("git clone {0} {1}", self.url, self.path, output_on_error=True)
         raise_error_if(
             not fs.path.exists(self._get_git_folder()),
             "git: failed to clone repository '{0}'", self.relpath)
@@ -46,7 +46,7 @@ class GitRepository(object):
     @utils.cached.instance
     def _diff(self, path="/"):
         with self.tools.cwd(self.path):
-            return self.tools.run("git diff --no-ext-diff --ignore-submodules=untracked HEAD .{0}".format(path),
+            return self.tools.run("git diff --no-ext-diff HEAD .{0}".format(path),
                                   output_on_error=True,
                                   output_rstrip=False)
 
@@ -103,10 +103,10 @@ class GitRepository(object):
         log.info("Checking out {0} in {1}", rev, self.path)
         with self.tools.cwd(self.path):
             try:
-                return self.tools.run("git checkout -f --recurse {rev}", rev=rev, output=False)
+                return self.tools.run("git checkout -f {rev}", rev=rev, output=False)
             except:
                 self.fetch()
-                return self.tools.run("git checkout -f --recurse {rev}", rev=rev, output_on_error=True)
+                return self.tools.run("git checkout -f {rev}", rev=rev, output_on_error=True)
 
 
 _repositories = {}
@@ -133,7 +133,7 @@ class GitInfluenceProvider(HashInfluenceProvider):
 
     def diff(self, tools):
         with tools.cwd(self.path):
-            return tools.run("git diff --no-ext-diff --ignore-submodules=untracked HEAD .", output_on_error=True)
+            return tools.run("git diff --no-ext-diff HEAD .", output_on_error=True)
 
     def diff_hash(self, tools):
         return utils.sha1(self.diff(tools))
