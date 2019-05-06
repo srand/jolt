@@ -572,23 +572,23 @@ class CXXProject(Task):
         return rule
 
     def _populate_variables(self, writer, deps, tools):
-        variables = {}
-        for name, var in Toolchain.all_variables(self.toolchain):
-            variables[name] = var
+        variables = set()
         for name, var in Toolchain.all_variables(self):
-            variables[name] = var
-        for name, var in variables.items():
             var.create(self, writer, deps, tools)
+            variables.add(name)
+        for name, var in Toolchain.all_variables(self.toolchain):
+            if name not in variables:
+                var.create(self, writer, deps, tools)
         writer.newline()
 
     def _populate_rules(self, writer, deps, tools):
-        rules = {}
-        for name, rule in Toolchain.all_rules(self.toolchain):
-            rules[name] = rule
+        rules = set()
         for name, rule in Toolchain.all_rules(self):
-            rules[name] = rule
-        for name, rule in rules.items():
             rule.create(self, writer, deps, tools)
+            rules.add(name)
+        for name, rule in Toolchain.all_rules(self.toolchain):
+            if name not in rules:
+                rule.create(self, writer, deps, tools)
         writer.newline()
 
     def _populate_inputs(self, writer, deps, tools):
