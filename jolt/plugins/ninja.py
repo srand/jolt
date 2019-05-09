@@ -5,6 +5,7 @@ import os
 
 from jolt.tasks import Task
 from jolt import influence
+from jolt import log
 from jolt import utils
 from jolt import filesystem as fs
 from jolt.error import raise_task_error_if
@@ -87,7 +88,7 @@ class Rule(object):
 
     def create(self, project, writer, deps, tools):
         if self.command is not None:
-            writer.rule(self.name, tools.expand(self.command), depfile=self.depfile, deps=self.deps)
+            writer.rule(self.name, tools.expand(self.command), depfile=self.depfile, deps=self.deps, description="$desc")
             writer.newline()
 
     def build(self, project, writer, infiles):
@@ -374,28 +375,32 @@ class GNUToolchain(Toolchain):
         deps="gcc",
         depfile="$out.d",
         infiles=[".c"],
-        outfiles=["{outdir}/{in_path}/{in_base}.o"])
+        outfiles=["{outdir}/{in_path}/{in_base}.o"],
+        variables={"desc": "[C] {in_base}{in_ext}"})
 
     compile_cxx = GNUCompiler(
         command="$cxx -x c++ $cxxflags $extra_cxxflags $macros $incpaths -MMD -MF $out.d -c $in -o $out",
         deps="gcc",
         depfile="$out.d",
         infiles=[".cc", ".cpp", ".cxx"],
-        outfiles=["{outdir}/{in_path}/{in_base}.o"])
+        outfiles=["{outdir}/{in_path}/{in_base}.o"],
+        variables={"desc": "[CXX] {in_base}{in_ext}"})
 
     compile_asm = GNUCompiler(
         command="$cc -x assembler $asflags $extra_asflags -MMD -MF $out.d -c $in -o $out",
         deps="gcc",
         depfile="$out.d",
         infiles=[".s", ".asm"],
-        outfiles=["{outdir}/{in_path}/{in_base}.o"])
+        outfiles=["{outdir}/{in_path}/{in_base}.o"],
+        variables={"desc": "[ASM] {in_base}{in_ext}"})
 
     compile_asm_with_cpp = GNUCompiler(
         "$cc -x assembler-with-cpp $cflags $extra_cflags $macros $incpaths -MMD -MF $out.d -c $in -o $out",
         deps="gcc",
         depfile="$out.d",
         infiles=[".S"],
-        outfiles=["{outdir}/{in_path}/{in_base}.o"])
+        outfiles=["{outdir}/{in_path}/{in_base}.o"],
+        variables={"desc": "[ASM] {in_base}{in_ext}"})
 
     linker = GNULinker(
         command=" && ".join([
@@ -405,11 +410,13 @@ class GNUToolchain(Toolchain):
             "$objcopy --strip-all $out",
             "$objcopy --add-gnu-debuglink=$outdir/.debug/$binary $out"
         ]),
-        outfiles=["{outdir}/{binary}"])
+        outfiles=["{outdir}/{binary}"],
+        variables={"desc": "[LINK] {binary}"})
 
     archiver = GNUArchiver(
         command="rm -f $out && $ar cr $out @objects.list",
-        outfiles=["{outdir}/lib{binary}.a"])
+        outfiles=["{outdir}/lib{binary}.a"],
+        variables={"desc": "[AR] lib{binary}.a"})
 
     depimport = GNUDepImporter(
         prefix="lib",
@@ -630,7 +637,8 @@ class CXXProject(Task):
         self._expand_sources()
         self.outdir = tools.builddir("build/ninja", self.incremental)
         self._write_ninja_file(self.outdir, deps, tools)
-        tools.run("ninja -C {0}", self.outdir)
+        verbose = "-v" if log.is_verbose() else ""
+        tools.run("ninja -C {0} {1}", self.outdir, verbose)
 
 
 @influence.attribute("shared")

@@ -7,6 +7,7 @@ import uuid
 from jolt import utils
 from jolt import log
 from jolt import filesystem as fs
+from jolt import tools
 
 
 _providers = []
@@ -58,7 +59,7 @@ class TaskAttributeInfluence(HashInfluenceProvider):
         self.name = attrib.title()
 
     def get_influence(self, task):
-        return getattr(task, self._attrib)
+        return getattr(task, tools.Tools(task).expand(self._attrib))
 
 
 def attribute(name):

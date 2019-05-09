@@ -194,7 +194,7 @@ def progress_log(desc, count, unit):
 
 
 def progress(desc, count, unit):
-    if sys.stdout.isatty() and sys.stderr.isatty() and _stdout.level > VERBOSE:
+    if sys.stdout.isatty() and sys.stderr.isatty() and not is_verbose():
         p = tqdm.tqdm(total=count, unit=unit, unit_scale=True)
         p.set_description("[   INFO] " + desc)
         return p
@@ -204,6 +204,10 @@ def progress(desc, count, unit):
 def set_level(level):
     _stdout.setLevel(level)
     _stderr.setLevel(level)
+
+
+def is_verbose():
+    return _stdout.level <= VERBOSE
 
 
 class _ThreadMapper(Filter):
