@@ -451,9 +451,19 @@ class Artifact(object):
             "can't collect files into an already published task artifact")
 
         files = self._node.task.expand(files)
+        files = self.tools.glob(files)
+
         dest = self._node.task.expand(dest) if dest is not None else None
 
-        files = self.tools.glob(files)
+        # Special case for renaming files
+        safe_dest = dest or fs.sep
+        if len(files) == 1 and safe_dest[-1] != fs.sep:
+            src = files[0]
+            self.tools.copy(src, fs.path.join(self._temp, dest), symlinks=symlinks)
+            log.verbose("Collected {0} -> {2}/{1}", src, dest, self._temp)
+            return
+
+        # General case
         dirname = fs.path.join(self._temp, dest) if dest else self._temp + fs.sep
         for src in files:
             srcs = fs.scandir(src) if fs.path.isdir(src) and flatten else [src]
