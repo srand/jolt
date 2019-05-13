@@ -261,7 +261,7 @@ def clean(ctx, task):
     if task:
         task = [utils.stable_task_name(t) for t in task]
         registry = TaskRegistry.get()
-        dag = graph.GraphBuilder(registry, ctx.obj["manifest"]).build(task)
+        dag = graph.GraphBuilder(registry, ctx.obj["manifest"]).build(task, influence=False)
         tasks = dag.select(
             lambda graph, node: node.short_qualified_name in task or \
             node.qualified_name in task)
@@ -283,7 +283,7 @@ def display(ctx, task, prune):
     """
     registry = TaskRegistry.get()
     gb = graph.GraphBuilder(registry, ctx.obj["manifest"])
-    dag = gb.build(task)
+    dag = gb.build(task, influence=False)
     if prune:
         acache = cache.ArtifactCache.get()
         dag.prune(lambda graph, task: task.is_available_locally(acache) or task.is_resource())
@@ -373,7 +373,7 @@ def _list(ctx, task=None, reverse=False):
     task = [utils.stable_task_name(t) for t in task]
 
     try:
-        dag = graph.GraphBuilder(registry, ctx.obj["manifest"]).build(task)
+        dag = graph.GraphBuilder(registry, ctx.obj["manifest"]).build(task, influence=False)
     except JoltError as e:
         raise e
     except:
@@ -465,7 +465,7 @@ def info(ctx, task, influence=False, artifacts=False):
     if artifacts:
         acache = cache.ArtifactCache.get()
         dag = graph.GraphBuilder(task_registry, ctx.obj["manifest"]).build(
-            [utils.format_task_name(task.name, task._get_parameters())])
+            [utils.format_task_name(task.name, task._get_parameters())], influence=False)
         tasks = dag.select(lambda graph, node: graph.is_root(node))
         assert len(tasks) == 1, "unexpected graph generated"
         proxy = tasks[0]

@@ -317,7 +317,7 @@ class Graph(nx.DiGraph):
         with self._mutex:
             for node in nx.topological_sort(self):
                 if func(self, node):
-                    log.debug("[GRAPH] Pruned {0} ({1})", node.name, node.identity)
+                    log.debug("[GRAPH] Pruned {0}", node.short_qualified_name)
                     self.remove_node(node)
 
             for node in self.nodes:
@@ -393,16 +393,17 @@ class GraphBuilder(object):
             with log.progress_log(*args, **kwargs) as p:
                 yield p
 
-    def build(self, task_list):
+    def build(self, task_list, influence=True):
         [self._get_node(task) for task in task_list]
         raise_error_if(not nx.is_directed_acyclic_graph(self.graph),
                        "there are cyclic task dependencies")
         self.graph._nodes_by_name = self.nodes
 
-        with self._progress("Collecting task influence", len(self.graph.tasks), "tasks") as p:
-            for node in reversed(list(nx.topological_sort(self.graph))):
-                node.finalize(self.graph, self.manifest)
-                p.update(1)
+        if influence:
+            with self._progress("Collecting task influence", len(self.graph.tasks), "tasks") as p:
+                for node in reversed(list(nx.topological_sort(self.graph))):
+                    node.finalize(self.graph, self.manifest)
+                    p.update(1)
 
         return self.graph
 
