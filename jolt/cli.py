@@ -300,9 +300,7 @@ def display(ctx, task, prune):
 
 
 @cli.command()
-@click.option("-f", "--follow", is_flag=True, help="Display log output as it appears")
-@click.option("-D", "--delete", is_flag=True, help="Delete the log file")
-def docs(follow, delete):
+def docs():
     """
     Opens the Jolt documentation in the default webbrowser.
     """
