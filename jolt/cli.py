@@ -484,4 +484,3 @@ def info(ctx, task, influence=False, artifacts=False):
         click.echo("  Influence")
         for string in HashInfluenceRegistry.get().get_strings(task):
             click.echo("    " + string)
-            click.echo()
