@@ -100,7 +100,7 @@ class TaskSourceInfluence(HashInfluenceProvider):
         return utils.sha1(task._get_source(getattr(obj, self.funcname)))
 
 
-def source(name):
+def source(name, obj=None):
     """ Add function source code as hash influence.
 
     Args:
@@ -122,7 +122,7 @@ def source(name):
         _old_init = cls.__init__
         def _init(self, *args, **kwargs):
             _old_init(self, *args, **kwargs)
-            self.influence.append(TaskSourceInfluence(name))
+            self.influence.append(TaskSourceInfluence(name, obj))
         cls.__init__ = _init
         return cls
     return _decorate
