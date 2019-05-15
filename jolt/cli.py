@@ -478,9 +478,10 @@ def info(ctx, task, influence=False, artifacts=False):
             click.echo("    Local             {0} ({1})".format(
                 True, utils.as_human_size(acache.get_artifact(proxy).get_size())))
             click.echo("    Remote            {0}".format(acache.is_available_remotely(proxy)))
-            click.echo()
+        click.echo()
 
     if influence:
         click.echo("  Influence")
         for string in HashInfluenceRegistry.get().get_strings(task):
-            click.echo("    " + string)
+            string = string.split(":", 1)
+            click.echo("    {:<18}{}".format(string[0][10:], string[1].strip()))
