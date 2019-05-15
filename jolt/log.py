@@ -44,6 +44,8 @@ logging.addLevelName(STDOUT, "STDOUT")
 logging.addLevelName(STDERR, "STDERR")
 logging.addLevelName(EXCEPTION, "EXCEPT")
 
+logging.raiseExceptions = False
+
 
 class Formatter(logging.Formatter):
     def __init__(self, fmt, *args, **kwargs):
@@ -51,7 +53,10 @@ class Formatter(logging.Formatter):
         self.fmt = fmt
 
     def format(self, record):
-        record.message = record.msg.format(*record.args)
+        try:
+            record.message = record.msg.format(*record.args)
+        except:
+            record.message = record.msg
         record.asctime = datetime.fromtimestamp(record.created).strftime("%Y-%m-%d %H:%M:%S.%f")
         return self.fmt.format(
             levelname=record.levelname,
@@ -66,7 +71,10 @@ class ConsoleFormatter(logging.Formatter):
         self.fmt = fmt
 
     def format(self, record):
-        msg = record.msg.format(*record.args)
+        try:
+            msg = record.msg.format(*record.args)
+        except:
+            msg = record.msg
         if sys.stdout.isatty() and sys.stderr.isatty():
             if record.levelno >= ERROR:
                 msg = colors.red(msg)
