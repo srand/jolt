@@ -36,7 +36,7 @@ WARNING = logging.WARNING
 INFO = logging.INFO
 VERBOSE = 15
 DEBUG = logging.DEBUG
-EXCEPTION = VERBOSE + 1
+EXCEPTION = logging.DEBUG + 1
 STDOUT = logging.INFO + 1
 STDERR = logging.ERROR + 1
 logging.addLevelName(VERBOSE, "VERBOSE")
