@@ -261,7 +261,7 @@ def clean(ctx, task):
     if task:
         task = [utils.stable_task_name(t) for t in task]
         registry = TaskRegistry.get()
-        dag = graph.GraphBuilder(registry, ctx.obj["manifest"]).build(task, influence=False)
+        dag = graph.GraphBuilder(registry, ctx.obj["manifest"]).build(task)
         tasks = dag.select(
             lambda graph, node: node.short_qualified_name in task or \
             node.qualified_name in task)
