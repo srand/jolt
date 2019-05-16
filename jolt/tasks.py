@@ -32,7 +32,7 @@ class Export(object):
 class Parameter(object):
     """ Generic task parameter type. """
 
-    def __init__(self, default=None, values=None, required=True, help=None):
+    def __init__(self, default=None, values=None, required=True, const=False, help=None):
         """
         Creates a new parameter.
 
@@ -42,6 +42,10 @@ class Parameter(object):
                 assertion is raised if an unlisted value is assigned to the parameter.
             required (boolean, optional): If required, the parameter must be assigned
                 a value before the task can be executed. The default is ``True``.
+            const (boolean, optional): If const is True, the parameter is immutable
+                and cannot be assigned a non-default value. This is useful in
+                a class hierarchy where a subclass may want to impose restrictions
+                on a parent class parameter. The default is ``False``.
             help (str, optional): Documentation for the parameter.
                 This text is displayed when running the ``info`` command on the
                 associated task.
@@ -55,6 +59,7 @@ class Parameter(object):
         self._value = default
         self._accepted_values = values
         self._required = required
+        self._const = const
         self.__doc__ = help
         if default:
             self._validate(default)
@@ -118,6 +123,14 @@ class Parameter(object):
         """
         return not self.is_unset() and not self.is_default()
 
+    def is_const(self):
+        """ Check if the parameter can be assigned or not.
+
+        Returns:
+            True if the parameter is immutable.
+        """
+        return self._const
+
     def get_value(self):
         """ Get the parameter value. """
         return self._value
@@ -132,13 +145,15 @@ class Parameter(object):
             ValueError: If the parameter is assigned an illegal value.
         """
         self._validate(value)
+        if self._const and value != self._default:
+            raise ValueError("immutable")
         self._value = value
 
 
 class BooleanParameter(Parameter):
     """ Boolean task parameter type. """
 
-    def __init__(self, default=None, required=True, help=None):
+    def __init__(self, default=None, required=True, const=False, help=None):
         """
         Creates a new parameter.
 
@@ -146,6 +161,10 @@ class BooleanParameter(Parameter):
             default (boolean, optional): An optional default boolean value.
             required (boolean, optional): If required, the parameter must be assigned
                 a value before the task can be executed. The default is ``True``.
+            const (boolean, optional): If const is True, the parameter is immutable
+                and cannot be assigned a non-default value. This is useful in
+                a class hierarchy where a subclass may want to impose restrictions
+                on a parent class parameter. The default is ``False``.
             help (str, optional): Documentation for the parameter.
                 This text is displayed when running the ``info`` command on the
                 associated task.
@@ -157,7 +176,7 @@ class BooleanParameter(Parameter):
         default = str(default).lower() if default is not None else None
         super(BooleanParameter, self).__init__(
             default, values=["false", "true", "0", "1"],
-            required=required, help=help)
+            required=required, const=const, help=help)
 
     def set_value(self, value):
         """ Set the parameter value.
