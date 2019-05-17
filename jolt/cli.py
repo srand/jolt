@@ -136,6 +136,7 @@ def build(ctx, task, network, keep_going, identity, default, local,
     duration = utils.duration()
 
     task = list(task)
+    task = [utils.stable_task_name(t) for t in task]
 
     if network:
         _download = config.getboolean("network", "download", True)
