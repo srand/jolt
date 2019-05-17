@@ -470,7 +470,7 @@ def info(ctx, task, influence=False, artifacts=False):
     if artifacts:
         acache = cache.ArtifactCache.get()
         dag = graph.GraphBuilder(task_registry, ctx.obj["manifest"]).build(
-            [utils.format_task_name(task.name, task._get_parameters())], influence=False)
+            [utils.format_task_name(task.name, task._get_parameters())])
         tasks = dag.select(lambda graph, node: graph.is_root(node))
         assert len(tasks) == 1, "unexpected graph generated"
         proxy = tasks[0]
