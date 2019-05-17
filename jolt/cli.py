@@ -124,10 +124,12 @@ def _autocomplete_tasks(ctx, args, incomplete):
 @click.option("--worker", is_flag=True, default=False,
               help="Run with the worker build strategy", hidden=True)
 @click.option("-d", "--default", type=str, multiple=True, help="Override default parameter values.")
-@click.option("-f", "--force", is_flag=True, default=False, help="Force rebuild.")
+@click.option("-f", "--force", is_flag=True, default=False, help="Force rebuild (taint hash).")
+@click.option("-c", "--copy", type=click.Path(),
+              help="Copy artifact content to this directory upon completion.")
 @click.pass_context
 def build(ctx, task, network, keep_going, identity, default, local,
-          no_download, no_upload, download, upload, worker, force):
+          no_download, no_upload, download, upload, worker, force, copy):
     """
     Execute specified task.
 
@@ -235,6 +237,8 @@ def build(ctx, task, network, keep_going, identity, default, local,
             if acache.is_available_locally(goal):
                 with acache.get_artifact(goal) as artifact:
                     log.info("Location: {0}", artifact.path)
+                    if copy:
+                        artifact.copy("*", click.format_filename(copy))
 
         log.info("Total execution time: {0} {1}",
                  str(duration),
