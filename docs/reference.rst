@@ -4,48 +4,72 @@ Reference
 Artifact
 --------
 
+.. reference-artifact-start
+
 .. autoclass:: jolt.Artifact
    :members: collect, copy, path, final_path, environ, strings
 
+.. reference-artifact-end
 
 Context
 --------
 
+.. reference-context-start
+
 .. autoclass:: jolt.Context
    :members: items, __getitem__
 
+.. reference-context-end
 
 Influence
 ---------
 
+.. reference-influence-start
+
 .. automodule:: jolt.influence
    :members: attribute, daily, environ, files, hourly, monthly, source, weekly, yearly
+
+.. reference-influence-end
 
 
 Parameter
 ---------
 
+.. reference-parameter-start
+
 .. autoclass:: jolt.Parameter
    :members: __init__, __str__, is_default, get_default, get_value, set_value, is_set, is_unset
+
+.. reference-parameter-end
 
 
 BooleanParameter
 ----------------
 
+.. reference-booleanparameter-start
+
 .. autoclass:: jolt.BooleanParameter
    :members: __init__, __str__, is_default, get_default, get_value, set_value, is_set, is_unset, is_true, is_false
+
+.. reference-booleanparameter-end
 
 
 Resource
 ---------
 
+.. reference-resource-start
+
 .. autoclass:: jolt.tasks.Resource
    :members: acquire, release
    :show-inheritance:
 
+.. reference-resource-end
+
 
 Task
 ----
+
+.. reference-task-start
 
 .. autoclass:: jolt.tasks.Task
    :inherited-members: cacheble, expires, extends, fast, influence, joltdir, name, requires
@@ -136,30 +160,42 @@ Task
 
        List of dependencies to other tasks.
 
+.. reference-task-end
+
 
 Test
 ----
+
+.. reference-test-start
 
 .. autoclass:: jolt.tasks.Test
    :members: setup, cleanup
    :undoc-members:
 
+.. reference-test-end
 
 
 Tools
 -----
 
+.. reference-tools-start
+
 .. autoclass:: jolt.Tools
    :members:
    :undoc-members:
+
+.. reference-tools-end
 
 
 Ninja
 ------
 
+.. reference-ninja-start
 
 CXXExecutable
 ^^^^^^^^^^^^^
+
+.. reference-ninja-cxxexecutable-start
 
 .. autoclass:: jolt.plugins.ninja.CXXExecutable
 
@@ -177,9 +213,12 @@ CXXExecutable
   .. autoattribute:: CXXProject.sources
   .. autoattribute:: CXXProject.source_influence
 
+.. reference-ninja-cxxexecutable-end
 
 CXXLibrary
 ^^^^^^^^^^
+
+.. reference-ninja-cxxlibrary-start
 
 .. autoclass:: jolt.plugins.ninja.CXXLibrary
 
@@ -194,10 +233,19 @@ CXXLibrary
   .. autoattribute:: CXXProject.sources
   .. autoattribute:: CXXProject.source_influence
 
+.. reference-ninja-cxxlibrary-end
+
 
 Rule
 ^^^^
 
+.. reference-ninja-rule-start
+
 .. autoclass:: jolt.plugins.ninja.Rule
   :members: __init__
+
+.. reference-ninja-rule-end
+
+.. reference-ninja-end
+
 
