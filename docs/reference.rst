@@ -72,9 +72,8 @@ Task
 .. reference-task-start
 
 .. autoclass:: jolt.tasks.Task
-   :inherited-members: cacheble, expires, extends, fast, influence, joltdir, name, requires
    :undoc-members:
-   :members: info, warn, error, run, publish, unpack
+   :members: info, warning, error, run, publish, unpack
 
 
     .. attribute:: cacheable = True
@@ -103,20 +102,20 @@ Task
 
        Examples:
 
-	 .. code-block:: python
+      .. code-block:: python
 
-	    # May be evicted if it hasn't been used for 15 days
-	    expires = WhenUnusedFor(days=15)
+        # May be evicted if it hasn't been used for 15 days
+        expires = WhenUnusedFor(days=15)
 
-	 .. code-block:: python
+      .. code-block:: python
 
-	    # May be evicted 1h after creation
-	    expires = After(hours=1)
+        # May be evicted 1h after creation
+        expires = After(hours=1)
 
-	 .. code-block:: python
+      .. code-block:: python
 
-	    # Never evicted
-            expires = Never()
+        # Never evicted
+        expires = Never()
 
 
     .. attribute:: extends = ""
@@ -147,9 +146,11 @@ Task
        An extended task is only considered fast if all extensions are fast.
 
     .. attribute:: influence = []
+
        List of influence provider objects.
 
     .. attribute:: joltdir = "."
+
        Path to the directory of the .jolt file where the task was defined.
 
     .. attribute:: name
