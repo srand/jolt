@@ -7,6 +7,7 @@ from jolt.loader import JoltLoader
 from jolt import filesystem as fs
 from jolt import log
 from jolt import utils
+from jolt.error import JoltCommandError
 from jolt.error import raise_error_if
 from jolt.error import raise_task_error_if
 
@@ -133,25 +134,30 @@ class GitInfluenceProvider(HashInfluenceProvider):
 
     def diff(self, tools):
         with tools.cwd(self.path):
-            return tools.run("git diff --no-ext-diff HEAD .", output_on_error=True)
+            return tools.run("git diff --no-ext-diff HEAD .", output=False)
 
     def diff_hash(self, tools):
         return utils.sha1(self.diff(tools))
 
     def tree_hash(self, tools, sha="HEAD", path="/"):
         with tools.cwd(self.path):
-            return tools.run("git rev-parse {0}:.{1}".format(sha, path), output_on_error=True)
+            return tools.run("git rev-parse {0}:.{1}".format(sha, path), output=False)
 
     @utils.cached.instance
     def get_influence(self, task):
         tools = Tools(task)
-        if not fs.path.exists(tools.expand_path(self.path)):
-            return "{0}:N/A".format(tools.expand(self.relpath))
-        return "{0}:{1}:{2}".format(
-            tools.expand(self.relpath),
-            self.tree_hash(tools),
-            self.diff_hash(tools)[:8])
-
+        try:
+            return "{0}:{1}:{2}".format(
+                tools.expand(self.relpath),
+                self.tree_hash(tools),
+                self.diff_hash(tools)[:8])
+        except JoltCommandError as e:
+            stderr = "\n".join(e.stderr)
+            if "exists on disk, but not in" in stderr:
+                return "{0}:N/A".format(tools.expand(self.relpath))
+            for line in e.stderr:
+                log.stderr(line)
+            raise e
 
 def global_influence(path, cls=GitInfluenceProvider):
     HashInfluenceRegistry.get().register(cls(path))
