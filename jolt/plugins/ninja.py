@@ -46,7 +46,72 @@ class ProjectVariable(Variable):
 
 
 class Rule(object):
+    """ A source transformation rule.
+
+    Rules are used to transform files from one type to another.
+    An example is the rule that compiles a C/C++ file to an object file.
+    Ninja tasks can be extended with additional rules beyond those
+    already builtin and the builtin rules may also be overridden.
+
+    To define a new rule for a type of file, assign a Rule object
+    to an arbitrary attribute of the compilation task being defined.
+    Below is an example where a rule has been created to generate Qt moc
+    source files from headers.
+
+    .. code-block:: python
+
+      class MyQtProject(CXXExecutable):
+          moc_rule = Rule(
+              command="moc -o $out $in",
+              infiles=[".h"],
+              outfiles=["{outdir}/{in_path}/{in_base}_moc.cpp"])
+
+          sources = ["myqtproject.h", "myqtproject.cpp"]
+
+    The moc rule will be run on all ``.h`` header files listed as sources,
+    i.e. ``myqtproject.h``. It takes the input header file and generates
+    a corresponding moc source file, ``myqtproject_moc.cpp``.
+    The moc source file will then automatically be fed to the builtin
+    compiler rule from which the output is an object file,
+    ``myqtproject_moc.o``.
+
+    """
+
     def __init__(self, command=None, infiles=None, outfiles=None, depfile=None, deps=None, variables=None):
+        """
+        Creates a new rule.
+
+        Args:
+            command (str, optional):
+                The command that will be execute by the rule.
+                It can use any of the `variables` created below.
+
+            infiles (str, optional):
+                A list of file extensions that the rule should apply to.
+
+            outfiles (str, optional):
+                A list of files created by the rule. Regular keyword
+                expansion is done on the strings but additional keywords
+                are supported, see `variables` below.
+
+            variables (str, optional):
+                A dictionary of variables that should be available to Ninja
+                when running the command. By default, only $in and $out will be set,
+                where $in is a single input file and $out is the output file(s).
+                Regular keyword expansion is done on the value strings, see
+                :meth:`jolt.Tools.expand`. These additional keywords are supported:
+
+                   - ``in_path`` - the path to the directory where the input file is located
+                   - ``in_base`` - the name of the input file, excluding file extension
+                   - ``in_ext`` - the input file extension
+
+                Example:
+
+                  .. code-block:: python
+
+                    Rule(command="echo $extension", variables={"extension": "{in_ext}"}, ...)
+
+        """
         self.command = command
         self.variables = variables or {}
         self.depfile = depfile
@@ -502,17 +567,92 @@ else:
 @influence.attribute("publishdir")
 @influence.attribute("toolchain")
 class CXXProject(Task):
-    incpaths = []
-    macros = []
-    sources = []
+    """
+
+    The task recognizes these source file types:
+    .asm, .c, .cc, .cpp, .cxx, .h, .hh, .hpp, .hxx, .s, .S
+
+    Other file types can be supported through additional rules,
+    see the :class:`Rule <jolt.plugin.ninja.Rule>` class.
+
+    On Linux, GCC/Binutils is the default toolchain used.
+    The default toolchain can be overridden by setting the
+    environment variables ``AR``, ``CC``, ``CXX`` and ``LD``.
+    The prefered method is to assign these variables through the
+    artifact of a special task that you depend on.
+
+    On Windows, Visual Studio is the default toolchain and it
+    must be present in the ``PATH``. Run Jolt from a developer
+    command prompt.
+
+    Additionally, these environment variables can be used to
+    customize toolchain behavior on any platform:
+
+     - ``ASFLAGS`` - compiler flags used for assembly code
+     - ``CFLAGS`` - compiler flags used for C code
+     - ``CXXFLAGS`` - compiler flags used for C++ code
+     - ``LDFLAGS`` - linker flags
+
+    """
+
     asflags = []
+    """ A list of compiler flags used when compiling assembler files. """
+
     cflags = []
+    """ A list of compiler flags used when compiling C files. """
+
     cxxflags = []
+    """ A list of compiler flags used when compiling C++ files. """
+
     depimports = []
+    """ List of implicit dependencies """
+
+    incpaths = []
+    """ List of preprocessor include paths """
+
+    macros = []
+    """ List of preprocessor macros to set """
+
+    sources = []
+    """ A list of sources to compile.
+
+    Path names may contain simple shell-style wildcards such as
+    '*' and '?'. Note: files starting with a dot are not matched
+    by these wildcards.
+
+    Example:
+
+      .. code-block:: python
+
+        sources = ["src/*.cpp"]
+    """
+
     publishdir = None
+
     source_influence = True
+    """ Let the contents of source files influence the identity of the task artifact.
+
+    When ``True``, a source file listed in the ``sources`` attribute will
+    cause a rebuild of the task if modified.
+
+    Source influence can hurt performance since every files needs to be hashed.
+    It is safe to set this flag to ``False`` if all source files reside in a
+    ``git`` repository listed as a dependency with the ``requires`` attribute or
+    if the task uses the ``git.influence`` decorator.
+
+    Always use ``source_influence`` if you are unsure whether it is needed or not.
+    """
+
     binary = None
+    """ Name of the target binary (defaults to canonical task name) """
+
     incremental = True
+    """ Compile incrementally.
+
+    If incremental build is disabled, all intermediate files from a
+    previous build will be removed before the execution begins.
+    """
+
     abstract = True
     toolchain = None
 
@@ -643,9 +783,15 @@ class CXXProject(Task):
 
 @influence.attribute("shared")
 class CXXLibrary(CXXProject):
+    """
+    Builds a C/C++ library.
+    """
+
     abstract = True
     shared = False
+
     publishdir = "lib/"
+    """ The artifact path where the library is published. """
 
     def __init__(self, *args, **kwargs):
         super(CXXLibrary, self).__init__(*args, **kwargs)
@@ -666,16 +812,32 @@ class CXXLibrary(CXXProject):
         artifact.cxxinfo.libpaths.append("lib")
         artifact.cxxinfo.libraries.append(self.binary)
 
+CXXLibrary.__doc__ += CXXProject.__doc__
+
 
 @influence.attribute("ldflags")
 @influence.attribute("libpaths")
 @influence.attribute("libraries")
 class CXXExecutable(CXXProject):
+    """
+    Builds a C/C++ executable.
+    """
+
     abstract = True
+
+
     libpaths = []
+    """ A list of library search paths used when linking. """
+
     libraries = []
+    """ A list of libraries to link with. """
+
     ldflags = []
+    """ A list of linker flags to use. """
+
     publishdir = "bin/"
+    """ The artifact path where the binary is published. """
+
 
     def __init__(self, *args, **kwargs):
         super(CXXExecutable, self).__init__(*args, **kwargs)
@@ -709,3 +871,5 @@ class CXXExecutable(CXXProject):
         artifact.environ.PATH.append(self.publishdir)
         artifact.strings.executable = fs.path.join(
             self.publishdir, self.binary)
+
+CXXExecutable.__doc__ += CXXProject.__doc__

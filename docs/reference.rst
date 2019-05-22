@@ -152,3 +152,52 @@ Tools
 .. autoclass:: jolt.Tools
    :members:
    :undoc-members:
+
+
+Ninja
+------
+
+
+CXXExecutable
+^^^^^^^^^^^^^
+
+.. autoclass:: jolt.plugins.ninja.CXXExecutable
+
+  .. autoattribute:: CXXProject.asflags
+  .. autoattribute:: CXXProject.binary
+  .. autoattribute:: CXXProject.cflags
+  .. autoattribute:: CXXProject.cxxflags
+  .. autoattribute:: CXXProject.incpaths
+  .. autoattribute:: CXXProject.incremental
+  .. autoattribute:: ldflags
+  .. autoattribute:: libpaths
+  .. autoattribute:: libraries
+  .. autoattribute:: CXXProject.macros
+  .. autoattribute:: publishdir
+  .. autoattribute:: CXXProject.sources
+  .. autoattribute:: CXXProject.source_influence
+
+
+CXXLibrary
+^^^^^^^^^^
+
+.. autoclass:: jolt.plugins.ninja.CXXLibrary
+
+  .. autoattribute:: CXXProject.asflags
+  .. autoattribute:: CXXProject.binary
+  .. autoattribute:: CXXProject.cflags
+  .. autoattribute:: CXXProject.cxxflags
+  .. autoattribute:: CXXProject.incpaths
+  .. autoattribute:: CXXProject.incremental
+  .. autoattribute:: CXXProject.macros
+  .. autoattribute:: publishdir
+  .. autoattribute:: CXXProject.sources
+  .. autoattribute:: CXXProject.source_influence
+
+
+Rule
+^^^^
+
+.. autoclass:: jolt.plugins.ninja.Rule
+  :members: __init__
+

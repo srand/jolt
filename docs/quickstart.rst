@@ -375,14 +375,14 @@ There are a number of other useful influence decorators as well:
     @influence.source("report")
     class E2fsprogs(Task):
         def report(self):
-	    # TODO: Report something
+            # TODO: Report something
 
-	def run(self, deps, tools):
+        def run(self, deps, tools):
             ac = tools.autotools()
             ac.configure("path/to/e2fsprogs")
             ac.build()
             ac.install()
-	    self.report()
+            self.report()
 
 Above, the ``git.influence`` decorator has been replaced by
 ``influence.files``. The result is virtually the same, the content of all files
@@ -417,7 +417,7 @@ are high-level languages, Ninja aims to be an assembler. Together they form a
 powerful couple. Jolt has builtin Ninja tasks which automatically generate Ninja
 build files and build your projects for you. All you have to do is to tell Jolt which
 source files to compile. You can also define custom build rules for file types not
-recognized by Jolt.
+recognized by Jolt, see the :class:`Rule <jolt.plugins.ninja.Rule>` class.
 
 Below is an example of a library and a program. The library contains a function
 returning a message. The program calls this function and prints the message.
