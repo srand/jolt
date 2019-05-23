@@ -146,6 +146,8 @@ class GitInfluenceProvider(HashInfluenceProvider):
     @utils.cached.instance
     def get_influence(self, task):
         tools = Tools(task)
+        if not fs.path.exists(tools.expand_path(self.path)):
+            return "{0}:N/A".format(tools.expand(self.relpath))
         try:
             return "{0}:{1}:{2}".format(
                 tools.expand(self.relpath),
