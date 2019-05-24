@@ -145,7 +145,7 @@ class _tmpdir(object):
 
     def __exit__(self, type, value, tb):
         if self._path:
-            fs.rmtree(self._path)
+            fs.rmtree(self._path, ignore_errors=True)
 
     @property
     def path(self):
@@ -266,7 +266,7 @@ class Tools(object):
 
     def __exit__(self, type, value, tb):
         for dir in self._builddir.values():
-            fs.rmtree(dir)
+            fs.rmtree(dir, ignore_errors=True)
         return False
 
     def append_file(self, pathname, content):
