@@ -333,7 +333,7 @@ class Tools(object):
         """ Creates an AutoTools invokation helper """
         return _AutoTools(deps, self)
 
-    def builddir(self, name="build", incremental=False):
+    def builddir(self, name=None, incremental=False):
         """ Creates a temporary build directory.
 
         The build directory will persist for the duration of a task's
@@ -347,7 +347,9 @@ class Tools(object):
         Returns:
             Path to the created directory.
         """
-        name = self.expand(name)
+        default_name = "builddir" if self._task is None else self._task.canonical_name
+        name = self.expand(name or default_name)
+        name = fs.path.join("build", name)
 
         if incremental and self._task is not None:
             unique = utils.sha1(utils.format_task_name(

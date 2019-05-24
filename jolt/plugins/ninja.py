@@ -775,7 +775,7 @@ class CXXProject(Task):
 
     def run(self, deps, tools):
         self._expand_sources()
-        self.outdir = tools.builddir("build/ninja", self.incremental)
+        self.outdir = tools.builddir("ninja", self.incremental)
         self._write_ninja_file(self.outdir, deps, tools)
         verbose = "-v" if log.is_verbose() else ""
         tools.run("ninja -C {0} {1}", self.outdir, verbose)
