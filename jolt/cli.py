@@ -290,7 +290,7 @@ def clean(ctx, task, deps, expired):
         for task in tasks:
             task.clean(acache, expired)
     else:
-        fs.rmtree(acache.root)
+        acache.discard_all(expired)
 
 
 @cli.command()

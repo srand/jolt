@@ -241,9 +241,9 @@ class TaskProxy(object):
             self.task.clean(self.tools)
             discarded = cache.discard(self, expired)
             if discarded:
-                log.verbose("Discarded: " + self.short_qualified_name)
+                log.verbose("Discarded: {} ({})", self.short_qualified_name, self.identity[:8])
             else:
-                log.verbose(" Retained: " + self.short_qualified_name)
+                log.verbose(" Retained: {} ({})", self.short_qualified_name, self.identity[:8])
 
     def run(self, cache, force_upload=False, force_build=False):
         with self.tools:

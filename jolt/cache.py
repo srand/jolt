@@ -659,7 +659,7 @@ class CacheStats(object):
 
     def load(self):
         try:
-            with open(path) as f:
+            with open(self.path) as f:
                 data = utils.decode_str(f.read())
                 self.stats = json.loads(data, object_hook=json_deserializer)
         except:
@@ -725,7 +725,6 @@ class CacheStats(object):
 
     @locked
     def get_lru(self):
-        assert self.stats, "can't evict artifact, no artifacts in cache"
         nt = [dict(identity=artifact, **stats) for artifact, stats in self.stats.items()]
         # Don't evict artifacts in the current active working set
         nt = list(filter(lambda x: x["identity"] not in self.active, nt))
@@ -898,6 +897,22 @@ class ArtifactCache(StorageProvider):
             self.stats.remove(dict(identity=node.identity))
             artifact.discard()
         return True
+
+    def discard_all(self, if_expired=False):
+        if if_expired:
+            artifact = self.stats.get_lru()
+            while artifact is not None:
+                log.verbose("Discarded: {name} ({})".format(
+                    artifact["identity"][:8], **artifact))
+                path = fs.path.join(self.root, artifact["name"], artifact["identity"])
+                self.stats.remove(artifact)
+                fs.rmtree(path, ignore_errors=True)
+                artifact = self.stats.get_lru()
+        else:
+            with tools.Tools() as t:
+                artifacts = t.glob(fs.path.join(self.root, "*"))
+                for artifact in artifacts:
+                    fs.rmtree(artifact, ignore_errors=True)
 
     def get_context(self, node):
         return Context(self, node)
