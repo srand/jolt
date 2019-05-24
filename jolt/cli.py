@@ -255,8 +255,9 @@ def build(ctx, task, network, keep_going, identity, default, local,
 
 @cli.command()
 @click.argument("task", type=str, nargs=-1, required=False, autocompletion=_autocomplete_tasks)
+@click.option("-d", "--deps", is_flag=True, help="Clean all task dependencies.")
 @click.pass_context
-def clean(ctx, task):
+def clean(ctx, task, deps):
     """
     Remove (task artifact from) local cache.
 
@@ -267,9 +268,12 @@ def clean(ctx, task):
         task = [utils.stable_task_name(t) for t in task]
         registry = TaskRegistry.get()
         dag = graph.GraphBuilder(registry, ctx.obj["manifest"]).build(task)
-        tasks = dag.select(
-            lambda graph, node: node.short_qualified_name in task or \
-            node.qualified_name in task)
+        if deps:
+            tasks = dag.tasks
+        else:
+            tasks = dag.select(
+                lambda graph, node: node.short_qualified_name in task or \
+                node.qualified_name in task)
         for task in tasks:
             task.clean(acache)
     else:
