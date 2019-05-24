@@ -260,9 +260,21 @@ def build(ctx, task, network, keep_going, identity, default, local,
 @click.pass_context
 def clean(ctx, task, deps, expired):
     """
-    Remove (task artifact from) local cache.
+    Removes task artifacts and intermediate files.
 
-    <WIP>
+    When run without arguments, this command removes all task artifacts
+    from the local cache, but no intermediate files are removed.
+
+    When a task is specified, the task clean() method is invoked to remove
+    any intermediate files still present in persistent build directories.
+    Secondly, the task artifact will be removed from the local cache.
+    Global caches are not affected. The --deps parameter can be used to also
+    clean all dependencies of the specified task.
+
+    By default, task artifacts are removed without considering any
+    artifact expiration metadata. To only remove artifact which have expired,
+    use the --expired parameter. Artifacts typically expire immediately after
+    creation unless explicitly configured not to.
     """
     acache = cache.ArtifactCache.get()
     if task:
