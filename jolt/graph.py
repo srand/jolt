@@ -236,11 +236,14 @@ class TaskProxy(object):
         except:
             self.warn("Pruned task was executed")
 
-    def clean(self, cache):
+    def clean(self, cache, expired):
         with self.tools:
-            log.verbose("Cleaning: " + self.short_qualified_name)
             self.task.clean(self.tools)
-            cache.discard(self)
+            discarded = cache.discard(self, expired)
+            if discarded:
+                log.verbose("Discarded: " + self.short_qualified_name)
+            else:
+                log.verbose(" Retained: " + self.short_qualified_name)
 
     def run(self, cache, force_upload=False, force_build=False):
         with self.tools:

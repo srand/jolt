@@ -704,6 +704,18 @@ class CacheStats(object):
         del self.stats[artifact["identity"]]
         self.save()
 
+    def is_expired(self, artifact):
+        if not self.stats:
+            return False
+        stats = self.stats.get(artifact.get_identity())
+        if not stats:
+            return False
+        content, _ = Artifact.load_manifest(artifact.path)
+        content["used"] = stats["used"]
+        strategy = ArtifactEvictionStrategyRegister.get().find(
+            content.get("expires", "immediately"))
+        return strategy.is_evictable(content)
+
     @locked
     def get_size(self):
         size = 0
@@ -877,10 +889,12 @@ class ArtifactCache(StorageProvider):
         self.stats.update(artifact)
         self.evict()
 
-    def discard(self, node):
+    def discard(self, node, if_expired=False):
         if not self.is_available_locally(node):
             return False
         with self.get_artifact(node) as artifact:
+            if if_expired and not self.stats.is_expired(artifact):
+                return False
             self.stats.remove(dict(identity=node.identity))
             artifact.discard()
         return True

@@ -256,8 +256,9 @@ def build(ctx, task, network, keep_going, identity, default, local,
 @cli.command()
 @click.argument("task", type=str, nargs=-1, required=False, autocompletion=_autocomplete_tasks)
 @click.option("-d", "--deps", is_flag=True, help="Clean all task dependencies.")
+@click.option("-e", "--expired", is_flag=True, help="Only clean expired tasks.")
 @click.pass_context
-def clean(ctx, task, deps):
+def clean(ctx, task, deps, expired):
     """
     Remove (task artifact from) local cache.
 
@@ -275,7 +276,7 @@ def clean(ctx, task, deps):
                 lambda graph, node: node.short_qualified_name in task or \
                 node.qualified_name in task)
         for task in tasks:
-            task.clean(acache)
+            task.clean(acache, expired)
     else:
         fs.rmtree(acache.root)
 
