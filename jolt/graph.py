@@ -173,7 +173,7 @@ class TaskProxy(object):
         self._in_progress = True
 
     def finalize(self, dag, manifest):
-        log.verbose("Finalizing: " + self.qualified_name)
+        log.verbose("Finalizing: " + self.short_qualified_name)
         self.manifest = manifest
 
         # Find all direct and transitive dependencies
@@ -235,6 +235,12 @@ class TaskProxy(object):
             self.graph.remove_node(self)
         except:
             self.warn("Pruned task was executed")
+
+    def clean(self, cache):
+        with self.tools:
+            log.verbose("Cleaning: " + self.short_qualified_name)
+            self.task.clean(self.tools)
+            cache.discard(self)
 
     def run(self, cache, force_upload=False, force_build=False):
         with self.tools:

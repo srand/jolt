@@ -271,7 +271,7 @@ def clean(ctx, task):
             lambda graph, node: node.short_qualified_name in task or \
             node.qualified_name in task)
         for task in tasks:
-            acache.discard(task)
+            task.clean(acache)
     else:
         fs.rmtree(acache.root)
 

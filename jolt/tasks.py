@@ -595,6 +595,19 @@ class Task(TaskBase):
         fmt = self.tools.expand(fmt, *args, **kwargs)
         log.error(fmt, *args, **kwargs)
 
+    def clean(self, tools):
+        """
+        Cleans up resources and intermediate files and created by the task.
+
+        The method is invoked in response to the user running clean
+        on the command line. It should restore the environment to its
+        original state. The next execution of the task should behave
+        as if the task is executed for the first time.
+
+        An implementation must not clean any local or remote artifact cache.
+        """
+        pass
+
     def run(self, deps, tools):
         """
         Performs the work of the task.

@@ -773,6 +773,10 @@ class CXXProject(Task):
     def _depimports(self):
         return utils.call_or_return(self, self.__class__.depimports)
 
+    def clean(self, tools):
+        self.outdir = tools.builddir("ninja", self.incremental)
+        tools.rmtree(self.outdir, ignore_errors=True)
+
     def run(self, deps, tools):
         self._expand_sources()
         self.outdir = tools.builddir("ninja", self.incremental)
