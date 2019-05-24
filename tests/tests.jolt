@@ -64,19 +64,19 @@ class Tools(Test):
 
     def test_tools_extract_zip(self):
         with self.tools.cwd(self.tmpdir):
-            self.tools.run("zip tests.zip ../tests.jolt")
+            self.tools.run("zip tests.zip ../../tests.jolt")
             self.tools.extract("tests.zip", self.tmpdir)
             self.assertExists("tests.jolt")
 
     def test_tools_extract_tar_gz(self):
         with self.tools.cwd(self.tmpdir):
-            self.tools.run("tar czvf tests.tar.gz ../tests.jolt")
+            self.tools.run("tar czvf tests.tar.gz ../../tests.jolt")
             self.tools.extract("tests.tar.gz", self.tmpdir)
             self.assertExists("tests.jolt")
 
     def test_tools_extract_tar_bz2(self):
         with self.tools.cwd(self.tmpdir):
-            self.tools.run("tar cjvf tests.tar.bz2 ../tests.jolt")
+            self.tools.run("tar cjvf tests.tar.bz2 ../../tests.jolt")
             self.tools.extract("tests.tar.bz2", self.tmpdir)
             self.assertExists("tests.jolt")
 
