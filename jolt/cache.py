@@ -1,3 +1,4 @@
+from collections import OrderedDict
 import json
 import yaml
 import os
@@ -590,8 +591,8 @@ class Context(object):
     def __init__(self, cache, node):
         self._cache = cache
         self._node = node
-        self._artifacts = {}
-        self._artifacts_index = {}
+        self._artifacts = OrderedDict()
+        self._artifacts_index = OrderedDict()
 
     def __enter__(self):
         for dep in self._node.children:
