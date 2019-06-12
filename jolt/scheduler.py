@@ -363,12 +363,7 @@ class WorkerStrategy(ExecutionStrategy):
             return self.executors.create_local(task)
 
         if task.is_available_locally(self.cache):
-            if not task.is_available_remotely(self.cache):
-                return self.executors.create_uploader(task)
-            else:
-                return self.executors.create_skipper(task)
-
-            return self.executors.create_downloader(task)
+            return self.executors.create_skipper(task)
 
         if not self.cache.download_enabled():
             return self.executors.create_local(task)
