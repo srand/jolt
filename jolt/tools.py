@@ -309,6 +309,9 @@ class Tools(object):
             fmt = "tar"
             basename = filename[:-4]
         elif filename.endswith(".tar.gz"):
+            if shutil.which("tar") and shutil.which("pigz"):
+                self.run("tar -I pigz -cf {} -C {} .", filename, pathname)
+                return filename
             fmt = "gztar"
             basename = filename[:-7]
         elif filename.endswith(".tgz"):
@@ -592,6 +595,9 @@ class Tools(object):
                     else:
                         tar.extractall(filepath)
             elif filename.endswith(".tar.gz") or filename.endswith(".tgz"):
+                if shutil.which("tar") and shutil.which("pigz"):
+                    self.run("tar -I pigz -xf {} -C {} {}", filename, filepath, files or "")
+                    return
                 with tarfile.open(filename, 'r:gz') as tar:
                     if files:
                         tar.extract(files, filepath)
