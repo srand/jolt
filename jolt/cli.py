@@ -76,6 +76,8 @@ def cli(ctx, verbose, extra_verbose, config_file, debug, profile):
     global debug_enabled
     debug_enabled = debug
 
+    log.verbose("Jolt install path: {}", fs.path.dirname(__file__))
+
     manifest = JoltManifest()
     try:
         manifest.parse()

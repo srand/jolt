@@ -41,10 +41,18 @@ class _JoltBuild(SubElement):
         super(_JoltBuild, self).__init__('build', elem=elem)
 
 
+@Attribute("key")
+@Attribute("value")
+class _JoltNetworkParameter(SubElement):
+    def __init__(self, elem=None):
+        super(_JoltNetworkParameter, self).__init__('parameter', elem=elem)
+
+
 @Attribute("config", child=True)
 @Composition(_JoltRecipe, "recipe")
 @Composition(_JoltTask, "task")
 @Composition(_JoltBuild, "build")
+@Composition(_JoltNetworkParameter, "parameter")
 class JoltManifest(ElementTree):
     def __init__(self):
         super(JoltManifest, self).__init__(element=Element('jolt-manifest'))
@@ -93,9 +101,15 @@ class JoltManifest(ElementTree):
 
     def find_task(self, task):
         match = self.find("./task[@name='{0}']".format(task))
-        if not match:
+        if match is None:
             return None
         return _JoltTask(elem=match)
+
+    def get_parameter(self, key):
+        match = self.find("./parameter[@key='{0}']".format(key))
+        if match is None:
+            return None
+        return match.get("value")
 
     @property
     def task_identities(self):

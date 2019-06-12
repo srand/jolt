@@ -9,9 +9,10 @@ import uuid
 
 from jolt.cli import cli
 from jolt import config
+from jolt import filesystem as fs
+from jolt import log
 from jolt import scheduler
 from jolt import utils
-from jolt import log
 from jolt.manifest import JoltManifest
 from jolt.tools import Tools
 from jolt.error import JoltCommandError
@@ -362,6 +363,38 @@ class WorkerTaskConsumer(object):
                 self.properties = properties
                 self.body = body
 
+            def selfdeploy(self):
+                """ Installs the correct version of Jolt as specified in execution request. """
+
+                tools = Tools()
+                manifest = JoltManifest()
+                try:
+                    manifest.parse()
+                    ident = manifest.get_parameter("jolt_identity")
+                    url = manifest.get_parameter("jolt_url")
+                    if not ident or not url:
+                        return "jolt"
+
+                    log.info("Jolt version: {}", ident)
+
+                    src = "build/selfdeploy/{}/src".format(ident)
+                    env = "build/selfdeploy/{}/env".format(ident)
+
+                    if not fs.path.exists(env):
+                        try:
+                            fs.makedirs(src)
+                            tools.run("curl {} | tar zx -C {}", url, src)
+                            tools.run("virtualenv {}", env)
+                            tools.run(". {}/bin/activate && pip install -e {}", env, src)
+                        except Exception as e:
+                            tools.rmtree("build/selfdeploy/{}", ident, ignore_errors=True)
+                            raise e
+
+                    return ". {}/bin/activate && jolt".format(env)
+                except:
+                    log.exception()
+                return "jolt"
+
             def run(self):
                 with open("default.joltxmanifest", "wb") as f:
                     f.write(self.body)
@@ -372,10 +405,11 @@ class WorkerTaskConsumer(object):
                 for recipe in tools.glob("*.jolt"):
                     tools.unlink(recipe)
 
-                log.info("Running jolt")
-
                 try:
-                    tools.run("jolt -vv build --worker", output_stdio=True)
+                    jolt = self.selfdeploy()
+
+                    log.info("Running jolt")
+                    tools.run("{} -vv build --worker", jolt, output_stdio=True)
                 except JoltCommandError as e:
                     self.response = ["FAILED"]
                     self.response.extend(e.stdout)
@@ -566,11 +600,13 @@ class AmqpExecutor(scheduler.NetworkExecutor):
             default = build.create_default()
             default.name = task
 
-        return manifest.format()
-
-    def _get_parameters(self):
         registry = scheduler.ExecutorRegistry.get()
-        return registry.get_network_parameters(self.task)
+        for key, value in registry.get_network_parameters(self.task).items():
+            param = manifest.create_parameter()
+            param.key = key
+            param.value = value
+
+        return manifest.format()
 
     def _run(self, env):
         manifest = self._create_manifest()
