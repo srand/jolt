@@ -14,8 +14,10 @@ class Sigint(Task):
             pass
 
 class Sigint2(Task):
+    t = Parameter(10)
+
     def run(self, deps, tools):
-        tools.run("sleep 1000")
+        tools.run("sleep {t}")
 
 
 class Pass(Task):
