@@ -463,7 +463,10 @@ class TaskBase(object):
     def _set_parameters(self, params):
         params = params or {}
         for key, value in params.items():
-            param = utils.getattr_safe(self, key)
+            try:
+                param = utils.getattr_safe(self, key)
+            except AttributeError as e:
+                raise_task_error(self, "no such parameter '{0}'", key)
             if isinstance(param, Parameter):
                 try:
                     param.set_value(value)
