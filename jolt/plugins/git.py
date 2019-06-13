@@ -8,8 +8,14 @@ from jolt import filesystem as fs
 from jolt import log
 from jolt import utils
 from jolt.error import JoltCommandError
+from jolt.error import raise_error
 from jolt.error import raise_error_if
 from jolt.error import raise_task_error_if
+
+
+
+_tree = {}
+_tree_hash_cache = {}
 
 
 
@@ -19,7 +25,7 @@ class GitRepository(object):
         self.relpath = relpath
         self.tools = Tools()
         self.url = url
-        self.refspecs = utils.as_list(refspecs)
+        self.refspecs = utils.as_list(refspecs or [])
 
     @utils.cached.instance
     def _get_git_folder(self):
@@ -72,18 +78,41 @@ class GitRepository(object):
     def head(self):
         return self._head() if self.is_cloned() else ""
 
-    @utils.cached.instance
-    def diff_hash(self, path="/"):
-        return utils.sha1(self.diff(path))
+    def write_tree(self):
+        tools = Tools()
+        index = fs.path.join(self.path, ".git", "jolt-index")
+        gitpath = fs.path.dirname(index)
 
-    @utils.cached.instance
+        tree = _tree.get(gitpath)
+        if tree is not None:
+            return tree
+
+        with tools.environ(GIT_INDEX_FILE=index):
+            with tools.cwd(gitpath):
+                tools.copy("index", "jolt-index")
+            with tools.cwd(fs.path.dirname(gitpath)):
+                _tree[gitpath] = tree = tools.run("git add -u && git write-tree", output_on_error=True)
+
+        return tree
+
     def tree_hash(self, sha="HEAD", path="/"):
-        with self.tools.cwd(self.path):
-            try:
-                return self.tools.run("git rev-parse {0}:.{1}".format(sha, path), output=False)
-            except:
-                self.fetch()
-                return self.tools.run("git rev-parse {0}:.{1}".format(sha, path), output_on_error=True)
+        full_path = fs.path.join(self.path, path)
+        value = _tree_hash_cache.get((full_path, sha))
+        if value is None:
+            if sha == "HEAD":
+                tree = self.write_tree()
+            else:
+                try:
+                    tree = self.tools.run("git rev-parse {0}^{tree}".format(sha), output=False)
+                except:
+                    self.fetch()
+                    tree = self.tools.run("git rev-parse {0}^{tree}".format(sha), output_on_error=True)
+            if path == "/":
+                return tree
+            with self.tools.cwd(self.path):
+                _tree_hash_cache[(full_path, sha)] = value = self.tools.run(
+                    "git rev-parse {0}:{1}".format(tree, path), output=False)
+        return value
 
     def clean(self):
         with self.tools.cwd(self.path):
@@ -110,15 +139,12 @@ class GitRepository(object):
                 return self.tools.run("git checkout -f {rev}", rev=rev, output_on_error=True)
 
 
-_repositories = {}
+class LocalGitRepository(GitRepository):
+    def fetch(self):
+        pass
 
-def _create_repo(url, path, relpath, refspecs=None):
-    repo = _repositories.get(relpath)
-    if not repo:
-        repo = GitRepository(url, path, relpath, refspecs)
-        _repositories[relpath] = repo
-    return repo
-
+    def clone(self):
+        raise_error("attempt to clone local git repository at '{}'", self.relpath)
 
 
 class GitInfluenceProvider(HashInfluenceProvider):
@@ -126,37 +152,38 @@ class GitInfluenceProvider(HashInfluenceProvider):
 
     def __init__(self, path):
         super(GitInfluenceProvider, self).__init__()
-        self.relpath = path
+        self.path = fs.path.join(self.joltdir, path)
 
     @property
-    def path(self):
-        return fs.path.join(JoltLoader.get().joltdir, self.relpath)
+    def joltdir(self):
+        return JoltLoader.get().joltdir
 
-    def diff(self, tools):
-        with tools.cwd(self.path):
-            return tools.run("git diff --no-ext-diff HEAD .", output=False)
-
-    def diff_hash(self, tools):
-        return utils.sha1(self.diff(tools))
-
-    def tree_hash(self, tools, sha="HEAD", path="/"):
-        with tools.cwd(self.path):
-            return tools.run("git rev-parse {0}:.{1}".format(sha, path), output=False)
+    def _find_dotgit(self, path):
+        while path != self.joltdir:
+            if fs.path.isdir(fs.path.join(path, ".git")):
+                return path
+            path = fs.path.dirname(path)
+        raise_error("no git repository found at '{}'", self.path)
 
     @utils.cached.instance
     def get_influence(self, task):
         tools = Tools(task)
-        if not fs.path.exists(tools.expand_path(self.path)):
-            return "{0}:N/A".format(tools.expand(self.relpath))
+
+        path = tools.expand_path(self.path)
+        git_abs = self._find_dotgit(path)
+        git_rel = git_abs[len(self.joltdir)+1:]
+        relpath = path[len(git_abs)+1:]
+
+        if not fs.path.exists(path):
+            return "{0}/{1}: N/A".format(git_rel, relpath)
         try:
-            return "{0}:{1}:{2}".format(
-                tools.expand(self.relpath),
-                self.tree_hash(tools),
-                self.diff_hash(tools)[:8])
+            git = LocalGitRepository(None, git_abs, git_rel)
+
+            return "{0}/{1}: {2}".format(git_rel, relpath, git.tree_hash(path=relpath or "/"))
         except JoltCommandError as e:
             stderr = "\n".join(e.stderr)
             if "exists on disk, but not in" in stderr:
-                return "{0}:N/A".format(tools.expand(self.relpath))
+                return "{0}/{1}: N/A".format(git_rel, relpath)
             for line in e.stderr:
                 log.stderr(line)
             raise e
@@ -253,9 +280,8 @@ class Git(GitSrc, HashInfluenceProvider):
         rev = self._get_revision()
         if rev is not None:
             return self.git.tree_hash(rev)
-        return "{0}:{1}:{2}".format(
+        return "{0}: {1}".format(
             self.git.relpath,
-            self.git.tree_hash(),
-            self.git.diff_hash()[:8])
+            self.git.tree_hash())
 
 TaskRegistry.get().add_task_class(Git)

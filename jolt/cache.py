@@ -264,6 +264,7 @@ class Artifact(object):
         self._modified = datetime.now()
         self._expires = node.task.expires
         self._size = 0
+        self._influence = None
         ArtifactAttributeSetRegistry.create_all(self)
         try:
             self._read_manifest()
@@ -293,7 +294,10 @@ class Artifact(object):
         content["identity"] = self._node.identity
         content["requires"] = self._node.task.requires
         content["parameters"] = self._node.task._get_parameters()
-        content["influence"] = influence.HashInfluenceRegistry.get().get_strings(self._node.task)
+        if self._influence is not None:
+            content["influence"] = self._influence
+        else:
+            content["influence"] = influence.HashInfluenceRegistry.get().get_strings(self._node.task)
         content["created"] = self._created
         content["modified"] = datetime.now()
         content["expires"] = self._expires.value
@@ -332,6 +336,7 @@ class Artifact(object):
         self._created = content.get("created", datetime.now())
         self._modified = content.get("modified", datetime.now())
         self._evictable = content.get("evictable", True)
+        self._influence = content.get("influence", [])
         self._expires = ArtifactEvictionStrategyRegister.get().find(
             content.get("expires", "immediately"))
         ArtifactAttributeSetRegistry.parse_all(self, content)
