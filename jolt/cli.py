@@ -3,7 +3,7 @@ import imp
 import subprocess
 import sys
 import webbrowser
-from os import _exit
+from os import _exit, environ
 
 from jolt.tasks import TaskRegistry, Parameter
 from jolt import scheduler
@@ -76,6 +76,7 @@ def cli(ctx, verbose, extra_verbose, config_file, debug, profile):
     global debug_enabled
     debug_enabled = debug
 
+    log.verbose("Jolt host: {}", environ.get("HOSTNAME", "localhost"))
     log.verbose("Jolt install path: {}", fs.path.dirname(__file__))
 
     manifest = JoltManifest()
