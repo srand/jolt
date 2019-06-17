@@ -175,7 +175,7 @@ class BooleanParameter(Parameter):
         """
         default = str(default).lower() if default is not None else None
         super(BooleanParameter, self).__init__(
-            default, values=["false", "true", "0", "1"],
+            default, values=["false", "true", "0", "1", "no", "yes"],
             required=required, const=const, help=help)
 
     def set_value(self, value):
@@ -183,7 +183,7 @@ class BooleanParameter(Parameter):
 
         Args:
             value (boolean): The new parameter value. Accepted values are:
-                False, True, "false, and "true", 0 and 1.
+                False, True, "false, and "true", 0 and 1, "no" and "yes".
 
         Raises:
             ValueError: If the parameter is assigned an illegal value.
@@ -194,7 +194,7 @@ class BooleanParameter(Parameter):
     @property
     def is_true(self):
         """ The parameter value is True. """
-        return str(self.get_value()) in ["true", "1"]
+        return str(self.get_value()) in ["true", "1", "yes"]
 
     @property
     def is_false(self):
