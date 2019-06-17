@@ -707,8 +707,12 @@ class CacheStats(object):
 
     @locked
     def remove(self, artifact):
-        del self.stats[artifact["identity"]]
-        self.save()
+        try:
+            del self.stats[artifact["identity"]]
+        except KeyError as e:
+            log.verbose("Eviction from artifact DB failed: {}", e)
+        else:
+            self.save()
 
     def is_expired(self, artifact):
         if not self.stats:
