@@ -742,7 +742,10 @@ class CacheStats(object):
 
         for target in nt:
             path = fs.path.join(self.cache.root, target["name"], target["identity"])
-            content, _ = Artifact.load_manifest(path)
+            try:
+                content, _ = Artifact.load_manifest(path)
+            except FileNotFoundError as e:
+                continue
             content["used"] = target["used"]
             strategy = ArtifactEvictionStrategyRegister.get().find(
                 content.get("expires", "immediately"))
