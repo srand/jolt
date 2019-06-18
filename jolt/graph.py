@@ -390,8 +390,9 @@ class GraphBuilder(object):
         node = self.nodes.get(name)
         if not node:
             task = self.registry.get_task(name)
-            node = self._build_node(TaskProxy(task, self.graph))
-            self.nodes[name] = node
+            node = TaskProxy(task, self.graph)
+            node = self.nodes.get(node.qualified_name) or self._build_node(node)
+            self.nodes[node.qualified_name] = node
         return node
 
     def _build_node(self, node):

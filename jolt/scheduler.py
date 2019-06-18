@@ -186,6 +186,7 @@ class ExecutorRegistry(object):
         self._options = options or JoltOptions()
         self._factories = [factory(self._options) for factory in self.__class__.executor_factories]
         self._local_factory = LocalExecutorFactory(self._options)
+        self._concurrent_factory = ConcurrentLocalExecutorFactory(self._options)
         self._extensions = [factory().create() for factory in self.__class__.extension_factories]
 
     def shutdown(self):
@@ -193,12 +194,14 @@ class ExecutorRegistry(object):
             factory.shutdown()
 
     def create_skipper(self, task):
-        return SkipTask(self._local_factory, task)
+        return SkipTask(self._concurrent_factory, task)
 
     def create_downloader(self, task):
+        # TODO: Switch to concurrent factory once the progress bar can handle it
         return Downloader(self._local_factory, task)
 
     def create_uploader(self, task):
+        # TODO: Switch to concurrent factory once the progress bar can handle it
         return Uploader(self._local_factory, task)
 
     def create_local(self, task):
@@ -272,6 +275,15 @@ class LocalExecutorFactory(ExecutorFactory):
 
     def create(self, task):
         return LocalExecutor(self, task)
+
+
+class ConcurrentLocalExecutorFactory(ExecutorFactory):
+    def __init__(self, options=None):
+        super(ConcurrentLocalExecutorFactory, self).__init__()
+        self._options = options or JoltOptions()
+
+    def create(self, task):
+        raise NotImplementedError()
 
 
 class NetworkExecutorFactory(ExecutorFactory):
