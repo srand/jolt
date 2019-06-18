@@ -1,6 +1,7 @@
 from contextlib import contextmanager
 import hashlib
 import networkx as nx
+from os import getenv
 from threading import RLock
 
 from jolt.tasks import Resource, Export
@@ -282,6 +283,8 @@ class TaskProxy(object):
 
             if force_build or not available_locally:
                 with log.threadsink() as buildlog:
+                    log.verbose("Host: {0}", getenv("HOSTNAME", "localhost"))
+
                     with cache.get_context(self) as context:
                         with self.tools.cwd(self.task.joltdir):
                             self.task.run(context, self.tools)
