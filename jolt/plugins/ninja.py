@@ -851,6 +851,7 @@ class CXXExecutable(CXXProject):
         self.ldflags = utils.as_list(utils.call_or_return(self, self.__class__._ldflags))
         self.libpaths = utils.as_list(utils.call_or_return(self, self.__class__._libpaths))
         self.libraries = utils.as_list(utils.call_or_return(self, self.__class__._libraries))
+        self.strip = utils.call_or_return(self, self.__class__._strip)
 
     def _populate_inputs(self, writer, deps, tools):
         self.depimports += self.toolchain.depimport.build(self, writer, deps)
@@ -858,6 +859,9 @@ class CXXExecutable(CXXProject):
 
     def _populate_project(self, writer, deps, tools):
         self.toolchain.linker.build(self, writer, self.objects)
+
+    def _strip(self):
+        return utils.call_or_return(self, self.__class__.strip)
 
     def _ldflags(self):
         return utils.call_or_return(self, self.__class__.ldflags)
