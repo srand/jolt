@@ -211,9 +211,7 @@ def build(ctx, task, network, keep_going, identity, default, local,
         root = dag.select(lambda graph, task: task.identity.startswith(identity))
         raise_error_if(len(root) < 1, "unknown hash identity, no such task '{0}'", identity)
 
-    goal_tasks = dag.select(
-        lambda graph, node: node.short_qualified_name in task or \
-        node.qualified_name in task)
+    goal_tasks = dag.roots
 
     queue = scheduler.TaskQueue(strategy)
 

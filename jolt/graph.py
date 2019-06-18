@@ -314,6 +314,11 @@ class Graph(nx.DiGraph):
         with self._mutex:
             return [n for n in self.nodes]
 
+    @property
+    def roots(self):
+        with self._mutex:
+            return [n for n in self.nodes if self.is_root(n)]
+
     def has_tasks(self):
         with self._mutex:
             return len(self.nodes) > 0
