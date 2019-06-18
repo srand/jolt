@@ -299,7 +299,7 @@ class LocalStrategy(ExecutionStrategy):
         return self.executors.create_local(task)
 
 
-class DistributedStrategy(ExecutionStrategy):
+class CollaborativeDistributedStrategy(ExecutionStrategy):
     def __init__(self, executors, cache):
         self.executors = executors
         self.cache = cache
@@ -342,6 +342,36 @@ class DistributedStrategy(ExecutionStrategy):
                 return self.executors.create_network(task)
             else:
                 return self.executors.create_local(task)
+
+        return self.executors.create_network(task)
+
+
+class DistributedStrategy(ExecutionStrategy):
+    def __init__(self, executors, cache):
+        self.executors = executors
+        self.cache = cache
+
+    def create_executor(self, task):
+        if task.is_resource():
+            return self.executors.create_local(task)
+
+        if not task.is_cacheable():
+            return self.executors.create_network(task)
+
+        remote = task.is_available_remotely(self.cache)
+        if remote:
+            if task.is_goal() and self.cache.download_enabled() and \
+               not task.is_available_locally(self.cache):
+                return self.executors.create_downloader(task)
+            return self.executors.create_skipper(task)
+        else:
+            if task.is_available_locally(self.cache):
+                if self.cache.upload_enabled():
+                    if task.is_uploadable(self.cache):
+                        return self.executors.create_uploader(task)
+
+        if not task.is_goal():
+            task.disable_download()
 
         return self.executors.create_network(task)
 

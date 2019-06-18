@@ -846,6 +846,8 @@ class ArtifactCache(StorageProvider):
         if self.is_available_locally(node):
             node.info("Download skipped, already in local cache")
             return True
+        if not node.is_downloadable():
+            return True
         for provider in self.storage_providers:
             if provider.download(node, force):
                 with self.get_artifact(node) as artifact:

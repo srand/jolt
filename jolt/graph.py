@@ -30,6 +30,8 @@ class TaskProxy(object):
         self._completed = False
         self._identity = None
         self._frozen = False
+        self._goal = False
+        self._download = True
 
     def __hash__(self):
         return id(self)
@@ -150,6 +152,12 @@ class TaskProxy(object):
         tasks = [self] + self.extensions
         return all(map(cache.is_uploadable, tasks))
 
+    def is_downloadable(self):
+        return self._download
+
+    def disable_download(self):
+        self._download = False
+
     def is_fast(self):
         tasks = [self.task] + [e.task for e in self.extensions]
         return all([task.fast for task in tasks])
@@ -171,6 +179,12 @@ class TaskProxy(object):
 
     def set_in_progress(self):
         self._in_progress = True
+
+    def is_goal(self):
+        return self._goal
+
+    def set_goal(self):
+        self._goal = True
 
     def finalize(self, dag, manifest):
         log.verbose("Finalizing: " + self.short_qualified_name)
@@ -418,6 +432,9 @@ class GraphBuilder(object):
                 for node in reversed(list(nx.topological_sort(self.graph))):
                     node.finalize(self.graph, self.manifest)
                     p.update(1)
+
+        for root in self.graph.roots:
+            root.set_goal()
 
         return self.graph
 
