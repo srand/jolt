@@ -822,6 +822,7 @@ CXXLibrary.__doc__ += CXXProject.__doc__
 @influence.attribute("ldflags")
 @influence.attribute("libpaths")
 @influence.attribute("libraries")
+@influence.attribute("strip")
 class CXXExecutable(CXXProject):
     """
     Builds a C/C++ executable.
@@ -842,6 +843,8 @@ class CXXExecutable(CXXProject):
     publishdir = "bin/"
     """ The artifact path where the binary is published. """
 
+    strip = True
+    """ Strip binary from debug information. """
 
     def __init__(self, *args, **kwargs):
         super(CXXExecutable, self).__init__(*args, **kwargs)
@@ -871,7 +874,8 @@ class CXXExecutable(CXXProject):
                 artifact.collect(self.binary + '.exe', self.publishdir)
             else:
                 artifact.collect(self.binary, self.publishdir)
-                artifact.collect(".debug", self.publishdir)
+                if not self.strip:
+                    artifact.collect(".debug", self.publishdir)
         artifact.environ.PATH.append(self.publishdir)
         artifact.strings.executable = fs.path.join(
             self.publishdir, self.binary)
