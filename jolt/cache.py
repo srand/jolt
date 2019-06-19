@@ -516,7 +516,9 @@ class Artifact(object):
         with self.tools.cwd(self._path):
             files = self.tools.glob(pathname)
         for src in files:
-            srcs = fs.scandir(src) if fs.path.isdir(src) and flatten else [src]
+            with self.tools.cwd(self._path):
+                srcs = self.tools.glob(src) \
+                    if fs.path.isdir(fs.path.join(self._path, src)) and flatten else [src]
             for src in srcs:
                 destfile = fs.path.join(dest, src) \
                            if not flatten else \
