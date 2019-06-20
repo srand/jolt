@@ -59,7 +59,12 @@ class TaskAttributeInfluence(HashInfluenceProvider):
         self.name = attrib.title()
 
     def get_influence(self, task):
-        return utils.getattr_safe(task, tools.Tools(task).expand(self._attrib), "N/A")
+        value = utils.getattr_safe(task, tools.Tools(task).expand(self._attrib), "N/A")
+        try:
+            value = value.__get__(task)
+        except AttributeError:
+            pass
+        return value
 
 
 def attribute(name):
