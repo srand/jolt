@@ -1,6 +1,23 @@
 Reference
 ===========
 
+Alias
+--------
+
+.. reference-alias-start
+
+.. autoclass:: jolt.Alias
+
+    .. attribute:: name
+
+      Name of the alias. Derived from class name if not set.
+
+    .. attribute:: requires = []
+
+      List of dependencies to other tasks.
+
+.. reference-alias-end
+
 Artifact
 --------
 

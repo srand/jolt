@@ -730,6 +730,33 @@ class Resource(Task):
         self._run_env = env
 
 
+class Alias(Task):
+    """
+    An alias task.
+
+    Aliases are a special kind of task which can be used to introduce new
+    names for other tasks or groups of tasks. They are useful as milestones
+    when building continuous integration pipelines since they won't
+    be executed, thus saving time compared to a regular task.
+    """
+
+    cacheable = False
+
+    abstract = True
+    """ An abstract alias class indended to be subclassed. """
+
+    def __init__(self, *args, **kwargs):
+        super(Alias, self).__init__(*args, **kwargs)
+        raise_task_error_if(
+            self.extends, self, "aliases cannot be extensions")
+
+    def is_runnable(self):
+        return False
+
+    def info(self, fmt, *args, **kwargs):
+        pass
+
+
 class TaskException(Exception):
     def __init__(self, *args, **kwargs):
         super(TaskException, self).__init__(*args, **kwargs)

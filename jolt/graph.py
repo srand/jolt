@@ -4,7 +4,7 @@ import networkx as nx
 from os import getenv
 from threading import RLock
 
-from jolt.tasks import Resource, Export
+from jolt.tasks import Alias, Resource, Export
 #from jolt.utils import *
 from jolt.influence import HashInfluenceRegistry
 from jolt import log
@@ -115,6 +115,9 @@ class TaskProxy(object):
     def is_cacheable(self):
         return self.task.is_cacheable()
 
+    def is_alias(self):
+        return isinstance(self.task, Alias)
+
     def is_resource(self):
         return isinstance(self.task, Resource)
 
@@ -158,6 +161,8 @@ class TaskProxy(object):
 
     def disable_download(self):
         self._download = False
+        for extension in self.extensions:
+            extension.disable_download()
 
     def is_fast(self):
         tasks = [self.task] + [e.task for e in self.extensions]
@@ -196,10 +201,14 @@ class TaskProxy(object):
             nx.descendants(dag, self),
             key=lambda t: t.qualified_name)
 
-        # Exclude transitive resources dependencies
+        # Find all direct dependencies
+        self.neighbors = list(
+            filter(lambda n: dag.are_neighbors(self, n), self.descendants))
+
+        # Exclude transitive alias and resources dependencies
         self.children = list(
-            filter(lambda n: not n.is_resource() or \
-                   dag.are_neighbors(self, n),
+            filter(lambda n: not n.is_alias() and (not n.is_resource() or \
+                   dag.are_neighbors(self, n)),
                    self.descendants))
 
         self.ancestors = nx.ancestors(dag, self)
@@ -437,8 +446,14 @@ class GraphBuilder(object):
                     node.finalize(self.graph, self.manifest)
                     p.update(1)
 
+        self.graph.goals = []
         for root in self.graph.roots:
             root.set_goal()
+            self.graph.goals.append(root)
+            if root.is_alias():
+                for root_alias in root.neighbors:
+                    root_alias.set_goal()
+                    self.graph.goals.append(root_alias)
 
         return self.graph
 

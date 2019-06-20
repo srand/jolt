@@ -302,6 +302,8 @@ class LocalStrategy(ExecutionStrategy):
         self.cache = cache
 
     def create_executor(self, task):
+        if task.is_alias():
+            return self.executors.create_skipper(task)
         if not task.is_cacheable():
             return self.executors.create_local(task)
         if task.is_available_locally(self.cache):
@@ -319,6 +321,9 @@ class CollaborativeDistributedStrategy(ExecutionStrategy):
     def create_executor(self, task):
         if task.is_resource():
             return self.executors.create_local(task)
+
+        if task.is_alias():
+            return self.executors.create_skipper(task)
 
         if not task.is_cacheable():
             return self.executors.create_network(task)
@@ -367,6 +372,9 @@ class DistributedStrategy(ExecutionStrategy):
         if task.is_resource():
             return self.executors.create_local(task)
 
+        if task.is_alias():
+            return self.executors.create_skipper(task)
+
         if not task.is_cacheable():
             return self.executors.create_network(task)
 
@@ -396,6 +404,9 @@ class WorkerStrategy(ExecutionStrategy):
     def create_executor(self, task):
         if task.is_resource():
             return self.executors.create_local(task)
+
+        if task.is_alias():
+            return self.executors.create_skipper(task)
 
         raise_task_error_if(
             not self.cache.upload_enabled(), task,
