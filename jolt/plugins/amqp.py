@@ -594,7 +594,7 @@ class AmqpExecutor(scheduler.NetworkExecutor):
 
         for task in tasks:
             mt = build.create_task()
-            mt.name = self.task.qualified_name
+            mt.name = task
 
         for task in self.factory.options.default:
             default = build.create_default()
