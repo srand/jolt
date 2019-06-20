@@ -292,7 +292,8 @@ class TaskProxy(object):
 
             if force_build or not available_locally:
                 with log.threadsink() as buildlog:
-                    log.verbose("Host: {0}", getenv("HOSTNAME", "localhost"))
+                    if self.task.is_runnable():
+                        log.verbose("Host: {0}", getenv("HOSTNAME", "localhost"))
 
                     with cache.get_context(self) as context:
                         with self.tools.cwd(self.task.joltdir):
