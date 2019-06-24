@@ -369,10 +369,7 @@ class DistributedStrategy(ExecutionStrategy):
         self.cache = cache
 
     def create_executor(self, task):
-        if task.is_resource():
-            return self.executors.create_local(task)
-
-        if task.is_alias():
+        if task.is_resource() or task.is_alias():
             return self.executors.create_skipper(task)
 
         if not task.is_cacheable():
