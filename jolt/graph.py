@@ -372,7 +372,7 @@ class Graph(nx.DiGraph):
         with self._mutex:
             log.verbose("[GRAPH] Listing all nodes")
             for node in nx.topological_sort(self):
-                log.verbose("[GRAPH]   " + node.qualified_name)
+                log.verbose("[GRAPH]   " + node.qualified_name + " ({})", self.out_degree(node))
 
     def is_leaf(self, node):
         with self._mutex:
@@ -466,3 +466,45 @@ class GraphBuilder(object):
             write_dot(self.graph, fs.path.join(t.getcwd(), 'graph.dot'))
             t.run('dot -Tsvg graph.dot -o graph.svg')
             t.run('eog graph.svg')
+
+
+class PruneStrategy(object):
+    def should_prune_requirements(self, task):
+        raise NotImplementedError()
+
+
+class GraphPruner(object):
+    def __init__(self, strategy):
+        self.strategy = strategy
+        self.retained = set()
+        self.visited = set()
+
+    def _check_node(self, node):
+        if node in self.visited:
+            return
+        self.visited.add(node)
+        self.retained.add(node)
+
+        prune = self.strategy.should_prune_requirements(node)
+        if not node.task.selfsustained or not prune:
+            for child in node.neighbors:
+                self._check_node(child)
+
+    def prune(self, graph):
+        for root in graph.roots:
+            self._check_node(root)
+
+        pruned = []
+
+        for node in graph:
+            if node not in self.retained:
+                log.verbose("Excluded: {}", node.short_qualified_name)
+                pruned.append(node)
+            else:
+                log.verbose("Retained: {}", node.short_qualified_name)
+                node.children = [c for c in node.children if c in self.retained]
+
+        for node in pruned:
+            graph.remove_node(node)
+
+        return graph

@@ -829,7 +829,7 @@ class CXXExecutable(CXXProject):
     """
 
     abstract = True
-
+    selfsustained = True
 
     libpaths = []
     """ A list of library search paths used when linking. """

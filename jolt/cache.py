@@ -776,6 +776,7 @@ class ArtifactCache(StorageProvider):
             factory.create(self)
             for factory in ArtifactCache.storage_provider_factories]
         self._options = options or JoltOptions()
+        self._remote_identity_cache = set()
         self._lockfile = utils.LockFile(
             fs.path.join(self.root),
             log.info, "Another instance of Jolt is already running, waiting for it to complete...")
@@ -824,8 +825,11 @@ class ArtifactCache(StorageProvider):
             return True
         if not node.task.is_cacheable():
             return False
+        if node.identity in self._remote_identity_cache:
+            return True
         for provider in self.storage_providers:
             if provider.location(node):
+                self._remote_identity_cache.add(node.identity)
                 return True
         return False
 

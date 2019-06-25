@@ -418,6 +418,21 @@ class TaskBase(object):
     requires = []
     """ List of dependencies to other tasks. """
 
+    selfsustained = False
+    """ The task is self-sustained and consumed independently of its requirements.
+
+    Requirements of a self-sustained task will be pruned if the task artifact
+    is present in a cache. In other words, if the task is not executed its
+    requirements are considered unnecessary.
+
+    For example, consider the task graph A -> B -> C. If B is self-sustained
+    and present in a cache, C will never be executed and will not be an implicit
+    transitive requirement of A. If A requires C, it should be listed as an
+    explicit requirement.
+
+    Using this attribute speeds up execution and reduces network
+    traffic by allowing the task graph to be reduced.
+    """
 
     def __init__(self, parameters=None, **kwargs):
         self._identity = None
@@ -438,10 +453,14 @@ class TaskBase(object):
         self.influence.append(TaskSourceInfluence("run"))
         self.influence.append(TaskSourceInfluence("unpack"))
         self.requires = self.expand(utils.call_or_return_list(self, self.__class__._requires))
+        self.selfsustained = utils.call_or_return(self, self.__class__._selfsustained)
         self.tools = Tools(self, self.joltdir)
 
     def _requires(self):
         return utils.call_or_return_list(self, self.__class__.requires)
+
+    def _selfsustained(self):
+        return utils.call_or_return(self, self.__class__.selfsustained)
 
     def _get_source(self, func):
         source, lines = inspect.getsourcelines(func)

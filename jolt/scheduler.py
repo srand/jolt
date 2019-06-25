@@ -9,11 +9,12 @@ except:
 
 from jolt import log
 from jolt import utils
-from jolt.options import JoltOptions
-from jolt.manifest import ManifestExtension
-from jolt.manifest import ManifestExtensionRegistry
 from jolt.error import raise_error
 from jolt.error import raise_task_error_if
+from jolt.graph import PruneStrategy
+from jolt.manifest import ManifestExtension
+from jolt.manifest import ManifestExtensionRegistry
+from jolt.options import JoltOptions
 
 
 class JoltEnvironment(object):
@@ -296,7 +297,7 @@ class ExecutionStrategy(object):
         raise NotImplemented()
 
 
-class LocalStrategy(ExecutionStrategy):
+class LocalStrategy(ExecutionStrategy, PruneStrategy):
     def __init__(self, executors, cache):
         self.executors = executors
         self.cache = cache
@@ -312,8 +313,17 @@ class LocalStrategy(ExecutionStrategy):
             return self.executors.create_downloader(task)
         return self.executors.create_local(task)
 
+    def should_prune_requirements(self, task):
+        if task.is_alias() or not task.is_cacheable():
+            return False
+        if task.is_available_locally(self.cache):
+            return True
+        if self.cache.download_enabled() and task.is_available_remotely(self.cache):
+            return True
+        return False
 
-class CollaborativeDistributedStrategy(ExecutionStrategy):
+
+class CollaborativeDistributedStrategy(ExecutionStrategy, PruneStrategy):
     def __init__(self, executors, cache):
         self.executors = executors
         self.cache = cache
@@ -362,8 +372,17 @@ class CollaborativeDistributedStrategy(ExecutionStrategy):
 
         return self.executors.create_network(task)
 
+    def should_prune_requirements(self, task):
+        if task.is_alias() or not task.is_cacheable():
+            return False
+        if self.cache.upload_enabled() and task.is_available_locally(self.cache):
+            return True
+        if self.cache.download_enabled() and task.is_available_remotely(self.cache):
+            return True
+        return False
 
-class DistributedStrategy(ExecutionStrategy):
+
+class DistributedStrategy(ExecutionStrategy, PruneStrategy):
     def __init__(self, executors, cache):
         self.executors = executors
         self.cache = cache
@@ -392,8 +411,15 @@ class DistributedStrategy(ExecutionStrategy):
 
         return self.executors.create_network(task)
 
+    def should_prune_requirements(self, task):
+        if task.is_alias() or not task.is_cacheable():
+            return False
+        if task.is_available_remotely(self.cache):
+            return True
+        return False
 
-class WorkerStrategy(ExecutionStrategy):
+
+class WorkerStrategy(ExecutionStrategy, PruneStrategy):
     def __init__(self, executors, cache):
         self.executors = executors
         self.cache = cache
@@ -423,6 +449,14 @@ class WorkerStrategy(ExecutionStrategy):
 
         return self.executors.create_local(task)
 
+    def should_prune_requirements(self, task):
+        if task.is_alias() or not task.is_cacheable():
+            return False
+        if task.is_available_locally(self.cache):
+            return True
+        if task.is_available_remotely(self.cache):
+            return True
+        return False
 
 
 class TaskIdentityExtension(ManifestExtension):
