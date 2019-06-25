@@ -6,7 +6,7 @@ from threading import RLock
 
 from jolt.tasks import Alias, Resource, Export
 #from jolt.utils import *
-from jolt.influence import HashInfluenceRegistry
+from jolt.influence import ForcedInfluenceProvider, HashInfluenceRegistry
 from jolt import log
 from jolt import utils
 from jolt import colors
@@ -225,6 +225,11 @@ class TaskProxy(object):
                 export.assign(attrib.value)
 
         return self.identity
+
+    def taint(self, salt=None):
+        self.task.influence.append(ForcedInfluenceProvider(salt))
+        self._identity = None
+        self.identity
 
     def started(self, what="Execution"):
         self.task.info(colors.blue(what + " started " + self.log_name))

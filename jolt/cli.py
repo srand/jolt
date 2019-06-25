@@ -127,12 +127,13 @@ def _autocomplete_tasks(ctx, args, incomplete):
 @click.option("--worker", is_flag=True, default=False,
               help="Run with the worker build strategy", hidden=True)
 @click.option("-d", "--default", type=str, multiple=True, help="Override default parameter values.")
-@click.option("-f", "--force", is_flag=True, default=False, help="Force rebuild (taint hash).")
+@click.option("-f", "--force", is_flag=True, default=False, help="Force rebuild of target tasks.")
+@click.option("-s", "--salt", type=str, help="Add salt as task influence.")
 @click.option("-c", "--copy", type=click.Path(),
               help="Copy artifact content to this directory upon completion.")
 @click.pass_context
 def build(ctx, task, network, keep_going, identity, default, local,
-          no_download, no_upload, download, upload, worker, force, copy):
+          no_download, no_upload, download, upload, worker, force, salt, copy):
     """
     Execute specified task.
 
@@ -163,8 +164,8 @@ def build(ctx, task, network, keep_going, identity, default, local,
         if upload:
             _upload = True
 
-    if force:
-        taint()
+    if salt:
+        taint(salt)
 
     options = JoltOptions(network=network,
                           local=local,
@@ -203,6 +204,10 @@ def build(ctx, task, network, keep_going, identity, default, local,
 
     gb = graph.GraphBuilder(registry, manifest, progress=True)
     dag = gb.build(task)
+
+    if force:
+        for goal in dag.goals:
+            goal.taint()
 
     # Inform cache about what task artifacts we will need.
     acache.advise(dag.tasks)
