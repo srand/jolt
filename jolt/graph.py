@@ -22,6 +22,7 @@ class TaskProxy(object):
         self.graph = graph
         self.children = []
         self.ancestors = []
+        self.neighbors = []
         self.extensions = []
         self.duration_queued = None
         self.duration_running = None
