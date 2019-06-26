@@ -40,12 +40,13 @@ class GitRepository(object):
         return True
 
     def clone(self):
-        raise_error_if(
-            fs.path.exists(self.path),
-            "git: destination folder '{0}' already exists and is not a git repository",
-            self.path)
         log.info("Cloning into {0}", self.path)
-        self.tools.run("git clone {0} {1}", self.url, self.path, output_on_error=True)
+        if fs.path.exists(self.path):
+            with self.tools.cwd(self.path):
+                self.tools.run("git init && git remote add origin {} && git fetch",
+                               self.url, output_on_error=True)
+        else:
+            self.tools.run("git clone {0} {1}", self.url, self.path, output_on_error=True)
         raise_error_if(
             not fs.path.exists(self._get_git_folder()),
             "git: failed to clone repository '{0}'", self.relpath)
