@@ -98,8 +98,8 @@ class TaskProxy(object):
     def info(self, fmt, *args, **kwargs):
         self.task.info(fmt + " " + self.log_name, *args, **kwargs)
 
-    def warn(self, fmt, *args, **kwargs):
-        self.task.warn(fmt + " " + self.log_name, *args, **kwargs)
+    def warning(self, fmt, *args, **kwargs):
+        self.task.warning(fmt + " " + self.log_name, *args, **kwargs)
 
     def error(self, fmt, *args, **kwargs):
         self.task.error(fmt + " " + self.log_name, *args, **kwargs)
