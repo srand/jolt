@@ -253,7 +253,7 @@ class TaskProxy(object):
         try:
             self.graph.remove_node(self)
         except:
-            self.warn("Pruned task was executed")
+            self.warning("Pruned task was executed")
         self.task.info(colors.green(what + " finished after {0} {1}" + self.log_name),
                        self.duration_running,
                        self.duration_queued.diff(self.duration_running))
@@ -264,7 +264,7 @@ class TaskProxy(object):
         try:
             self.graph.remove_node(self)
         except:
-            self.warn("Pruned task was executed")
+            self.warning("Pruned task was executed")
 
     def clean(self, cache, expired):
         with self.tools:
