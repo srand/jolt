@@ -467,7 +467,8 @@ class TaskBase(object):
         return "\n".join(source)
 
     def _create_exports(self):
-        for key, export in self.__class__.__dict__.items():
+        for key in dir(self):
+            export = utils.getattr_safe(self, key)
             if isinstance(export, Export):
                 export = copy.copy(export)
                 setattr(self, key, export)
