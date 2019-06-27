@@ -15,11 +15,15 @@ from jolt import tools
 from jolt import filesystem as fs
 from jolt.error import raise_error_if
 from jolt.error import raise_task_error_if
+from jolt.options import JoltOptions
+
 
 class TaskProxy(object):
-    def __init__(self, task, graph):
+    def __init__(self, task, graph, options):
         self.task = task
         self.graph = graph
+        self.options = options
+
         self.children = []
         self.ancestors = []
         self.neighbors = []
@@ -303,6 +307,9 @@ class TaskProxy(object):
 
                     with cache.get_context(self) as context:
                         with self.tools.cwd(self.task.joltdir):
+                            if self.is_goal() and self.options.debug:
+                                log.info("Entering debug shell")
+                                self.task.shell(context, self.tools)
                             self.task.run(context, self.tools)
 
                     if cache.is_available_locally(self):
@@ -398,18 +405,19 @@ class Graph(nx.DiGraph):
 
 
 class GraphBuilder(object):
-    def __init__(self, registry, manifest, progress=False):
+    def __init__(self, registry, manifest, options=None, progress=False):
         self.graph = Graph()
         self.nodes = {}
         self.registry = registry
         self.manifest = manifest
         self.progress = progress
+        self.options = options or JoltOptions()
 
     def _get_node(self, name):
         node = self.nodes.get(name)
         if not node:
             task = self.registry.get_task(name)
-            node = TaskProxy(task, self.graph)
+            node = TaskProxy(task, self.graph, self.options)
             node = self.nodes.get(node.qualified_name) or self._build_node(node)
             self.nodes[node.qualified_name] = node
         return node

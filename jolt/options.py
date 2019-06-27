@@ -3,11 +3,12 @@
 
 class JoltOptions(object):
     def __init__(self, **kwargs):
-        self.network = False
-        self.local = False
-        self.download = True
-        self.upload = True
-        self.keep_going = False
-        self.worker = False
+        self.debug = False
         self.default = []
+        self.download = True
+        self.keep_going = False
+        self.local = False
+        self.network = False
+        self.upload = True
+        self.worker = False
         self.__dict__.update(kwargs)

@@ -1,6 +1,7 @@
 import base64
 import copy
 import inspect
+import subprocess
 import unittest as ut
 
 from jolt import log
@@ -683,6 +684,16 @@ class Task(TaskBase):
         This hook is executed in the context of a consuming task.
         """
         raise NotImplementedError()
+
+    def shell(self, deps, tools):
+        """
+        Invoked to start a debug shell.
+
+        The environment will be prepared with attributes exported by
+        task requirements.
+        """
+        with tools.environ(PS1="jolt$ ") as env:
+            subprocess.call(["bash", "--norc"], env=env, cwd=tools._cwd)
 
 
 class Resource(Task):

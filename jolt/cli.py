@@ -129,16 +129,31 @@ def _autocomplete_tasks(ctx, args, incomplete):
 @click.option("-d", "--default", type=str, multiple=True, help="Override default parameter values.")
 @click.option("-f", "--force", is_flag=True, default=False, help="Force rebuild of target tasks.")
 @click.option("-s", "--salt", type=str, help="Add salt as task influence.")
+@click.option("-g", "--debug", is_flag=True, default=False,
+              help="Start debug shell before executing task.")
 @click.option("-c", "--copy", type=click.Path(),
               help="Copy artifact content to this directory upon completion.")
 @click.pass_context
 def build(ctx, task, network, keep_going, identity, default, local,
-          no_download, no_upload, download, upload, worker, force, salt, copy):
+          no_download, no_upload, download, upload, worker, force,
+          salt, copy, debug):
     """
     Execute specified task.
 
     <WIP>
     """
+    raise_error_if(network and local,
+                   "The -n and -l flags are mutually exclusive")
+
+    raise_error_if(network and debug,
+                   "The -g and -n flags are mutually exclusive")
+
+    raise_error_if(no_download and download,
+                   "The --download and --no-download flags are mutually exclusive")
+
+    raise_error_if(no_upload and upload,
+                   "The --upload and --no-upload flags are mutually exclusive")
+
     duration = utils.duration()
 
     task = list(task)
@@ -173,7 +188,8 @@ def build(ctx, task, network, keep_going, identity, default, local,
                           upload=_upload,
                           keep_going=keep_going,
                           default=default,
-                          worker=worker)
+                          worker=worker,
+                          debug=debug)
 
     acache = cache.ArtifactCache.get(options)
 
@@ -202,7 +218,7 @@ def build(ctx, task, network, keep_going, identity, default, local,
         for mt in mb.defaults:
             registry.set_default_parameters(mt.name)
 
-    gb = graph.GraphBuilder(registry, manifest, progress=True)
+    gb = graph.GraphBuilder(registry, manifest, options, progress=True)
     dag = gb.build(task)
 
     if force:

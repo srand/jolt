@@ -709,6 +709,48 @@ class CXXProject(Task):
             self._populate_project(writer, deps, tools)
             writer.close()
 
+    def _write_shell_file(self, basedir, deps, tools):
+        filepath = fs.path.join(basedir, "compile")
+        with open(filepath, "w") as fobj:
+            data = """#!/usr/bin/env python
+import sys
+import subprocess
+
+objects = {objects}
+
+def help():
+    print("usage: compile [-a] [-l] [target-pattern]")
+    print("")
+    print("  -a               Build all targets")
+    print("  -l               List all build targets")
+    print("  target-pattern   Compile build targets containing this substring")
+
+def main():
+    if len(sys.argv) <= 1:
+        help()
+    elif [arg for arg in sys.argv[1:] if arg == "-l"]:
+        for object in objects:
+            print(object)
+    elif [arg for arg in sys.argv[1:] if arg == "-a"]:
+        subprocess.call(["ninja", "-v"])
+    else:
+        targets = []
+        for arg in sys.argv[1:]:
+            matches = [t for t in objects if arg in t]
+            if not matches:
+                print("error: no such build target")
+            targets.extend(matches)
+        if not targets:
+            return
+        subprocess.call(["ninja", "-v"] + targets)
+
+if __name__ == "__main__":
+    main()
+
+"""
+            fobj.write(data.format(objects=self.objects))
+        tools.chmod(filepath, 0o777)
+
     def find_rule(self, ext):
         rule = self._rule_map.get(ext)
         if rule is None:
@@ -783,6 +825,17 @@ class CXXProject(Task):
         self._write_ninja_file(self.outdir, deps, tools)
         verbose = "-v" if log.is_verbose() else ""
         tools.run("ninja -C {0} {1}", self.outdir, verbose)
+
+    def shell(self, deps, tools):
+        self._expand_sources()
+        self.outdir = tools.builddir("ninja", self.incremental)
+        self._write_ninja_file(self.outdir, deps, tools)
+        self._write_shell_file(self.outdir, deps, tools)
+        pathenv = self.outdir + os.pathsep + tools.getenv("PATH")
+        with tools.cwd(self.outdir), tools.environ(PATH=pathenv):
+            print()
+            print("Use the 'compile' command to build individual compilation targets")
+            super(CXXProject, self).shell(deps, tools)
 
 
 @influence.attribute("shared")
