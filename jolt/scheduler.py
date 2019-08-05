@@ -90,9 +90,10 @@ class Executor(object):
 
 
 class LocalExecutor(Executor):
-    def __init__(self, factory, task, force_upload=False):
+    def __init__(self, factory, task, force_upload=False, force_build=False):
         super(LocalExecutor, self).__init__(factory)
         self.task = task
+        self.force_build = force_build
         self.force_upload = force_upload
 
     def run(self, env):
@@ -103,7 +104,10 @@ class LocalExecutor(Executor):
         try:
             self.task.started()
             self.task.running()
-            self.task.run(env.cache, self.force_upload)
+            self.task.run(
+                env.cache,
+                force_build=self.force_build,
+                force_upload=self.force_upload)
         except Exception as e:
             self.task.failed()
             log.exception()
@@ -205,8 +209,8 @@ class ExecutorRegistry(object):
         # TODO: Switch to concurrent factory once the progress bar can handle it
         return Uploader(self._local_factory, task)
 
-    def create_local(self, task):
-        return self._local_factory.create(task)
+    def create_local(self, task, force=False):
+        return self._local_factory.create(task, force=force)
 
     def create_network(self, task):
         for factory in self._factories:
@@ -274,8 +278,8 @@ class LocalExecutorFactory(ExecutorFactory):
         super(LocalExecutorFactory, self).__init__(max_workers=1)
         self._options = options or JoltOptions()
 
-    def create(self, task):
-        return LocalExecutor(self, task)
+    def create(self, task, force=False):
+        return LocalExecutor(self, task, force_build=force)
 
 
 class ConcurrentLocalExecutorFactory(ExecutorFactory):
@@ -439,6 +443,11 @@ class WorkerStrategy(ExecutionStrategy, PruneStrategy):
             return self.executors.create_local(task)
 
         if task.is_available_locally(self.cache):
+            if task.is_goal() and not task.is_available_remotely(self.cache):
+                if task.is_uploadable(self.cache):
+                    return self.executors.create_uploader(task)
+                else:
+                    return self.executors.create_local(task, force=True)
             return self.executors.create_skipper(task)
 
         if not self.cache.download_enabled():
