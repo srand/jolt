@@ -269,7 +269,7 @@ class GNUDepImporter(Rule):
              for lib in artifact.cxxinfo.libraries.items():
                  name = "{0}{1}{2}".format(self.prefix, lib, self.suffix)
                  for path in artifact.cxxinfo.libpaths.items():
-                     archive = fs.path.join(artifact.stable_path, path, name)
+                     archive = fs.path.join(artifact.path, path, name)
                      if fs.path.exists(archive):
                          archives.append(archive)
         return archives
@@ -343,7 +343,7 @@ class IncludePaths(Variable):
         def expand_artifact(artifact, path):
             if path[0] in ['=', fs.sep]:
                 return path
-            return fs.path.join(artifact.stable_path, path)
+            return fs.path.join(artifact.path, path)
 
         incpaths = [expand(path) for path in project.incpaths]
         for name, artifact in deps.items():
@@ -362,7 +362,7 @@ class LibraryPaths(Variable):
             return
         libpaths = [tools.expand_path(path) for path in project.libpaths]
         for name, artifact in deps.items():
-            libpaths += [fs.path.join(artifact.stable_path, path)
+            libpaths += [fs.path.join(artifact.path, path)
                          for path in artifact.cxxinfo.libpaths.items()]
         libpaths = ["{0}{1}".format(self.prefix, path) for path in libpaths]
         writer.variable(self.name, " ".join(libpaths))
