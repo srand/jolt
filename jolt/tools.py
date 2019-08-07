@@ -315,6 +315,9 @@ class Tools(object):
             fmt = "gztar"
             basename = filename[:-7]
         elif filename.endswith(".tgz"):
+            if shutil.which("tar") and shutil.which("pigz"):
+                self.run("tar -I pigz -cf {} -C {} .", filename, pathname)
+                return filename
             fmt = "gztar"
             basename = filename[:-4]
         elif filename.endswith(".tar.bz2"):
@@ -327,7 +330,9 @@ class Tools(object):
             not fmt, self._task,
             "unknown archive type '{0}'", fs.path.basename(filename))
         try:
-            shutil.make_archive(basename, fmt, root_dir=pathname)
+            outfile = shutil.make_archive(basename, fmt, root_dir=pathname)
+            if outfile != filename:
+                shutil.move(outfile, filename)
             return filename
         except Exception:
             raise_task_error(self._task, "failed to create archive from directory '{0}'", pathname)
