@@ -500,7 +500,7 @@ class GraphPruner(object):
         self.retained.add(node)
 
         prune = self.strategy.should_prune_requirements(node)
-        if not node.task.selfsustained or not prune:
+        if not node.task.selfsustained or not prune or node.is_extension():
             for child in node.neighbors:
                 self._check_node(child)
 
