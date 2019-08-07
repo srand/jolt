@@ -3,7 +3,7 @@ import imp
 import subprocess
 import sys
 import webbrowser
-from os import _exit, environ
+from os import _exit, environ, getcwd
 
 from jolt.tasks import TaskRegistry, Parameter
 from jolt import scheduler
@@ -263,7 +263,7 @@ def build(ctx, task, network, keep_going, identity, default, local,
                 with acache.get_artifact(goal) as artifact:
                     log.info("Location: {0}", artifact.path)
                     if copy:
-                        artifact.copy("*", click.format_filename(copy))
+                        artifact.copy("*", fs.path.join(getcwd(), click.format_filename(copy)))
 
         log.info("Total execution time: {0} {1}",
                  str(duration),

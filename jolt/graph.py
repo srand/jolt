@@ -192,7 +192,7 @@ class TaskProxy(object):
         self._in_progress = True
 
     def is_goal(self):
-        return self._goal
+        return self._goal or any([e.is_goal() for e in self.extensions])
 
     def set_goal(self):
         self._goal = True
@@ -450,7 +450,7 @@ class GraphBuilder(object):
                 yield p
 
     def build(self, task_list, influence=True):
-        [self._get_node(task) for task in task_list]
+        goals = [self._get_node(task) for task in task_list]
         raise_error_if(not nx.is_directed_acyclic_graph(self.graph),
                        "there are cyclic task dependencies")
         self.graph._nodes_by_name = self.nodes
@@ -462,13 +462,13 @@ class GraphBuilder(object):
                     p.update(1)
 
         self.graph.goals = []
-        for root in self.graph.roots:
-            root.set_goal()
-            self.graph.goals.append(root)
-            if root.is_alias():
-                for root_alias in root.neighbors:
-                    root_alias.set_goal()
-                    self.graph.goals.append(root_alias)
+        for goal in goals:
+            goal.set_goal()
+            self.graph.goals.append(goal)
+            if goal.is_alias():
+                for goal_alias in goal.neighbors:
+                    goal_alias.set_goal()
+                    self.graph.goals.append(goal_alias)
 
         return self.graph
 
@@ -511,14 +511,18 @@ class GraphPruner(object):
         pruned = []
 
         for node in graph:
+            if node.is_goal():
+                self.retained.add(node)
+
+        for node in graph:
             if node not in self.retained:
-                log.verbose("Excluded: {}", node.short_qualified_name)
                 pruned.append(node)
             else:
                 log.verbose("Retained: {}", node.short_qualified_name)
                 node.children = [c for c in node.children if c in self.retained]
 
         for node in pruned:
+            log.verbose("Excluded: {}", node.short_qualified_name)
             graph.remove_node(node)
 
         return graph
