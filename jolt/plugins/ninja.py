@@ -697,7 +697,6 @@ class CXXProject(Task):
                 not l and not ('*' in source or '?' in source), self,
                 "source file '{0}' not found", fs.path.basename(source))
             sources += l
-        sources.sort()
         self.sources = sources
 
     def _write_ninja_file(self, basedir, deps, tools):
@@ -911,7 +910,7 @@ class CXXExecutable(CXXProject):
         super(CXXExecutable, self)._populate_inputs(writer, deps, tools)
 
     def _populate_project(self, writer, deps, tools):
-        self.toolchain.linker.build(self, writer, self.objects)
+        self.toolchain.linker.build(self, writer, [o for o in reversed(self.objects)])
 
     def _strip(self):
         return utils.call_or_return(self, self.__class__.strip)

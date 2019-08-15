@@ -58,20 +58,23 @@ def taint(salt=None):
 
 
 class TaskAttributeInfluence(HashInfluenceProvider):
-    def __init__(self, attrib):
+    def __init__(self, attrib, sort=False):
         self._attrib = attrib
+        self._sort = sort
         self.name = attrib.title()
 
     def get_influence(self, task):
         value = utils.getattr_safe(task, tools.Tools(task).expand(self._attrib), "N/A")
         try:
             value = value.__get__(task)
+            if type(value) == list and self._sort:
+                value.sort()
         except AttributeError:
             pass
         return value
 
 
-def attribute(name):
+def attribute(name, sort=False):
     """ Add task attribute value as hash influence.
 
     Args:
@@ -92,7 +95,7 @@ def attribute(name):
         _old_init = cls.__init__
         def _init(self, *args, **kwargs):
             _old_init(self, *args, **kwargs)
-            self.influence.append(TaskAttributeInfluence(name))
+            self.influence.append(TaskAttributeInfluence(name, sort))
         cls.__init__ = _init
         return cls
     return _decorate
