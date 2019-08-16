@@ -565,6 +565,9 @@ class Artifact(object):
     def get_task(self):
         return self._node.task
 
+    def get_name(self):
+        return self._node.qualified_name
+
     def get_cache(self):
         return self._cache
 

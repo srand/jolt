@@ -338,17 +338,24 @@ class IncludePaths(Variable):
         def expand(path):
             if path[0] in ['=', fs.sep]:
                 return tools.expand(path)
+            if path[0] in ['-']:
+                return tools.expand(path[1:])
             return tools.expand_path(path)
 
-        def expand_artifact(artifact, path):
+        def expand_artifact(sandbox, path):
             if path[0] in ['=', fs.sep]:
                 return path
-            return fs.path.join(artifact.path, path)
+            if path[0] in ['-']:
+                return path[1:]
+            return tools.expand_path(fs.path.join(sandbox, path))
 
         incpaths = [expand(path) for path in project.incpaths]
         for name, artifact in deps.items():
-            incpaths += [expand_artifact(artifact, path)
-                         for path in artifact.cxxinfo.incpaths.items()]
+            incs = [path for path in artifact.cxxinfo.incpaths.items()]
+            if incs:
+                sandbox = tools.sandbox(artifact, project.incremental)
+                incpaths += [expand_artifact(sandbox, path) for path in incs]
+
         incpaths = ["{0}{1}".format(self.prefix, path) for path in incpaths]
         writer.variable(self.name, " ".join(incpaths))
 
