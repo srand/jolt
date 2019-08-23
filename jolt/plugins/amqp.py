@@ -15,7 +15,7 @@ from jolt import scheduler
 from jolt import utils
 from jolt.manifest import JoltManifest
 from jolt.tools import Tools
-from jolt.error import JoltCommandError
+from jolt.error import JoltCommandError, raise_error
 
 
 NAME = "amqp"
@@ -408,8 +408,13 @@ class WorkerTaskConsumer(object):
                 try:
                     jolt = self.selfdeploy()
 
+                    config = config.get("amqp", "config", "")
+                    if config:
+                        config = "-c " + config
+
                     log.info("Running jolt")
-                    tools.run("{} -vv build --worker", jolt, output_stdio=True)
+                    tools.run("{} -vv {} build --worker",
+                              jolt, config, output_stdio=True)
                 except JoltCommandError as e:
                     self.response = ["FAILED"]
                     self.response.extend(e.stdout)
@@ -692,7 +697,7 @@ class AmqpExecutor(scheduler.NetworkExecutor):
         self.response = None
         self.channel.basic_publish(
             exchange='jolt_exchange',
-            routing_key="default",
+            routing_key="jolt_default",
             properties=pika.BasicProperties(correlation_id=self.corr_id),
             body=manifest)
 
