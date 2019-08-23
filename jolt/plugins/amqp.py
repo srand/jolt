@@ -407,14 +407,12 @@ class WorkerTaskConsumer(object):
 
                 try:
                     jolt = self.selfdeploy()
-
-                    config = config.get("amqp", "config", "")
-                    if config:
-                        config = "-c " + config
+                    config_file = config.get("amqp", "config", "")
+                    if config_file:
+                        config_file = "-c " + config_file
 
                     log.info("Running jolt")
-                    tools.run("{} -vv {} build --worker",
-                              jolt, config, output_stdio=True)
+                    tools.run("{} -vv {} build --worker", jolt, config_file, output_stdio=True)
                 except JoltCommandError as e:
                     self.response = ["FAILED"]
                     self.response.extend(e.stdout)
@@ -422,8 +420,9 @@ class WorkerTaskConsumer(object):
                     self.response = "\n".join(self.response)
                     log.error("Task failed")
                 except Exception as e:
-                    self.response = "FAILED"
+                    self.response = "FAILED\n"
                     log.error("Task failed")
+                    log.exception()
                 else:
                     self.response = "SUCCESS\n"
                     log.info("Task succeeded")
