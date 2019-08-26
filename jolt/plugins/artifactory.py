@@ -15,6 +15,7 @@ from jolt.error import raise_error_if
 
 NAME = "artifactory"
 TIMEOUT = (3.5, 27)
+TIMEOUT_HEAD = (27, 27)
 
 
 class Artifactory(cache.StorageProvider):
@@ -98,7 +99,7 @@ class Artifactory(cache.StorageProvider):
         with self._cache.get_artifact(node) as artifact:
             url = self._get_url(node, artifact)
             try:
-                response = requests.head(url, stream=True, timeout=TIMEOUT)
+                response = requests.head(url, stream=True, timeout=TIMEOUT_HEAD)
             except ConnectTimeout:
                 self._disabled = True
                 log.warning("[ARTIFACTORY] failed to establish server connection, disabled")
