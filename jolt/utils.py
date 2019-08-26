@@ -202,7 +202,7 @@ class cached:
 
 class retried:
     @staticmethod
-    def on_exception(exc_type, pattern=None, count=4, backoff=[1,4,10]):
+    def on_exception(exc_type, pattern=None, count=8, backoff=[1,4,10,15,20,25,35,40]):
         def _decorate(f):
             def _f(*args, **kwargs):
                 for i in range(0, count):
