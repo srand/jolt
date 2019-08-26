@@ -850,7 +850,7 @@ class Tools(object):
         meta = fs.path.join(self.getcwd(), path, ".artifact")
 
         if not fs.path.exists(meta) or self.read_file(meta) != artifact.path:
-            self.run("rsync -c -r {0}/ {1}", artifact.path, path, output_on_error=True)
+            self.run("rsync --delete -c -r {0}/ {1}", artifact.path, path, output_on_error=True)
             self.write_file(meta, artifact.path)
 
         return path
