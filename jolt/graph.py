@@ -198,7 +198,7 @@ class TaskProxy(object):
         self._goal = True
 
     def finalize(self, dag, manifest):
-        log.verbose("Finalizing: " + self.short_qualified_name)
+        log.debug("Finalizing: " + self.short_qualified_name)
         self.manifest = manifest
 
         # Find all direct and transitive dependencies
@@ -518,11 +518,11 @@ class GraphPruner(object):
             if node not in self.retained:
                 pruned.append(node)
             else:
-                log.verbose("Retained: {}", node.short_qualified_name)
+                log.verbose("Retained: {}", node.log_name)
                 node.children = [c for c in node.children if c in self.retained]
 
         for node in pruned:
-            log.verbose("Excluded: {}", node.short_qualified_name)
+            log.verbose("Excluded: {}", node.log_name)
             graph.remove_node(node)
 
         return graph
