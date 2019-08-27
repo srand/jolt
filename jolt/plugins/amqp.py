@@ -618,7 +618,7 @@ class AmqpExecutor(scheduler.NetworkExecutor):
         self.connect()
         self.publish_request(manifest)
 
-        log.verbose("[AMQP] Queued {0}", self.task.short_qualified_name)
+        log.debug("[AMQP] Queued {0}", self.task.short_qualified_name)
 
         self.task.running()
         for extension in self.task.extensions:
@@ -628,10 +628,10 @@ class AmqpExecutor(scheduler.NetworkExecutor):
             try:
                 self.connection.process_data_events(None)
             except (ConnectionError, pika.exceptions.AMQPConnectionError):
-                log.verbose("[AMQP] Lost server connection")
+                log.warning("[AMQP] Lost server connection")
                 self.connect()
 
-        log.verbose("[AMQP] Finished {0}", self.task.short_qualified_name)
+        log.debug("[AMQP] Finished {0}", self.task.short_qualified_name)
 
         result = self.response.splitlines()
         output = result[1:]
@@ -682,10 +682,10 @@ class AmqpExecutor(scheduler.NetworkExecutor):
             queue=self.callback_queue,
             on_message_callback=self.on_response,
             auto_ack=False)
-        log.verbose("[AMQP] Established connection to server")
+        log.debug("[AMQP] Established connection to server")
 
     def on_response(self, channel, basic_deliver, properties, body):
-        log.verbose("[AMQP] Completion of {}, expecting {}", properties.correlation_id, self.corr_id)
+        log.debug("[AMQP] Completion of {}, expecting {}", properties.correlation_id, self.corr_id)
         if self.corr_id == properties.correlation_id:
             self.response = body.decode()
             channel.basic_ack(basic_deliver.delivery_tag)
