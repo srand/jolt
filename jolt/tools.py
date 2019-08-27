@@ -476,6 +476,8 @@ class Tools(object):
                     for data in response.iter_content(chunk_size=chunk_size):
                         out_file.write(data)
                         pbar.update(len(data))
+            if response.status_code not in [200, 404]:
+                log.verbose("Server response {} for {}", response.status_code, url)
             return response.status_code == 200
         except:
             log.exception()
