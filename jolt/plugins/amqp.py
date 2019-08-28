@@ -727,7 +727,8 @@ class AmqpExecutor(scheduler.NetworkExecutor):
 @scheduler.ExecutorFactory.Register
 class AmqpExecutorFactory(scheduler.NetworkExecutorFactory):
     def __init__(self, options):
-        super(AmqpExecutorFactory, self).__init__(max_workers=16)
+        workers = config.getint(NAME, "workers", 16)
+        super(AmqpExecutorFactory, self).__init__(max_workers=workers)
         self._options = options
 
     @property
