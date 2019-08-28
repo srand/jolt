@@ -62,7 +62,6 @@ class TaskQueue(object):
     def abort(self):
         self._aborted = True
         for future, task in self.futures.items():
-            task.info("Execution cancelled")
             future.cancel()
         if len(self.futures):
             log.info("Waiting for tasks to finish, please be patient")
@@ -97,6 +96,8 @@ class LocalExecutor(Executor):
         self.force_upload = force_upload
 
     def run(self, env):
+        if self.is_aborted():
+            return
         if has_asyncio:
             loop = asyncio.SelectorEventLoop()
             asyncio.set_event_loop(loop)
@@ -139,6 +140,8 @@ class Downloader(Executor):
         self.task = task
 
     def _download(self, env, task):
+        if self.is_aborted():
+            return
         try:
             task.started("Download")
             raise_task_error_if(
@@ -163,6 +166,8 @@ class Uploader(Executor):
         self.task = task
 
     def _upload(self, env, task):
+        if self.is_aborted():
+            return
         try:
             task.started("Upload")
             raise_task_error_if(
@@ -197,6 +202,8 @@ class ExecutorRegistry(object):
     def shutdown(self):
         for factory in self._factories:
             factory.shutdown()
+        self._local_factory.shutdown()
+        self._concurrent_factory.shutdown()
 
     def create_skipper(self, task):
         return SkipTask(self._concurrent_factory, task)
@@ -254,6 +261,9 @@ class ExecutorFactory(object):
     def is_aborted(self):
         return self._aborted
 
+    def is_keep_going(self):
+        return False
+
     def shutdown(self):
         self._aborted = True
         self.pool.shutdown()
@@ -267,16 +277,23 @@ class ExecutorFactory(object):
                 executor.run(env)
         except KeyboardInterrupt:
             raise_error("Interrupted by user")
+            self._aborted = True
+        except Exception as e:
+            if not self.is_keep_going():
+                self._aborted = True
+            raise e
 
     def submit(self, executor, env):
         return self.pool.submit(partial(self._run, executor, env))
-
 
 
 class LocalExecutorFactory(ExecutorFactory):
     def __init__(self, options=None):
         super(LocalExecutorFactory, self).__init__(max_workers=1)
         self._options = options or JoltOptions()
+
+    def is_keep_going(self):
+        return self._options.keep_going
 
     def create(self, task, force=False):
         return LocalExecutor(self, task, force_build=force)
@@ -286,6 +303,9 @@ class ConcurrentLocalExecutorFactory(ExecutorFactory):
     def __init__(self, options=None):
         super(ConcurrentLocalExecutorFactory, self).__init__()
         self._options = options or JoltOptions()
+
+    def is_keep_going(self):
+        return self._options.keep_going
 
     def create(self, task):
         raise NotImplementedError()
