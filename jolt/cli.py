@@ -269,11 +269,13 @@ def build(ctx, task, network, keep_going, identity, default, local,
                  str(duration),
                  str(queue.duration_acc) if network else '')
     except KeyboardInterrupt:
+        print()
         log.warning("Interrupted by user")
         try:
             queue.abort()
-            return
+            sys.exit(1)
         except KeyboardInterrupt:
+            print()
             log.warning("Interrupted again, exiting")
             _exit(1)
 
