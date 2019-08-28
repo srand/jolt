@@ -50,6 +50,10 @@ The ``[jolt]`` config section contains global configuration.
   providers or not when building locally. The option has no effect on
   distributed network builds. The default value is ``true``.
 
+* ``pluginpath = <str>``
+
+  A list of one or more directory names, separated by colon, specifying
+  additional search paths for plugins.
 
 
 Network
