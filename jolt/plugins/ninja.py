@@ -443,7 +443,7 @@ class GNUToolchain(Toolchain):
     libraries = Libraries(prefix="-l")
 
     compile_c = GNUCompiler(
-        command="$cc -x c $cflags $extra_cflags $macros $incpaths -MMD -MF $out.d -c $in -o $out",
+        command="$cc -x c -fdebug-prefix-map=$joltdir/= $cflags $extra_cflags $macros $incpaths -MMD -MF $out.d -c $in -o $out",
         deps="gcc",
         depfile="$out.d",
         infiles=[".c"],
@@ -451,7 +451,7 @@ class GNUToolchain(Toolchain):
         variables={"desc": "[C] {in_base}{in_ext}"})
 
     compile_cxx = GNUCompiler(
-        command="$cxx -x c++ $cxxflags $extra_cxxflags $macros $incpaths -MMD -MF $out.d -c $in -o $out",
+        command="$cxx -x c++ -fdebug-prefix-map=$joltdir/= $cxxflags $extra_cxxflags $macros $incpaths -MMD -MF $out.d -c $in -o $out",
         deps="gcc",
         depfile="$out.d",
         infiles=[".cc", ".cpp", ".cxx"],
@@ -459,7 +459,7 @@ class GNUToolchain(Toolchain):
         variables={"desc": "[CXX] {in_base}{in_ext}"})
 
     compile_asm = GNUCompiler(
-        command="$cc -x assembler $asflags $extra_asflags -MMD -MF $out.d -c $in -o $out",
+        command="$cc -x assembler -fdebug-prefix-map=$joltdir/= $asflags $extra_asflags -MMD -MF $out.d -c $in -o $out",
         deps="gcc",
         depfile="$out.d",
         infiles=[".s", ".asm"],
@@ -467,7 +467,7 @@ class GNUToolchain(Toolchain):
         variables={"desc": "[ASM] {in_base}{in_ext}"})
 
     compile_asm_with_cpp = GNUCompiler(
-        "$cc -x assembler-with-cpp $cflags $extra_cflags $macros $incpaths -MMD -MF $out.d -c $in -o $out",
+        "$cc -x assembler-with-cpp -fdebug-prefix-map=$joltdir/= $cflags $extra_cflags $macros $incpaths -MMD -MF $out.d -c $in -o $out",
         deps="gcc",
         depfile="$out.d",
         infiles=[".S"],
