@@ -846,7 +846,7 @@ class Tools(object):
             "non-artifact passed as argument to Tools.sandbox()")
 
         canon_name = fs.path.basename(fs.path.dirname(artifact.path))
-        sandbox_name = "sandbox-{0}-{1}".format(
+        sandbox_name = "sandbox-1-{0}-{1}".format(
             canon_name, utils.sha1(artifact.get_name())[:8])
         path = self.builddir(sandbox_name, incremental=incremental, unique=False)
         meta = fs.path.join(self.getcwd(), path, ".artifact")
