@@ -55,6 +55,10 @@ The ``[jolt]`` config section contains global configuration.
   A list of one or more directory names, separated by colon, specifying
   additional search paths for plugins.
 
+* ``threads = <integer>``
+  Used to limit the number of threads used by third party tools such as Ninja.
+  The environment variable ``JOLT_THREADS`` can also be used.
+  The default value is the number of CPUs available.
 
 Network
 --------

@@ -4,6 +4,7 @@ import platform
 import os
 
 from jolt.tasks import Task
+from jolt import config
 from jolt import influence
 from jolt import log
 from jolt import utils
@@ -830,7 +831,9 @@ if __name__ == "__main__":
         self.outdir = tools.builddir("ninja", self.incremental)
         self._write_ninja_file(self.outdir, deps, tools)
         verbose = "-v" if log.is_verbose() else ""
-        tools.run("ninja -C {0} {1}", self.outdir, verbose)
+        threads = config.get("jolt", "threads", tools.getenv("JOLT_THREADS", None))
+        threads = "-j " + threads if threads else ""
+        tools.run("ninja {2} -C {0} {1}", self.outdir, verbose, threads)
 
     def shell(self, deps, tools):
         self._expand_sources()
