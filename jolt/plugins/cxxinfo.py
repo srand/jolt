@@ -21,13 +21,13 @@ class CppInfoListVariable(CppInfoVariable):
 
     def append(self, value):
         if self.get_value():
-            self.set_value(self.get_value() + fs.pathsep + value)
+            self.set_value(self.get_value() + ":" + value)
         else:
             self.set_value(value)
 
     def items(self):
         value = self.get_value()
-        return value.split(fs.pathsep) if value is not None else []
+        return value.split(":") if value is not None else []
 
 
 class CppInfoDictVariable(CppInfoListVariable):

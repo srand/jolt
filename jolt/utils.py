@@ -160,8 +160,8 @@ class duration_diff(object):
         if elapsed <= 1:
             return ""
         if elapsed >= 60:
-            return time.strftime("[%Mmin %-Ss] ", time.gmtime(elapsed))
-        return time.strftime("[%-Ss] ", time.gmtime(elapsed))
+            return time.strftime("[%Mmin %Ss] ", time.gmtime(elapsed))
+        return time.strftime("[%Ss] ", time.gmtime(elapsed))
 
     def __iadd__(self, dur):
         if isinstance(dur, duration):

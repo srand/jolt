@@ -174,13 +174,15 @@ class _CMake(object):
                            sourcedir, self.installdir, extra_args,
                            output=True)
 
-    def build(self, *args, **kwargs):
+    def build(self, release=True, *args, **kwargs):
         with self.tools.cwd(self.builddir):
-            self.tools.run("cmake --build .", output=True)
+            release = "--config Release" if release else ""
+            self.tools.run("cmake --build . {0}", release, output=True)
 
-    def install(self, *args, **kwargs):
+    def install(self, release=True, *args, **kwargs):
         with self.tools.cwd(self.builddir):
-            self.tools.run("cmake --build . --target install", output=True)
+            release = "--config Release" if release else ""
+            self.tools.run("cmake --build . --target install {0}", release, output=True)
 
     def publish(self, artifact, files='*', *args, **kwargs):
         with self.tools.cwd(self.installdir):
@@ -469,7 +471,7 @@ class Tools(object):
         try:
             response = requests.get(url, stream=True, **kwargs)
             name = fs.path.basename(pathname)
-            size = int(response.headers['content-length'])
+            size = int(response.headers.get('content-length', 0))
             with log.progress("Downloading {0}".format(name), size, "B") as pbar:
                 with open(pathname, 'wb') as out_file:
                     chunk_size = 4096
@@ -852,7 +854,11 @@ class Tools(object):
         meta = fs.path.join(self.getcwd(), path, ".artifact")
 
         if not fs.path.exists(meta) or self.read_file(meta) != artifact.path:
-            self.run("rsync --delete -c -r {0}/ {1}", artifact.path, path, output_on_error=True)
+            if shutil.which("rsync"):
+                self.run("rsync --delete -c -r {0}/ {1}", artifact.path, path, output_on_error=True)
+            else:
+                fs.rmtree(path)
+                fs.copytree(artifact.path, path)
             self.write_file(meta, artifact.path)
 
         return path

@@ -506,6 +506,7 @@ class MSVCToolchain(Toolchain):
     hh = Skip(infiles=[".h", ".hh", ".hpp", ".hxx"])
     obj = Objects(infiles=[".o", ".obj", ".a"])
 
+    joltdir = ProjectVariable()
     outdir = ProjectVariable()
     binary = ProjectVariable()
 
