@@ -98,7 +98,7 @@ def cli(ctx, verbose, extra_verbose, config_file, debug, profile):
         path = fs.path.dirname(__file__)
         path = fs.path.join(path, "plugins", section + ".py")
         if fs.path.exists(path):
-            mod = "jolt.plugins." + section
+            mod = "jolt.plugins.loaded." + section
             if mod not in sys.modules:
                 imp.load_source(mod, path)
 

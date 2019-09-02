@@ -19,7 +19,6 @@ from jolt import utils
 
 log.verbose("SelfDeploy loaded")
 
-
 _path = fs.path.dirname(__file__)
 _path = fs.path.dirname(_path)
 _path = fs.path.dirname(_path)
