@@ -54,7 +54,7 @@ class PluginGroup(click.Group):
 
         # Load configured plugins
         searchpath = config.get("jolt", "pluginpath")
-        searchpath = searchpath.split(fs.pathsep) if searchpath else []
+        searchpath = searchpath.split(":") if searchpath else []
         searchpath.append(fs.path.join(fs.path.dirname(__file__), "plugins"))
 
         imp.new_module("jolt.plugins")
