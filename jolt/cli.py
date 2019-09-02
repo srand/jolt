@@ -57,13 +57,14 @@ class PluginGroup(click.Group):
         searchpath = searchpath.split(":") if searchpath else []
         searchpath.append(fs.path.join(fs.path.dirname(__file__), "plugins"))
 
-        imp.new_module("jolt.plugins")
-        for section in config.sections():
-            for path in searchpath:
-                module = fs.path.join(fs.path.dirname(__file__), path, section + ".py")
-                if fs.path.exists(module):
-                    imp.load_source("jolt.plugins." + section, module)
-                    continue
+        if not "jolt.plugins.loaded" in sys.modules:
+            sys.modules["jolt.plugins.loaded"] = imp.new_module("jolt.plugins.loaded")
+            for section in config.sections():
+                for path in searchpath:
+                    module = fs.path.join(fs.path.dirname(__file__), path, section + ".py")
+                    if fs.path.exists(module):
+                        imp.load_source("jolt.plugins.loaded." + section, module)
+                        continue
 
         return click.Group.get_command(self, ctx, cmd_name)
 
