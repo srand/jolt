@@ -956,9 +956,9 @@ class Tools(object):
                     pbar.update(len(data))
                     return data
                 response = requests.put(url, data=iter(read, b''), auth=auth, **kwargs)
-                if response.status_code not in [201]:
+                if response.status_code not in [201, 204]:
                     log.verbose("Server response {} for {}", response.status_code, url)
-                return response.status_code == 201
+                return response.status_code in [201, 204]
         except:
             log.exception()
             pass
