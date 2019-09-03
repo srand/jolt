@@ -80,6 +80,16 @@ def set(section, key, value):
 def load(file):
     _file.read(file)
 
+def load_or_set(file_or_str):
+    if fs.path.exists(file_or_str):
+        _file.read(file_or_str)
+    else:
+        key_value = file_or_str.split("=", 1)
+        raise_error_if(len(key_value) <= 1, "syntax error in configuration: '{}'".format(file_or_str))
+        section_key = key_value[0].split(".", 1)
+        raise_error_if(len(section_key) <= 1, "syntax error in configuration: '{}'".format(file_or_str))
+        set(section_key[0], section_key[1], key_value[1])
+
 def save():
     fs.makedirs(fs.path.dirname(location))
     config = StringIO()

@@ -49,8 +49,10 @@ class PluginGroup(click.Group):
             log.set_level(log.VERBOSE)
         if ctx.params.get("extra_verbose", False):
             log.set_level(log.DEBUG)
-        if ctx.params.get("config_file"):
-            config.load(ctx.params.get("config_file"))
+        config_files = ctx.params.get("config_file")
+        for config_file in config_files:
+            log.verbose("Config: {0}", config_file)
+            config.load_or_set(config_file)
 
         # Load configured plugins
         searchpath = config.get("jolt", "pluginpath")
@@ -72,7 +74,7 @@ class PluginGroup(click.Group):
 @click.group(cls=PluginGroup)
 @click.option("-v", "--verbose", is_flag=True, help="Verbose.")
 @click.option("-vv", "--extra-verbose", is_flag=True, help="Verbose.")
-@click.option("-c", "--config-file", type=str, help="Configuration file")
+@click.option("-c", "--config", "config_file", multiple=True, type=str, help="Extra configuration as file or section.key=value string")
 @click.option("-d", "--debug", is_flag=True, help="Attach debugger on exception", hidden=True)
 @click.option("-p", "--profile", is_flag=True, help="Profile code while running", hidden=True)
 @click.pass_context
