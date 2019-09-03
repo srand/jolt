@@ -12,9 +12,12 @@ from jolt.manifest import ManifestExtension, ManifestExtensionRegistry
 
 
 location = fs.path.join(fs.path.expanduser("~"), ".config", "jolt", "config")
+location_user = fs.path.join(fs.path.expanduser("~"), ".config", "jolt", "user")
 
 _file = SafeConfigParser()
 _file.read(location)
+_file.read(location_user)
+
 if not _file.has_section("jolt"):
     _file.add_section("jolt")
 if not _file.has_section("cxxinfo"):
