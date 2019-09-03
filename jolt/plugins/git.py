@@ -54,9 +54,11 @@ class GitRepository(object):
     @utils.cached.instance
     def _diff(self, path="/"):
         with self.tools.cwd(self.path):
-            return self.tools.run("git diff --no-ext-diff HEAD .{0}".format(path),
-                                  output_on_error=True,
-                                  output_rstrip=False)
+            index = fs.path.join(self.path, ".git", "jolt-index")
+            with self.tools.environ(GIT_INDEX_FILE=index):
+                return self.tools.run("git diff --no-ext-diff HEAD .{0}".format(path),
+                                      output_on_error=True,
+                                      output_rstrip=False)
 
     def diff(self, path="/"):
         return self._diff(path) if self.is_cloned() else ""
@@ -92,7 +94,7 @@ class GitRepository(object):
             with tools.cwd(gitpath):
                 tools.copy("index", "jolt-index")
             with tools.cwd(fs.path.dirname(gitpath)):
-                _tree[gitpath] = tree = tools.run("git add -u && git write-tree", output_on_error=True)
+                _tree[gitpath] = tree = tools.run("git add -A && git write-tree", output_on_error=True)
 
         return tree
 
