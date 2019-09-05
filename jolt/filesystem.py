@@ -18,6 +18,9 @@ def makedirs(path):
 
 mkdtemp = tempfile.mkdtemp
 
+def exists(path):
+    return os.path.exists(path)
+
 def rename(old, new):
     return os.rename(old, new)
 

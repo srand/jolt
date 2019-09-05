@@ -1,4 +1,5 @@
 import uuid
+import errno
 
 from jolt import utils
 from jolt import cache
@@ -10,6 +11,10 @@ from jolt.error import raise_error_if
 
 NAME = "volume"
 TIMEOUT = (3.5, 27)
+
+
+class StaleFileHandleError(OSError):
+    pass
 
 
 class DiskVolume(cache.StorageProvider):
@@ -34,17 +39,26 @@ class DiskVolume(cache.StorageProvider):
             name=node.name,
             file=uuid.uuid4())
 
+    @utils.retried.on_exception(StaleFileHandleError)
     def download(self, node, force=False):
         if not self._download and not force:
             return False
+
         with self._cache.get_artifact(node) as artifact:
             path = self._get_path(node, artifact)
             try:
                 log.verbose("[VOLUME] Copying {}", path)
                 fs.copy(path, artifact.get_archive_path())
                 return True
-            except:
+            except OSError as e:
+                if e.errno == errno.ESTALE:
+                    log.verbose("[VOLUME] got stale file handle, retrying...")
+                    raise StaleFileHandleError(e)
+                else:
+                    log.exception()
+            except Exception as e:
                 log.exception()
+
         return False
 
     def download_enabled(self):
@@ -59,11 +73,15 @@ class DiskVolume(cache.StorageProvider):
             try:
                 log.verbose("[VOLUME] Copying {}", path)
                 fs.copy(artifact.get_archive_path(), temp)
-                fs.rename(temp, path)
+                # To avoid race-condition, make sure that the artifact still is missing before moving it into place.
+                if not fs.exists(path):
+                    fs.rename(temp, path)
+                else:
+                    fs.unlink(temp)
                 return True
             except OSError as e:
                 return e.errno == errno.EEXIST
-            except:
+            except Exception as e:
                 log.exception()
             finally:
                 fs.unlink(temp, ignore_errors=True)
@@ -87,3 +105,5 @@ class DiskVolumeFactory(cache.StorageProviderFactory):
     def create(cache):
         log.verbose("Volume cache loaded")
         return DiskVolume(cache)
+
+# vim: et sw=4 ts=4
