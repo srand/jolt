@@ -252,7 +252,12 @@ def build(ctx, task, network, keep_going, identity, default, local,
             return
 
         while dag.has_tasks():
+            # Find all tasks ready to be executed
             leafs = dag.select(lambda graph, task: task.is_ready())
+
+            # Order the tasks by their weights to improve build times
+            leafs.sort(key=lambda x: x.weight)
+
             while leafs:
                 task = leafs.pop()
                 queue.submit(acache, task)

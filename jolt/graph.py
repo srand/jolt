@@ -96,6 +96,10 @@ class TaskProxy(object):
         self._identity = value
         self.task.identity = self._identity
 
+    @property
+    def weight(self):
+        return self.task.weight
+
     def __str__(self):
         return "{0}{1}".format(self.short_qualified_name, "*" if self.is_extension() else '')
 
@@ -216,7 +220,9 @@ class TaskProxy(object):
                    dag.are_neighbors(self, n)),
                    self.descendants))
 
-        self.ancestors = nx.ancestors(dag, self)
+        self.ancestors = list(nx.ancestors(dag, self))
+        self.direct_ancestors = list(
+            filter(lambda n: dag.are_neighbors(n, self), self.ancestors))
 
         task = self.manifest.find_task(self.qualified_name)
         if task is not None:
@@ -456,10 +462,13 @@ class GraphBuilder(object):
         self.graph._nodes_by_name = self.nodes
 
         if influence:
+            topological_nodes = list(nx.topological_sort(self.graph))
             with self._progress("Collecting task influence", len(self.graph.tasks), "tasks") as p:
-                for node in reversed(list(nx.topological_sort(self.graph))):
+                for node in reversed(topological_nodes):
                     node.finalize(self.graph, self.manifest)
                     p.update(1)
+            for node in topological_nodes:
+                node.task.weight += max([a.weight for a in node.direct_ancestors] + [0])
 
         self.graph.goals = []
         for goal in goals:

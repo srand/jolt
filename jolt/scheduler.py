@@ -1,5 +1,6 @@
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor, as_completed, Future
 from functools import partial
+import queue
 try:
     import asyncio
     has_asyncio = True
@@ -248,6 +249,29 @@ class NetworkExecutorExtension(object):
         return {}
 
 
+class Job(object):
+    def __init__(self, priority, future, executor, env):
+        self.priority = priority
+        self.future = future
+        self.executor = executor
+        self.env = env
+
+    def __le__(self, o):
+        return self.priority <= o.priority
+
+    def __ge__(self, o):
+        return self.priority >= o.priority
+
+    def __lt__(self, o):
+        return self.priority < o.priority
+
+    def __gt__(self, o):
+        return self.priority > o.priority
+
+    def __eq__(self, o):
+        return self.priority == o.priority
+
+
 class ExecutorFactory(object):
     @staticmethod
     def Register(cls):
@@ -257,6 +281,7 @@ class ExecutorFactory(object):
     def __init__(self, max_workers=None):
         self.pool = ThreadPoolExecutor(max_workers=max_workers)
         self._aborted = False
+        self._queue = queue.PriorityQueue()
 
     def is_aborted(self):
         return self._aborted
@@ -271,20 +296,28 @@ class ExecutorFactory(object):
     def create(self, task):
         raise NotImplemented()
 
-    def _run(self, executor, env):
+    def _run(self):
+        job = self._queue.get(False)
+        self._queue.task_done()
         try:
             if not self.is_aborted():
-                executor.run(env)
-        except KeyboardInterrupt:
+                job.executor.run(job.env)
+        except KeyboardInterrupt as e:
             raise_error("Interrupted by user")
             self._aborted = True
+            job.future.set_exception(e)
         except Exception as e:
             if not self.is_keep_going():
                 self._aborted = True
-            raise e
+            job.future.set_exception(e)
+        else:
+            job.future.set_result(job.executor)
 
     def submit(self, executor, env):
-        return self.pool.submit(partial(self._run, executor, env))
+        future = Future()
+        self._queue.put(Job(-executor.task.weight, future, executor, env))
+        self.pool.submit(self._run)
+        return future
 
 
 class LocalExecutorFactory(ExecutorFactory):

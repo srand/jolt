@@ -435,6 +435,15 @@ class TaskBase(object):
     traffic by allowing the task graph to be reduced.
     """
 
+    weight = 0
+    """
+    Indication of task execution time.
+
+    The weight is used to optimize the order in which tasks are
+    executed using a heuristic scheduling algorithm where ready
+    tasks along the critical path are favored.
+    """
+
     def __init__(self, parameters=None, **kwargs):
         self._identity = None
         self.name = self.__class__.name
