@@ -57,6 +57,22 @@ These configuration keys exist:
   Keyring service identifier. Defaults to ``artifactory``.
 
 
+Autoweight
+----------
+
+The autoweight plugin automatically collects statistics about task execution times.
+The data is used to assign weights to task, allowing the Jolt scheduler to favor tasks
+along the critical path. This improves overall execution time in a distributed execution
+configuration where many tasks are executed in parallel.
+
+The plugin is enabled by adding an ``[autoweight]`` section in
+the Jolt configuration.
+
+These configuration keys exist:
+
+* ``samples`` - Integer. The number of execution time samples to store per task in the database. Once the number is exceeded, samples are evicted in FIFO order.
+
+
 FTP
 -----------
 

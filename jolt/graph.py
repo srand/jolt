@@ -38,6 +38,7 @@ class TaskProxy(object):
         self._frozen = False
         self._goal = False
         self._download = True
+        hooks.task_created(self)
 
     def __hash__(self):
         return id(self)
@@ -99,6 +100,10 @@ class TaskProxy(object):
     @property
     def weight(self):
         return self.task.weight
+
+    @weight.setter
+    def weight(self, weight):
+        self.task.weight =  weight
 
     def __str__(self):
         return "{0}{1}".format(self.short_qualified_name, "*" if self.is_extension() else '')

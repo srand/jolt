@@ -72,6 +72,12 @@ def getboolean(section, key, default=None):
     except NoOptionError:
         return default
 
+def get_jolthome():
+    return fs.path.join(fs.path.expanduser("~"), ".jolt")
+
+def get_logpath():
+    return get_jolthome()
+
 def set(section, key, value):
     if not _file.has_section(section):
         _file.add_section(section)

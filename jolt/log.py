@@ -18,7 +18,7 @@ from jolt import filesystem as fs
 from jolt import colors
 
 
-default_path = fs.path.join(fs.path.expanduser("~"), ".jolt", "jolt.log")
+default_path = fs.path.join(config.get_logpath(), "jolt.log")
 logfile = config.get("jolt", "logfile", default_path)
 logsize = config.getsize("jolt", "logsize", os.environ.get("JOLT_LOGSIZE", 10*1024**2))  # 10MiB
 logcount = config.getint("jolt", "logcount", os.environ.get("JOLT_LOGCOUNT", 1))

@@ -8,6 +8,7 @@ import hashlib
 import sys
 from fasteners import process_lock
 import errno
+import json
 
 
 if sys.version_info[0] == 3:
@@ -131,7 +132,7 @@ class duration(object):
         self._time = time.time()
 
     def __str__(self):
-        elapsed = time.time() - self._time
+        elapsed = self.seconds
         if elapsed >= 60:
             return "%dmin %02ds" % (elapsed/60, elapsed%60)
         return "%02ds" % elapsed
@@ -149,6 +150,10 @@ class duration(object):
         elapsed1 = now - self._time
         elapsed2 = now - d._time
         return duration_diff(abs(elapsed1 - elapsed2))
+
+    @property
+    def seconds(self):
+        return time.time() - self._time
 
 
 class duration_diff(object):
@@ -269,3 +274,22 @@ def sha1(string):
     sha = hashlib.sha1()
     sha.update(string.encode())
     return sha.hexdigest()
+
+
+def fromjson(filepath, ignore_errors=False):
+    try:
+        with open(filepath) as f:
+            return json.loads(f.read())
+    except Exception as e:
+        if ignore_errors:
+            return {}
+        raise e
+
+def tojson(filepath, data, ignore_errors=False):
+    try:
+        with open(filepath, "w") as f:
+            f.write(json.dumps(data, indent=2))
+    except Exception as e:
+        if ignore_errors:
+            return
+        raise e
