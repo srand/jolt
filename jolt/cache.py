@@ -1,14 +1,9 @@
 from collections import OrderedDict
 import json
-import yaml
 import os
 from tempfile import mkdtemp
 from threading import RLock
 from datetime import datetime
-try:
-    from yaml import FullLoader as YamlLoader
-except:
-    from yaml import Loader as YamlLoader
 
 from jolt import config
 from jolt import filesystem as fs
@@ -312,24 +307,16 @@ class Artifact(object):
 
     @staticmethod
     def load_manifest(path):
-        content_type = "json"
-        try:
-            manifest = fs.path.join(path, ".manifest.json")
-            with open(manifest, "rb") as f:
-                data = utils.decode_str(f.read())
-                content = json.loads(data, object_hook=json_deserializer)
-        except:
-            manifest = fs.path.join(path, ".manifest.yaml")
-            with open(manifest, "rb") as f:
-                data = utils.decode_str(f.read())
-                content = yaml.load(data, Loader=YamlLoader)
-            content_type = "yaml"
-        return content, content_type
+        manifest = fs.path.join(path, ".manifest.json")
+        with open(manifest, "rb") as f:
+            data = utils.decode_str(f.read())
+            content = json.loads(data, object_hook=json_deserializer)
+        return content
 
     def _read_manifest(self):
         if self._temp:
             return
-        content, content_type = Artifact.load_manifest(self._path)
+        content = Artifact.load_manifest(self._path)
         self._size = content["size"]
         self._unpacked = content["unpacked"]
         self._uploadable = content.get("uploadable", True)
@@ -340,9 +327,6 @@ class Artifact(object):
         self._expires = ArtifactEvictionStrategyRegister.get().find(
             content.get("expires", "immediately"))
         ArtifactAttributeSetRegistry.parse_all(self, content)
-        if content_type != "json":
-            self._write_manifest()
-            fs.unlink(fs.path.join(self._path, ".manifest.yaml"))
 
     def _get_size(self):
         counted_inodes = {}
@@ -669,18 +653,9 @@ class CacheStats(object):
         log.verbose("Cache size is {0}", utils.as_human_size(self.get_size()))
 
     def load(self):
-        try:
-            with open(self.path) as f:
-                data = utils.decode_str(f.read())
-                self.stats = json.loads(data, object_hook=json_deserializer)
-        except:
-            # Load legacy file and convert data to new format
-            path = fs.path.join(self.cache.root, ".stats.yaml")
-            with open(self.path) as f:
-                data = utils.decode_str(f.read())
-                self.stats = yaml.load(data, Loader=YamlLoader)
-            self.save()
-            fs.unlink(path)
+        with open(self.path) as f:
+            data = utils.decode_str(f.read())
+            self.stats = json.loads(data, object_hook=json_deserializer)
 
         deleted = []
         for artifact, stats in self.stats.items():
@@ -725,7 +700,7 @@ class CacheStats(object):
         stats = self.stats.get(artifact.get_identity())
         if not stats:
             return False
-        content, _ = Artifact.load_manifest(artifact.path)
+        content = Artifact.load_manifest(artifact.path)
         content["used"] = stats["used"]
         strategy = ArtifactEvictionStrategyRegister.get().find(
             content.get("expires", "immediately"))
@@ -748,7 +723,7 @@ class CacheStats(object):
         for target in nt:
             path = fs.path.join(self.cache.root, target["name"], target["identity"])
             try:
-                content, _ = Artifact.load_manifest(path)
+                content = Artifact.load_manifest(path)
             except FileNotFoundError as e:
                 continue
             content["used"] = target["used"]
