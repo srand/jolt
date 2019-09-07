@@ -268,4 +268,4 @@ class JenkinsExecutorFactory(scheduler.NetworkExecutorFactory):
             return None
         return JenkinsExecutor(self, task)
 
-log.verbose("Jenkins loaded")
+log.verbose("[Jenkins] Loaded")

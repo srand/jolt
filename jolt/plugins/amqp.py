@@ -740,4 +740,4 @@ class AmqpExecutorFactory(scheduler.NetworkExecutorFactory):
 
 
 
-log.verbose("AMQP loaded")
+log.verbose("[AMQP] Loaded")

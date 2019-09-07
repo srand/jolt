@@ -177,5 +177,5 @@ class FtpStorage(cache.StorageProvider):
 class FtpStorageFactory(cache.StorageProviderFactory):
     @staticmethod
     def create(cache):
-        log.verbose("Ftp loaded")
+        log.verbose("[Ftp] Loaded")
         return FtpStorage(cache)

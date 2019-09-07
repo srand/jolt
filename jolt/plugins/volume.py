@@ -103,7 +103,7 @@ class DiskVolume(cache.StorageProvider):
 class DiskVolumeFactory(cache.StorageProviderFactory):
     @staticmethod
     def create(cache):
-        log.verbose("Volume cache loaded")
+        log.verbose("[Volume] Loaded")
         return DiskVolume(cache)
 
 # vim: et sw=4 ts=4

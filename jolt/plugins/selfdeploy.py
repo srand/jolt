@@ -17,7 +17,7 @@ from jolt import utils
 
 
 
-log.verbose("SelfDeploy loaded")
+log.verbose("[SelfDeploy] Loaded")
 
 _path = fs.path.dirname(__file__)
 _path = fs.path.dirname(_path)

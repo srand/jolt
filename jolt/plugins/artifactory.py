@@ -115,5 +115,5 @@ class Artifactory(cache.StorageProvider):
 class ArtifactoryFactory(cache.StorageProviderFactory):
     @staticmethod
     def create(cache):
-        log.verbose("Artifactory loaded")
+        log.verbose("[Artifactory] Loaded")
         return Artifactory(cache)
