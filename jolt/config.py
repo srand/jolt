@@ -1,5 +1,5 @@
 import base64
-from configparser import SafeConfigParser, NoOptionError
+from configparser import SafeConfigParser, NoOptionError, NoSectionError
 try:
     from StringIO import StringIO
 except:
@@ -31,13 +31,13 @@ def get(section, key, default=None, expand=True):
     try:
         value = _file.get(section, key)
         return utils.expand(value) if expand else value
-    except NoOptionError:
+    except (NoOptionError, NoSectionError):
         return default
 
 def getint(section, key, default=None):
     try:
         return _file.getint(section, key)
-    except NoOptionError:
+    except (NoOptionError, NoSectionError):
         return default
 
 def getsize(section, key, default=None):
@@ -57,19 +57,19 @@ def getsize(section, key, default=None):
             unit not in units,
             "config: unit invalid for '{0}.{1}', expected [B,K,M,G,T]", section, key)
         return int(size)*units[unit]
-    except NoOptionError:
+    except (NoOptionError, NoSectionError):
         return default
 
 def getfloat(section, key, default=None):
     try:
         return _file.getfloat(section, key)
-    except NoOptionError:
+    except (NoOptionError, NoSectionError):
         return default
 
 def getboolean(section, key, default=None):
     try:
         return _file.getboolean(section, key)
-    except NoOptionError:
+    except (NoOptionError, NoSectionError):
         return default
 
 def get_jolthome():
