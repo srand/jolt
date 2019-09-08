@@ -472,8 +472,17 @@ class GraphBuilder(object):
                 for node in reversed(topological_nodes):
                     node.finalize(self.graph, self.manifest)
                     p.update(1)
+
+            max_time = 0
+            min_time = 0
             for node in topological_nodes:
+                max_time += node.task.weight
                 node.task.weight += max([a.weight for a in node.direct_ancestors] + [0])
+                min_time = max(node.task.weight, min_time)
+
+            log.verbose("Time estimate: {}- {}",
+                        utils.duration_diff(min_time),
+                        utils.duration_diff(max_time))
 
         self.graph.goals = []
         for goal in goals:
