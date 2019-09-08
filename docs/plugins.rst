@@ -170,6 +170,24 @@ These configuration keys exist:
   Keyring service identifier. Defaults to ``jenkins``.
 
 
+Logstash (HTTP)
+---------------
+
+The logstash plugin is used to collect task logs into a common place. This is useful
+in distributed execution environments where detailed logs may not always be immediately
+accessible to ordinary users. Unlike the terminal log output, stashed logs are always
+unfiltered and include statements from all log levels as well as exception callstacks.
+
+The plugin is enabled by adding a ``[logstash]`` section in
+the Jolt configuration.
+
+These configuration keys exist:
+
+- ``http.uri`` - An HTTP URL where logs will be stashed. The HTTP PUT method is used.
+- ``failed`` - Boolean. Stash logs when tasks fail.
+- ``finished`` - Boolean. Stash logs when tasks finish successfully.
+
+
 Selfdeploy
 -----------
 

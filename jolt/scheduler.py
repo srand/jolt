@@ -111,8 +111,8 @@ class LocalExecutor(Executor):
                 force_build=self.force_build,
                 force_upload=self.force_upload)
         except Exception as e:
-            self.task.failed()
             log.exception()
+            self.task.failed()
             raise e
         else:
             self.task.finished()
