@@ -49,7 +49,7 @@ class PluginGroup(click.Group):
             log.set_level(log.VERBOSE)
         if ctx.params.get("extra_verbose", False):
             log.set_level(log.DEBUG)
-        config_files = ctx.params.get("config_file")
+        config_files = ctx.params.get("config_file") or []
         for config_file in config_files:
             log.verbose("Config: {0}", config_file)
             config.load_or_set(config_file)
