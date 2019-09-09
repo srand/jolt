@@ -20,7 +20,7 @@ class LogStashHooks(TaskHook):
         raise_error_if(not self._uri, "logstash.http.uri not configured")
 
     def _get_uri(self, task):
-        return "{}/{}-{}".format(
+        return "{}/{}-{}.txt".format(
             self._uri,
             datetime.now().strftime("%Y-%m-%d_%H%M%S.%f"),
             task.canonical_name)
