@@ -28,7 +28,8 @@ class LogStashHooks(TaskHook):
     def _stash_log(self, task):
         with task.tools.tmpdir("logstash") as t:
             filepath = fs.path.join(t.path, "log")
-            task.tools.write_file(filepath, task.logsink_buffer.getvalue())
+            with open(filepath, "w") as f:
+                f.write(task.logsink_buffer.getvalue())
             task.tools.upload(filepath, self._get_uri(task))
 
     def task_started(self, task):
