@@ -737,12 +737,11 @@ class CacheStats(object):
 
 @utils.Singleton
 class ArtifactCache(StorageProvider):
-    root = fs.path.join(fs.path.expanduser("~"), ".cache", "jolt")
     storage_provider_factories = []
 
     def __init__(self, options=None):
+        self.root = config.get_cachedir()
         try:
-            self.root = config.get("jolt", "cachedir") or ArtifactCache.root
             fs.makedirs(self.root)
         except:
             raise_error("failed to create cache directory '{0}'", self.root)

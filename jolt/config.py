@@ -78,6 +78,9 @@ def get_jolthome():
 def get_logpath():
     return get_jolthome()
 
+def get_cachedir():
+    return get("jolt", "cachedir") or fs.path.join(fs.path.expanduser("~"), ".cache", "jolt")
+
 def set(section, key, value):
     if not _file.has_section(section):
         _file.add_section(section)

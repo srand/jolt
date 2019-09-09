@@ -16,7 +16,7 @@ class WeightHooks(TaskHook):
 
     @property
     def dbpath(self):
-        return fs.path.join(config.get_jolthome(), "autoweight.json")
+        return fs.path.join(config.get_cachedir(), "autoweight.json")
 
     def load(self):
         self._tasks = utils.fromjson(self.dbpath, ignore_errors=True)
