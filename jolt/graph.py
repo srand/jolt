@@ -424,20 +424,20 @@ class GraphBuilder(object):
         self.progress = progress
         self.options = options or JoltOptions()
 
-    def _get_node(self, name):
+    def _get_node(self, progress, name):
         node = self.nodes.get(name)
         if not node:
             task = self.registry.get_task(name)
-            node = TaskProxy(task, self.graph, self.options)
-            node = self.nodes.get(node.qualified_name) or self._build_node(node)
-            self.nodes[node.qualified_name] = node
+            node = self.nodes[name] = TaskProxy(task, self.graph, self.options)
+            self._build_node(progress, node)
+            progress.update(1)
         return node
 
-    def _build_node(self, node):
+    def _build_node(self, progress, node):
         self.graph.add_node(node)
 
         if node.task.extends:
-            extended_node = self._get_node(node.task.extends)
+            extended_node = self._get_node(progress, node.task.extends)
             self.graph.add_edges_from([(node, extended_node)])
             node.set_extended_task(extended_node)
             extended_node.add_extension(node)
@@ -446,7 +446,7 @@ class GraphBuilder(object):
             parent = node
 
         for requirement in node.task.requires:
-            child = self._get_node(requirement)
+            child = self._get_node(progress, requirement)
             self.graph.add_edges_from([(parent, child)])
 
         return node
@@ -461,10 +461,11 @@ class GraphBuilder(object):
                 yield p
 
     def build(self, task_list, influence=True):
-        goals = [self._get_node(task) for task in task_list]
-        raise_error_if(not nx.is_directed_acyclic_graph(self.graph),
-                       "there are cyclic task dependencies")
-        self.graph._nodes_by_name = self.nodes
+        with self._progress("Building graph", len(self.graph.tasks), "tasks") as progress:
+            goals = [self._get_node(progress, task) for task in task_list]
+            raise_error_if(not nx.is_directed_acyclic_graph(self.graph),
+                           "there are cyclic task dependencies")
+            self.graph._nodes_by_name = self.nodes
 
         if influence:
             topological_nodes = list(nx.topological_sort(self.graph))
