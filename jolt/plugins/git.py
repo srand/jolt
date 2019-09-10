@@ -1,7 +1,7 @@
 import copy
 
 from jolt.tasks import Resource, Parameter, Export, TaskRegistry
-from jolt.influence import HashInfluenceProvider, HashInfluenceRegistry
+from jolt.influence import HashInfluenceProvider, HashInfluenceRegistry, FileInfluence
 from jolt.tools import Tools
 from jolt.loader import JoltLoader
 from jolt import filesystem as fs
@@ -152,12 +152,13 @@ class LocalGitRepository(GitRepository):
         raise_error("attempt to clone local git repository at '{}'", self.relpath)
 
 
-class GitInfluenceProvider(HashInfluenceProvider):
+class GitInfluenceProvider(FileInfluence):
     name = "Git"
 
     def __init__(self, path):
-        super(GitInfluenceProvider, self).__init__()
-        self.path = fs.path.join(self.joltdir, path)
+        super(GitInfluenceProvider, self).__init__(path)
+        self.path = path
+        self.name = GitInfluenceProvider.name
 
     @property
     def joltdir(self):
@@ -173,8 +174,7 @@ class GitInfluenceProvider(HashInfluenceProvider):
     @utils.cached.instance
     def get_influence(self, task):
         tools = Tools(task)
-
-        path = tools.expand_path(self.path)
+        path = tools.expand_path(fs.path.join(task.joltdir, self.path))
         git_abs = self._find_dotgit(path)
         git_rel = git_abs[len(self.joltdir)+1:]
         relpath = path[len(git_abs)+1:]
@@ -199,11 +199,12 @@ def global_influence(path, cls=GitInfluenceProvider):
 
 def influence(path, git_cls=GitInfluenceProvider):
     def _decorate(cls):
-        _old_init = cls.__init__
-        def _init(self, *args, **kwargs):
-            _old_init(self, *args, **kwargs)
-            self.influence.append(git_cls(path=path))
-        cls.__init__ = _init
+        _old_influence = cls._influence
+        def _influence(self, *args, **kwargs):
+            influence = _old_influence(self, *args, **kwargs)
+            influence.append(git_cls(path=path))
+            return influence
+        cls._influence = _influence
         return cls
     return _decorate
 

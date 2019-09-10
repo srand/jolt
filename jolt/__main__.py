@@ -1,5 +1,4 @@
 #!/usr/bin/python
-import imp
 import os
 import sys
 

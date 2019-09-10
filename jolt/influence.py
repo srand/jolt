@@ -92,11 +92,12 @@ def attribute(name, sort=False):
     """
 
     def _decorate(cls):
-        _old_init = cls.__init__
-        def _init(self, *args, **kwargs):
-            _old_init(self, *args, **kwargs)
-            self.influence.append(TaskAttributeInfluence(name, sort))
-        cls.__init__ = _init
+        _old_influence = cls._influence
+        def _influence(self, *args, **kwargs):
+            influence = _old_influence(self, *args, **kwargs)
+            influence.append(TaskAttributeInfluence(name, sort))
+            return influence
+        cls._influence = _influence
         return cls
     return _decorate
 
@@ -131,11 +132,12 @@ def source(name, obj=None):
 
     """
     def _decorate(cls):
-        _old_init = cls.__init__
-        def _init(self, *args, **kwargs):
-            _old_init(self, *args, **kwargs)
-            self.influence.append(TaskSourceInfluence(name, obj))
-        cls.__init__ = _init
+        _old_influence = cls._influence
+        def _influence(self, *args, **kwargs):
+            influence = _old_influence(self, *args, **kwargs)
+            influence.append(TaskSourceInfluence(name, obj))
+            return influence
+        cls._influence = _influence
         return cls
     return _decorate
 
@@ -170,11 +172,12 @@ class TaskDateInfluence(HashInfluenceProvider):
 
 def _date_influence(fmt):
     def _decorate(cls):
-        _old_init = cls.__init__
-        def _init(self, *args, **kwargs):
-            _old_init(self, *args, **kwargs)
-            self.influence.append(TaskDateInfluence(fmt))
-        cls.__init__ = _init
+        _old_influence = cls._influence
+        def _influence(self, *args, **kwargs):
+            influence = _old_influence(self, *args, **kwargs)
+            influence.append(TaskDateInfluence(fmt))
+            return influence
+        cls._influence = _influence
         return cls
     return _decorate
 
@@ -289,15 +292,18 @@ def environ(variable):
 
     """
     def _decorate(cls):
-        _old_init = cls.__init__
-        def _init(self, *args, **kwargs):
-            _old_init(self, *args, **kwargs)
-            self.influence.append(TaskEnvironmentInfluence(variable))
-        cls.__init__ = _init
+        _old_influence = cls._influence
+        def _influence(self, *args, **kwargs):
+            influence = _old_influence(self, *args, **kwargs)
+            influence.append(TaskEnvironmentInfluence(variable))
+            return influence
+        cls._influence = _influence
         return cls
 
     return _decorate
 
+
+_fi_files = {}
 
 
 class FileInfluence(HashInfluenceProvider):
@@ -305,7 +311,7 @@ class FileInfluence(HashInfluenceProvider):
         self.path = path
         self.name = "File"
 
-    def get_file_influence(self, task, path):
+    def get_file_influence(self, path):
         sha = hashlib.sha1()
         with open(path, "rb") as f:
             for data in iter(lambda: f.read(0x10000), b''):
@@ -318,10 +324,15 @@ class FileInfluence(HashInfluenceProvider):
         files.sort()
         for f in files:
             f = task.tools.expand_path(f)
-            if fs.path.exists(f):
-                result.append(fs.path.basename(f) + ":" + self.get_file_influence(task, f))
+            value = _fi_files.get(f)
+            if value:
+                result.append(value)
+            elif fs.path.exists(f):
+                _fi_files[f] = value = fs.path.basename(f) + ":" + self.get_file_influence(f)
+                result.append(value)
             elif fs.path.lexists(f):
-                result.append(fs.path.basename(f) + ": Symlink (broken)")
+                _fi_files[f] = value = fs.path.basename(f) + ": Symlink (broken)"
+                result.append(value)
 
         return "\n".join(result)
 
@@ -347,11 +358,12 @@ def files(pathname):
 
     """
     def _decorate(cls):
-        _old_init = cls.__init__
-        def _init(self, *args, **kwargs):
-            _old_init(self, *args, **kwargs)
-            self.influence.append(FileInfluence(pathname))
-        cls.__init__ = _init
+        _old_influence = cls._influence
+        def _influence(self, *args, **kwargs):
+            influence = _old_influence(self, *args, **kwargs)
+            influence.append(FileInfluence(pathname))
+            return influence
+        cls._influence = _influence
         return cls
 
     return _decorate

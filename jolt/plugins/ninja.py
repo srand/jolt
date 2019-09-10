@@ -680,6 +680,8 @@ class CXXProject(Task):
         if self.source_influence:
             for source in self.sources:
                 self.influence.append(influence.FileInfluence(source))
+        else:
+            self._verify_influence()
         self._init_variables()
         self._init_rules()
         self._rule_map = Toolchain.build_rule_map(self)
@@ -697,6 +699,18 @@ class CXXProject(Task):
 
     def _init_sources(self):
         self.sources = utils.as_list(utils.call_or_return(self, self.__class__._sources))
+
+    def _verify_influence(self):
+        sources = set(self.sources)
+        for ip in self.influence:
+            if not isinstance(ip, influence.FileInfluence):
+                continue
+            ok = [source for source in sources
+                  if self.expand(source).startswith(self.expand(ip.path))]
+            sources.difference_update(ok)
+        for source in sources:
+            log.warning("Missing influence: {} ({})", source, self.name)
+            self.influence.append(influence.FileInfluence(source))
 
     def _expand_sources(self):
         sources = []

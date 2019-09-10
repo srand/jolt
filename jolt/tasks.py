@@ -458,13 +458,16 @@ class TaskBase(object):
             len(self.extends) != 1, self,
             "multiple tasks extended, only one allowed")
         self.extends = self.extends[0]
-        self.influence = utils.as_list(self.__class__.influence)
+        self.influence = utils.call_or_return_list(self, self.__class__._influence)
         self.influence.append(TaskSourceInfluence("publish"))
         self.influence.append(TaskSourceInfluence("run"))
         self.influence.append(TaskSourceInfluence("unpack"))
         self.requires = self.expand(utils.call_or_return_list(self, self.__class__._requires))
         self.selfsustained = utils.call_or_return(self, self.__class__._selfsustained)
         self.tools = Tools(self, self.joltdir)
+
+    def _influence(self):
+        return utils.as_list(self.__class__.influence)
 
     def _requires(self):
         return utils.call_or_return_list(self, self.__class__.requires)
