@@ -133,15 +133,22 @@ class duration(object):
 
     def __str__(self):
         elapsed = self.seconds
+        if elapsed >= 3600:
+            return time.strftime("%Hh %Mmin %Ss", time.gmtime(elapsed))
         if elapsed >= 60:
-            return "%dmin %02ds" % (elapsed/60, elapsed%60)
-        return "%02ds" % elapsed
+            return time.strftime("%Mmin %Ss", time.gmtime(elapsed))
+        return time.strftime("%Ss", time.gmtime(elapsed))
 
     def __le__(self, d):
         now = time.time()
         elapsed1 = now - self._time
         elapsed2 = now - d._time
         return elapsed1 < elapsed2
+
+    def __sub__(self, delta):
+        assert type(delta) in [int, float]
+        self._time -= int(delta+.5)
+        return self
 
     def diff(self, d):
         if d is None:

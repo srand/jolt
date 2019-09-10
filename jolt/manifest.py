@@ -14,7 +14,7 @@ class _JoltAttribute(SubElement):
 
 
 @Attribute('path')
-@Attribute('source', child=True)
+@Attribute('source', child=True, zlib=True)
 class _JoltRecipe(SubElement):
     def __init__(self, elem=None):
         super(_JoltRecipe, self).__init__('recipe', elem=elem)
@@ -48,7 +48,11 @@ class _JoltNetworkParameter(SubElement):
         super(_JoltNetworkParameter, self).__init__('parameter', elem=elem)
 
 
-@Attribute("config", child=True)
+@Attribute("config", child=True, zlib=True)
+@Attribute("stdout", child=True, zlib=True)
+@Attribute("stderr", child=True, zlib=True)
+@Attribute("result", child=True)
+@Attribute("duration", child=True)
 @Composition(_JoltRecipe, "recipe")
 @Composition(_JoltTask, "task")
 @Composition(_JoltBuild, "build")
@@ -82,12 +86,16 @@ class JoltManifest(ElementTree):
         with open(filepath) as f:
             data = f.read().replace("\n  ", "")
             data = data.replace("\n", "")
-            root = ET.fromstring(data)
-            self._setroot(root)
-            self._elem = root
+            self.parsestring(data)
             log.verbose("Loaded: {0}", filepath)
             return self
         raise Exception("failed to parse xml file")
+
+    def parsestring(self, string):
+        root = ET.fromstring(string)
+        self._setroot(root)
+        self._elem = root
+        return self
 
     def format(self):
         return minidom.parseString(ET.tostring(self.getroot())).toprettyxml(indent="  ")

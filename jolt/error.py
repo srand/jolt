@@ -32,3 +32,27 @@ def raise_error_if(condition, *args, **kwargs):
 def raise_task_error_if(condition, task, *args, **kwargs):
     if condition:
         raise_task_error(task, *args, **kwargs)
+
+
+class raise_error_on_exception(object):
+    def __init__(self, message):
+        self.message = message
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, type, value, tb):
+        raise_error_if(value, self.message)
+
+
+class raise_task_error_on_exception(object):
+    def __init__(self, task, *args, **kwargs):
+        self.task = task
+        self.args = args
+        self.kwargs = kwargs
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, type, value, tb):
+        raise_task_error_if(value, self.task, *self.args, **self.kwargs)

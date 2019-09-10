@@ -253,8 +253,8 @@ class TaskProxy(object):
         self.duration_running = utils.duration()
         hooks.task_started(self)
 
-    def running(self):
-        self.duration_running = utils.duration()
+    def running(self, when=None):
+        self.duration_running = utils.duration() if not when else when
 
     def failed(self, what="Execution"):
         self.error("{0} failed after {1} {2}", what,

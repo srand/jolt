@@ -1,3 +1,6 @@
+from base64 import decodestring as base64_decodestring
+from base64 import encodestring as base64_encodestring
+import codecs
 from xml.etree.ElementTree import Element
 from xml.etree.ElementTree import ElementTree
 from xml.etree import ElementTree as ET
@@ -49,14 +52,19 @@ class SubElement(object):
 
 
 class Attribute(object):
-    def __init__(self, attribute, varname=None, child=False, values=None):
+    def __init__(self, attribute, varname=None, child=False, values=None, base64=False, zlib=False):
         self.attribute = attribute
         self.varname = varname if varname is not None else attribute.lower()
         self.child = child
         self.values = values
+        self.base64 = base64 or zlib
+        self.zlib = zlib
 
     def __call__(self, cls):
         def decorate(cls, attribute, varname, child, values):
+            base64 = self.base64
+            zlib = self.zlib
+
             def _check_value(value, values):
                 if values and value not in values:
                     raise ValueError('{0} is not one of {1}'.format(value, values))
@@ -64,7 +72,13 @@ class Attribute(object):
             def attr_get(self):
                 if attribute not in self.attrib:
                     return ''
-                return self.get(attribute)
+                value = self.get(attribute)
+                if base64:
+                    value = base64_decodestring(value.encode())
+                    if zlib:
+                        value = codecs.decode(value, "zlib")
+                    value = value.decode()
+                return value
 
             def attr_set(self, value):
                 if value is None:
@@ -75,6 +89,11 @@ class Attribute(object):
                     finally:
                         return
                 _check_value(value, values)
+                if base64:
+                    value = value.encode()
+                    if zlib:
+                        value = codecs.encode(value, "zlib")
+                    value = base64_encodestring(value).decode()
                 return self.set(attribute, value)
 
             def child_get(self):
@@ -82,7 +101,14 @@ class Attribute(object):
                     e = SubElement(attribute, elem=self._elem.find(attribute))
                     setattr(self, '_'+varname, e)
                 value = getattr(self, '_'+varname).text
-                return str(value) if value is not None else None
+                if value is None:
+                    return None
+                if base64:
+                    value = base64_decodestring(value.encode())
+                    if zlib:
+                        value = codecs.decode(value, "zlib")
+                    value = value.decode()
+                return str(value)
 
             def child_set(self, value):
                 _check_value(value, values)
@@ -91,6 +117,11 @@ class Attribute(object):
                     e = SubElement(attribute)
                     self.append(e)
                     setattr(self, '_'+varname, e)
+                if base64:
+                    value = value.encode()
+                    if zlib:
+                        value = codecs.encode(value, "zlib")
+                    value = base64_encodestring(value).decode()
                 getattr(self,'_'+varname).text = value
 
             if not child:

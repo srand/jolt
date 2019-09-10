@@ -17,7 +17,10 @@ from jolt import scheduler
 from jolt import utils
 from jolt.manifest import JoltManifest
 from jolt.tools import Tools
-from jolt.error import JoltCommandError, raise_error
+from jolt.error import JoltCommandError
+from jolt.error import raise_error
+from jolt.error import raise_task_error_if
+from jolt.error import raise_task_error_on_exception
 
 
 NAME = "amqp"
@@ -407,6 +410,7 @@ class WorkerTaskConsumer(object):
                 for recipe in tools.glob("*.jolt"):
                     tools.unlink(recipe)
 
+                duration = None
                 try:
                     jolt = self.selfdeploy()
                     config_file = config.get("amqp", "config", "")
@@ -414,19 +418,42 @@ class WorkerTaskConsumer(object):
                         config_file = "-c " + config_file
 
                     log.info("Running jolt")
+                    duration = utils.duration()
                     tools.run("{} -vv {} build --worker", jolt, config_file, output_stdio=True)
                 except JoltCommandError as e:
-                    self.response = ["FAILED"]
-                    self.response.extend(e.stdout)
-                    self.response.extend(e.stderr)
-                    self.response = "\n".join(self.response)
+                    self.response = ""
+                    try:
+                        manifest = JoltManifest()
+                        manifest.result = "FAILED"
+                        manifest.duration = str(duration.seconds)
+                        manifest.stdout = "\n".join(e.stdout)
+                        manifest.stderr = "\n".join(e.stderr)
+                        self.response = manifest.format()
+                    except:
+                        log.exception()
                     log.error("Task failed")
                 except Exception as e:
-                    self.response = "FAILED\n"
-                    log.error("Task failed")
                     log.exception()
+                    self.response = ""
+                    try:
+                        manifest = JoltManifest()
+                        manifest.result = "FAILED"
+                        manifest.duration = str(duration.seconds)
+                        manifest.stdout = "\n".join(e.stdout)
+                        manifest.stderr = "\n".join(e.stderr)
+                        self.response = manifest.format()
+                    except:
+                        log.exception()
+                    log.error("Task failed")
                 else:
-                    self.response = "SUCCESS\n"
+                    self.response = ""
+                    try:
+                        manifest = JoltManifest()
+                        manifest.result = "SUCCESS"
+                        manifest.duration = str(duration.seconds)
+                        self.response = manifest.format()
+                    except:
+                        log.exception()
                     log.info("Task succeeded")
 
                 self.consumer.add_on_job_completed_callback(self)
@@ -635,30 +662,32 @@ class AmqpExecutor(scheduler.NetworkExecutor):
 
         log.debug("[AMQP] Finished {0}", self.task.short_qualified_name)
 
-        result = self.response.splitlines()
-        output = result[1:]
-        result = result[0]
+        manifest = JoltManifest()
+        with raise_task_error_on_exception(self.task, "failed to parse build result manifest"):
+            manifest.parsestring(self.response)
 
-        if result[0] != "SUCCESS":
+        self.task.running(utils.duration() - float(manifest.duration))
+
+        if manifest.result != "SUCCESS":
+            output = []
+            output.extend(manifest.stdout.split("\n"))
+            output.extend(manifest.stderr.split("\n"))
             for line in output:
                 log.transfer(line, self.task.identity[:8])
-            assert result == "SUCCESS", \
-                "[AMQP] remote build failed with status: {0}".format(result)
+            raise_error("[AMQP] remote build failed with status: {0}".format(manifest.result))
 
-        assert env.cache.is_available_remotely(self.task), \
-            "[AMQP] no artifact produced for {0}, check configuration"\
-            .format(self.task.qualified_name)
+        raise_task_error_if(
+            not env.cache.is_available_remotely(self.task), self.task,
+            "no task artifact available in any cache, check configuration")
 
-        assert env.cache.download(self.task) or \
-            not env.cache.download_enabled(), \
-            "[AMQP] failed to download artifact for {0}"\
-            .format(self.task.qualified_name)
+        raise_task_error_if(
+            not env.cache.download(self.task) and env.cache.download_enabled(),
+            self.task, "failed to download task artifact")
 
         for extension in self.task.extensions:
-            assert env.cache.download(extension) or \
-                not env.cache.download_enabled(), \
-                "[AMQP] failed to download artifact for {0}"\
-                .format(extension.qualified_name)
+            raise_task_error_if(
+                not env.cache.download(extension) and env.cache.download_enabled(),
+                self.task, "failed to download task artifact")
 
         return self.task
 
@@ -739,7 +768,6 @@ class AmqpExecutorFactory(scheduler.NetworkExecutorFactory):
 
     def create(self, task):
         return AmqpExecutor(self, task)
-
 
 
 log.verbose("[AMQP] Loaded")
