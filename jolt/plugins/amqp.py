@@ -3,6 +3,8 @@ import functools
 import getpass
 import keyring
 import pika
+from pika.exceptions import AMQPConnectionError
+from pika.adapters.utils.connection_workflow import AMQPConnectorStackTimeout
 import threading
 import time
 import uuid
@@ -627,7 +629,7 @@ class AmqpExecutor(scheduler.NetworkExecutor):
         while self.response is None:
             try:
                 self.connection.process_data_events(None)
-            except (ConnectionError, pika.exceptions.AMQPConnectionError):
+            except (ConnectionError, AMQPConnectionError):
                 log.warning("[AMQP] Lost server connection")
                 self.connect()
 
@@ -660,7 +662,7 @@ class AmqpExecutor(scheduler.NetworkExecutor):
 
         return self.task
 
-    @utils.retried.on_exception((ConnectionError, pika.exceptions.AMQPConnectionError))
+    @utils.retried.on_exception((ConnectionError, AMQPConnectionError, AMQPConnectorStackTimeout))
     def connect(self):
         self.connection = pika.BlockingConnection(
             parameters=pika.URLParameters(_get_url()))
@@ -709,7 +711,7 @@ class AmqpExecutor(scheduler.NetworkExecutor):
             for extension in self.task.extensions:
                 extension.finished(TYPE)
             self.task.finished(TYPE)
-        except (ConnectionError, pika.exceptions.AMQPConnectionError) as e:
+        except (ConnectionError, AMQPConnectionError) as e:
             log.exception()
             for extension in self.task.extensions:
                 extension.failed(TYPE)
