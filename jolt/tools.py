@@ -138,6 +138,8 @@ class _tmpdir(object):
             dirname = self._cwd
             fs.makedirs(fs.path.join(dirname, fs.path.dirname(self._name)))
             self._path = fs.mkdtemp(prefix=self._name + "-", dir=dirname)
+        except KeyboardInterrupt as e:
+            raise e
         except:
             raise
         raise_error_if(not self._path, "failed to create temporary directory")
@@ -456,12 +458,13 @@ class Tools(object):
         finally:
             self._cwd = prev
 
-    def download(self, url, pathname, **kwargs):
+    def download(self, url, pathname, exceptions=False, **kwargs):
         """ Downloads a file using HTTP.
 
         Args:
            url (str): URL to the file to be downloaded.
            pathname (str): Name/path of destination file.
+           exceptions (boolean): Raise exception if connection fails. Default: false.
            kwargs (optional): Addidional keyword arguments passed on
                directly ``requests.get()``.
 
@@ -481,8 +484,12 @@ class Tools(object):
             if response.status_code not in [200, 404]:
                 log.verbose("Server response {} for {}", response.status_code, url)
             return response.status_code == 200
-        except:
+        except KeyboardInterrupt as e:
+            raise e
+        except Exception as e:
             log.exception()
+            if exceptions:
+                raise e
             return False
 
     @contextmanager
@@ -649,6 +656,8 @@ class Tools(object):
         pathname = self.expand_path(pathname)
         try:
             stat = os.stat(pathname)
+        except KeyboardInterrupt as e:
+            raise e
         except:
             raise_task_error(self._task, "file not found '{0}'", pathname)
         else:
@@ -759,6 +768,8 @@ class Tools(object):
             data = data.replace(search, replace)
             with open(pathname, "wb") as f:
                 f.write(data.encode())
+        except KeyboardInterrupt as e:
+            raise e
         except:
             raise_task_error(self._task, "failed to replace string in file '{0}'", pathname)
 
@@ -810,6 +821,8 @@ class Tools(object):
                 stdi = termios.tcgetattr(sys.stdin.fileno())
                 stdo = termios.tcgetattr(sys.stdout.fileno())
                 stde = termios.tcgetattr(sys.stderr.fileno())
+            except KeyboardInterrupt as e:
+                raise e
             except:
                 pass
             return _run(cmd, self._cwd, self._env, *args, **kwargs)
@@ -878,6 +891,8 @@ class Tools(object):
         if value is None:
             try:
                 del self._env[key]
+            except KeyboardInterrupt as e:
+                raise e
             except:
                 pass
         else:
@@ -932,12 +947,13 @@ class Tools(object):
         pathname = self.expand_path(pathname, *args, **kwargs)
         return fs.unlink(pathname)
 
-    def upload(self, pathname, url, auth=None, **kwargs):
+    def upload(self, pathname, url, exceptions=False, auth=None, **kwargs):
         """ Uploads a file using HTTP (PUT).
 
         Args:
            pathname (str): Name/path of file to be uploaded.
            url (str): Destination URL.
+           exceptions (boolean): Raise exception if connection fails. Default: false.
            auth (requests.auth.AuthBase, optional): Authentication helper.
                See requests.auth for details.
            kwargs (optional): Addidional keyword arguments passed on
@@ -959,9 +975,12 @@ class Tools(object):
                 if response.status_code not in [201, 204]:
                     log.verbose("Server response {} for {}", response.status_code, url)
                 return response.status_code in [201, 204]
-        except:
+        except KeyboardInterrupt as e:
+            raise e
+        except Exception as e:
             log.exception()
-            pass
+            if exceptions:
+                raise e
         return False
 
     def read_file(self, pathname, binary=False):
