@@ -716,7 +716,7 @@ class AmqpExecutor(scheduler.NetworkExecutor):
         log.debug("[AMQP] Established connection to server")
 
     def on_response(self, channel, basic_deliver, properties, body):
-        log.debug("[AMQP] Completion of {}, expecting {}", properties.correlation_id, self.corr_id)
+        # log.debug("[AMQP] Completion of {}, expecting {}", properties.correlation_id, self.corr_id)
         if self.corr_id == properties.correlation_id:
             self.response = body.decode()
             channel.basic_ack(basic_deliver.delivery_tag)
