@@ -558,13 +558,6 @@ class TaskBase(object):
             if param.is_set()
         }
 
-    def _get_properties(self):
-        return {
-            key: str(getattr(self, key))
-            for key in dir(self)
-            if utils.is_str(getattr(self, key))
-        }
-
     def __str__(self):
         return str(self.name)
 
@@ -579,8 +572,7 @@ class TaskBase(object):
         """
 
         try:
-            kwargs.update(**self._get_parameters())
-            kwargs.update(**self._get_properties())
+            kwargs["_instance"] = self
             if type(string_or_list) == list:
                 return [utils.expand(string, *args, **kwargs) for string in string_or_list]
             return utils.expand(string_or_list, *args, **kwargs)

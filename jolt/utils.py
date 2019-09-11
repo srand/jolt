@@ -114,6 +114,8 @@ class _SafeDict(object):
     def __getitem__(self, key):
         value = self.values.get(key)
         if value is None:
+            value = call_and_catch(getattr, self.values.get("_instance", object()), key)
+        if value is None:
             value = self._envget(key)
         if value is not None:
             return value
