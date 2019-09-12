@@ -1,6 +1,6 @@
 import copy
 
-from jolt.tasks import Resource, Parameter, Export, TaskRegistry
+from jolt.tasks import Resource, Parameter, BooleanParameter, Export, TaskRegistry
 from jolt.influence import HashInfluenceProvider, HashInfluenceRegistry, FileInfluence
 from jolt.tools import Tools
 from jolt.loader import JoltLoader
@@ -108,10 +108,12 @@ class GitRepository(object):
                 tree = self.write_tree()
             else:
                 try:
-                    tree = self.tools.run("git rev-parse {0}^{tree}".format(sha), output=False)
+                    with self.tools.cwd(self.path):
+                        tree = self.tools.run("git rev-parse {0}^{{tree}}", sha, output=False)
                 except:
-                    self.fetch()
-                    tree = self.tools.run("git rev-parse {0}^{tree}".format(sha), output_on_error=True)
+                    with self.tools.cwd(self.path):
+                        self.fetch()
+                        tree = self.tools.run("git rev-parse {0}^{{tree}}", sha, output_on_error=True)
             if path == "/":
                 return tree
             with self.tools.cwd(self.path):
@@ -217,6 +219,7 @@ class GitSrc(Resource):
     url = Parameter(help="URL to the git repo to be cloned. Required.")
     sha = Parameter(required=False, help="Specific commit or tag to be checked out. Optional.")
     path = Parameter(required=False, help="Local path where the repository should be cloned.")
+    defer = BooleanParameter(False, help="Defer cloning until a consumer task must be built.")
     _revision = Export(value=lambda self: self._get_revision() or self.git.head())
     _diff = Export(value=lambda self: self.git.diff(), encoded=True)
 
@@ -227,6 +230,7 @@ class GitSrc(Resource):
         self.abspath = fs.path.join(self.joltdir, self.relpath)
         self.refspecs = kwargs.get("refspecs", [])
         self.git = GitRepository(self.url, self.abspath, self.relpath, self.refspecs)
+        self.influence.append(self)
 
     @utils.cached.instance
     def _get_name(self):
@@ -257,11 +261,17 @@ class GitSrc(Resource):
             self.git.clean()
             self.git.patch(self._get_diff())
 
+    @utils.cached.instance
+    def get_influence(self, task):
+        if self.defer.is_false and not self.git.is_cloned():
+            self.git.clone()
+        return "Enabled"
+
 
 TaskRegistry.get().add_task_class(GitSrc)
 
 
-class Git(GitSrc, HashInfluenceProvider):
+class Git(GitSrc):
     """ Clones a Git repo.
 
     Also influences the hash of consuming tasks, causing tasks to
@@ -272,12 +282,12 @@ class Git(GitSrc, HashInfluenceProvider):
     url = Parameter(help="URL to the git repo to be cloned. Required.")
     sha = Parameter(required=False, help="Specific commit or tag to be checked out. Optional.")
     path = Parameter(required=False, help="Local path where the repository should be cloned.")
+    defer = None
     _revision = Export(value=lambda self: self._get_revision())
     _diff = Export(value=lambda self: self.git.diff(), encoded=True)
 
     def __init__(self, *args, **kwargs):
         super(Git, self).__init__(*args, **kwargs)
-        self.influence.append(self)
 
     @utils.cached.instance
     def get_influence(self, task):
