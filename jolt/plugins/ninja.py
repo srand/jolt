@@ -46,6 +46,16 @@ class ProjectVariable(Variable):
         writer.variable(self.name, str(value))
 
 
+class SharedLibraryVariable(Variable):
+    def __init__(self, name=None, default=None):
+        self.name = name
+        self._default = default
+
+    def create(self, project, writer, deps, tools):
+        value = self._default if isinstance(project, CXXLibrary) and project.shared else ""
+        writer.variable(self.name, str(value))
+
+
 class Rule(object):
     """ A source transformation rule.
 
@@ -433,6 +443,8 @@ class GNUToolchain(Toolchain):
     cxxflags = EnvironmentVariable(default="")
     ldflags = EnvironmentVariable(default="")
 
+    shared_flags = SharedLibraryVariable(default="-fPIC")
+
     extra_asflags = ProjectVariable(attrib="asflags")
     extra_cflags = ProjectVariable(attrib="cflags")
     extra_cxxflags = ProjectVariable(attrib="cxxflags")
@@ -444,7 +456,7 @@ class GNUToolchain(Toolchain):
     libraries = Libraries(prefix="-l")
 
     compile_c = GNUCompiler(
-        command="$cc -x c -fdebug-prefix-map=$joltdir/= $cflags $extra_cflags $macros $incpaths -MMD -MF $out.d -c $in -o $out",
+        command="$cc -x c -fdebug-prefix-map=$joltdir/= $cflags $shared_flags $extra_cflags $macros $incpaths -MMD -MF $out.d -c $in -o $out",
         deps="gcc",
         depfile="$out.d",
         infiles=[".c"],
@@ -452,7 +464,7 @@ class GNUToolchain(Toolchain):
         variables={"desc": "[C] {in_base}{in_ext}"})
 
     compile_cxx = GNUCompiler(
-        command="$cxx -x c++ -fdebug-prefix-map=$joltdir/= $cxxflags $extra_cxxflags $macros $incpaths -MMD -MF $out.d -c $in -o $out",
+        command="$cxx -x c++ -fdebug-prefix-map=$joltdir/= $cxxflags $shared_flags $extra_cxxflags $macros $incpaths -MMD -MF $out.d -c $in -o $out",
         deps="gcc",
         depfile="$out.d",
         infiles=[".cc", ".cpp", ".cxx"],
@@ -460,7 +472,7 @@ class GNUToolchain(Toolchain):
         variables={"desc": "[CXX] {in_base}{in_ext}"})
 
     compile_asm = GNUCompiler(
-        command="$cc -x assembler -fdebug-prefix-map=$joltdir/= $asflags $extra_asflags -MMD -MF $out.d -c $in -o $out",
+        command="$cc -x assembler -fdebug-prefix-map=$joltdir/= $asflags $shared_flags $extra_asflags -MMD -MF $out.d -c $in -o $out",
         deps="gcc",
         depfile="$out.d",
         infiles=[".s", ".asm"],
@@ -468,7 +480,7 @@ class GNUToolchain(Toolchain):
         variables={"desc": "[ASM] {in_base}{in_ext}"})
 
     compile_asm_with_cpp = GNUCompiler(
-        "$cc -x assembler-with-cpp -fdebug-prefix-map=$joltdir/= $cflags $extra_cflags $macros $incpaths -MMD -MF $out.d -c $in -o $out",
+        "$cc -x assembler-with-cpp -fdebug-prefix-map=$joltdir/= $asflags $shared_flags $extra_asflags $macros $incpaths -MMD -MF $out.d -c $in -o $out",
         deps="gcc",
         depfile="$out.d",
         infiles=[".S"],
@@ -484,6 +496,17 @@ class GNUToolchain(Toolchain):
             "$objcopy --add-gnu-debuglink=$outdir/.debug/$binary $out"
         ]),
         outfiles=["{outdir}/{binary}"],
+        variables={"desc": "[LINK] {binary}"})
+
+    dynlinker = GNULinker(
+        command=" && ".join([
+            "$ld $ldflags -shared $extra_ldflags $libpaths -Wl,--start-group @objects.list -Wl,--end-group -o $out -Wl,--start-group $libraries -Wl,--end-group",
+            "mkdir -p $outdir/.debug",
+            "$objcopy --only-keep-debug $out $outdir/.debug/$binary",
+            "$objcopy --strip-all $out",
+            "$objcopy --add-gnu-debuglink=$outdir/.debug/$binary $out"
+        ]),
+        outfiles=["{outdir}/lib{binary}.so"],
         variables={"desc": "[LINK] {binary}"})
 
     archiver = GNUArchiver(
@@ -882,15 +905,18 @@ class CXXLibrary(CXXProject):
         super(CXXLibrary, self)._populate_inputs(writer, deps, tools)
 
     def _populate_project(self, writer, deps, tools):
-        self.toolchain.archiver.build(self, writer, self.objects)
+        if self.shared:
+            self.toolchain.dynlinker.build(self, writer, self.objects)
+        else:
+            self.toolchain.archiver.build(self, writer, self.objects)
 
     def publish(self, artifact, tools):
         with tools.cwd(self.outdir):
-            artifact.collect("*{binary}.a", "lib/")
-            artifact.collect("*{binary}.dll", "lib/")
-            artifact.collect("*{binary}.lib", "lib/")
-            artifact.collect("*{binary}.so", "lib/")
-        artifact.cxxinfo.libpaths.append("lib")
+            artifact.collect("*{binary}.a", self.publishdir)
+            artifact.collect("*{binary}.dll", self.publishdir)
+            artifact.collect("*{binary}.lib", self.publishdir)
+            artifact.collect("*{binary}.so", self.publishdir)
+        artifact.cxxinfo.libpaths.append(self.publishdir)
         artifact.cxxinfo.libraries.append(self.binary)
 
 CXXLibrary.__doc__ += CXXProject.__doc__
