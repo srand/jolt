@@ -48,6 +48,8 @@ class EnvironmentVariableSet(ArtifactAttributeSet):
     def create(self, name):
         if name == "PATH":
             return PathEnvironmentVariable(name)
+        if name == "PYTHONPATH":
+            return PathEnvironmentVariable(name)
         if name == "LD_LIBRARY_PATH":
             return PathEnvironmentVariable(name)
         if name == "PKG_CONFIG_PATH":
