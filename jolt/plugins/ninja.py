@@ -292,7 +292,6 @@ class GNUDepImporter(Rule):
         return imports
 
 
-
 class Toolchain(object):
     def __init__(self):
         self._rule_map = self.build_rule_map(self)
@@ -376,7 +375,7 @@ class LibraryPaths(Variable):
         self.prefix = prefix or ''
 
     def create(self, project, writer, deps, tools):
-        if not isinstance(project, CXXExecutable):
+        if isinstance(project, CXXLibrary) and not project.shared:
             return
         libpaths = [tools.expand_path(path) for path in project.libpaths]
         for name, artifact in deps.items():
@@ -392,7 +391,7 @@ class Libraries(Variable):
         self.suffix = suffix or ''
 
     def create(self, project, writer, deps, tools):
-        if not isinstance(project, CXXExecutable):
+        if isinstance(project, CXXLibrary) and not project.shared:
             return
         libraries = [tools.expand(lib) for lib in project._libraries()]
         for name, artifact in deps.items():
@@ -593,6 +592,9 @@ else:
 @influence.attribute("cxxflags")
 @influence.attribute("depimports")
 @influence.attribute("incpaths")
+@influence.attribute("ldflags")
+@influence.attribute("libpaths")
+@influence.attribute("libraries")
 @influence.attribute("macros")
 @influence.attribute("sources")
 @influence.attribute("binary")
@@ -641,6 +643,15 @@ class CXXProject(Task):
 
     incpaths = []
     """ List of preprocessor include paths """
+
+    libpaths = []
+    """ A list of library search paths used when linking. """
+
+    libraries = []
+    """ A list of libraries to link with. """
+
+    ldflags = []
+    """ A list of linker flags to use. """
 
     macros = []
     """ List of preprocessor macros to set """
@@ -693,12 +704,15 @@ class CXXProject(Task):
         self._init_sources()
         self.toolchain = self.__class__.toolchain() if self.__class__.toolchain else toolchain
         self.asflags = utils.as_list(utils.call_or_return(self, self.__class__._asflags))
+        self.binary = self.expand(self.__class__.binary or self.canonical_name)
         self.cflags = utils.as_list(utils.call_or_return(self, self.__class__._cflags))
         self.cxxflags = utils.as_list(utils.call_or_return(self, self.__class__._cxxflags))
         self.depimports = utils.as_list(utils.call_or_return(self, self.__class__._depimports))
-        self.macros = utils.as_list(utils.call_or_return(self, self.__class__._macros))
         self.incpaths = utils.as_list(utils.call_or_return(self, self.__class__._incpaths))
-        self.binary = self.expand(self.__class__.binary or self.canonical_name)
+        self.ldflags = utils.as_list(utils.call_or_return(self, self.__class__._ldflags))
+        self.libpaths = utils.as_list(utils.call_or_return(self, self.__class__._libpaths))
+        self.libraries = utils.as_list(utils.call_or_return(self, self.__class__._libraries))
+        self.macros = utils.as_list(utils.call_or_return(self, self.__class__._macros))
         self.publishdir = self.expand(self.__class__.publishdir or '')
         if self.source_influence:
             for source in self.sources:
@@ -842,6 +856,15 @@ if __name__ == "__main__":
     def _incpaths(self):
         return utils.call_or_return(self, self.__class__.incpaths)
 
+    def _ldflags(self):
+        return utils.call_or_return(self, self.__class__.ldflags)
+
+    def _libpaths(self):
+        return utils.call_or_return(self, self.__class__.libpaths)
+
+    def _libraries(self):
+        return utils.call_or_return(self, self.__class__.libraries)
+
     def _macros(self):
         return utils.call_or_return(self, self.__class__.macros)
 
@@ -922,9 +945,6 @@ class CXXLibrary(CXXProject):
 CXXLibrary.__doc__ += CXXProject.__doc__
 
 
-@influence.attribute("ldflags")
-@influence.attribute("libpaths")
-@influence.attribute("libraries")
 @influence.attribute("strip")
 class CXXExecutable(CXXProject):
     """
@@ -934,15 +954,6 @@ class CXXExecutable(CXXProject):
     abstract = True
     selfsustained = True
 
-    libpaths = []
-    """ A list of library search paths used when linking. """
-
-    libraries = []
-    """ A list of libraries to link with. """
-
-    ldflags = []
-    """ A list of linker flags to use. """
-
     publishdir = "bin/"
     """ The artifact path where the binary is published. """
 
@@ -951,9 +962,6 @@ class CXXExecutable(CXXProject):
 
     def __init__(self, *args, **kwargs):
         super(CXXExecutable, self).__init__(*args, **kwargs)
-        self.ldflags = utils.as_list(utils.call_or_return(self, self.__class__._ldflags))
-        self.libpaths = utils.as_list(utils.call_or_return(self, self.__class__._libpaths))
-        self.libraries = utils.as_list(utils.call_or_return(self, self.__class__._libraries))
         self.strip = utils.call_or_return(self, self.__class__._strip)
 
     def _populate_inputs(self, writer, deps, tools):
@@ -965,15 +973,6 @@ class CXXExecutable(CXXProject):
 
     def _strip(self):
         return utils.call_or_return(self, self.__class__.strip)
-
-    def _ldflags(self):
-        return utils.call_or_return(self, self.__class__.ldflags)
-
-    def _libpaths(self):
-        return utils.call_or_return(self, self.__class__.libpaths)
-
-    def _libraries(self):
-        return utils.call_or_return(self, self.__class__.libraries)
 
     def publish(self, artifact, tools):
         with tools.cwd(self.outdir):
