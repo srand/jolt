@@ -77,7 +77,7 @@ def parse_task_name(name):
         params = params.split(",")
         def _param(param):
             if "=" in param:
-                key, value = param.split("=")
+                key, value = param.split("=", 1)
             else:
                 key, value = param, None
             return key, value
