@@ -230,6 +230,25 @@ class Artifact(object):
                 artifact.environ.JAVA_HOME = artifact.final_path
     """
 
+    python = {}
+    """ Artifact Python configuration.
+
+    A task can add Python configuration to an artifact. Such configuration
+    will automatically be set in the environment when consumer tasks are
+    executed. A common use-case is to add Python modules to the PATH so that
+    they can be easily imported by a consumer.
+
+    Values appended to PATH-type variables are relative to the artifact
+    root. They will be automatically expanded to absolute paths.
+
+    Example:
+
+        .. code-block:: python
+
+            def publish(self, artifact, tools):
+                artifact.python.PATH.append("my_module")
+    """
+
     strings = {}
     """ Artifact strings.
 

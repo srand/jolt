@@ -24,6 +24,8 @@ if not _file.has_section("cxxinfo"):
     _file.add_section("cxxinfo")
 if not _file.has_section("environ"):
     _file.add_section("environ")
+if not _file.has_section("python"):
+    _file.add_section("python")
 if not _file.has_section("strings"):
     _file.add_section("strings")
 
