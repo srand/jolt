@@ -89,7 +89,7 @@ def format_task_name(name, params):
     if not params:
         return name
     def _param(key, value):
-        return "{0}={1}".format(key, value) if value else key
+        return "{0}={1}".format(key, value) if value is not None else key
     params = sorted([(key, value) for key, value in params.items()], key=lambda x: x[0])
     return "{0}:{1}".format(name, ",".join([_param(key, value) for key, value in params]))
 
