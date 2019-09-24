@@ -31,8 +31,15 @@ class GitRepository(object):
     def _get_git_folder(self):
         return fs.path.join(self.path, ".git")
 
+    @utils.cached.instance
+    def _get_git_index(self):
+        return fs.path.join(self.path, ".git", "index")
+
     def is_cloned(self):
         return fs.path.exists(self._get_git_folder())
+
+    def is_indexed(self):
+        return fs.path.exists(self._get_git_index())
 
     def _is_synced(self):
         with self.tools.cwd(self.path):
@@ -62,7 +69,7 @@ class GitRepository(object):
                                       output_rstrip=False)
 
     def diff(self, path="/"):
-        return self._diff(path) if self.is_cloned() else ""
+        return self._diff(path) if self.is_indexed() else ""
 
     def patch(self, patch):
         if not patch:
@@ -85,7 +92,7 @@ class GitRepository(object):
     @utils.cached.instance
     def write_tree(self):
         tools = Tools()
-        index = fs.path.join(self.path, ".git", "jolt-index")
+        index = self._get_git_index()
         gitpath = fs.path.dirname(index)
 
         tree = _tree.get(gitpath)
@@ -139,6 +146,7 @@ class GitRepository(object):
     def checkout(self, rev):
         log.info("Checking out {0} in {1}", rev, self.path)
         with self.tools.cwd(self.path):
+            rev = self.tools.run("git rev-parse {rev}", rev=rev, output_on_error=True)
             try:
                 return self.tools.run("git checkout -f {rev}", rev=rev, output=False)
             except:
