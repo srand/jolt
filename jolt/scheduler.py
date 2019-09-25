@@ -105,7 +105,6 @@ class LocalExecutor(Executor):
 
         try:
             self.task.started()
-            self.task.running()
             self.task.run(
                 env.cache,
                 force_build=self.force_build,

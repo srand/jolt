@@ -317,6 +317,7 @@ class TaskProxy(object):
                         log.verbose("Host: {0}", getenv("HOSTNAME", "localhost"))
 
                     with cache.get_context(self) as context:
+                        self.running()
                         with self.tools.cwd(self.task.joltdir):
                             if self.is_goal() and self.options.debug:
                                 log.info("Entering debug shell")
@@ -342,7 +343,6 @@ class TaskProxy(object):
             for extension in self.extensions:
                 try:
                     extension.started()
-                    extension.running()
                     extension.run(cache, force_upload, force_build)
                 except Exception as e:
                     extension.failed()
