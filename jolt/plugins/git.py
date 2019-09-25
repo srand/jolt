@@ -92,7 +92,7 @@ class GitRepository(object):
     @utils.cached.instance
     def write_tree(self):
         tools = Tools()
-        index = self._get_git_index()
+        index = fs.path.join(self.path, ".git", "jolt-index")
         gitpath = fs.path.dirname(index)
 
         tree = _tree.get(gitpath)
