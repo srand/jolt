@@ -10,7 +10,7 @@ from jolt import cache
 from jolt import log
 from jolt import config
 from jolt import filesystem as fs
-from jolt.error import raise_error_if
+from jolt.error import raise_error_if, JoltError
 
 
 NAME = "artifactory"
@@ -62,7 +62,7 @@ class Artifactory(cache.StorageProvider):
             name=node.name,
             file=fs.path.basename(artifact.get_archive_path()))
 
-    @utils.retried.on_exception((ConnectionError, ReadTimeout))
+    @utils.retried.on_exception((ConnectionError, ReadTimeout, JoltError))
     def download(self, node, force=False):
         if self._disabled:
             return False

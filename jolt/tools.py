@@ -481,6 +481,9 @@ class Tools(object):
                     for data in response.iter_content(chunk_size=chunk_size):
                         out_file.write(data)
                         pbar.update(len(data))
+                actual_size = self.file_size(pathname)
+                raise_error_if(size != 0 and size != actual_size,
+                               f"downloaded file was truncated to {actual_size}/{size} bytes: {name}")
             if response.status_code not in [200, 404]:
                 log.verbose("Server response {} for {}", response.status_code, url)
             return response.status_code == 200
