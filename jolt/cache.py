@@ -326,7 +326,7 @@ class Artifact(object):
         if self._archive:
             fs.unlink(self._archive)
         if self._temp:
-            fs.rmtree(self._temp)
+            fs.rmtree(self._temp, ignore_errors=True)
 
     def __getattr__(self, name):
         raise_task_error(self._node, "attempt to access invalid artifact attribute '{0}'", name)
@@ -432,7 +432,7 @@ class Artifact(object):
         if self._archive:
             fs.unlink(self._archive)
         if self._temp:
-            fs.rmtree(self._temp)
+            fs.rmtree(self._temp, ignore_errors=True)
         if self._path:
             fs.rmtree(self._path)
 
