@@ -410,7 +410,6 @@ class WorkerTaskConsumer(object):
                 for recipe in tools.glob("*.jolt"):
                     tools.unlink(recipe)
 
-                duration = None
                 try:
                     jolt = self.selfdeploy()
                     config_file = config.get("amqp", "config", "")
@@ -418,14 +417,17 @@ class WorkerTaskConsumer(object):
                         config_file = "-c " + config_file
 
                     log.info("Running jolt")
-                    duration = utils.duration()
-                    tools.run("{} -vv {} build --worker", jolt, config_file, output_stdio=True)
+                    tools.run("{} -vv {} build --worker --result result.joltxmanifest",
+                              jolt, config_file, output_stdio=True)
                 except JoltCommandError as e:
                     self.response = ""
                     try:
                         manifest = JoltManifest()
+                        try:
+                            manifest.parse("result.joltxmanifest")
+                        except:
+                            manifest.duration = "0"
                         manifest.result = "FAILED"
-                        manifest.duration = str(duration.seconds)
                         manifest.stdout = "\n".join(e.stdout)
                         manifest.stderr = "\n".join(e.stderr)
                         self.response = manifest.format()
@@ -437,10 +439,11 @@ class WorkerTaskConsumer(object):
                     self.response = ""
                     try:
                         manifest = JoltManifest()
+                        try:
+                            manifest.parse("result.joltxmanifest")
+                        except:
+                            manifest.duration = "0"
                         manifest.result = "FAILED"
-                        manifest.duration = str(duration.seconds)
-                        manifest.stdout = "\n".join(e.stdout)
-                        manifest.stderr = "\n".join(e.stderr)
                         self.response = manifest.format()
                     except:
                         log.exception()
@@ -449,13 +452,17 @@ class WorkerTaskConsumer(object):
                     self.response = ""
                     try:
                         manifest = JoltManifest()
+                        try:
+                            manifest.parse("result.joltxmanifest")
+                        except:
+                            manifest.duration = "0"
                         manifest.result = "SUCCESS"
-                        manifest.duration = str(duration.seconds)
                         self.response = manifest.format()
                     except:
                         log.exception()
                     log.info("Task succeeded")
 
+                tools.unlink("result.joltxmanifest", ignore_errors=True)
                 self.consumer.add_on_job_completed_callback(self)
 
         self._job = Job(self, channel, basic_deliver, properties, body)
