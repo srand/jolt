@@ -141,10 +141,12 @@ def _autocomplete_tasks(ctx, args, incomplete):
               help="Start debug shell before executing task.")
 @click.option("-c", "--copy", type=click.Path(),
               help="Copy artifact content to this directory upon completion.")
+@click.option("--result", type=click.Path(), hidden=True,
+              help="Write result manifest to this file.")
 @click.pass_context
 def build(ctx, task, network, keep_going, identity, default, local,
           no_download, no_upload, download, upload, worker, force,
-          salt, copy, debug):
+          salt, copy, debug, result):
     """
     Execute specified task.
 
@@ -244,6 +246,7 @@ def build(ctx, task, network, keep_going, identity, default, local,
     dag = gp.prune(dag)
 
     goal_tasks = dag.goals
+    goal_task_duration = 0
 
     queue = scheduler.TaskQueue(strategy)
 
@@ -266,6 +269,8 @@ def build(ctx, task, network, keep_going, identity, default, local,
             if not task:
                 dag.debug()
                 raise_error_if(not task, "no more tasks in progress, only blocked tasks remain")
+            elif task.is_goal() and task.duration_running:
+                goal_task_duration += task.duration_running.seconds
 
             if not keep_going and error is not None:
                 queue.abort()
@@ -291,6 +296,12 @@ def build(ctx, task, network, keep_going, identity, default, local,
             print()
             log.warning("Interrupted again, exiting")
             _exit(1)
+    finally:
+        if result:
+            manifest = JoltManifest()
+            manifest.duration = str(goal_task_duration)
+            manifest.write(result)
+
 
 
 @cli.command()
