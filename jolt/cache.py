@@ -205,6 +205,38 @@ class Artifact(object):
 
     """
 
+    cxxinfo = {}
+    """ Artifact C/C++ build metadata.
+
+    A task can add compilation metadata to an artifact. Such metadata
+    will be automatically applied when consumer compilation tasks
+    are executed. A common use-case is to add preprocessor definitions,
+    link libraries, etc. These string fields are supported:
+
+    - ``asflags`` - assembler flags (string)
+    - ``cflags`` - compiler flags (string)
+    - ``cxxflags`` - compiler flags (string)
+    - ``ldflags`` - linker flags (string)
+    - ``libraries`` - libraries to link with (list, use append())
+    - ``macros`` - preprocessor macros to set (list, use append())
+
+    Values appended to PATH-type metadata fields are relative to the artifact
+    root. They will be automatically expanded to absolute paths. These
+    PATH-type fields are supported:
+
+    - ``incpaths`` - preprocessor include paths (list, use append())
+    - ``libpaths`` - linker library search paths (list, use append())
+
+    Example:
+
+        .. code-block:: python
+
+            def publish(self, artifact, tools):
+                artifact.collect("*.h", "include/")
+                artifact.cxxinfo.incpaths.append("include")
+                artifact.cxxinfo.macros.append("PACKAGE_VERSION=1.0")
+    """
+
     environ = {}
     """ Artifact environment variables.
 
