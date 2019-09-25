@@ -340,6 +340,23 @@ class Macros(Variable):
         writer.variable(self.name, " ".join(macros))
 
 
+class ImportedFlags(Variable):
+    def create(self, project, writer, deps, tools):
+        asflags = []
+        cflags = []
+        cxxflags = []
+        ldflags = []
+        for name, artifact in deps.items():
+            asflags += artifact.cxxinfo.asflags.items()
+            cflags += artifact.cxxinfo.cflags.items()
+            cxxflags += artifact.cxxinfo.cxxflags.items()
+            ldflags += artifact.cxxinfo.ldflags.items()
+        writer.variable("imported_asflags", " ".join(asflags))
+        writer.variable("imported_cflags", " ".join(cflags))
+        writer.variable("imported_cxxflags", " ".join(cxxflags))
+        writer.variable("imported_ldflags", " ".join(ldflags))
+
+
 class IncludePaths(Variable):
     def __init__(self, prefix=None):
         self.prefix = prefix or ''
@@ -449,13 +466,14 @@ class GNUToolchain(Toolchain):
     extra_cxxflags = ProjectVariable(attrib="cxxflags")
     extra_ldflags = ProjectVariable(attrib="ldflags")
 
+    flags = ImportedFlags()
     macros = Macros(prefix="-D")
     incpaths = IncludePaths(prefix="-I")
     libpaths = LibraryPaths(prefix="-L")
     libraries = Libraries(prefix="-l")
 
     compile_c = GNUCompiler(
-        command="$cc -x c -fdebug-prefix-map=$joltdir/= $cflags $shared_flags $extra_cflags $macros $incpaths -MMD -MF $out.d -c $in -o $out",
+        command="$cc -x c -fdebug-prefix-map=$joltdir/= $cflags $shared_flags $imported_cflags $extra_cflags $macros $incpaths -MMD -MF $out.d -c $in -o $out",
         deps="gcc",
         depfile="$out.d",
         infiles=[".c"],
@@ -463,7 +481,7 @@ class GNUToolchain(Toolchain):
         variables={"desc": "[C] {in_base}{in_ext}"})
 
     compile_cxx = GNUCompiler(
-        command="$cxx -x c++ -fdebug-prefix-map=$joltdir/= $cxxflags $shared_flags $extra_cxxflags $macros $incpaths -MMD -MF $out.d -c $in -o $out",
+        command="$cxx -x c++ -fdebug-prefix-map=$joltdir/= $cxxflags $shared_flags $imported_cxxflags $extra_cxxflags $macros $incpaths -MMD -MF $out.d -c $in -o $out",
         deps="gcc",
         depfile="$out.d",
         infiles=[".cc", ".cpp", ".cxx"],
@@ -471,7 +489,7 @@ class GNUToolchain(Toolchain):
         variables={"desc": "[CXX] {in_base}{in_ext}"})
 
     compile_asm = GNUCompiler(
-        command="$cc -x assembler -fdebug-prefix-map=$joltdir/= $asflags $shared_flags $extra_asflags -MMD -MF $out.d -c $in -o $out",
+        command="$cc -x assembler -fdebug-prefix-map=$joltdir/= $asflags $shared_flags $imported_asflags $extra_asflags -MMD -MF $out.d -c $in -o $out",
         deps="gcc",
         depfile="$out.d",
         infiles=[".s", ".asm"],
@@ -479,7 +497,7 @@ class GNUToolchain(Toolchain):
         variables={"desc": "[ASM] {in_base}{in_ext}"})
 
     compile_asm_with_cpp = GNUCompiler(
-        "$cc -x assembler-with-cpp -fdebug-prefix-map=$joltdir/= $asflags $shared_flags $extra_asflags $macros $incpaths -MMD -MF $out.d -c $in -o $out",
+        "$cc -x assembler-with-cpp -fdebug-prefix-map=$joltdir/= $asflags $shared_flags $imported_asflags $extra_asflags $macros $incpaths -MMD -MF $out.d -c $in -o $out",
         deps="gcc",
         depfile="$out.d",
         infiles=[".S"],
@@ -488,7 +506,7 @@ class GNUToolchain(Toolchain):
 
     linker = GNULinker(
         command=" && ".join([
-            "$ld $ldflags $extra_ldflags $libpaths -Wl,--start-group @objects.list -Wl,--end-group -o $out -Wl,--start-group $libraries -Wl,--end-group",
+            "$ld $ldflags $imported_ldflags $extra_ldflags $libpaths -Wl,--start-group @objects.list -Wl,--end-group -o $out -Wl,--start-group $libraries -Wl,--end-group",
             "mkdir -p $outdir/.debug",
             "$objcopy --only-keep-debug $out $outdir/.debug/$binary",
             "$objcopy --strip-all $out",
@@ -499,7 +517,7 @@ class GNUToolchain(Toolchain):
 
     dynlinker = GNULinker(
         command=" && ".join([
-            "$ld $ldflags -shared $extra_ldflags $libpaths -Wl,--start-group @objects.list -Wl,--end-group -o $out -Wl,--start-group $libraries -Wl,--end-group",
+            "$ld $ldflags -shared $imported_ldflags $extra_ldflags $libpaths -Wl,--start-group @objects.list -Wl,--end-group -o $out -Wl,--start-group $libraries -Wl,--end-group",
             "mkdir -p $outdir/.debug",
             "$objcopy --only-keep-debug $out $outdir/.debug/$binary",
             "$objcopy --strip-all $out",

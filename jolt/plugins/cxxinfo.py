@@ -44,8 +44,16 @@ class CppInfo(ArtifactAttributeSet):
         super(CppInfo, self).__init__()
 
     def create(self, name):
+        if name == "asflags":
+            return CppInfoListVariable("asflags")
+        if name == "cflags":
+            return CppInfoListVariable("cflags")
+        if name == "cxxflags":
+            return CppInfoListVariable("cxxflags")
         if name == "incpaths":
             return CppInfoListVariable("incpaths")
+        if name == "ldflags":
+            return CppInfoListVariable("ldflags")
         if name == "libpaths":
             return CppInfoListVariable("libpaths")
         if name == "libraries":
