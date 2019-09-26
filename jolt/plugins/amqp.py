@@ -2,6 +2,7 @@ import click
 import functools
 import getpass
 import keyring
+import os
 import pika
 from pika.exceptions import AMQPConnectionError
 from pika.adapters.utils.connection_workflow import AMQPConnectorStackTimeout
@@ -71,7 +72,9 @@ class WorkerTaskConsumer(object):
     EXCHANGE_TYPE = 'direct'
     QUEUE = 'jolt_tasks'
     RESULT_EXCHANGE = 'jolt_results'
-    ROUTING_KEY = 'jolt_default'
+    ROUTING_KEY_PREFIX = 'jolt_'
+    ROUTING_KEY_REQUEST = 'default'
+    ROUTING_KEY_RESULT = 'default'
 
     def __init__(self, amqp_url):
         """Create a new instance of the consumer class, passing in the AMQP
@@ -93,6 +96,10 @@ class WorkerTaskConsumer(object):
         # for higher consumer throughput
         self._prefetch_count = 1
         self._job = None
+        self._routing_key = self.ROUTING_KEY_PREFIX + config.get(
+            "amqp", "routing_key",
+            os.getenv("RABBITMQ_ROUTING_KEY", self.ROUTING_KEY_REQUEST))
+        self._queue = self.QUEUE + "_" + self._routing_key
 
     def connect(self):
         """This method connects to RabbitMQ, returning the connection handle.
@@ -237,7 +244,7 @@ class WorkerTaskConsumer(object):
 
         """
         log.info('Exchange declared: {}', userdata)
-        self.setup_queue(self.QUEUE)
+        self.setup_queue(self._queue)
 
     def setup_queue(self, queue_name):
         """Setup the queue on RabbitMQ by invoking the Queue.Declare RPC
@@ -263,13 +270,13 @@ class WorkerTaskConsumer(object):
 
         """
         queue_name = userdata
-        log.info('Binding {} to {} with {}', self.EXCHANGE, queue_name,
-                 self.ROUTING_KEY)
+        log.info('Binding {} to {} with {}',
+                 self.EXCHANGE, queue_name, self._routing_key)
         cb = functools.partial(self.on_bindok, userdata=queue_name)
         self._channel.queue_bind(
             queue_name,
             self.EXCHANGE,
-            routing_key=self.ROUTING_KEY,
+            routing_key=self._routing_key,
             callback=cb)
 
     def on_bindok(self, _unused_frame, userdata):
@@ -317,7 +324,7 @@ class WorkerTaskConsumer(object):
         log.info('Issuing consumer related RPC commands')
         self.add_on_cancel_callback()
         self._consumer_tag = self._channel.basic_consume(
-            self.QUEUE, self.on_message)
+            self._queue, self.on_message)
         self.was_consuming = True
         self._consuming = True
 
@@ -480,7 +487,7 @@ class WorkerTaskConsumer(object):
         if job.channel is self._channel:
             self._channel.basic_publish(
                 exchange=self.RESULT_EXCHANGE,
-                routing_key=self.ROUTING_KEY,
+                routing_key=self.ROUTING_KEY_PREFIX+self.ROUTING_KEY_RESULT,
                 properties=pika.BasicProperties(
                     correlation_id=job.properties.correlation_id,
                     expiration="600000"),
@@ -646,13 +653,16 @@ class AmqpExecutor(scheduler.NetworkExecutor):
             param.key = key
             param.value = value
 
-        return manifest.format()
+        routing_key = WorkerTaskConsumer.ROUTING_KEY_PREFIX
+        routing_key += getattr(self.task.task, "routing_key", WorkerTaskConsumer.ROUTING_KEY_REQUEST)
+
+        return manifest.format(), routing_key
 
     def _run(self, env):
-        manifest = self._create_manifest()
+        manifest, routing_key = self._create_manifest()
 
         self.connect()
-        self.publish_request(manifest)
+        self.publish_request(manifest, routing_key)
 
         log.debug("[AMQP] Queued {0}", self.task.short_qualified_name)
 
@@ -715,7 +725,7 @@ class AmqpExecutor(scheduler.NetworkExecutor):
             self.channel.queue_bind(
                 self.callback_queue,
                 WorkerTaskConsumer.RESULT_EXCHANGE,
-                routing_key=WorkerTaskConsumer.ROUTING_KEY)
+                routing_key=WorkerTaskConsumer.ROUTING_KEY_PREFIX+WorkerTaskConsumer.ROUTING_KEY_RESULT)
         self.channel.basic_consume(
             queue=self.callback_queue,
             on_message_callback=self.on_response,
@@ -730,11 +740,11 @@ class AmqpExecutor(scheduler.NetworkExecutor):
         else:
             channel.basic_ack(basic_deliver.delivery_tag)
 
-    def publish_request(self, manifest):
+    def publish_request(self, manifest, routing_key):
         self.response = None
         self.channel.basic_publish(
-            exchange='jolt_exchange',
-            routing_key="jolt_default",
+            exchange=WorkerTaskConsumer.EXCHANGE,
+            routing_key=routing_key,
             properties=pika.BasicProperties(correlation_id=self.corr_id),
             body=manifest)
 
