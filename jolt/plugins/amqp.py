@@ -469,7 +469,7 @@ class WorkerTaskConsumer(object):
                         log.exception()
                     log.info("Task succeeded")
 
-                tools.unlink("result.joltxmanifest", ignore_errors=True)
+                utils.call_and_catch(tools.unlink, "result.joltxmanifest")
                 self.consumer.add_on_job_completed_callback(self)
 
         self._job = Job(self, channel, basic_deliver, properties, body)
