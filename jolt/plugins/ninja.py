@@ -134,12 +134,11 @@ class Rule(object):
         in_dirname, in_basename = fs.path.split(infile)
         in_base, in_ext = fs.path.splitext(in_basename)
 
-        if in_dirname.startswith(project.joltdir):
-            in_dirname = in_dirname[len(project.joltdir)+1:]
+        if in_dirname:
+            in_dirname = fs.path.relpath(in_dirname, project.joltdir)
 
         result_files = []
         for outfile in self.outfiles:
-
             outfile = project.tools.expand(
                 outfile,
                 in_path=in_dirname,
@@ -170,8 +169,10 @@ class Rule(object):
     def build(self, project, writer, infiles):
         result = []
         for infile in utils.as_list(infiles):
+            infile_rel = fs.path.relpath(infile, project.outdir)
             outfiles, variables = self._out(project, infile)
-            writer.build(outfiles, self.name, infile, variables=variables)
+            outfiles_rel = [fs.path.relpath(outfile, project.outdir) for outfile in outfiles]
+            writer.build(outfiles_rel, self.name, infile_rel, variables=variables)
             result.extend(outfiles)
         return result
 
@@ -249,8 +250,10 @@ class GNULinker(Rule):
         file_list = FileListWriter("objects")
         file_list.build(project, writer, infiles)
 
+        infiles_rel = [fs.path.relpath(infile, project.outdir) for infile in infiles]
         outfiles, variables = self._out(project, project.binary)
-        writer.build(outfiles, self.name, infiles, implicit=project.depimports, variables=variables)
+        outfiles_rel = [fs.path.relpath(outfile, project.outdir) for outfile in outfiles]
+        writer.build(outfiles_rel, self.name, infiles_rel, implicit=project.depimports, variables=variables)
         return outfiles
 
 
@@ -262,8 +265,10 @@ class GNUArchiver(Rule):
         file_list = FileListWriter("objects")
         file_list.build(project, writer, infiles)
 
+        infiles_rel = [fs.path.relpath(infile, project.outdir) for infile in infiles]
         outfiles, variables = self._out(project, project.binary)
-        writer.build(outfiles, self.name, infiles, implicit=project.depimports, variables=variables)
+        outfiles_rel = [fs.path.relpath(outfile, project.outdir) for outfile in outfiles]
+        writer.build(outfiles_rel, self.name, infiles_rel, implicit=project.depimports, variables=variables)
         return outfiles
 
 
@@ -374,7 +379,7 @@ class IncludePaths(Variable):
                 return path
             if path[0] in ['-']:
                 return path[1:]
-            return tools.expand_path(fs.path.join(sandbox, path))
+            return tools.expand_relpath(fs.path.join(sandbox, path), project.outdir)
 
         incpaths = [expand(path) for path in project.incpaths]
         for name, artifact in deps.items():
@@ -394,7 +399,7 @@ class LibraryPaths(Variable):
     def create(self, project, writer, deps, tools):
         if isinstance(project, CXXLibrary) and not project.shared:
             return
-        libpaths = [tools.expand_path(path) for path in project.libpaths]
+        libpaths = [tools.expand_relpath(path, project.outdir) for path in project.libpaths]
         for name, artifact in deps.items():
             libpaths += [fs.path.join(artifact.path, path)
                          for path in artifact.cxxinfo.libpaths.items()]
@@ -454,6 +459,9 @@ class GNUToolchain(Toolchain):
     ld = EnvironmentVariable(default="g++", envname="CXX")
     objcopy = EnvironmentVariable(default="objcopy")
 
+    ccwrap = EnvironmentVariable(default="")
+    cxxwrap = EnvironmentVariable(default="")
+
     asflags = EnvironmentVariable(default="")
     cflags = EnvironmentVariable(default="")
     cxxflags = EnvironmentVariable(default="")
@@ -473,7 +481,7 @@ class GNUToolchain(Toolchain):
     libraries = Libraries(prefix="-l")
 
     compile_c = GNUCompiler(
-        command="$cc -x c -fdebug-prefix-map=$joltdir/= $cflags $shared_flags $imported_cflags $extra_cflags $macros $incpaths -MMD -MF $out.d -c $in -o $out",
+        command="$ccwrap $cc -x c $cflags $shared_flags $imported_cflags $extra_cflags $macros $incpaths -MMD -MF $out.d -c $in -o $out",
         deps="gcc",
         depfile="$out.d",
         infiles=[".c"],
@@ -481,7 +489,7 @@ class GNUToolchain(Toolchain):
         variables={"desc": "[C] {in_base}{in_ext}"})
 
     compile_cxx = GNUCompiler(
-        command="$cxx -x c++ -fdebug-prefix-map=$joltdir/= $cxxflags $shared_flags $imported_cxxflags $extra_cxxflags $macros $incpaths -MMD -MF $out.d -c $in -o $out",
+        command="$cxxwrap $cxx -x c++ $cxxflags $shared_flags $imported_cxxflags $extra_cxxflags $macros $incpaths -MMD -MF $out.d -c $in -o $out",
         deps="gcc",
         depfile="$out.d",
         infiles=[".cc", ".cpp", ".cxx"],
@@ -489,7 +497,7 @@ class GNUToolchain(Toolchain):
         variables={"desc": "[CXX] {in_base}{in_ext}"})
 
     compile_asm = GNUCompiler(
-        command="$cc -x assembler -fdebug-prefix-map=$joltdir/= $asflags $shared_flags $imported_asflags $extra_asflags -MMD -MF $out.d -c $in -o $out",
+        command="$ccwrap $cc -x assembler $asflags $shared_flags $imported_asflags $extra_asflags -MMD -MF $out.d -c $in -o $out",
         deps="gcc",
         depfile="$out.d",
         infiles=[".s", ".asm"],
@@ -497,7 +505,7 @@ class GNUToolchain(Toolchain):
         variables={"desc": "[ASM] {in_base}{in_ext}"})
 
     compile_asm_with_cpp = GNUCompiler(
-        "$cc -x assembler-with-cpp -fdebug-prefix-map=$joltdir/= $asflags $shared_flags $imported_asflags $extra_asflags $macros $incpaths -MMD -MF $out.d -c $in -o $out",
+        "$ccwrap $cc -x assembler-with-cpp $cflags $shared_flags $imported_cflags $extra_cflags $macros $incpaths -MMD -MF $out.d -c $in -o $out",
         deps="gcc",
         depfile="$out.d",
         infiles=[".S"],
@@ -507,10 +515,10 @@ class GNUToolchain(Toolchain):
     linker = GNULinker(
         command=" && ".join([
             "$ld $ldflags $imported_ldflags $extra_ldflags $libpaths -Wl,--start-group @objects.list -Wl,--end-group -o $out -Wl,--start-group $libraries -Wl,--end-group",
-            "mkdir -p $outdir/.debug",
-            "$objcopy --only-keep-debug $out $outdir/.debug/$binary",
+            "mkdir -p .debug",
+            "$objcopy --only-keep-debug $out .debug/$binary",
             "$objcopy --strip-all $out",
-            "$objcopy --add-gnu-debuglink=$outdir/.debug/$binary $out"
+            "$objcopy --add-gnu-debuglink=.debug/$binary $out"
         ]),
         outfiles=["{outdir}/{binary}"],
         variables={"desc": "[LINK] {binary}"})
@@ -825,7 +833,7 @@ if __name__ == "__main__":
     main()
 
 """
-            fobj.write(data.format(objects=self.objects))
+            fobj.write(data.format(objects=[fs.path.relpath(o, self.outdir) for o in self.objects]))
         tools.chmod(filepath, 0o777)
 
     def find_rule(self, ext):
@@ -912,7 +920,7 @@ if __name__ == "__main__":
         verbose = "-v" if log.is_verbose() else ""
         threads = config.get("jolt", "threads", tools.getenv("JOLT_THREADS", None))
         threads = "-j " + threads if threads else ""
-        tools.run("ninja {2} -C {0} {1}", self.outdir, verbose, threads)
+        tools.run("ninja -d keepdepfile {2} -C {0} {1}", self.outdir, verbose, threads)
 
     def shell(self, deps, tools):
         self._expand_sources()
@@ -947,9 +955,9 @@ class CXXLibrary(CXXProject):
 
     def _populate_project(self, writer, deps, tools):
         if self.shared:
-            self.toolchain.dynlinker.build(self, writer, self.objects)
+            self.outfiles = self.toolchain.dynlinker.build(self, writer, self.objects)
         else:
-            self.toolchain.archiver.build(self, writer, self.objects)
+            self.outfiles = self.toolchain.archiver.build(self, writer, self.objects)
 
     def publish(self, artifact, tools):
         with tools.cwd(self.outdir):
@@ -959,6 +967,8 @@ class CXXLibrary(CXXProject):
             artifact.collect("*{binary}.so", self.publishdir)
         artifact.cxxinfo.libpaths.append(self.publishdir)
         artifact.cxxinfo.libraries.append(self.binary)
+        artifact.strings.library = fs.path.join(
+            self.publishdir, fs.path.basename(self.outfiles[0]))
 
 CXXLibrary.__doc__ += CXXProject.__doc__
 
