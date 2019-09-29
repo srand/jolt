@@ -21,6 +21,7 @@ from jolt.error import JoltCommandError
 from jolt.error import raise_error_if
 from jolt.error import raise_task_error, raise_task_error_if
 
+
 def stdout_write(line):
     sys.stdout.write(line + "\n")
     sys.stdout.flush()
@@ -562,7 +563,7 @@ class Tools(object):
             else utils.expand(string, *args, **kwargs)
 
     def expand_path(self, pathname, *args, **kwargs):
-        """ Expands keyword arguments(macros in a pathname format string.
+        """ Expands keyword arguments/macros in a pathname format string.
 
         This function is identical to ``str.format()`` but it
         automatically collects keyword arguments from a task's parameters
@@ -583,6 +584,33 @@ class Tools(object):
         """
 
         pathname = fs.path.join(self.getcwd(), pathname)
+        return self.expand(pathname, *args, **kwargs)
+
+    def expand_relpath(self, pathname, relpath, *args, **kwargs):
+        """ Expands keyword arguments/macros in a pathname format string.
+
+        This function is identical to ``str.format()`` but it
+        automatically collects keyword arguments from a task's parameters
+        and properties.
+
+        The function also makes absolute paths relative to a specified
+        directory.
+
+        Args:
+            pathname (str): The pathname to be expanded.
+            relpath (str): Directory to which the returned path will be relative.
+            args (str, optional): Additional positional values required
+                by the format pathname.
+            kwargs (str, optional): Additional keyword values required by
+                the format pathname.
+
+        Return
+            str: Expanded string.
+        """
+
+        pathname = fs.path.join(self.getcwd(), pathname)
+        pathname = fs.path.relpath(pathname, relpath)
+
         return self.expand(pathname, *args, **kwargs)
 
     def extract(self, filename, pathname, files=None):
