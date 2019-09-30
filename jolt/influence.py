@@ -323,6 +323,8 @@ class FileInfluence(HashInfluenceProvider):
         files = task.tools.glob(self.path)
         files.sort()
         for f in files:
+            if fs.path.isdir(f):
+                continue
             f = task.tools.expand_path(f)
             value = _fi_files.get(f)
             if value:
