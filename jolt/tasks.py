@@ -821,6 +821,9 @@ class _Test(Task):
         for name in self._get_test_names():
             self.influence.append(TaskSourceInfluence(name, self.test_cls))
 
+    def _requires(self):
+        return self.test_cls.requires
+
     def _create_parameters(self):
         for key in dir(self.test_cls):
             param = utils.getattr_safe(self.test_cls, key)

@@ -1,0 +1,14 @@
+from jolt import *
+
+
+class All(Alias):
+    requires = [
+        "api/artifact/environ",
+        "api/task",
+        "api/tools",
+        "cli/build",
+        "cli/info",
+        "cli/list",
+        "cli/list",
+        "int/utils",
+    ]

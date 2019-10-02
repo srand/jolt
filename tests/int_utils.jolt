@@ -1,0 +1,25 @@
+import sys
+import time
+sys.path.append(".")
+
+from testsupport import JoltTest
+from jolt import utils
+
+
+class UtilsInternal(JoltTest):
+    name = "int/utils"
+
+    @utils.retried.on_exception(AssertionError)
+    def raise1(self):
+        self.exc_count += 1
+        assert self.exc_count > 1, "failed!"
+
+    @utils.retried.on_exception(AssertionError, count=2)
+    def raise2(self):
+        self.exc_count += 1
+        assert self.exc_count > 2, "failed!"
+
+    def test_retried_on_exception(self):
+        self.exc_count = 0
+        with self.assertRaises(AssertionError):
+            self.raise2()

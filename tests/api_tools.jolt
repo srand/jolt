@@ -1,0 +1,27 @@
+import sys
+import time
+sys.path.append(".")
+
+from testsupport import JoltTest
+
+
+class ToolsApi(JoltTest):
+    name = "api/tools"
+
+    def test_tools_extract_zip(self):
+        with self.tools.cwd(self.ws):
+            self.tools.run("zip tests.zip ../../api_tools.jolt")
+            self.tools.extract("tests.zip", self.ws)
+            self.assertExists("api_tools.jolt")
+
+    def test_tools_extract_tar_gz(self):
+        with self.tools.cwd(self.ws):
+            self.tools.run("tar czvf tests.tar.gz ../../api_tools.jolt")
+            self.tools.extract("tests.tar.gz", self.ws)
+            self.assertExists("api_tools.jolt")
+
+    def test_tools_extract_tar_bz2(self):
+        with self.tools.cwd(self.ws):
+            self.tools.run("tar cjvf tests.tar.bz2 ../../api_tools.jolt")
+            self.tools.extract("tests.tar.bz2", self.ws)
+            self.assertExists("api_tools.jolt")

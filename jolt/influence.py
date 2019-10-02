@@ -373,3 +373,18 @@ def files(pathname):
 
 def global_files(pathname, cls=FileInfluence):
     HashInfluenceRegistry.get().register(cls(pathname))
+
+
+
+class StringInfluence(HashInfluenceProvider):
+    name = "String"
+
+    def __init__(self, value):
+        self.value = value
+
+    def get_influence(self, task):
+        return self.value
+
+
+def global_string(string):
+    HashInfluenceRegistry.get().register(StringInfluence(string))

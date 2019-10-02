@@ -729,13 +729,15 @@ class CXXProject(Task):
         super(CXXProject, self).__init__(*args, **kwargs)
         self._init_sources()
         self.toolchain = self.__class__.toolchain() if self.__class__.toolchain else toolchain
-        self.asflags = utils.as_list(utils.call_or_return(self, self.__class__._asflags))
         self.binary = self.expand(self.__class__.binary or self.canonical_name)
-        self.cflags = utils.as_list(utils.call_or_return(self, self.__class__._cflags))
-        self.cxxflags = utils.as_list(utils.call_or_return(self, self.__class__._cxxflags))
+
+        self.asflags = self.expand(utils.as_list(utils.call_or_return(self, self.__class__._asflags)))
+        self.cflags = self.expand(utils.as_list(utils.call_or_return(self, self.__class__._cflags)))
+        self.cxxflags = self.expand(utils.as_list(utils.call_or_return(self, self.__class__._cxxflags)))
+        self.ldflags = self.expand(utils.as_list(utils.call_or_return(self, self.__class__._ldflags)))
+
         self.depimports = utils.as_list(utils.call_or_return(self, self.__class__._depimports))
         self.incpaths = utils.as_list(utils.call_or_return(self, self.__class__._incpaths))
-        self.ldflags = utils.as_list(utils.call_or_return(self, self.__class__._ldflags))
         self.libpaths = utils.as_list(utils.call_or_return(self, self.__class__._libpaths))
         self.libraries = utils.as_list(utils.call_or_return(self, self.__class__._libraries))
         self.macros = utils.as_list(utils.call_or_return(self, self.__class__._macros))

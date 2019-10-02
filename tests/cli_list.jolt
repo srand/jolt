@@ -1,0 +1,48 @@
+import sys
+import time
+sys.path.append(".")
+
+from testsupport import JoltTest
+
+
+class ListCli(JoltTest):
+    name = "cli/list"
+
+    def test_list(self):
+        """
+        --- tasks:
+        class TaskName(Task):
+            pass
+        class TestName(Test):
+            pass
+        ---
+        """
+        r = self.jolt("list")
+        self.assertIn("taskname", r)
+        self.assertIn("testname", r)
+
+    def test_list_hidden(self):
+        """
+        --- tasks:
+        class _TaskName(Task):
+            pass
+        class _TestName(Task):
+            pass
+        ---
+        """
+        r = self.jolt("list")
+        self.assertNotIn("taskname", r)
+        self.assertNotIn("testname", r)
+
+    def test_list_requirements(self):
+        """
+        --- tasks:
+        class Task1(Task):
+            pass
+        class Task2(Task):
+            requires = ["task1"]
+        ---
+        """
+        r = self.jolt("list task2")
+        self.assertIn("task1", r)
+        self.assertNotIn("task2", r)

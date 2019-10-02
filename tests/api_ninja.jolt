@@ -1,0 +1,297 @@
+#!/usr/bin/env python
+
+import os
+import sys
+import time
+sys.path.append(".")
+
+from testsupport import JoltTest
+
+
+class NinjaApi(JoltTest):
+    name = "api/ninja"
+
+    def assertCompiled(self, r, filename):
+        if filename not in r:
+            self.fail("{} was not compiled", filename)
+
+    def _recipe(self):
+        return "from jolt.plugins.ninja import *\n" + super(NinjaApi, self)._recipe()
+
+
+    def test_asflags(self):
+        """
+        --- file: test.S
+        #if TESTMACRO != 1337
+        #error "Macro not set as expected"
+        #endif
+
+        .global main
+        main:
+
+        --- tasks:
+        class Lib(CXXLibrary):
+            arg = Parameter()
+            sources = ["test.S"]
+            asflags = ["-DTESTMACRO={{arg}}"]
+
+        class Exe(CXXExecutable):
+            arg = Parameter()
+            sources = ["test.S"]
+            asflags = ["-DTESTMACRO={{arg}}"]
+
+        ---
+        """
+        self.jolt("build lib:arg=1337 exe:arg=1337")
+
+
+    def test_binary(self):
+        """
+        --- file: test.cpp
+        int main() {{return 0;}}
+
+        --- tasks:
+        class Lib(CXXLibrary):
+            arg = Parameter()
+            binary = "{{arg}}"
+            sources = ["test.cpp"]
+
+        class Exe(CXXExecutable):
+            arg = Parameter()
+            binary = "{{arg}}"
+            sources = ["test.cpp"]
+
+        ---
+        """
+        r = self.jolt("build lib:arg=XYZ exe:arg=ZYX")
+        self.assertCompiled(r, "XYZ")
+        self.assertCompiled(r, "ZYX")
+
+
+    def test_cflags(self):
+        """
+        --- file: test.c
+        #if TESTMACRO != 1337
+        #error "Macro not set as expected"
+        #endif
+
+        int main() {{return 0;}}
+
+        --- tasks:
+        class Lib(CXXLibrary):
+            arg = Parameter()
+            sources = ["test.c"]
+            cflags = ["-DTESTMACRO={{arg}}"]
+
+        class Exe(CXXExecutable):
+            arg = Parameter()
+            sources = ["test.c"]
+            cflags = ["-DTESTMACRO={{arg}}"]
+
+        ---
+        """
+        self.jolt("build lib:arg=1337 exe:arg=1337")
+
+
+    def test_cxxflags(self):
+        """
+        --- file: test.cpp
+        #if TESTMACRO != 1337
+        #error "Macro not set as expected"
+        #endif
+
+        int main() {{return 0;}}
+
+        --- tasks:
+        class Lib(CXXLibrary):
+            arg = Parameter()
+            sources = ["test.cpp"]
+            cxxflags = ["-DTESTMACRO={{arg}}"]
+
+        class Exe(CXXExecutable):
+            arg = Parameter()
+            sources = ["test.cpp"]
+            cxxflags = ["-DTESTMACRO={{arg}}"]
+
+        ---
+        """
+        self.jolt("build lib:arg=1337 exe:arg=1337")
+
+
+    def test_incpaths(self):
+        """
+        --- file: inc/test.h
+
+        --- file: test.cpp
+        #include "test.h"
+        int main() {{return 0;}}
+
+        --- tasks:
+        class Lib(CXXLibrary):
+            arg = Parameter()
+            incpaths = ["{{arg}}"]
+            sources = ["test.cpp"]
+
+        class Exe(CXXExecutable):
+            arg = Parameter()
+            incpaths = ["{{arg}}"]
+            sources = ["test.cpp"]
+
+        ---
+        """
+        self.jolt("build lib:arg=inc exe:arg=inc")
+
+
+    def test_ldflags(self):
+        """
+        --- file: base.h
+        int base();
+
+        --- file: base.cpp
+        int base() {{return 0;}}
+
+        --- file: main.cpp
+        #include "base.h"
+        int main() {{return base();}}
+
+        --- tasks:
+        class Base(CXXLibrary):
+            sources = ["base.cpp"]
+
+        class Lib(CXXLibrary):
+            arg1 = Parameter()
+            arg2 = Parameter()
+            shared = True
+            ldflags = ["-L{{arg1}}/lib"]
+            libraries = ["{{arg2}}"]
+            sources = ["main.cpp"]
+
+        class Exe(CXXExecutable):
+            arg1 = Parameter()
+            arg2 = Parameter()
+            ldflags = ["-L{{arg1}}/lib"]
+            libraries = ["{{arg2}}"]
+            sources = ["main.cpp"]
+
+        ---
+        """
+        r = self.jolt("build base")
+        a = self.artifacts(r)
+        self.jolt("build lib:arg1={p},arg2={l} exe:arg1={p},arg2={l}", p=a[0], l="base")
+
+
+    def test_libpaths_libraries(self):
+        """
+        --- file: base.h
+        int base();
+
+        --- file: base.cpp
+        int base() {{return 0;}}
+
+        --- file: main.cpp
+        #include "base.h"
+        int main() {{return base();}}
+
+        --- tasks:
+        class Base(CXXLibrary):
+            sources = ["base.cpp"]
+
+        class Lib(CXXLibrary):
+            arg1 = Parameter()
+            arg2 = Parameter()
+            shared = True
+            libpaths = ["{{arg1}}/lib"]
+            libraries = ["{{arg2}}"]
+            sources = ["main.cpp"]
+
+        class Exe(CXXExecutable):
+            arg1 = Parameter()
+            arg2 = Parameter()
+            libpaths = ["{{arg1}}/lib"]
+            libraries = ["{{arg2}}"]
+            sources = ["main.cpp"]
+
+        ---
+        """
+        r = self.jolt("build base")
+        a = self.artifacts(r)
+        self.jolt("build lib:arg1={p},arg2={l} exe:arg1={p},arg2={l}", p=a[0], l="base")
+
+
+    def test_macros(self):
+        """
+        --- file: test.cpp
+        #if TESTMACRO != 1337
+        #error "Macro not set as expected"
+        #endif
+
+        int main() {{return 0;}}
+
+        --- tasks:
+        class Lib(CXXLibrary):
+            arg = Parameter()
+            sources = ["test.cpp"]
+            macros = ["TESTMACRO={{arg}}"]
+
+        class Exe(CXXExecutable):
+            arg = Parameter()
+            sources = ["test.cpp"]
+            macros = ["TESTMACRO={{arg}}"]
+
+        ---
+        """
+        self.jolt("build lib:arg=1337 exe:arg=1337")
+
+
+    def test_publishdir(self):
+        """
+        --- file: test.cpp
+        int main() {{return 0;}}
+
+        --- tasks:
+        class Lib(CXXLibrary):
+            arg = Parameter()
+            publishdir = "{{arg}}/"
+            sources = ["test.cpp"]
+
+        class Exe(CXXExecutable):
+            arg = Parameter()
+            publishdir = "{{arg}}/"
+            sources = ["test.cpp"]
+
+        ---
+        """
+        r = self.jolt("-vv build lib:arg=xyz")
+        self.assertExists(self.artifacts(r)[0], "xyz", "liblib.a")
+
+        r = self.jolt("build exe:arg=zyx")
+        self.assertExists(self.artifacts(r)[0], "zyx", "exe")
+
+
+    def test_sources(self):
+        """
+        --- file: main.cpp
+        int main() {{return 0;}}
+
+        --- tasks:
+        class Lib(CXXLibrary):
+            arg = Parameter()
+            sources = ["{{arg}}.cpp"]
+
+        class Exe(CXXExecutable):
+            arg = Parameter()
+            sources = ["{{arg}}.cpp"]
+
+        ---
+        """
+        r = self.jolt("build lib:arg=main")
+        self.assertCompiled(r, "main.cpp")
+
+        self.jolt("build exe:arg=main")
+        self.assertCompiled(r, "main.cpp")
+
+        self.jolt("build lib:arg=*")
+        self.assertCompiled(r, "main.cpp")
+
+        self.jolt("build exe:arg=*")
+        self.assertCompiled(r, "main.cpp")

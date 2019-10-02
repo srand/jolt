@@ -1,0 +1,122 @@
+import sys
+import time
+sys.path.append(".")
+
+import testsupport
+
+
+@testsupport.enable_network_testing
+class BuildCli(testsupport.JoltTest):
+    name = "cli/build"
+
+    def test_return_value(self):
+        """
+        --- tasks:
+        class Pass(Task):
+            pass
+        class Fail(Task):
+            def run(self, deps, tools):
+                assert False, "This task always fails"
+        ---
+        """
+        self.build("pass")
+        with self.assertRaises(Exception, msg="always fails"):
+            self.build("fail")
+
+
+    def test_force(self):
+        """
+        --- tasks:
+        class Pass(Task):
+            pass
+        class Pass2(Task):
+            pass
+        ---
+        """
+        r1 = self.build("pass")
+        self.assertBuild(r1, "pass")
+
+        r2 = self.build("pass")
+        self.assertNoBuild(r2, "pass")
+
+        r3 = self.build("-f pass")
+        self.assertBuild(r3, "pass")
+        self.assertNotEqual(self.artifacts(r1), self.artifacts(r3))
+
+        r4 = self.build("-f pass")
+        self.assertBuild(r4, "pass")
+        self.assertNotEqual(self.artifacts(r1), self.artifacts(r4))
+        self.assertNotEqual(self.artifacts(r3), self.artifacts(r4))
+
+        r5 = self.build("pass pass2")
+        self.assertNoBuild(r5, "pass")
+        self.assertBuild(r5, "pass2")
+
+        r5 = self.build("-f pass pass2")
+        self.assertBuild(r5, "pass")
+        self.assertBuild(r5, "pass2")
+
+
+    def test_salt(self):
+        """
+        --- tasks:
+        class Pass(Task):
+            pass
+        ---
+        """
+        r1 = self.build("pass")
+        self.assertBuild(r1, "pass")
+
+        r2 = self.build("pass")
+        self.assertNoBuild(r2, "pass")
+
+        r3 = self.build("-s 1 pass")
+        self.assertBuild(r3, "pass")
+        self.assertNotEqual(self.artifacts(r1), self.artifacts(r3))
+
+        r4 = self.build("-s 1 pass")
+        self.assertNoBuild(r4, "pass")
+
+
+    def test_default(self):
+        """
+        --- tasks:
+        class A(Task):
+            arg = Parameter("default")
+
+            def run(self, d, t):
+                print("x%sx" % self.arg.get_value())
+                raise_error_if(True, "always fails")
+
+        class B(Task):
+            requires = ["a"]
+        ---
+        """
+        with self.assertRaises(Exception, msg="always fails"):
+            self.build("b")
+        r1 = self.lastLog()
+        self.assertBuild(r1, "a")
+        self.assertIn("xdefaultx", r1)
+
+        with self.assertRaises(Exception, msg="always fails"):
+            self.build("b -d a:arg=nondefault")
+        r2 = self.lastLog()
+        self.assertBuild(r2, "a")
+        self.assertIn("xnondefaultx", r2)
+
+
+    def test_copy(self):
+        """
+        --- tasks:
+        class A(Task):
+            def run(self, d, t):
+                pass
+
+            def publish(self, a, t):
+                a.collect("test.jolt", "test.py")
+                a.collect("test.jolt", "directory/test.py")
+        ---
+        """
+        r1 = self.build("a -c artifact/copy")
+        self.assertExists(self.ws+"/artifact/copy/test.py")
+        self.assertExists(self.ws+"/artifact/copy/directory/test.py")

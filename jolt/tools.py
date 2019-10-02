@@ -430,7 +430,7 @@ class Tools(object):
         return multiprocessing.cpu_count()
 
     @contextmanager
-    def cwd(self, pathname, *args, **kwargs):
+    def cwd(self, pathname, *args):
         """ Change the current working directory to the specified path.
 
         This function doesn't change the working directory of the Jolt
@@ -447,7 +447,7 @@ class Tools(object):
                 with tools.cwd("subdir") as cwd:
                     print(cwd)
         """
-        path = self.expand_path(pathname, *args, **kwargs)
+        path = self.expand_path(fs.path.join(pathname, *args))
         prev = self._cwd
         try:
             raise_task_error_if(
@@ -583,8 +583,7 @@ class Tools(object):
             str: Expanded string.
         """
 
-        pathname = fs.path.join(self.getcwd(), pathname)
-        return self.expand(pathname, *args, **kwargs)
+        return fs.path.join(self.getcwd(), self.expand(pathname, *args, **kwargs))
 
     def expand_relpath(self, pathname, relpath, *args, **kwargs):
         """ Expands keyword arguments/macros in a pathname format string.

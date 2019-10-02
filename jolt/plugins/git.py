@@ -120,7 +120,7 @@ class GitRepository(object):
                 except:
                     with self.tools.cwd(self.path):
                         self.fetch()
-                        tree = self.tools.run("git rev-parse {0}^{{tree}}", sha, output_on_error=True)
+                        tree = self.tools.run("git rev-parse {0}^{{tree}}", sha, output=False)
             if path == "/":
                 return tree
             with self.tools.cwd(self.path):
@@ -199,8 +199,8 @@ class GitInfluenceProvider(FileInfluence):
             stderr = "\n".join(e.stderr)
             if "exists on disk, but not in" in stderr:
                 return "{0}/{1}: N/A".format(git_rel, relpath)
-            for line in e.stderr:
-                log.stderr(line)
+            #for line in e.stderr:
+            #    log.stderr(line)
             raise e
 
 def global_influence(path, cls=GitInfluenceProvider):
@@ -262,7 +262,7 @@ class GitSrc(Resource):
         rev = self._get_revision()
         if rev is not None:
             raise_task_error_if(
-                not self.sha.is_unset() and self.git.diff(), self,
+                self._revision.value is None and not self.sha.is_unset() and self.git.diff(), self,
                 "explicit sha requested but git repo '{0}' has local changes", self.git.relpath)
             # Should be safe to do this now
             self.git.checkout(rev)

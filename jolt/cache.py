@@ -792,6 +792,7 @@ class ArtifactCache(StorageProvider):
 
     def __init__(self, options=None):
         self.root = config.get_cachedir()
+
         try:
             fs.makedirs(self.root)
         except:
@@ -815,6 +816,7 @@ class ArtifactCache(StorageProvider):
     def get_stable_path(self, node):
         identity = utils.sha1(node.qualified_name)
         return fs.path.join(self.root, node.canonical_name, identity)
+
 
     def evict(self):
         while self.stats.get_size() > self.max_size:

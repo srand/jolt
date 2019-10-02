@@ -1,0 +1,254 @@
+import sys
+import time
+sys.path.append(".")
+
+from testsupport import JoltTest
+
+
+class TaskApi(JoltTest):
+    name = "api/task"
+
+    def test_name(self):
+        """
+        --- tasks:
+        class Explicit(Task):
+            name = "explicit1"
+        ---
+        """
+        self.jolt("build explicit1")
+
+    def test_name_inferred(self):
+        """
+        --- tasks:
+        class Inferred(Task):
+            pass
+        ---
+        """
+        self.jolt("build inferred")
+
+    def test_name_symbols(self):
+        """
+        --- tasks:
+        class Name(Task):
+            name = "a&b/c(d)#"
+        ---
+        """
+        self.jolt("build 'a&b/c(d)#'")
+
+    def test_cacheable(self):
+        """
+        --- tasks:
+        class NonCacheable(Task):
+            cacheable = False
+
+        class Cacheable(Task):
+            cacheable = True
+        ---
+        """
+        r = self.jolt("build cacheable")
+        self.assertBuild(r, "cacheable")
+        r = self.jolt("build cacheable")
+        self.assertNoBuild(r, "cacheable")
+
+        r = self.jolt("build noncacheable")
+        self.assertBuild(r, "noncacheable")
+        r = self.jolt("build noncacheable")
+        self.assertBuild(r, "noncacheable")
+        self.assertNoArtifact(r)
+
+    def test_expires_whenunused(self):
+        """
+        --- tasks:
+        class WhenUnused(Task):
+            i = Parameter()
+            expires = expires.WhenUnusedFor(seconds=2)
+
+        class WhenUnusedArgs(Task):
+            expires = expires.After(weeks=1,days=1,hours=1,minutes=1,seconds=1)
+
+        --- config:
+        cachesize = 0G
+        ---
+        """
+        r1 = self.jolt("build whenunused:i=1")
+        self.assertArtifact(r1)
+        time.sleep(3)
+
+        # This evicts i=1
+        r2 = self.jolt("build whenunused:i=2")
+        self.assertNoArtifact(r1)
+        self.assertArtifact(r2)
+
+        r3 = self.jolt("build whenunused:i=3")
+        self.assertArtifact(r2)
+        self.assertArtifact(r3)
+        time.sleep(1)
+
+        # 1s passed since i=2 was created, now reuse it
+        r4 = self.jolt("build whenunused:i=2")
+        self.assertNoBuild(r4)
+        self.assertArtifact(r2)
+        self.assertArtifact(r3)
+        time.sleep(1)
+
+        # 2s passed since i=2 was created, reused 1s ago => no eviction
+        r4 = self.jolt("build whenunused:i=4")
+        self.assertArtifact(r2)
+        time.sleep(1)
+
+        # 3s passed since i=2 was created, reused 2s ago => possible eviction
+        r4 = self.jolt("build whenunused:i=5")
+        time.sleep(1)
+
+        # 4s passed since i=2 was created, reused 3s ago => guaranteed eviction
+        r3 = self.jolt("build whenunusedargs")
+        self.assertNoArtifact(r2)
+
+    def test_expires_after(self):
+        """
+        --- tasks:
+        class After(Task):
+            i = Parameter()
+            expires = expires.After(seconds=1)
+
+        class AfterArgs(Task):
+            expires = expires.After(weeks=1,days=1,hours=1,minutes=1,seconds=1)
+        --- config:
+        cachesize = 0G
+        ---
+        """
+        r1 = self.jolt("build after:i=1")
+        self.assertArtifact(r1)
+        time.sleep(2)
+
+        r2 = self.jolt("build after:i=2")
+        self.assertArtifact(r2)
+        self.assertNoArtifact(r1)
+
+        r3 = self.jolt("build afterargs")
+
+    def test_expires_after(self):
+        """
+        --- tasks:
+        class NeverArgs(Task):
+            expires = expires.Never()
+        ---
+        """
+        self.jolt("build neverargs")
+
+    def test_extends(self):
+        """
+        --- tasks:
+        class Base(Task):
+            pass
+
+        class Extended(Task):
+            i = Parameter()
+
+            extends = "base"
+
+            def run(self, deps, tools):
+                raise_error_if(not deps["base"], "dependency missing")
+        ---
+        """
+        r = self.jolt("build extended:i=1")
+        self.assertBuild(r, "base")
+        r = self.jolt("build extended:i=2")
+        self.assertBuild(r, "base")
+
+    def test_extends_multiple(self):
+        """
+        --- tasks:
+        class Base1(Task):
+            pass
+
+        class Base2(Task):
+            pass
+
+        class Extended(Task):
+            extends = ["base1", "base2"]
+        ---
+        """
+        with self.assertRaises(Exception, msg="multiple tasks extended"):
+            self.jolt("build extended")
+
+    def test_requires(self):
+        """
+        --- tasks:
+        class Base(Task):
+            pass
+
+        class Consumer(Task):
+            i = Parameter()
+
+            requires = ["base"]
+
+            def run(self, deps, tools):
+                raise_error_if(not deps["base"], "dependency missing")
+        ---
+        """
+        r = self.jolt("build consumer:i=1")
+        self.assertBuild(r, "base")
+        r = self.jolt("build consumer:i=2")
+        self.assertNoBuild(r, "base")
+
+    def test_selfsustained(self):
+        """
+        --- tasks:
+        class A(Task):
+            pass
+
+        class B1(Task):
+            requires = "a"
+            selfsustained = False
+
+        class B2(Task):
+            requires = "a"
+            selfsustained = True
+
+        class C1(Task):
+            requires = "b1"
+
+            def run(self, deps, tools):
+                print(deps["a"].path)
+
+        class C2(Task):
+            requires = "b2"
+
+            def run(self, deps, tools):
+                print(deps["a"].path)
+
+        ---
+        """
+        self.jolt("build c1")
+        self.jolt("build c2")
+
+        # Because B1 is not selfsustained, A becomes a transitive dependency of C1
+        self.jolt("clean a")
+        r = self.jolt("build -f c1")
+        self.assertBuild(r, "a")
+        self.assertBuild(self.lastLog(), "c1")
+
+        # Because B2 is selfsustained, A is not a transitive dependency of C2
+        self.jolt("clean a")
+        with self.assertRaises(Exception, msg="no such dependency"):
+            self.jolt("build -f c2")
+        self.assertNoBuild(self.lastLog(), "a")
+        self.assertBuild(self.lastLog(), "c2")
+
+    def test_weight(self):
+        """
+        --- tasks:
+        class A(Task):
+            weight = 3
+
+        class B(Task):
+            weight = 1
+
+        class C(Task):
+            weight = 2
+
+        ---
+        """
+        r = self.jolt("build a b c")
+        self.assertEqual(self.tasks(r), ["a", "c", "b"])

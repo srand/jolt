@@ -1,0 +1,37 @@
+import sys
+import time
+sys.path.append(".")
+
+from testsupport import JoltTest
+from jolt import utils
+
+
+class ArtifactEnvironApi(JoltTest):
+    name = "api/artifact/environ"
+
+    def test_path_append(self):
+        """
+        --- tasks:
+        class A(Task):
+            def publish(self, a, t):
+                t.write_file("bin.sh", "#!/bin/sh\\necho first")
+                t.write_file("sbin.sh", "#!/bin/sh\\necho second")
+                t.chmod("bin.sh", 0o755)
+                t.chmod("sbin.sh", 0o755)
+                a.collect("bin.sh", "bin/")
+                a.collect("sbin.sh", "sbin/")
+                a.environ.PATH.append("bin")
+                a.environ.PATH.append("sbin")
+
+        class B(Task):
+            name = "b"
+            requires = ["a"]
+
+            def run(self, d, t):
+                t.run("bin.sh")
+                t.run("sbin.sh")
+        ---
+        """
+        r = self.jolt("build b")
+        self.assertIn("first", r)
+        self.assertIn("second", r)
