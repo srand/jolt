@@ -216,3 +216,20 @@ distributed network builds:
 
 - ``jolt_identity`` -
   The identity of the Jolt artifact.
+
+
+Symlinks
+--------
+
+The symlink plugin automatically creates symlinks to task artifacts
+in the jolt workspace (relative to the topmost ``.jolt`` file). The
+symlinks are kept updated and always points to the latest built
+artifact.
+
+The plugin is enabled by adding a ``[symlinks]`` section in
+the Jolt configuration.
+
+These configuration keys exist:
+
+* ``path`` - Path, relative to the workspace root, where symlinks
+  will be created. Defaults to ``artifacts``.

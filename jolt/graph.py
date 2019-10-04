@@ -136,7 +136,7 @@ class TaskProxy(object):
         return isinstance(self.task, Resource)
 
     def has_artifact(self):
-        return not self.is_resource()
+        return self.is_cacheable() and not self.is_resource() and not self.is_alias()
 
     def has_extensions(self):
         return len(self.extensions) > 0
