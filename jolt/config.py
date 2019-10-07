@@ -114,11 +114,10 @@ def sections():
 
 class ConfigExtension(ManifestExtension):
     def export_manifest(self, manifest, task):
-        manifest.config = base64.encodestring(
-            get("network", "config", "", expand=False).encode()).decode()
+        manifest.config = get("network", "config", "", expand=False)
 
     def import_manifest(self, manifest):
-        _file.read_string(base64.decodestring(manifest.config.encode()).decode())
+        _file.read_string(manifest.config)
 
 
 ManifestExtensionRegistry.add(ConfigExtension())
