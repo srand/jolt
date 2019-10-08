@@ -28,10 +28,10 @@ config = [volume]
   path = /tmp/jolt-cache/jolt
 
 [artifactory]
-uri = http://nginx-service/
+uri = http://nginx-service.localhost/
 
 [amqp]
-
+host = amqp-service.localhost
 """
 
 

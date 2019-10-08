@@ -144,6 +144,9 @@ class Composition(object):
                 self.append(child)
                 return child
 
+            def remove(self, child, *args, **kwargs):
+                self.remove(child._elem)
+
             @property
             def get(self):
                 children = list(self.getroot()) if isinstance(self, ElementTree) else list(self._elem)
@@ -151,6 +154,7 @@ class Composition(object):
                 return [comp_cls(elem=child) for child in children]
 
             setattr(cls, 'create_' + name, create)
+            setattr(cls, 'remove_' + name, remove)
             setattr(cls, name + 's', get)
             return cls
         return decorate(cls, self.cls, self.name)

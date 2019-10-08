@@ -1,6 +1,10 @@
 from jolt import Parameter, Export
+from jolt import log
 from jolt.tasks import TaskRegistry
 from jolt.plugins import git
+
+
+log.verbose("[Gerrit] Loaded")
 
 
 class GerritSrc(git.GitSrc):

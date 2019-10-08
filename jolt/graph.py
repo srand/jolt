@@ -34,8 +34,6 @@ class TaskProxy(object):
         self._extended_task = None
         self._in_progress = False
         self._completed = False
-        self._identity = None
-        self._frozen = False
         self._goal = False
         self._download = True
         hooks.task_created(self)
@@ -57,15 +55,11 @@ class TaskProxy(object):
 
     @property
     def qualified_name(self):
-        return utils.format_task_name(
-            self.task.name,
-            self.task._get_parameters())
+        return self.task.qualified_name
 
     @property
     def short_qualified_name(self):
-        return utils.format_task_name(
-            self.task.name,
-            self.task._get_explicitly_set_parameters())
+        return self.task.short_qualified_name
 
     @property
     def log_name(self):
@@ -73,8 +67,8 @@ class TaskProxy(object):
 
     @property
     def identity(self):
-        if self._identity is not None:
-            return self._identity
+        if self.task.identity is not None:
+            return self.task.identity
 
         sha = hashlib.sha1()
 
@@ -87,15 +81,12 @@ class TaskProxy(object):
         if self._extended_task:
             sha.update(self._extended_task.identity.encode())
 
-        self._identity = sha.hexdigest()
-        self.task.identity = self._identity
-        return self._identity
+        self.task.identity = sha.hexdigest()
+        return str(self.task.identity)
 
     @identity.setter
     def identity(self, value):
-        self._frozen = True
-        self._identity = value
-        self.task.identity = self._identity
+        self.task.identity = value
 
     @property
     def weight(self):
@@ -122,9 +113,6 @@ class TaskProxy(object):
 
     def has_ancestors(self):
         return len(self.ancestors) > 0
-
-    def is_frozen(self):
-        return self._frozen
 
     def is_cacheable(self):
         return self.task.is_cacheable()
@@ -229,22 +217,11 @@ class TaskProxy(object):
         self.direct_ancestors = list(
             filter(lambda n: dag.are_neighbors(n, self), self.ancestors))
 
-        task = self.manifest.find_task(self.qualified_name)
-        if task is not None:
-            if task.identity:
-                self.identity = task.identity
-            for attrib in task.attributes:
-                export = utils.getattr_safe(self.task, attrib.name)
-                assert isinstance(export, Export), \
-                    "'{0}' is not an exportable attribute of task '{1}'"\
-                    .format(attrib.name, self.qualified_name)
-                export.assign(attrib.value)
-
         return self.identity
 
     def taint(self, salt=None):
         self.task.influence.append(ForcedInfluenceProvider(salt))
-        self._identity = None
+        self.identity = None
         self.identity
 
     def started(self, what="Execution"):
@@ -427,7 +404,7 @@ class GraphBuilder(object):
     def _get_node(self, progress, name):
         node = self.nodes.get(name)
         if not node:
-            task = self.registry.get_task(name)
+            task = self.registry.get_task(name, manifest=self.manifest)
             node = self.nodes[name] = TaskProxy(task, self.graph, self.options)
             self._build_node(progress, node)
             progress.update(1)
@@ -447,7 +424,13 @@ class GraphBuilder(object):
 
         for requirement in node.task.requires:
             child = self._get_node(progress, requirement)
-            self.graph.add_edges_from([(parent, child)])
+            # Create direct edges from alias parents to alias children
+            if child.is_alias():
+                for child_child in child.children:
+                    self.graph.add_edges_from([(parent, child_child)])
+            else:
+                self.graph.add_edges_from([(parent, child)])
+            node.children.append(child)
 
         return node
 

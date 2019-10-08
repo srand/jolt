@@ -1,6 +1,6 @@
 import copy
 
-from jolt.tasks import Resource, Parameter, BooleanParameter, Export, TaskRegistry
+from jolt.tasks import Resource, WorkspaceResource, Parameter, BooleanParameter, Export, TaskRegistry
 from jolt.influence import HashInfluenceProvider, HashInfluenceRegistry, FileInfluence
 from jolt.tools import Tools
 from jolt.loader import JoltLoader
@@ -12,6 +12,8 @@ from jolt.error import raise_error
 from jolt.error import raise_error_if
 from jolt.error import raise_task_error_if
 
+
+log.verbose("[Git] Loaded")
 
 
 _tree = {}
@@ -89,6 +91,13 @@ class GitRepository(object):
     def head(self):
         return self._head() if self.is_cloned() else ""
 
+    def is_head(self, rev):
+        return self.is_indexed() and self.head() == rev
+
+    def rev_parse(self, rev):
+        with self.tools.cwd(self.path):
+            return self.tools.run("git rev-parse {rev}", rev=rev, output_on_error=True)
+
     @utils.cached.instance
     def write_tree(self):
         tools = Tools()
@@ -146,7 +155,6 @@ class GitRepository(object):
     def checkout(self, rev):
         log.info("Checking out {0} in {1}", rev, self.path)
         with self.tools.cwd(self.path):
-            rev = self.tools.run("git rev-parse {rev}", rev=rev, output_on_error=True)
             try:
                 return self.tools.run("git checkout -f {rev}", rev=rev, output=False)
             except:
@@ -219,7 +227,7 @@ def influence(path, git_cls=GitInfluenceProvider):
     return _decorate
 
 
-class GitSrc(Resource):
+class GitSrc(WorkspaceResource):
     """ Clones a Git repo.
     """
 
@@ -257,6 +265,9 @@ class GitSrc(Resource):
         return self._diff.value
 
     def acquire(self, artifact, env, tools):
+        self.acquire_ws()
+
+    def acquire_ws(self):
         if not self.git.is_cloned():
             self.git.clone()
         rev = self._get_revision()
@@ -265,9 +276,11 @@ class GitSrc(Resource):
                 self._revision.value is None and not self.sha.is_unset() and self.git.diff(), self,
                 "explicit sha requested but git repo '{0}' has local changes", self.git.relpath)
             # Should be safe to do this now
-            self.git.checkout(rev)
-            self.git.clean()
-            self.git.patch(self._get_diff())
+            rev = self.git.rev_parse(rev)
+            if not self.git.is_head(rev) or self._revision.value is not None:
+                self.git.checkout(rev)
+                self.git.clean()
+                self.git.patch(self._get_diff())
 
     @utils.cached.instance
     def get_influence(self, task):

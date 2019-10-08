@@ -242,7 +242,21 @@ class TaskRegistry(object):
     def get_test_classes(self):
         return list(self.tests.values())
 
-    def get_task(self, name, extra_params=None):
+    def _apply_task_manifest(self, task, manifest=None):
+        if manifest is None:
+            return
+        manifest_task = manifest.find_task(task.qualified_name)
+        if manifest_task is not None:
+            if manifest_task.identity:
+                task.identity = manifest_task.identity
+            for attrib in manifest_task.attributes:
+                export = utils.getattr_safe(task, attrib.name)
+                assert isinstance(export, Export), \
+                    "'{0}' is not an exportable attribute of task '{1}'"\
+                    .format(attrib.name, task.qualified_name)
+                export.assign(attrib.value)
+
+    def get_task(self, name, extra_params=None, manifest=None):
         name, params = utils.parse_task_name(name)
         params.update(extra_params or {})
         full_name = utils.format_task_name(name, params)
@@ -254,12 +268,14 @@ class TaskRegistry(object):
         cls = self.tasks.get(name)
         if cls:
             task = cls(parameters=params)
+            self._apply_task_manifest(task, manifest)
             self.instances[full_name] = task
             return task
 
         cls = self.tests.get(name)
         if cls:
             task = _Test(cls, parameters=params)
+            self._apply_task_manifest(task, manifest)
             self.instances[full_name] = task
             return task
 
@@ -273,6 +289,10 @@ class TaskRegistry(object):
             cls = self.tests.get(name)
         raise_task_error_if(not cls, task, "no such task")
         cls._set_default_parameters(cls, params)
+
+    def set_joltdir(self, joltdir):
+        for task in list(self.tasks.values()) + list(self.tests.values()):
+            task.joltdir = joltdir
 
     def _create_parents(self, name):
         names = name.split("/")
@@ -412,6 +432,9 @@ class TaskBase(object):
 
     joltdir = "."
     """ Path to the directory of the .jolt file where the task was defined. """
+
+    joltproject = None
+    """ Name of project this task belongs to. """
 
     name = None
     """ Name of the task. Derived from class name if not set. """
@@ -564,6 +587,18 @@ class TaskBase(object):
     @property
     def canonical_name(self):
         return utils.canonical(self.name)
+
+    @property
+    def qualified_name(self):
+        return utils.format_task_name(
+            self.name,
+            self._get_parameters())
+
+    @property
+    def short_qualified_name(self):
+        return utils.format_task_name(
+            self.name,
+            self._get_explicitly_set_parameters())
 
     def expand(self, string_or_list, *args, **kwargs):
         """ Expands keyword arguments/macros in a format string.
@@ -765,6 +800,47 @@ class Resource(Task):
         self._run_env = env
 
 
+class WorkspaceResource(Resource):
+    """
+    A workspace resource task.
+
+    A workspace resource is a similiar to a regular resource and may be used as such,
+    but it can also be used from a workspace manifest to acquire project resources
+    before any task recipes are parsed. A common use-case is to retrieve project
+    sources from SCM. Workspace resources cannot have any dependencies.
+    No artifact is produced.
+
+    Implementors should override :func:`~acquire_ws` and :func:`~release_ws`.
+    """
+
+    def __init__(self, *args, **kwargs):
+        super(WorkspaceResource, self).__init__(*args, **kwargs)
+        raise_task_error_if(len(self.requires) > 0, self,
+                            "workspace resource is not allowed to have requirements")
+
+    def acquire(self, artifact, deps, tools):
+        return self.acquire_ws()
+
+    def release(self, artifact, deps, tools):
+        return self.release_ws()
+
+    def acquire_ws(self):
+        """ Called to acquire the resource.
+
+        An implementor overrides this method in a subclass. The acquired
+        resource must be released manually if an exception occurs before the
+        method has returned. """
+        pass
+
+    def release_ws(self):
+        """ Called to release the resource.
+
+        An implementor overrides this method in a subclass.
+
+        """
+        pass
+
+
 class Alias(Task):
     """
     An alias task.
@@ -830,14 +906,6 @@ class _Test(Task):
             if isinstance(param, Parameter):
                 param = copy.copy(param)
                 setattr(self, key, param)
-
-    @property
-    def identity(self):
-        return self.test_cls.identity
-
-    @identity.setter
-    def identity(self, identity):
-        self.test_cls.identity = identity
 
     def _get_test_names(self):
         return [attrib for attrib in dir(self.test_cls)

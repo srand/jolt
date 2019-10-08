@@ -55,18 +55,7 @@ class PluginGroup(click.Group):
             config.load_or_set(config_file)
 
         # Load configured plugins
-        searchpath = config.get("jolt", "pluginpath")
-        searchpath = searchpath.split(":") if searchpath else []
-        searchpath.append(fs.path.join(fs.path.dirname(__file__), "plugins"))
-
-        if not "jolt.plugins.loaded" in sys.modules:
-            sys.modules["jolt.plugins.loaded"] = imp.new_module("jolt.plugins.loaded")
-            for section in config.sections():
-                for path in searchpath:
-                    module = fs.path.join(fs.path.dirname(__file__), path, section + ".py")
-                    if fs.path.exists(module):
-                        imp.load_source("jolt.plugins.loaded." + section, module)
-                        continue
+        JoltLoader.get().load_plugins()
 
         return click.Group.get_command(self, ctx, cmd_name)
 
@@ -88,21 +77,9 @@ def cli(ctx, verbose, extra_verbose, config_file, debug, profile):
     log.verbose("Jolt install path: {}", fs.path.dirname(__file__))
 
     manifest = JoltManifest()
-    try:
-        manifest.parse()
-        manifest.process_import()
-    except:
-        pass
+    utils.call_and_catch(manifest.parse)
+    manifest.process_import()
     ctx.obj["manifest"] = manifest
-
-    # Load additional plugins configured through manifest
-    for section in config.sections():
-        path = fs.path.dirname(__file__)
-        path = fs.path.join(path, "plugins", section + ".py")
-        if fs.path.exists(path):
-            mod = "jolt.plugins.loaded." + section
-            if mod not in sys.modules:
-                imp.load_source(mod, path)
 
     loader = JoltLoader.get()
     tasks, tests = loader.load()
@@ -335,9 +312,7 @@ def clean(ctx, task, deps, expired):
         if deps:
             tasks = dag.tasks
         else:
-            tasks = dag.select(
-                lambda graph, node: node.short_qualified_name in task or \
-                node.qualified_name in task)
+            tasks = dag.goals
         for task in tasks:
             task.clean(acache, expired)
     else:
@@ -382,10 +357,11 @@ def docs():
 
 @cli.command(hidden=True)
 @click.argument("task", type=str, nargs=-1, required=True)
+@click.option("-r", "--remove", is_flag=True, help="Remove tasks from existing manifest.")
 @click.option("-d", "--default", type=str, multiple=True, help="Override default parameter values.")
 @click.option("-o", "--output", type=str, default="default.joltxmanifest", help="Manifest filename.")
 @click.pass_context
-def freeze(ctx, task, default, output):
+def freeze(ctx, task, default, output, remove):
     """
     Freeze the identity of a task.
 
@@ -411,11 +387,15 @@ def freeze(ctx, task, default, output):
 
     for available, task in available_in_cache:
         raise_task_error_if(
-            not available, task,
+            not remove and not available, task,
             "task artifact is not available in any cache, build it first")
 
     for task in dag.tasks:
-        if not manifest.has_task(task):
+        manifest_task = manifest.find_task(task)
+        if remove and manifest_task:
+            manifest.remove_task(manifest_task)
+            continue
+        if not remove and manifest_task:
             manifest_task = manifest.create_task()
             manifest_task.name = task.qualified_name
             manifest_task.identity = task.identity
@@ -517,8 +497,9 @@ def info(ctx, task, influence=False, artifacts=False):
 
     click.echo()
     click.echo("  Requirements")
+    manifest = ctx.obj["manifest"]
     try:
-        task = task_registry.get_task(task_name)
+        task = task_registry.get_task(task_name, manifest=manifest)
         for req in utils.as_list(utils.call_or_return(task, task.requires)):
             click.echo("    {0}".format(task.tools.expand(req)))
         if not task.requires:
@@ -537,7 +518,7 @@ def info(ctx, task, influence=False, artifacts=False):
 
     if artifacts:
         acache = cache.ArtifactCache.get()
-        dag = graph.GraphBuilder(task_registry, ctx.obj["manifest"]).build(
+        dag = graph.GraphBuilder(task_registry, manifest).build(
             [utils.format_task_name(task.name, task._get_parameters())])
         tasks = dag.select(lambda graph, node: graph.is_root(node))
         assert len(tasks) == 1, "unexpected graph generated"

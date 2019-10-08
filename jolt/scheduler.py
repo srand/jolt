@@ -522,7 +522,7 @@ class WorkerStrategy(ExecutionStrategy, PruneStrategy):
 
 class TaskIdentityExtension(ManifestExtension):
     def export_manifest(self, manifest, task):
-        for child in [task] + task.descendants:
+        for child in [task] + task.extensions + task.descendants:
             manifest_task = manifest.find_task(child.qualified_name)
             if manifest_task is None:
                 manifest_task = manifest.create_task()

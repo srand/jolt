@@ -117,7 +117,11 @@ class ConfigExtension(ManifestExtension):
         manifest.config = get("network", "config", "", expand=False)
 
     def import_manifest(self, manifest):
-        _file.read_string(manifest.config)
+        if manifest.config:
+            _file.read_string(manifest.config)
+            from jolt.loader import JoltLoader
+            JoltLoader.get().load_plugins()
 
 
-ManifestExtensionRegistry.add(ConfigExtension())
+# High priority so that plugins are loaded before resources are acquired.
+ManifestExtensionRegistry.add(ConfigExtension(), -10)

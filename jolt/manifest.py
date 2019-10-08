@@ -20,6 +20,34 @@ class _JoltRecipe(SubElement):
         super(_JoltRecipe, self).__init__('recipe', elem=elem)
 
 
+@Attribute('src')
+@Attribute('dest')
+class _JoltProjectLink(SubElement):
+    def __init__(self, elem=None):
+        super(_JoltProjectLink, self).__init__('link', elem=elem)
+
+
+@Attribute('src')
+@Attribute('joltdir')
+class _JoltProjectRecipe(SubElement):
+    def __init__(self, elem=None):
+        super(_JoltProjectRecipe, self).__init__('recipe', elem=elem)
+
+
+@Attribute('name')
+class _JoltProjectResource(SubElement):
+    def __init__(self, elem=None):
+        super(_JoltProjectResource, self).__init__('resource', elem=elem)
+
+
+@Attribute('name')
+@Composition(_JoltProjectLink, "link")
+@Composition(_JoltProjectRecipe, "recipe")
+@Composition(_JoltProjectResource, "resource")
+class _JoltProject(SubElement):
+    def __init__(self, elem=None):
+        super(_JoltProject, self).__init__('project', elem=elem)
+
 @Attribute('name')
 @Attribute('identity', child=True)
 @Composition(_JoltAttribute, "attribute")
@@ -53,24 +81,43 @@ class _JoltNetworkParameter(SubElement):
 @Attribute("stderr", child=True, zlib=True)
 @Attribute("result", child=True)
 @Attribute("duration", child=True)
+@Attribute("workspace")
 @Composition(_JoltRecipe, "recipe")
 @Composition(_JoltTask, "task")
 @Composition(_JoltBuild, "build")
 @Composition(_JoltNetworkParameter, "parameter")
+@Composition(_JoltProject, "project")
 class JoltManifest(ElementTree):
     def __init__(self):
         super(JoltManifest, self).__init__(element=Element('jolt-manifest'))
         self._identities = None
         self._elem = self.getroot()
+        self.path = None
+
+    @property
+    def joltdir(self):
+        if self.path is None:
+            return None
+        joltdir = fs.path.dirname(self.path)
+        if self.workspace:
+            joltdir = fs.path.normpath(fs.path.join(joltdir, self.workspace))
+        return joltdir
+
+    @property
+    def attrib(self):
+        return self.getroot().attrib
 
     def append(self, element):
         SubElement(elem=self.getroot()).append(element)
 
     def get(self, key):
-        self.getroot().get(key)
+        return self.getroot().get(key)
 
     def set(self, key, value):
         self.getroot().set(key, value)
+
+    def remove(self, child):
+        self.getroot().remove(child)
 
     def parse(self, filename="default.joltxmanifest"):
         path = os.getcwd()
@@ -84,15 +131,19 @@ class JoltManifest(ElementTree):
         if path == fs.sep:
             raise Exception("couldn't find manifest file")
         with open(filepath) as f:
-            data = f.read().replace("\n  ", "")
-            data = data.replace("\n", "")
-            self.parsestring(data)
+            self.parsestring(f.read())
             log.verbose("Loaded: {0}", filepath)
+            self.path = filepath
             return self
         raise Exception("failed to parse xml file")
 
     def parsestring(self, string):
         root = ET.fromstring(string)
+        for elem in root.iter():
+            if elem.text is not None:
+                elem.text = elem.text.strip()
+            if elem.tail is not None:
+                elem.tail = elem.tail.strip()
         self._setroot(root)
         self._elem = root
         return self
@@ -142,17 +193,18 @@ class ManifestExtensionRegistry(object):
     extensions = []
 
     @staticmethod
-    def add(extension):
-        ManifestExtensionRegistry.extensions.append(extension)
+    def add(extension, priority=0):
+        ManifestExtensionRegistry.extensions.append((extension, priority))
+        ManifestExtensionRegistry.extensions.sort(key=lambda x: x[1])
 
     @staticmethod
     def export_manifest(manifest, task):
-        for extension in ManifestExtensionRegistry.extensions:
+        for extension, _ in ManifestExtensionRegistry.extensions:
             extension.export_manifest(manifest, task)
 
     @staticmethod
     def import_manifest(manifest):
-        for extension in ManifestExtensionRegistry.extensions:
+        for extension, _ in ManifestExtensionRegistry.extensions:
             extension.import_manifest(manifest)
 
 
