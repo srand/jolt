@@ -491,7 +491,7 @@ class WorkerTaskConsumer(object):
         if job.channel is self._channel:
             self._channel.basic_publish(
                 exchange=self.RESULT_EXCHANGE,
-                routing_key=self.ROUTING_KEY_PREFIX+self.ROUTING_KEY_RESULT,
+                routing_key=job.properties.correlation_id,
                 properties=pika.BasicProperties(
                     correlation_id=job.properties.correlation_id,
                     expiration="600000"),
@@ -729,7 +729,7 @@ class AmqpExecutor(scheduler.NetworkExecutor):
             self.channel.queue_bind(
                 self.callback_queue,
                 WorkerTaskConsumer.RESULT_EXCHANGE,
-                routing_key=WorkerTaskConsumer.ROUTING_KEY_PREFIX+WorkerTaskConsumer.ROUTING_KEY_RESULT)
+                routing_key=self.corr_id)
         self.channel.basic_consume(
             queue=self.callback_queue,
             on_message_callback=self.on_response,
