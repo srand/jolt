@@ -1,0 +1,117 @@
+#!/usr/bin/env python
+
+import os
+import sys
+import time
+sys.path.append(".")
+
+import testsupport
+
+
+@testsupport.enable_network_testing
+class GitApi(testsupport.JoltTest):
+    name = "api/git"
+
+
+    def _recipe(self):
+        return "from jolt.plugins.ninja import *\nfrom jolt.plugins import git\n" + \
+            super(GitApi, self)._recipe()
+
+    def append(self, filepath, content):
+        self.tools.append_file(os.path.join(self.ws, filepath), content)
+
+    def test_head(self):
+        """
+        --- tasks:
+        class Exe(CXXLibrary):
+            requires = ["git:url=https://github.com/gideont/hello_world.git"]
+            sources = ["hello_world/01_hello_world/*.c"]
+            source_influence = False
+        ---
+        """
+        r = self.build("exe")
+        self.assertBuild(r, "exe")
+        time.sleep(1)
+        self.append("hello_world/01_hello_world/hello.c", '#error "xfailx"\n')
+        with self.assertRaises(Exception):
+            r = self.build("exe")
+        self.assertBuild(r, "exe")
+        self.assertIn("xfailx", self.lastLog())
+
+    def test_head_with_unstaged_filed(self):
+        """
+        --- tasks:
+        class Exe(Task):
+            requires = ["git:url=https://github.com/gideont/hello_world.git"]
+        ---
+        """
+        r = self.build("exe")
+        self.assertBuild(r, "exe")
+        time.sleep(1)
+        self.append("hello_world/01_hello_world/world.c", '#error "xfailx"\n')
+        r = self.build("exe")
+        self.assertBuild(r, "exe")
+
+    def test_sha_commit(self):
+        """
+        --- tasks:
+        class Exe(CXXExecutable):
+            requires = ["git:url=https://github.com/gideont/hello_world.git,sha=74cf3e97a3"]
+            sources = ["hello_world/01_hello_world/*.c"]
+            source_influence = False
+        ---
+        """
+        r = self.build("exe")
+        with self.tools.cwd(self.ws, "hello_world"):
+            if not self.network:
+                self.assertIn("74cf3e97a3", self.tools.run("git rev-parse HEAD"))
+        time.sleep(1)
+        self.append("hello_world/01_hello_world/hello.c", '\n\n')
+        if not self.network:
+            with self.assertRaises(Exception, msg="has local changes"):
+                self.build("exe")
+        else:
+            self.build("exe")
+
+    def test_sha_branch(self):
+        """
+        --- tasks:
+        class Exe(CXXExecutable):
+            requires = ["git:url=https://github.com/gideont/hello_world.git,sha=origin/master"]
+            sources = ["hello_world/01_hello_world/*.c"]
+            source_influence = False
+        ---
+        """
+        self.build("exe")
+        time.sleep(1)
+        self.append("hello_world/01_hello_world/hello.c", '\n\n')
+        if not self.network:
+            with self.assertRaises(Exception, msg="has local changes"):
+                self.build("exe")
+        else:
+            self.build("exe")
+
+    def test_sha_bad(self):
+        """
+        --- tasks:
+        class Exe(CXXExecutable):
+            requires = ["git:url=https://github.com/gideont/hello_world.git,sha=bad"]
+            sources = ["hello_world/01_hello_world/*.c"]
+            source_influence = False
+        ---
+        """
+        with self.assertRaises(Exception):
+            self.build("exe")
+
+    def test_src_head(self):
+        """
+        --- tasks:
+        class Exe(CXXLibrary):
+            requires = ["git-src:url=https://github.com/gideont/hello_world.git"]
+        ---
+        """
+        self.build("exe")
+        time.sleep(1)
+        self.append("hello_world/01_hello_world/hello.c", '#error "xfailx"\n')
+        r = self.build("exe")
+        self.assertNoBuild(r, "exe")

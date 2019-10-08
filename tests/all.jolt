@@ -4,6 +4,7 @@ from jolt import *
 class All(Alias):
     requires = [
         "api/artifact/environ",
+	"api/git",
         "api/task",
         "api/tools",
         "cli/build",
