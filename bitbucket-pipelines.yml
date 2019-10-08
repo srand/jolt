@@ -7,7 +7,7 @@ pipelines:
           - pip
         script:
           - apt-get update
-          - apt-get install -y python3 zip
+          - apt-get install -y python3 zip ninja-build gcc g++
           - pip3 install pika
           - pip3 install -e .
           - cd tests && jolt build all
@@ -16,7 +16,7 @@ pipelines:
           - pip
         script:
           - apt-get update
-          - apt-get install -y python3 zip
+          - apt-get install -y python3 zip ninja-build gcc g++
           - pip3 install pika
           - pip3 install jolt
           - cd tests && jolt build all

@@ -5,6 +5,7 @@ class All(Alias):
     requires = [
         "api/artifact/environ",
 	"api/git",
+	"api/ninja",
         "api/task",
         "api/tools",
         "cli/build",
