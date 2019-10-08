@@ -1,7 +1,7 @@
 import keyring
 import getpass
 from ftplib import FTP, FTP_TLS
-from requests.exceptions import ConnectionError, ReadTimeout
+from requests.exceptions import RequestException
 
 
 from jolt import utils
@@ -82,7 +82,7 @@ class FtpStorage(cache.StorageProvider):
             self._disabled = True
         return None
 
-    @utils.retried.on_exception((ConnectionError, ReadTimeout))
+    @utils.retried.on_exception((RequestException))
     def download(self, node, force=False):
         if self._disabled:
             return False
@@ -112,7 +112,7 @@ class FtpStorage(cache.StorageProvider):
     def download_enabled(self):
         return not self._disabled and self._download
 
-    @utils.retried.on_exception((ConnectionError, ReadTimeout))
+    @utils.retried.on_exception((RequestException))
     def upload(self, node, force=False):
         if self._disabled:
             return True
@@ -144,7 +144,7 @@ class FtpStorage(cache.StorageProvider):
     def upload_enabled(self):
         return not self._disabled and self._upload
 
-    @utils.retried.on_exception((ConnectionError, ReadTimeout))
+    @utils.retried.on_exception((RequestException))
     def location(self, node):
         if self._disabled:
             return False
