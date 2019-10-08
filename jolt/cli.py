@@ -391,12 +391,15 @@ def freeze(ctx, task, default, output, remove):
             "task artifact is not available in any cache, build it first")
 
     for task in dag.tasks:
+        if task.is_resource() or not task.is_cacheable():
+            continue
         manifest_task = manifest.find_task(task)
         if remove and manifest_task:
             manifest.remove_task(manifest_task)
             continue
-        if not remove and manifest_task:
-            manifest_task = manifest.create_task()
+        if not remove:
+            if not manifest_task:
+                manifest_task = manifest.create_task()
             manifest_task.name = task.qualified_name
             manifest_task.identity = task.identity
 
