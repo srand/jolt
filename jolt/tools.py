@@ -607,10 +607,10 @@ class Tools(object):
             str: Expanded string.
         """
 
+        pathname = self.expand(pathname, *args, **kwargs)
+        relpath = self.expand(relpath, *args, **kwargs)
         pathname = fs.path.join(self.getcwd(), pathname)
-        pathname = fs.path.relpath(pathname, relpath)
-
-        return self.expand(pathname, *args, **kwargs)
+        return fs.path.relpath(pathname, relpath)
 
     def extract(self, filename, pathname, files=None):
         """ Extracts files in an archive.

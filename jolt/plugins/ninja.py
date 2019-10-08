@@ -12,7 +12,6 @@ from jolt import filesystem as fs
 from jolt.error import raise_task_error_if
 
 
-
 class Variable(object):
     def __init__(self, value=None):
         self._value = value
@@ -56,6 +55,32 @@ class SharedLibraryVariable(Variable):
         writer.variable(self.name, str(value))
 
 
+class GNUPCHVariables(Variable):
+    pch_ext = ".pch"
+    gch_ext = ".gch"
+
+    def __init__(self):
+        pass
+
+    def create(self, project, writer, deps, tools):
+        pch = [src for src in project.sources if src.endswith(self.pch_ext)]
+
+        raise_task_error_if(
+            len(pch) > 1, project,
+            "multiple precompiled headers found, only one is allowed")
+
+        if len(pch) <= 0:
+            writer.variable("pch_out", ".")
+            return
+
+        project._pch = fs.path.basename(pch[0])
+        project._pch_out = project._pch + self.gch_ext
+
+        writer.variable("pch", project._pch)
+        writer.variable("pch_flags", "-include $pch")
+        writer.variable("pch_out", project._pch_out)
+
+
 class Rule(object):
     """ A source transformation rule.
 
@@ -88,7 +113,7 @@ class Rule(object):
 
     """
 
-    def __init__(self, command=None, infiles=None, outfiles=None, depfile=None, deps=None, variables=None):
+    def __init__(self, command=None, infiles=None, outfiles=None, depfile=None, deps=None, variables=None, implicit=None, order_only=None):
         """
         Creates a new rule.
 
@@ -129,6 +154,8 @@ class Rule(object):
         self.deps = deps
         self.infiles = infiles or []
         self.outfiles = utils.as_list(outfiles or [])
+        self.implicit = implicit
+        self.order_only = order_only
 
     def _out(self, project, infile):
         in_dirname, in_basename = fs.path.split(infile)
@@ -172,7 +199,7 @@ class Rule(object):
             infile_rel = fs.path.relpath(infile, project.outdir)
             outfiles, variables = self._out(project, infile)
             outfiles_rel = [fs.path.relpath(outfile, project.outdir) for outfile in outfiles]
-            writer.build(outfiles_rel, self.name, infile_rel, variables=variables)
+            writer.build(outfiles_rel, self.name, infile_rel, variables=variables, implicit=self.implicit, order_only=self.order_only)
             result.extend(outfiles)
         return result
 
@@ -381,7 +408,7 @@ class IncludePaths(Variable):
                 return path[1:]
             return tools.expand_relpath(fs.path.join(sandbox, path), project.outdir)
 
-        incpaths = [expand(path) for path in project.incpaths]
+        incpaths = [expand(path) for path in project.incpaths] + ["."]
         for name, artifact in deps.items():
             incs = [path for path in artifact.cxxinfo.incpaths.items()]
             if incs:
@@ -446,7 +473,7 @@ class GNUOptFlags(GNUFlags):
 
 
 class GNUToolchain(Toolchain):
-    hh = Skip(infiles=[".h", ".hh", ".hpp", ".hxx"])
+    hh = Skip(infiles=[".h", ".hh", ".hpp", ".hxx", GNUPCHVariables.gch_ext])
     obj = Objects(infiles=[".o", ".obj", ".a"])
 
     joltdir = ProjectVariable()
@@ -468,6 +495,7 @@ class GNUToolchain(Toolchain):
     ldflags = EnvironmentVariable(default="")
 
     shared_flags = SharedLibraryVariable(default="-fPIC")
+    pch_flags = GNUPCHVariables()
 
     extra_asflags = ProjectVariable(attrib="asflags")
     extra_cflags = ProjectVariable(attrib="cflags")
@@ -480,37 +508,49 @@ class GNUToolchain(Toolchain):
     libpaths = LibraryPaths(prefix="-L")
     libraries = Libraries(prefix="-l")
 
+    compile_pch = GNUCompiler(
+        command="$cxxwrap $cxx -x c++-header $cxxflags $shared_flags $imported_cxxflags $extra_cxxflags $macros $incpaths -MMD -MF $out.d -c $in -o $out",
+        deps="gcc",
+        depfile="$out.d",
+        infiles=[GNUPCHVariables.pch_ext],
+        outfiles=["{outdir}/{in_base}{in_ext}" + GNUPCHVariables.gch_ext],
+        variables={"desc": "[PCH] {in_base}{in_ext}"})
+
     compile_c = GNUCompiler(
-        command="$ccwrap $cc -x c $cflags $shared_flags $imported_cflags $extra_cflags $macros $incpaths -MMD -MF $out.d -c $in -o $out",
+        command="$ccwrap $cc -x c $pch_flags $cflags $shared_flags $imported_cflags $extra_cflags $macros $incpaths -MMD -MF $out.d -c $in -o $out",
         deps="gcc",
         depfile="$out.d",
         infiles=[".c"],
         outfiles=["{outdir}/{in_path}/{in_base}.o"],
-        variables={"desc": "[C] {in_base}{in_ext}"})
+        variables={"desc": "[C] {in_base}{in_ext}"},
+        order_only=["$pch_out"])
 
     compile_cxx = GNUCompiler(
-        command="$cxxwrap $cxx -x c++ $cxxflags $shared_flags $imported_cxxflags $extra_cxxflags $macros $incpaths -MMD -MF $out.d -c $in -o $out",
+        command="$cxxwrap $cxx -x c++ $pch_flags $cxxflags $shared_flags $imported_cxxflags $extra_cxxflags $macros $incpaths -MMD -MF $out.d -c $in -o $out",
         deps="gcc",
         depfile="$out.d",
         infiles=[".cc", ".cpp", ".cxx"],
         outfiles=["{outdir}/{in_path}/{in_base}.o"],
-        variables={"desc": "[CXX] {in_base}{in_ext}"})
+        variables={"desc": "[CXX] {in_base}{in_ext}"},
+        order_only=["$pch_out"])
 
     compile_asm = GNUCompiler(
-        command="$ccwrap $cc -x assembler $asflags $shared_flags $imported_asflags $extra_asflags -MMD -MF $out.d -c $in -o $out",
+        command="$ccwrap $cc -x assembler $pch_flags $asflags $shared_flags $imported_asflags $extra_asflags -MMD -MF $out.d -c $in -o $out",
         deps="gcc",
         depfile="$out.d",
         infiles=[".s", ".asm"],
         outfiles=["{outdir}/{in_path}/{in_base}.o"],
-        variables={"desc": "[ASM] {in_base}{in_ext}"})
+        variables={"desc": "[ASM] {in_base}{in_ext}"},
+        order_only=["$pch_out"])
 
     compile_asm_with_cpp = GNUCompiler(
-        "$ccwrap $cc -x assembler-with-cpp $cflags $shared_flags $imported_cflags $extra_cflags $macros $incpaths -MMD -MF $out.d -c $in -o $out",
+        "$ccwrap $cc -x assembler-with-cpp $pch_flags $asflags $shared_flags $imported_asflags $extra_asflags $macros $incpaths -MMD -MF $out.d -c $in -o $out",
         deps="gcc",
         depfile="$out.d",
         infiles=[".S"],
         outfiles=["{outdir}/{in_path}/{in_base}.o"],
-        variables={"desc": "[ASM] {in_base}{in_ext}"})
+        variables={"desc": "[ASM] {in_base}{in_ext}"},
+        order_only=["$pch_out"])
 
     linker = GNULinker(
         command=" && ".join([
@@ -521,7 +561,8 @@ class GNUToolchain(Toolchain):
             "$objcopy --add-gnu-debuglink=.debug/$binary $out"
         ]),
         outfiles=["{outdir}/{binary}"],
-        variables={"desc": "[LINK] {binary}"})
+        variables={"desc": "[LINK] {binary}"},
+        order_only=["$pch_out"])
 
     dynlinker = GNULinker(
         command=" && ".join([
@@ -630,7 +671,7 @@ class CXXProject(Task):
     """
 
     The task recognizes these source file types:
-    .asm, .c, .cc, .cpp, .cxx, .h, .hh, .hpp, .hxx, .s, .S
+    .asm, .c, .cc, .cpp, .cxx, .h, .hh, .hpp, .hxx, .pch, .s, .S
 
     Other file types can be supported through additional rules,
     see the :class:`Rule <jolt.plugin.ninja.Rule>` class.
@@ -741,6 +782,7 @@ class CXXProject(Task):
         self.libpaths = utils.as_list(utils.call_or_return(self, self.__class__._libpaths))
         self.libraries = utils.as_list(utils.call_or_return(self, self.__class__._libraries))
         self.macros = utils.as_list(utils.call_or_return(self, self.__class__._macros))
+        self._pch_out = None
         self.publishdir = self.expand(self.__class__.publishdir or '')
         if self.source_influence:
             for source in self.sources:

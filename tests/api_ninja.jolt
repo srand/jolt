@@ -243,6 +243,103 @@ class NinjaApi(JoltTest):
         self.jolt("build lib:arg=1337 exe:arg=1337")
 
 
+    def test_precompiled_header(self):
+        """
+        --- file: main.cpp
+        #include <iostream>
+        int main() {{ std::cout << "Hello world" << std::endl; return 0;}}
+
+        --- file: precompiled.pch
+        #include <iostream>
+
+        --- tasks:
+        class Lib(CXXLibrary):
+            sources = ["precompiled.pch", "main.cpp"]
+            cxxflags = ["-H"]
+
+        class Exe(CXXExecutable):
+            sources = ["precompiled.pch", "main.cpp"]
+            cxxflags = ["-H"]
+
+        ---
+        """
+        r = self.jolt("-v build lib")
+        self.assertCompiled(r, "precompiled.pch")
+        self.assertCompiled(r, "main.cpp")
+        self.assertIn("-include precompiled.pch", r)
+        self.assertIn("! ./precompiled.pch.gch", r)
+
+        self.jolt("-v build exe")
+        self.assertCompiled(r, "precompiled.pch")
+        self.assertCompiled(r, "main.cpp")
+        self.assertIn("-include precompiled.pch", r)
+        self.assertIn("! ./precompiled.pch.gch", r)
+
+
+    def test_precompiled_header_included(self):
+        """
+        --- file: main.cpp
+        #include "precompiled.pch"
+
+        int main() {{ std::cout << "Hello world" << std::endl; return 0;}}
+
+        --- file: precompiled.pch
+        #include <iostream>
+
+        --- tasks:
+        class Lib(CXXLibrary):
+            sources = ["precompiled.pch", "main.cpp"]
+            cxxflags = ["-H"]
+
+        class Exe(CXXExecutable):
+            sources = ["precompiled.pch", "main.cpp"]
+            cxxflags = ["-H"]
+
+        ---
+        """
+        r = self.jolt("-v build lib")
+        self.assertCompiled(r, "precompiled.pch")
+        self.assertCompiled(r, "main.cpp")
+        self.assertIn("-include precompiled.pch", r)
+        self.assertIn("! ./precompiled.pch.gch", r)
+
+        self.jolt("-v build exe")
+        self.assertCompiled(r, "precompiled.pch")
+        self.assertCompiled(r, "main.cpp")
+        self.assertIn("-include precompiled.pch", r)
+        self.assertIn("! ./precompiled.pch.gch", r)
+
+    def test_precompiled_header_multiple(self):
+        """
+        --- file: main.cpp
+        #include <iostream>
+        #include <sstream>
+        int main() {{ std::cout << "Hello world" << std::endl; return 0;}}
+
+        --- file: precompiled1.pch
+        #include <iostream>
+
+        --- file: precompiled2.pch
+        #include <sstream>
+
+        --- tasks:
+        class Lib(CXXLibrary):
+            sources = ["*.pch", "main.cpp"]
+            cxxflags = ["-H"]
+
+        class Exe(CXXExecutable):
+            sources = ["*.pch", "main.cpp"]
+            cxxflags = ["-H"]
+
+        ---
+        """
+        with self.assertRaises(Exception, msg="only one allowed"):
+            r = self.jolt("-v build lib")
+
+        with self.assertRaises(Exception, msg="only one allowed"):
+            r = self.jolt("-v build exe")
+
+
     def test_publishdir(self):
         """
         --- file: test.cpp
