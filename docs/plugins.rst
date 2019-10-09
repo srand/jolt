@@ -217,6 +217,9 @@ distributed network builds:
 - ``jolt_identity`` -
   The identity of the Jolt artifact.
 
+- ``jolt_requires`` -
+  A list of additional Python modules to install on the executor.
+
 
 Symlinks
 --------

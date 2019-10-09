@@ -387,6 +387,8 @@ class WorkerTaskConsumer(object):
                     if not ident or not url:
                         return "jolt"
 
+                    requires = manifest.get_parameter("jolt_requires")
+
                     log.info("Jolt version: {}", ident)
 
                     src = "build/selfdeploy/{}/src".format(ident)
@@ -398,6 +400,8 @@ class WorkerTaskConsumer(object):
                             tools.run("curl {} | tar zx -C {}", url, src)
                             tools.run("virtualenv {}", env)
                             tools.run(". {}/bin/activate && pip install -e {}", env, src)
+                            if requires:
+                                tools.run(". {}/bin/activate && pip install {}", env, requires)
                         except Exception as e:
                             tools.rmtree("build/selfdeploy/{}", ident, ignore_errors=True)
                             raise e
