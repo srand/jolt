@@ -148,7 +148,8 @@ class TaskParameterInfluence(HashInfluenceProvider):
     def get_influence(self, task):
         return ",".join(
             sorted(["{0}={1}".format(key, value)
-                    for key, value in task._get_parameters().items()]))
+                    for key, value in task._get_parameter_objects().items()
+                    if value.is_influencer()]))
 
 
 

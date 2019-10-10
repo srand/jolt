@@ -33,7 +33,8 @@ class Export(object):
 class Parameter(object):
     """ Generic task parameter type. """
 
-    def __init__(self, default=None, values=None, required=True, const=False, help=None):
+    def __init__(self, default=None, values=None, required=True,
+                 const=False, influence=True, help=None):
         """
         Creates a new parameter.
 
@@ -47,6 +48,9 @@ class Parameter(object):
                 and cannot be assigned a non-default value. This is useful in
                 a class hierarchy where a subclass may want to impose restrictions
                 on a parent class parameter. The default is ``False``.
+            influence (boolean, optional): If influence is False, the parameter value
+                will not influence the identity of the task artifact. The default is
+                True.
             help (str, optional): Documentation for the parameter.
                 This text is displayed when running the ``info`` command on the
                 associated task.
@@ -61,6 +65,7 @@ class Parameter(object):
         self._accepted_values = values
         self._required = required
         self._const = const
+        self._influence = influence
         self.__doc__ = help
         if default:
             self._validate(default)
@@ -91,6 +96,14 @@ class Parameter(object):
         if self.is_default():
             self._value = value
         self._default = value
+
+    def is_influencer(self):
+        """ Check if the parameter value influences the identitiy of the task artifact.
+
+        Returns:
+            True if the parameter influences the identity, False otherwise.
+        """
+        return self._influence
 
     def is_required(self):
         """ Check if the parameter must be set to a value.
@@ -154,7 +167,7 @@ class Parameter(object):
 class BooleanParameter(Parameter):
     """ Boolean task parameter type. """
 
-    def __init__(self, default=None, required=True, const=False, help=None):
+    def __init__(self, default=None, required=True, const=False, influence=True, help=None):
         """
         Creates a new parameter.
 
@@ -166,6 +179,9 @@ class BooleanParameter(Parameter):
                 and cannot be assigned a non-default value. This is useful in
                 a class hierarchy where a subclass may want to impose restrictions
                 on a parent class parameter. The default is ``False``.
+            influence (boolean, optional): If influence is False, the parameter value
+                will not influence the identity of the task artifact. The default is
+                True.
             help (str, optional): Documentation for the parameter.
                 This text is displayed when running the ``info`` command on the
                 associated task.
@@ -176,8 +192,12 @@ class BooleanParameter(Parameter):
         """
         default = str(default).lower() if default is not None else None
         super(BooleanParameter, self).__init__(
-            default, values=["false", "true", "0", "1", "no", "yes"],
-            required=required, const=const, help=help)
+            default,
+            values=["false", "true", "0", "1", "no", "yes"],
+            required=required,
+            const=const,
+            influence=influence,
+            help=help)
 
     def set_value(self, value):
         """ Set the parameter value.
