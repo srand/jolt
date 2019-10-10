@@ -9,7 +9,7 @@ from jolt import utils
 from jolt.cache import ArtifactAttributeSetProvider
 from jolt.error import raise_task_error, raise_task_error_if
 from jolt.expires import Immediately
-from jolt.influence import TaskSourceInfluence
+from jolt.influence import TaskSourceInfluence, TaintInfluenceProvider
 from jolt.tools import Tools
 
 
@@ -458,6 +458,14 @@ class TaskBase(object):
     traffic by allowing the task graph to be reduced.
     """
 
+    taint = None
+    """ An arbitrary value used to change the identity of the task.
+
+    It may be hard to remove bad artifacts in a distributed build
+    environment. A better method is to taint the task and let the
+    artifact be recreated with a different identity.
+    """
+
     weight = 0
     """
     Indication of task execution time.
@@ -485,6 +493,7 @@ class TaskBase(object):
         self.influence.append(TaskSourceInfluence("publish"))
         self.influence.append(TaskSourceInfluence("run"))
         self.influence.append(TaskSourceInfluence("unpack"))
+        self.influence.append(TaintInfluenceProvider())
         self.requires = self.expand(utils.call_or_return_list(self, self.__class__._requires))
         self.selfsustained = utils.call_or_return(self, self.__class__._selfsustained)
         self.tools = Tools(self, self.joltdir)

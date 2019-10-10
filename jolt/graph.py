@@ -3,10 +3,11 @@ import hashlib
 import networkx as nx
 from os import getenv
 from threading import RLock
+import uuid
 
 from jolt.tasks import Alias, Resource, Export
 #from jolt.utils import *
-from jolt.influence import ForcedInfluenceProvider, HashInfluenceRegistry
+from jolt.influence import HashInfluenceRegistry
 from jolt import log
 from jolt import utils
 from jolt import colors
@@ -220,7 +221,7 @@ class TaskProxy(object):
         return self.identity
 
     def taint(self, salt=None):
-        self.task.influence.append(ForcedInfluenceProvider(salt))
+        self.task.taint = salt or uuid.uuid4()
         self.identity = None
         self.identity
 
@@ -406,6 +407,8 @@ class GraphBuilder(object):
         if not node:
             task = self.registry.get_task(name, manifest=self.manifest)
             node = self.nodes[name] = TaskProxy(task, self.graph, self.options)
+            if self.options.salt:
+                node.taint(self.options.salt)
             self._build_node(progress, node)
             progress.update(1)
         return node

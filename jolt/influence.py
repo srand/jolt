@@ -43,18 +43,11 @@ class HashInfluenceProvider(object):
         raise NotImplemented()
 
 
-class ForcedInfluenceProvider(object):
-    name = "Forced"
-
-    def __init__(self, salt=None):
-        self.salt = salt
+class TaintInfluenceProvider(object):
+    name = "Taint"
 
     def get_influence(self, task):
-        return str(self.salt or uuid.uuid4())
-
-
-def taint(salt=None):
-    HashInfluenceRegistry.get().register(ForcedInfluenceProvider(salt))
+        return str(task.taint)
 
 
 class TaskAttributeInfluence(HashInfluenceProvider):

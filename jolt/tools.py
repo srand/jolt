@@ -376,7 +376,14 @@ class Tools(object):
             else:
                 dirname = name
 
-            fs.makedirs(dirname)
+            if self._task.taint is not None:
+                meta = fs.path.join(dirname, ".taint")
+                if not fs.path.exists(meta) or self.read_file(meta) != self._task.taint:
+                    fs.rmtree(dirname, ignore_errors=True)
+                    fs.makedirs(dirname)
+                    self.write_file(meta, self._task.taint)
+            else:
+                fs.makedirs(dirname)
             return dirname
 
         if name not in self._builddir:

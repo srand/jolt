@@ -11,4 +11,5 @@ class JoltOptions(object):
         self.network = False
         self.upload = True
         self.worker = False
+        self.salt = None
         self.__dict__.update(kwargs)

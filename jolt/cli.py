@@ -15,7 +15,7 @@ from jolt.log import logfile
 from jolt import config
 from jolt.loader import JoltLoader
 from jolt import utils
-from jolt.influence import HashInfluenceRegistry, taint
+from jolt.influence import HashInfluenceRegistry
 from jolt.options import JoltOptions
 from jolt.hooks import TaskHookRegistry
 from jolt.manifest import JoltManifest
@@ -166,9 +166,6 @@ def build(ctx, task, network, keep_going, identity, default, local,
         if upload:
             _upload = True
 
-    if salt:
-        taint(salt)
-
     options = JoltOptions(network=network,
                           local=local,
                           download=_download,
@@ -176,7 +173,8 @@ def build(ctx, task, network, keep_going, identity, default, local,
                           keep_going=keep_going,
                           default=default,
                           worker=worker,
-                          debug=debug)
+                          debug=debug,
+                          salt=salt)
 
     acache = cache.ArtifactCache.get(options)
 
@@ -468,8 +466,9 @@ def _log(follow, delete):
 @click.argument("task", autocompletion=_autocomplete_tasks)
 @click.option("-i", "--influence", is_flag=True, help="Print task influence.")
 @click.option("-a", "--artifacts", is_flag=True, help="Print task artifact status.")
+@click.option("-s", "--salt", type=str, help="Add salt as task influence.")
 @click.pass_context
-def info(ctx, task, influence=False, artifacts=False):
+def info(ctx, task, influence=False, artifacts=False, salt=None):
     """
     View information about a task, including its documentation.
 
@@ -518,6 +517,8 @@ def info(ctx, task, influence=False, artifacts=False):
         click.echo()
         return
 
+    if salt:
+        task.taint = salt
 
     if artifacts:
         acache = cache.ArtifactCache.get()
