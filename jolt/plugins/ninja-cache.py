@@ -19,10 +19,13 @@ log.verbose("[NinjaCache] Loaded")
 
 
 def run_cache(self, artifact, tools):
+    cli = fs.path.join(fs.path.dirname(__file__), "ninjacli.py")
+    disabled = "1" if config.getboolean("ninja-cache", "disable", False) else "0"
+    tools.setenv("CCWRAP", "{} {} -- ".format(sys.executable, cli))
+    tools.setenv("CXXWRAP", "{} {} -- ".format(sys.executable, cli))
     tools.setenv("JOLT_CACHEDIR", cache.ArtifactCache.get().root)
     tools.setenv("JOLT_CANONTASK", utils.canonical(self.name))
-    tools.setenv("NINJACACHE_DISABLE",
-                 "1" if config.getboolean("ninja-cache", "disable", False) else "0")
+    tools.setenv("NINJACACHE_DISABLE", disabled)
 
 def publish_cache(self, artifact, tools):
     with tools.cwd(self.outdir):
@@ -54,6 +57,3 @@ ninja.CXXLibrary.run = _decorate_run(ninja.CXXLibrary.run)
 ninja.CXXLibrary.publish = _decorate_publish(ninja.CXXLibrary.publish)
 ninja.CXXLibrary.shell = _decorate_shell(ninja.CXXLibrary.shell)
 
-cli = fs.path.join(fs.path.dirname(__file__), "ninjacli.py")
-os.environ["CCWRAP"] = "{} {} -- ".format(sys.executable, cli)
-os.environ["CXXWRAP"] = "{} {} -- ".format(sys.executable, cli)
