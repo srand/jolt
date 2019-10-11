@@ -222,8 +222,10 @@ class TaskProxy(object):
 
     def taint(self, salt=None):
         self.task.taint = salt or uuid.uuid4()
-        self.identity = None
-        self.identity
+        if salt is None:
+            # Only recalculate identity when build is forced, not when salted
+            self.identity = None
+            self.identity
 
     def started(self, what="Execution"):
         self.task.info(colors.blue(what + " started " + self.log_name))
