@@ -374,7 +374,7 @@ class Tools(object):
                 dirname = fs.path.join(self.getcwd(), "{0}-{1}-{2}".format(
                     name, self._task.canonical_name, task_hash[:8]))
             else:
-                dirname = name
+                dirname = fs.path.join(self.getcwd(), name)
 
             if self._task.taint is not None:
                 meta = fs.path.join(dirname, ".taint")
