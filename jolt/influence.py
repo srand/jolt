@@ -317,9 +317,9 @@ class FileInfluence(HashInfluenceProvider):
         files = task.tools.glob(self.path)
         files.sort()
         for f in files:
+            f = task.tools.expand_path(f)
             if fs.path.isdir(f):
                 continue
-            f = task.tools.expand_path(f)
             value = _fi_files.get(f)
             if value:
                 result.append(value)
