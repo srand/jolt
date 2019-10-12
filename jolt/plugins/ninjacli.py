@@ -52,7 +52,7 @@ class Depfile(object):
             with open(filepath, "rb") as f:
                 sha.update(f.read())
         except:
-            sha.update(uuid.uuid4().encode())
+            sha.update(str(uuid.uuid4()).encode())
         _hash_cache[filepath] = digest = sha.hexdigest()
         return digest
 
@@ -128,7 +128,9 @@ class LibraryManifest(object):
                 #print("error: failed to create directory: {}", objdir)
                 sys.exit(1)
 
-        subprocess.call(["ar", "x", self.library, objname], cwd=objdir)
+        rv = subprocess.call(["ar", "x", self.library, objname], cwd=objdir)
+        if rv != 0:
+            return False
         with open(objfile+".d", "w") as f:
             f.write("{}: {}".format(objfile, " ".join(data["deps"])))
             return True
@@ -227,8 +229,9 @@ def cli(compiler_args):
                     manifest.write()
                     return
 
-    #print("Running compiler")
-    subprocess.call(compiler_args)
+    rv = subprocess.call(compiler_args)
+    if rv != 0:
+        sys.exit(rv)
 
     with LockFile():
         manifest = LibraryManifest(".ninja.json")
