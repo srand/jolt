@@ -29,7 +29,19 @@ class EnvironmentVariable(Variable):
 
     def create(self, project, writer, deps, tools):
         envname = self._envname or self.name
-        writer.variable(self.name, self._prefix + tools.getenv(envname.upper(), self._default))
+        self.value = tools.getenv(envname.upper(), self._default)
+        writer.variable(self.name, self._prefix + self.value)
+
+
+class ToolEnvironmentVariable(EnvironmentVariable):
+    def create(self, project, writer, deps, tools):
+        super(ToolEnvironmentVariable, self).create(project, writer, deps, tools)
+        if not self.value:
+            return
+        value = self.value.split()[0]
+        executable_path = tools.which(value)
+        if executable_path:
+            writer.variable(self.name + "_path", executable_path)
 
 
 class ProjectVariable(Variable):
@@ -480,11 +492,11 @@ class GNUToolchain(Toolchain):
     outdir = ProjectVariable()
     binary = ProjectVariable()
 
-    ar = EnvironmentVariable(default="ar")
-    cc = EnvironmentVariable(default="gcc")
-    cxx = EnvironmentVariable(default="g++")
-    ld = EnvironmentVariable(default="g++", envname="CXX")
-    objcopy = EnvironmentVariable(default="objcopy")
+    ar = ToolEnvironmentVariable(default="ar")
+    cc = ToolEnvironmentVariable(default="gcc")
+    cxx = ToolEnvironmentVariable(default="g++")
+    ld = ToolEnvironmentVariable(default="g++", envname="CXX")
+    objcopy = ToolEnvironmentVariable(default="objcopy")
 
     ccwrap = EnvironmentVariable(default="")
     cxxwrap = EnvironmentVariable(default="")
@@ -523,6 +535,7 @@ class GNUToolchain(Toolchain):
         infiles=[".c"],
         outfiles=["{outdir}/{in_path}/{in_base}.o"],
         variables={"desc": "[C] {in_base}{in_ext}"},
+        implicit=["$cc_path"],
         order_only=["$pch_out"])
 
     compile_cxx = GNUCompiler(
@@ -532,6 +545,7 @@ class GNUToolchain(Toolchain):
         infiles=[".cc", ".cpp", ".cxx"],
         outfiles=["{outdir}/{in_path}/{in_base}.o"],
         variables={"desc": "[CXX] {in_base}{in_ext}"},
+        implicit=["$cxx_path"],
         order_only=["$pch_out"])
 
     compile_asm = GNUCompiler(
@@ -541,6 +555,7 @@ class GNUToolchain(Toolchain):
         infiles=[".s", ".asm"],
         outfiles=["{outdir}/{in_path}/{in_base}.o"],
         variables={"desc": "[ASM] {in_base}{in_ext}"},
+        implicit=["$cc_path"],
         order_only=["$pch_out"])
 
     compile_asm_with_cpp = GNUCompiler(
@@ -550,6 +565,7 @@ class GNUToolchain(Toolchain):
         infiles=[".S"],
         outfiles=["{outdir}/{in_path}/{in_base}.o"],
         variables={"desc": "[ASM] {in_base}{in_ext}"},
+        implicit=["$cc_path"],
         order_only=["$pch_out"])
 
     linker = GNULinker(
@@ -562,6 +578,7 @@ class GNUToolchain(Toolchain):
         ]),
         outfiles=["{outdir}/{binary}"],
         variables={"desc": "[LINK] {binary}"},
+        implicit=["$ld_path", "$objcopy_path"],
         order_only=["$pch_out"])
 
     dynlinker = GNULinker(
@@ -573,12 +590,14 @@ class GNUToolchain(Toolchain):
             "$objcopy --add-gnu-debuglink=$outdir/.debug/$binary $out"
         ]),
         outfiles=["{outdir}/lib{binary}.so"],
-        variables={"desc": "[LINK] {binary}"})
+        variables={"desc": "[LINK] {binary}"},
+        implicit=["$ld_path", "$objcopy_path"])
 
     archiver = GNUArchiver(
         command="rm -f $out && $ar cr $out @objects.list",
         outfiles=["{outdir}/lib{binary}.a"],
-        variables={"desc": "[AR] lib{binary}.a"})
+        variables={"desc": "[AR] lib{binary}.a"},
+        implicit=["$ld_path", "$ar_path"])
 
     depimport = GNUDepImporter(
         prefix="lib",
