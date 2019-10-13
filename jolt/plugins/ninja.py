@@ -418,7 +418,7 @@ class IncludePaths(Variable):
                 return tools.expand(path)
             if path[0] in ['-']:
                 return tools.expand(path[1:])
-            return tools.expand_path(path)
+            return tools.expand_relpath(path, project.outdir)
 
         def expand_artifact(sandbox, path):
             if path[0] in ['=', fs.sep]:
