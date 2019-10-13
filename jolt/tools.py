@@ -1028,6 +1028,18 @@ class Tools(object):
         with open(pathname, "rb" if binary else "r") as f:
             return f.read()
 
+    def which(self, executable):
+        """ Find executable in PATH.
+
+        Args:
+            executable (str): Name of executable to be found.
+
+        Returns:
+            str: Full path to the executable.
+        """
+        executable = self.expand(executable)
+        return shutil.which(executable, path=self._env.get("PATH"))
+
     def write_file(self, pathname, content=None):
         """ Creates a file.
 
