@@ -205,13 +205,14 @@ class Rule(object):
             writer.rule(self.name, tools.expand(self.command), depfile=self.depfile, deps=self.deps, description="$desc")
             writer.newline()
 
-    def build(self, project, writer, infiles):
+    def build(self, project, writer, infiles, implicit=None):
         result = []
         for infile in utils.as_list(infiles):
             infile_rel = fs.path.relpath(infile, project.outdir)
             outfiles, variables = self._out(project, infile)
             outfiles_rel = [fs.path.relpath(outfile, project.outdir) for outfile in outfiles]
-            writer.build(outfiles_rel, self.name, infile_rel, variables=variables, implicit=self.implicit, order_only=self.order_only)
+            implicit = (self.implicit or []) + (implicit or [])
+            writer.build(outfiles_rel, self.name, infile_rel, variables=variables, implicit=implicit, order_only=self.order_only)
             result.extend(outfiles)
         return result
 
@@ -244,6 +245,12 @@ class Objects(Rule):
 class GNUCompiler(Rule):
     def __init__(self, *args, **kwargs):
         super(GNUCompiler, self).__init__(*args, **kwargs)
+
+    def build(self, project, writer, infiles, implicit=None):
+        implicit = implicit or []
+        if GNUPCHVariables.pch_ext not in self.infiles and project._pch_out is not None:
+            implicit.append(project._pch_out)
+        return super(GNUCompiler, self).build(project, writer, infiles, implicit)
 
 
 class FileListWriter(Rule):
@@ -535,8 +542,7 @@ class GNUToolchain(Toolchain):
         infiles=[".c"],
         outfiles=["{outdir}/{in_path}/{in_base}.o"],
         variables={"desc": "[C] {in_base}{in_ext}"},
-        implicit=["$cc_path"],
-        order_only=["$pch_out"])
+        implicit=["$cc_path"])
 
     compile_cxx = GNUCompiler(
         command="$cxxwrap $cxx -x c++ $pch_flags $cxxflags $shared_flags $imported_cxxflags $extra_cxxflags $macros $incpaths -MMD -MF $out.d -c $in -o $out",
@@ -545,8 +551,7 @@ class GNUToolchain(Toolchain):
         infiles=[".cc", ".cpp", ".cxx"],
         outfiles=["{outdir}/{in_path}/{in_base}.o"],
         variables={"desc": "[CXX] {in_base}{in_ext}"},
-        implicit=["$cxx_path"],
-        order_only=["$pch_out"])
+        implicit=["$cxx_path"])
 
     compile_asm = GNUCompiler(
         command="$ccwrap $cc -x assembler $pch_flags $asflags $shared_flags $imported_asflags $extra_asflags -MMD -MF $out.d -c $in -o $out",
@@ -555,8 +560,7 @@ class GNUToolchain(Toolchain):
         infiles=[".s", ".asm"],
         outfiles=["{outdir}/{in_path}/{in_base}.o"],
         variables={"desc": "[ASM] {in_base}{in_ext}"},
-        implicit=["$cc_path"],
-        order_only=["$pch_out"])
+        implicit=["$cc_path"])
 
     compile_asm_with_cpp = GNUCompiler(
         "$ccwrap $cc -x assembler-with-cpp $pch_flags $asflags $shared_flags $imported_asflags $extra_asflags $macros $incpaths -MMD -MF $out.d -c $in -o $out",
@@ -565,8 +569,7 @@ class GNUToolchain(Toolchain):
         infiles=[".S"],
         outfiles=["{outdir}/{in_path}/{in_base}.o"],
         variables={"desc": "[ASM] {in_base}{in_ext}"},
-        implicit=["$cc_path"],
-        order_only=["$pch_out"])
+        implicit=["$cc_path"])
 
     linker = GNULinker(
         command=" && ".join([
@@ -578,8 +581,7 @@ class GNUToolchain(Toolchain):
         ]),
         outfiles=["{outdir}/{binary}"],
         variables={"desc": "[LINK] {binary}"},
-        implicit=["$ld_path", "$objcopy_path"],
-        order_only=["$pch_out"])
+        implicit=["$ld_path", "$objcopy_path"])
 
     dynlinker = GNULinker(
         command=" && ".join([
