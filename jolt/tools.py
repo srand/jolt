@@ -802,11 +802,11 @@ class Tools(object):
         search = self.expand(search)
         replace = self.expand(replace)
         try:
-            with open(pathname) as f:
-                data = utils.decode_str(f.read())
-            data = data.replace(search, replace)
+            with open(pathname, "rb") as f:
+                data = f.read()
+            data = data.replace(search.encode(), replace.encode())
             with open(pathname, "wb") as f:
-                f.write(data.encode())
+                f.write(data)
         except KeyboardInterrupt as e:
             raise e
         except:
