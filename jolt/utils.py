@@ -164,6 +164,9 @@ class duration(object):
     def seconds(self):
         return time.time() - self._time
 
+    @property
+    def milliseconds(self):
+        return (time.time() - self._time) * 1000
 
 class duration_diff(object):
     def __init__(self, elapsed):
@@ -296,10 +299,10 @@ def fromjson(filepath, ignore_errors=False):
             return {}
         raise e
 
-def tojson(filepath, data, ignore_errors=False):
+def tojson(filepath, data, ignore_errors=False, indent=2):
     try:
         with open(filepath, "w") as f:
-            f.write(json.dumps(data, indent=2))
+            f.write(json.dumps(data, indent=indent))
     except Exception as e:
         if ignore_errors:
             return
