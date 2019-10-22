@@ -112,7 +112,9 @@ class GitRepository(object):
             with tools.cwd(gitpath):
                 tools.copy("index", "jolt-index")
             with tools.cwd(fs.path.dirname(gitpath)):
-                _tree[gitpath] = tree = tools.run("git add -A && git write-tree", output_on_error=True)
+                _tree[gitpath] = tree = tools.run(
+                    "git -c core.safecrlf=false add -A && git write-tree",
+                    output_on_error=True)
 
         return tree
 
