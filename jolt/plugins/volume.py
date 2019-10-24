@@ -1,3 +1,4 @@
+import os
 import uuid
 import errno
 
@@ -80,6 +81,8 @@ class DiskVolume(cache.StorageProvider):
                     fs.unlink(temp)
                 return True
             except OSError as e:
+                if e.errno != errno.EEXIST:
+                    log.verbose("[VOLUME] Failed to copy artifact, errno={}", os.strerror(e.errno))
                 return e.errno == errno.EEXIST
             except Exception as e:
                 log.exception()
