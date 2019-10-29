@@ -242,9 +242,9 @@ class _AutoTools(object):
             self.tools.run("make VERBOSE=yes Q= V=1 -j{0}",
                            self.tools.cpu_count(), output=True)
 
-    def install(self, *args, **kwargs):
+    def install(self, target="install", **kwargs):
         with self.tools.cwd(self.builddir):
-            self.tools.run("make install", output=True)
+            self.tools.run("make {}", target, output=True)
 
     def publish(self, artifact, files='*', *args, **kwargs):
         with self.tools.cwd(self.installdir):
