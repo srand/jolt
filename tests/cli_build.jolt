@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 import sys
 import time
 sys.path.append(".")
@@ -120,3 +122,23 @@ class BuildCli(testsupport.JoltTest):
         r1 = self.build("a -c artifact/copy")
         self.assertExists(self.ws+"/artifact/copy/test.py")
         self.assertExists(self.ws+"/artifact/copy/directory/test.py")
+
+
+    def test_result(self):
+        """
+        --- tasks:
+        class Pass(Task):
+            pass
+        class Fail(Task):
+            def run(self, deps, tools):
+                assert False, "This task always fails"
+        ---
+        """
+        r1 = self.build("pass --result pass.xml")
+        self.assertExists(self.ws+"/pass.xml")
+        self.assertIn('task name="pass"', self.tools.read_file(self.ws+"/pass.xml"))
+
+        with self.assertRaises(Exception, msg="always fails"):
+            r1 = self.build("fail --result fail.xml")
+        self.assertExists(self.ws+"/fail.xml")
+        self.assertIn('task name="fail"', self.tools.read_file(self.ws+"/fail.xml"))

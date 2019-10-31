@@ -275,6 +275,10 @@ def build(ctx, task, network, keep_going, identity, default, local,
         if result:
             manifest = JoltManifest()
             manifest.duration = str(goal_task_duration)
+            for goal in goal_tasks:
+                mftask = manifest.create_task()
+                mftask.name = goal.qualified_name
+                mftask.identity = goal.identity
             manifest.write(result)
 
 
