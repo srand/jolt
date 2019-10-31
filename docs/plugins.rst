@@ -1,7 +1,61 @@
 Plugins
 =======
 
-Jolt is extensible through plugins.
+Jolt can be extended through plugins. Those already built-in and their
+configuration options are described below.
+
+AMQP
+----
+
+The AMQP plugin implements distributed task execution with the help
+of an AMQP message queue broker such as RabbitMQ. When the plugin is used,
+tasks execution requests are submitted to an AMQP queue. Execution requests
+are then consumed by workers that run tasks and build artifacts.
+
+The plugin enables a special subcommand ``amqp-worker`` that is used
+to run a worker. It is recommended to deploy multiple workers as well as
+a message queue broker using an orchestrator such as Kubernetes.
+
+As long as a connection to the message queue broker can be maintained,
+the number of workers may be scaled up and down transparently without
+affecting tasks already in progress. Workers may even be redeployed
+completely. If a worker is stopped before completing a task, the task
+is restarted as soon as another worker becomes available. Note, however,
+that tasks can't be safely interrupted if they have side-effects outside
+of the worker.
+
+To use this plugin, a networked artifact storage provider must also be
+configured to enable the workers to share artifacts between each other.
+
+The plugin is enabled by adding a ``[amqp]`` section in
+the Jolt configuration.
+
+These configuration keys exist:
+
+* ``host`` - Hostname or address of the AMQP service. Default: amqp-service
+
+* ``port`` - Port number of the AMQP service. Default: 5672
+
+* ``routing_key`` -
+  Optional. By using routing keys, tasks can be directed to different
+  types of workers. When starting a worker by using the ``amqp-worker``
+  command, the worker will only consume tasks tagged with the configured key.
+  To tag a task, set the ``routing_key`` task attribute. Default: default
+
+* ``workers`` -
+  Optional. The maximum number of tasks Jolt is allowed to run in parallel.
+  Defaults to 16.
+
+* ``keyring.username`` -
+  Username to use when authenticating with the AMQP service.
+
+* ``keyring.password`` -
+  Password to use when authenticating with AMQP service. Should normally
+  never need to be set in the configuration file. By default, Jolt asks
+  for the password when needed and stores it in a keyring for future use.
+
+* ``keyring.service`` -
+  Keyring service identifier. Defaults to ``amqp``.
 
 
 Artifactory
