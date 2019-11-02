@@ -12,5 +12,6 @@ class All(Alias):
         "cli/info",
         "cli/list",
         "cli/list",
+        "ext/autoweight",
         "int/utils",
     ]
