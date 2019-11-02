@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import sys
 import time
 sys.path.append(".")
@@ -8,19 +10,161 @@ from testsupport import JoltTest
 class ToolsApi(JoltTest):
     name = "api/tools"
 
-    def test_tools_extract_zip(self):
+    def test_append_file(self):
+        """
+        --- file: empty.txt---
+        --- file: data.txt
+        test
+        ---
+        """
+        self.filename = "empty"
+        self.filedata = "test"
+        with self.tools.cwd(self.ws):
+            self.tools.append_file("{filename}.txt", "appended-{filedata}")
+            self.assertEqual(self.tools.read_file("{filename}.txt"), "appended-test")
+
+        self.filename = "data"
+        self.filedata = "test"
+        with self.tools.cwd(self.ws):
+            self.tools.append_file("{filename}.txt", "appended-{filedata}")
+            self.assertEqual(self.tools.read_file("{filename}.txt"),
+                             "        test\n        appended-test")
+
+    def test_archive_zip(self):
+        """
+        --- file: original/tests.txt
+        testtesttesttest
+        ---
+        """
+        self.filename = "tests"
+        with self.tools.cwd(self.ws):
+            self.tools.archive(self.ws+"/original", "{filename}.zip")
+            self.tools.run("unzip tests.zip -d {}/extracted", self.ws)
+            self.assertEqual(self.tools.read_file(self.ws+"/original/tests.txt"),
+                             self.tools.read_file(self.ws+"/extracted/tests.txt"))
+
+    def test_archive_tar_gz(self):
+        """
+        --- file: original/tests.txt
+        testtesttesttest
+        ---
+        """
+        self.filename = "tests"
+        with self.tools.cwd(self.ws):
+            self.tools.archive(self.ws+"/original", "{filename}.tar.gz")
+            self.tools.run("mkdir {}/extracted", self.ws)
+            self.tools.run("tar xzvf tests.tar.gz -C {}/extracted", self.ws)
+            self.assertEqual(self.tools.read_file(self.ws+"/original/tests.txt"),
+                             self.tools.read_file(self.ws+"/extracted/tests.txt"))
+
+    def test_archive_tar_bz2(self):
+        """
+        --- file: original/tests.txt
+        testtesttesttest
+        ---
+        """
+        self.filename = "tests"
+        with self.tools.cwd(self.ws):
+            self.tools.archive(self.ws+"/original", "{filename}.tar.bz2")
+            self.tools.run("mkdir {}/extracted", self.ws)
+            self.tools.run("tar xjvf tests.tar.bz2 -C {}/extracted", self.ws)
+            self.assertEqual(self.tools.read_file(self.ws+"/original/tests.txt"),
+                             self.tools.read_file(self.ws+"/extracted/tests.txt"))
+
+    def test_builddir_unique(self):
+        """
+        --- tasks:
+        class A(Task):
+            def run(self, d, t):
+                self.bd = t.builddir("build", incremental=True)
+                t.write_file("{{bd}}/test.txt", "test")
+
+        class B(Task):
+            requires = ["a"]
+
+            def run(self, d, t):
+                self.bd = t.builddir("build", incremental=True)
+                assert len(t.glob("{{bd}}/*")) == 0
+        ---
+        """
+        self.build("b")
+
+    def test_builddir_shared(self):
+        """
+        --- tasks:
+        class A(Task):
+            def run(self, d, t):
+                self.bd = t.builddir("build", incremental=True, unique=False)
+                t.write_file("{{bd}}/test.txt", "test")
+
+        class B(Task):
+            requires = ["a"]
+
+            def run(self, d, t):
+                self.bd = t.builddir("build", incremental=True, unique=False)
+                assert len(t.glob("{{bd}}/*")) == 1
+        ---
+        """
+        self.build("b")
+
+    def test_builddir_name(self):
+        """
+        --- tasks:
+        class A(Task):
+            def run(self, d, t):
+                self.dirname = "test1234"
+                t.builddir(incremental=True)
+                t.builddir("{{dirname}}", incremental=True)
+        ---
+        """
+        self.build("a")
+        dirs = " ".join(self.tools.glob(self.ws+"/build/*"))
+        self.assertIn("/a-a-", dirs)
+        self.assertIn("/test1234-a-", dirs)
+
+    def test_builddir_incremental(self):
+        """
+        --- tasks:
+        class A(Task):
+            def run(self, d, t):
+                bd = t.builddir("build", incremental=True)
+                print("File#", len(t.glob(bd+"/*")))
+                t.write_file(bd + "/test.txt", "test")
+
+        class B(Task):
+            def run(self, d, t):
+                bd = t.builddir("build", incremental=False)
+                print("File#", len(t.glob(bd+"/*")))
+                t.write_file(bd + "/test.txt", "test")
+        ---
+        """
+        o = self.build("a")
+        self.assertIn("File# 0", o)
+        a = self.artifacts(o)
+        self.tools.rmtree(a[0])
+        o = self.build("a")
+        self.assertIn("File# 1", o)
+
+        o = self.build("b")
+        self.assertIn("File# 0", o)
+        b = self.artifacts(o)
+        self.tools.rmtree(b[0])
+        o = self.build("b")
+        self.assertIn("File# 0", o)
+
+    def test_extract_zip(self):
         with self.tools.cwd(self.ws):
             self.tools.run("zip tests.zip ../../api_tools.jolt")
             self.tools.extract("tests.zip", self.ws)
             self.assertExists("api_tools.jolt")
 
-    def test_tools_extract_tar_gz(self):
+    def test_extract_tar_gz(self):
         with self.tools.cwd(self.ws):
             self.tools.run("tar czvf tests.tar.gz ../../api_tools.jolt")
             self.tools.extract("tests.tar.gz", self.ws)
             self.assertExists("api_tools.jolt")
 
-    def test_tools_extract_tar_bz2(self):
+    def test_extract_tar_bz2(self):
         with self.tools.cwd(self.ws):
             self.tools.run("tar cjvf tests.tar.bz2 ../../api_tools.jolt")
             self.tools.extract("tests.tar.bz2", self.ws)

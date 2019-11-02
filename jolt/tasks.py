@@ -926,6 +926,7 @@ class _Test(Task):
         for name in self._get_test_names():
             self.influence.append(TaskSourceInfluence(name, self.test_cls))
 
+
     def _requires(self):
         return self.test_cls.requires
 
@@ -944,7 +945,7 @@ class _Test(Task):
         testsuite = ut.TestSuite()
         for test in self._get_test_names():
             testsuite.addTest(self.test_cls(
-                test, parameters=self._get_parameters(), deps=deps, tools=tools))
+                test, parameters=self._get_parameters(), deps=deps))
         with log.stream() as logstream:
             self.testresult = ut.TextTestRunner(stream=logstream, verbosity=2).run(testsuite)
             raise_task_error_if(not self.testresult.wasSuccessful(), self, "tests failed")
@@ -986,7 +987,7 @@ class Test(ut.TestCase, TaskBase):
         ut.TestCase.__init__(self, method)
         TaskBase.__init__(self, **kwargs)
         self.deps = deps
-        self.tools = tools
+        self.tools = Tools(self, self.joltdir)
 
     def setUp(self):
         self.setup(self.deps, self.tools)
