@@ -39,12 +39,14 @@ def _run(cmd, cwd, env, *args, **kwargs):
     output_stdio = kwargs.get("output_stdio", False)
     output = output if output is not None else True
     output = False if output_on_error else output
+    shell = kwargs.get("shell", True)
+
     p = subprocess.Popen(
         cmd,
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
-        shell=True,
+        shell=shell,
         cwd=cwd,
         env=env)
 
@@ -93,7 +95,8 @@ def _run(cmd, cwd, env, *args, **kwargs):
 
     if p.returncode != 0:
         raise JoltCommandError(
-            "command failed: {0}".format(cmd.format(*args, **kwargs)),
+            "command failed: {0}".format(
+                " ".join(cmd) if type(cmd) == list else cmd.format(*args, **kwargs)),
             stdout.buffer, stderr.buffer, p.returncode)
     return "\n".join(stdout.buffer) if output_rstrip else "".join(stdout.buffer)
 
@@ -840,6 +843,8 @@ class Tools(object):
             output_rstrip (boolean, optional): By default, output written
                 to stdout is stripped from whitespace at the end of the
                 string. This can be disabled by setting this argument to False.
+            shell (boolean, optional): Use a shell to run the command.
+                Default: True.
 
         Example:
 

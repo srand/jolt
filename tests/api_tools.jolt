@@ -169,3 +169,16 @@ class ToolsApi(JoltTest):
             self.tools.run("tar cjvf tests.tar.bz2 ../../api_tools.jolt")
             self.tools.extract("tests.tar.bz2", self.ws)
             self.assertExists("api_tools.jolt")
+
+    def test_run_shell(self):
+        s = self.tools.run(["echo Hello world"])
+        self.assertEqual(s, "Hello world")
+
+        s = self.tools.run("echo Hello world")
+        self.assertEqual(s, "Hello world")
+
+        with self.assertRaises(Exception, msg="No such file"):
+            s = self.tools.run("echo Hello world", shell=False)
+
+        s = self.tools.run(["sh", "-c", "echo Hello world"], shell=False)
+        self.assertEqual(s, "Hello world")
