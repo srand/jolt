@@ -81,7 +81,7 @@ def copytree(src, dst, symlinks=False, ignore=None):
     except OSError as why:
         errors.extend((src, dst, str(why)))
     if errors:
-        raise Error(errors)
+        raise Exception(errors)
 
 def copy(src, dest, symlinks=False):
     if not path.exists(dest):
