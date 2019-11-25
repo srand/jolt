@@ -17,6 +17,7 @@ from jolt import cache
 from jolt import filesystem as fs
 from jolt import log
 from jolt import utils
+from jolt import config
 from jolt.error import JoltCommandError
 from jolt.error import raise_error_if
 from jolt.error import raise_task_error, raise_task_error_if
@@ -40,6 +41,8 @@ def _run(cmd, cwd, env, *args, **kwargs):
     output = output if output is not None else True
     output = False if output_on_error else output
     shell = kwargs.get("shell", True)
+
+    log.debug("running {0} in {1}", cmd, cwd)
 
     p = subprocess.Popen(
         cmd,
@@ -181,9 +184,16 @@ class _CMake(object):
                            output=True)
 
     def build(self, release=True, *args, **kwargs):
+        threading_args = ''
+        try:
+            threading_args = '-j {}'.format(kwargs.get("threads", self.tools.thread_count())) \
+                if "--parallel" in self.tools.run("cmake --build 2>&1", output=False) else ''
+        except:
+            pass
+
         with self.tools.cwd(self.builddir):
             release = "--config Release" if release else ""
-            self.tools.run("cmake --build . {0}", release, output=True)
+            self.tools.run("cmake --build . {0}{1}", release, threading_args, output=True)
 
     def install(self, release=True, *args, **kwargs):
         with self.tools.cwd(self.builddir):
@@ -438,6 +448,15 @@ class Tools(object):
         """
 
         return multiprocessing.cpu_count()
+
+    def thread_count(self):
+        """ Number of threads to use for a task.
+
+        Returns:
+            int: number of threads to use.
+        """
+        threads = config.get("jolt", "threads", self.getenv("JOLT_THREADS", None))
+        return int(threads) if threads else self.cpu_count()
 
     @contextmanager
     def cwd(self, pathname, *args):
