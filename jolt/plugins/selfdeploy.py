@@ -30,6 +30,9 @@ class Jolt(Task):
 
     def __init__(self, *args, **kwargs):
         super(Jolt, self).__init__(*args, **kwargs)
+        self.influence.append(
+            influence.StringInfluence(
+                config.get("selfdeploy", "requires", "")))
         for e in self.extras:
             self.influence.append(
                 influence.FileInfluence(
