@@ -277,16 +277,17 @@ class ExecutorFactory(object):
         ExecutorRegistry.executor_factories.insert(0, cls)
         return cls
 
-    def __init__(self, max_workers=None):
+    def __init__(self, options=None, max_workers=None):
         self.pool = ThreadPoolExecutor(max_workers=max_workers)
         self._aborted = False
         self._queue = queue.PriorityQueue()
+        self._options = options or JoltOptions()
 
     def is_aborted(self):
         return self._aborted
 
     def is_keep_going(self):
-        return False
+        return self._options.keep_going
 
     def shutdown(self):
         self._aborted = True
@@ -321,11 +322,7 @@ class ExecutorFactory(object):
 
 class LocalExecutorFactory(ExecutorFactory):
     def __init__(self, options=None):
-        super(LocalExecutorFactory, self).__init__(max_workers=1)
-        self._options = options or JoltOptions()
-
-    def is_keep_going(self):
-        return self._options.keep_going
+        super(LocalExecutorFactory, self).__init__(options=options, max_workers=1)
 
     def create(self, task, force=False):
         return LocalExecutor(self, task, force_build=force)
@@ -333,11 +330,7 @@ class LocalExecutorFactory(ExecutorFactory):
 
 class ConcurrentLocalExecutorFactory(ExecutorFactory):
     def __init__(self, options=None):
-        super(ConcurrentLocalExecutorFactory, self).__init__()
-        self._options = options or JoltOptions()
-
-    def is_keep_going(self):
-        return self._options.keep_going
+        super(ConcurrentLocalExecutorFactory, self).__init__(options=options)
 
     def create(self, task):
         raise NotImplementedError()

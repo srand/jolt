@@ -142,3 +142,23 @@ class BuildCli(testsupport.JoltTest):
             r1 = self.build("fail --result fail.xml")
         self.assertExists(self.ws+"/fail.xml")
         self.assertIn('task name="fail"', self.tools.read_file(self.ws+"/fail.xml"))
+
+
+    def test_keep_going(self):
+        """
+        --- tasks:
+        class Pass(Task):
+            pass
+        class Pass2(Task):
+            requires = "pass"
+            weight = 2
+        class Fail(Task):
+            def run(self, deps, tools):
+                assert False, "This task always fails"
+        ---
+        """
+        with self.assertRaises(Exception, msg="always fails"):
+            self.build("-k pass2 fail")
+        r1 = self.lastLog()
+        self.assertBuild(r1, "pass2")
+
