@@ -141,7 +141,7 @@ class GitRepository(object):
 
     def clean(self):
         with self.tools.cwd(self.path):
-            return self.tools.run("git clean -fd", output_on_error=True)
+            return self.tools.run("git clean -dfx", output_on_error=True)
 
     def reset(self):
         with self.tools.cwd(self.path):
