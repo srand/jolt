@@ -42,7 +42,7 @@ def _run(cmd, cwd, env, *args, **kwargs):
     output = False if output_on_error else output
     shell = kwargs.get("shell", True)
 
-    log.debug("running {0} in {1}", cmd, cwd)
+    log.debug("Running: '{0}' (CWD: {1})", cmd, cwd)
 
     p = subprocess.Popen(
         cmd,
