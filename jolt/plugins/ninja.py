@@ -2,6 +2,7 @@ import copy
 import ninja_syntax as ninja
 import platform
 import os
+import sys
 
 from jolt.tasks import Task
 from jolt import config
@@ -862,7 +863,7 @@ class CXXProject(Task):
     def _write_shell_file(self, basedir, deps, tools):
         filepath = fs.path.join(basedir, "compile")
         with open(filepath, "w") as fobj:
-            data = """#!/usr/bin/env python
+            data = """#!{executable}
 import sys
 import subprocess
 
@@ -898,7 +899,10 @@ if __name__ == "__main__":
     main()
 
 """
-            fobj.write(data.format(objects=[fs.path.relpath(o, self.outdir) for o in self.objects]))
+            fobj.write(
+                data.format(
+                    executable=sys.executable,
+                    objects=[fs.path.relpath(o, self.outdir) for o in self.objects]))
         tools.chmod(filepath, 0o777)
 
     def find_rule(self, ext):
