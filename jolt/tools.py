@@ -186,8 +186,9 @@ class _CMake(object):
     def build(self, release=True, *args, **kwargs):
         threading_args = ''
         try:
-            threading_args = '-j {}'.format(kwargs.get("threads", self.tools.thread_count())) \
-                if "--parallel" in self.tools.run("cmake --build 2>&1", output=False) else ''
+            threading_args = ' -j {}'.format(kwargs.get("threads", self.tools.thread_count())) \
+                if "--parallel" in self.tools.run("cmake --help-manual cmake 2>&1", output=False) \
+                   else ''
         except:
             pass
 
