@@ -72,7 +72,7 @@ class WorkerTaskConsumer(object):
     EXCHANGE_TYPE = 'direct'
     QUEUE = 'jolt_tasks'
     RESULT_EXCHANGE = 'jolt_results'
-    ROUTING_KEY_PREFIX = 'jolt_'
+    ROUTING_KEY_PREFIX = ''
     ROUTING_KEY_REQUEST = 'default'
     ROUTING_KEY_RESULT = 'default'
 
@@ -256,7 +256,9 @@ class WorkerTaskConsumer(object):
         """
         log.info('Declaring queue {}', queue_name)
         cb = functools.partial(self.on_queue_declareok, userdata=queue_name)
-        self._channel.queue_declare(queue=queue_name, callback=cb)
+        self._channel.queue_declare(
+            queue=queue_name, callback=cb,
+            arguments={"x-message-deduplication": True})
 
     def on_queue_declareok(self, _unused_frame, userdata):
         """Method invoked by pika when the Queue.Declare RPC call made in
@@ -718,13 +720,12 @@ class AmqpExecutor(scheduler.NetworkExecutor):
             parameters=pika.URLParameters(_get_url()))
         self.channel = self.connection.channel()
         if not self.callback_queue:
-            self.corr_id = str(uuid.uuid4())
+            self.corr_id = self.task.identity
             self.channel.exchange_declare(
                 exchange=WorkerTaskConsumer.RESULT_EXCHANGE,
                 exchange_type=WorkerTaskConsumer.EXCHANGE_TYPE)
             result = self.channel.queue_declare(
-                self.corr_id,
-                arguments={"x-expires": 7200000})
+                '', arguments={"x-expires": 7200000})
             self.callback_queue = result.method.queue
             self.channel.queue_bind(
                 self.callback_queue,
@@ -745,11 +746,14 @@ class AmqpExecutor(scheduler.NetworkExecutor):
             channel.basic_ack(basic_deliver.delivery_tag)
 
     def publish_request(self, manifest, routing_key):
+        props = pika.BasicProperties(
+            correlation_id=self.corr_id,
+            headers={"x-deduplication-header": self.task.identity})
         self.response = None
         self.channel.basic_publish(
             exchange=WorkerTaskConsumer.EXCHANGE,
             routing_key=routing_key,
-            properties=pika.BasicProperties(correlation_id=self.corr_id),
+            properties=props,
             body=manifest)
 
     def run(self, env):

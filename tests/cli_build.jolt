@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import re
 import sys
 import time
 sys.path.append(".")
@@ -162,3 +163,29 @@ class BuildCli(testsupport.JoltTest):
         r1 = self.lastLog()
         self.assertBuild(r1, "pass2")
 
+
+    def test_task_deduplication(self):
+        """
+        --- tasks:
+        class Sleep(Task):
+            t = Parameter()
+
+            def run(self, d, tools):
+                tools.run("sleep {{t}}")
+        ---
+        """
+        if not self.network:
+            self.skipTest("network build deployment required")
+
+        # Starting two builds in parallel
+        with self.assertRaises(Exception), self.tools.cwd(self.ws):
+            self.tools.run("timeout 5 jolt -c test.conf -c net.conf -c jolt.cachedir=c1 "
+                           "build -n sleep:t=10")
+        self.jolt("-c jolt.cachedir=c2 build -n sleep:t=10")
+        self.tools.run("sleep 10")
+
+        # Assert that only one build request reaches the worker
+        log = self.tools.run("docker logs jolt_amqp_worker", output=False)
+        matches = re.findall(r"Finalizing: sleep:t=10", log, re.M)
+        print(matches)
+        self.assertEqual(len(matches), 1)

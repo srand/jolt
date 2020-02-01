@@ -4,11 +4,14 @@ services:
     container_name: jolt_amqp_worker
     build:
       context: .
-      dockerfile: Dockerfile.rabbitmq
+      dockerfile: Dockerfile.jolt-rabbitmq
     volumes:
       - jolt-cache:/tmp/jolt-cache
   amqp-service:
-    image: docker.io/rabbitmq
+    container_name: rabbitmq
+    build:
+      context: .
+      dockerfile: Dockerfile.rabbitmq
     ports:
       - "5672:5672"
   nginx-service:

@@ -1,11 +1,8 @@
-FROM python:3.7-alpine
+FROM docker.io/rabbitmq:3.8
 
-RUN apk update && apk add gcc g++ make libffi-dev musl-dev openssl-dev git ninja
-ADD . /opt/jolt
-RUN pip3 install -e /opt/jolt
-RUN pip3 install pika
-
-ENV RABBITMQ_HOST=amqp-service
-ENV RABBITMQ_PORT=5672
-WORKDIR /tmp/jolt-workspace
-CMD ["jolt", "-c", "/opt/jolt/docker/rabbitmq.conf", "amqp-worker"]
+RUN mkdir -p $RABBITMQ_HOME/plugins && \
+    cd $RABBITMQ_HOME/plugins && \
+    apt-get update && apt-get install -y wget && \
+    wget https://github.com/noxdafox/rabbitmq-message-deduplication/releases/download/0.4.3/rabbitmq_message_deduplication-v3.8.x-0.4.3.ez && \
+    wget https://github.com/noxdafox/rabbitmq-message-deduplication/releases/download/0.4.3/elixir-1.8.2.ez && \
+    rabbitmq-plugins enable rabbitmq_message_deduplication
