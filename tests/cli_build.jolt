@@ -189,3 +189,59 @@ class BuildCli(testsupport.JoltTest):
         matches = re.findall(r"Finalizing: sleep:t=10", log, re.M)
         print(matches)
         self.assertEqual(len(matches), 1)
+
+
+    def test_fast_task(self):
+        """
+        --- tasks:
+        class R(Resource):
+            pass
+
+        class A(Task):
+            fast = True
+            requires = "r"
+
+        class B(Task):
+            requires = "a", "r"
+
+        class C(Task):
+            requires = "b"
+        ---
+        """
+        if not self.network:
+            self.skipTest("network build deployment required")
+
+        r1 = self.build("c")
+        l1 = self.tasks(r1, local=True)
+        self.assertEqual(l1, ["a"])
+
+    def test_fast_task_with_deps(self):
+        """
+        --- tasks:
+        class R(Resource):
+            pass
+
+        class A(Task):
+            pass
+
+        class B(Task):
+            fast = True
+            requires = "a", "r"
+
+        class C(Task):
+            requires = "b"
+        ---
+        """
+        if not self.network:
+            self.skipTest("network build deployment required")
+
+        r1 = self.build("c")
+        l1 = self.tasks(r1, local=True)
+        self.assertEqual(l1, [])
+
+        r1 = self.build("-s 1 a r")
+        l1 = self.tasks(r1, remote=True)
+        self.assertEqual(l1, ["a"])
+        r2 = self.build("-s 1 c")
+        l2 = self.tasks(r2, local=True)
+        self.assertEqual(l2, ["b"])

@@ -15,7 +15,9 @@ services:
     ports:
       - "5672:5672"
   nginx-service:
-    image: docker.io/nginx
+    build:
+      context: .
+      dockerfile: Dockerfile.nginx
     volumes:
       - jolt-cache:/usr/share/nginx/html
     ports:

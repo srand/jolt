@@ -437,10 +437,16 @@ class DistributedStrategy(ExecutionStrategy, PruneStrategy):
         self.cache = cache
 
     def create_executor(self, task):
-        if task.is_resource() or task.is_alias():
+        if task.is_alias():
             return self.executors.create_skipper(task)
 
+        if task.is_resource():
+            return self.executors.create_local(task)
+
         if not task.is_cacheable():
+            return self.executors.create_network(task)
+
+        if not self.cache.upload_enabled():
             return self.executors.create_network(task)
 
         remote = task.is_available_remotely(self.cache)
@@ -450,10 +456,10 @@ class DistributedStrategy(ExecutionStrategy, PruneStrategy):
                 return self.executors.create_downloader(task)
             return self.executors.create_skipper(task)
         else:
-            if task.is_available_locally(self.cache):
-                if self.cache.upload_enabled():
-                    if task.is_uploadable(self.cache):
-                        return self.executors.create_uploader(task)
+            if task.is_available_locally(self.cache) and task.is_uploadable(self.cache):
+                return self.executors.create_uploader(task)
+            if task.deps_available_locally(self.cache) and task.is_fast():
+                return self.executors.create_local(task)
 
         if not task.is_goal():
             task.disable_download()

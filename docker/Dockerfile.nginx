@@ -1,0 +1,3 @@
+FROM docker.io/nginx
+
+ADD docker/nginx.conf /etc/nginx/

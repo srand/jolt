@@ -147,6 +147,14 @@ class TaskProxy(object):
             return self._extended_task.get_extended_task()
         return self
 
+    def deps_available_locally(self, cache):
+        for c in self.children:
+            if c.is_resource() or c.is_alias():
+                continue
+            if not c.is_available_locally(cache):
+                return False
+        return True
+
     def is_available_locally(self, cache):
         tasks = [self] + self.extensions
         return all(map(cache.is_available_locally, tasks))

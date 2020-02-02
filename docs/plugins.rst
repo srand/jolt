@@ -108,7 +108,7 @@ These configuration keys exist:
   for the password when needed and stores it in a keyring for future use.
 
 * ``keyring.service`` -
-  Keyring service identifier. Defaults to ``artifactory``.
+  Keyring service identifier. Authentication is disabled if left unset.
 
 
 Autoweight

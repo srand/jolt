@@ -116,7 +116,11 @@ global_string("{test}")
     def lastLog(self):
         return self._log
 
-    def tasks(self, output):
+    def tasks(self, output, remote=False, local=False):
+        if local:
+            return re.findall("Execution started.*?\((.*) [^ ]*\)", output)
+        if remote:
+            return re.findall("Remote execution started.*?\((.*) [^ ]*\)", output)
         return re.findall("xecution started.*?\((.*) [^ ]*\)", output)
 
     def artifacts(self, output):
