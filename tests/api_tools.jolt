@@ -152,6 +152,44 @@ class ToolsApi(JoltTest):
         o = self.build("b")
         self.assertIn("File# 0", o)
 
+    def test_builddir_incremental_with_publish(self):
+        """
+        --- tasks:
+        class A(Task):
+            def run(self, d, t):
+                bd = t.builddir("build", incremental=True)
+                print("File#", len(t.glob(bd+"/*")))
+                t.write_file(bd + "/test.txt", "test")
+
+            def publish(self, a, t):
+                bd = t.builddir("build", incremental=True)
+                t.read_file(bd + "/test.txt")
+
+        class B(Task):
+            def run(self, d, t):
+                bd = t.builddir("build", incremental=False)
+                print("File#", len(t.glob(bd+"/*")))
+                t.write_file(bd + "/test.txt", "test")
+
+            def publish(self, a, t):
+                bd = t.builddir("build", incremental=False)
+                t.read_file(bd + "/test.txt")
+        ---
+        """
+        o = self.build("a")
+        self.assertIn("File# 0", o)
+        a = self.artifacts(o)
+        self.tools.rmtree(a[0])
+        o = self.build("a")
+        self.assertIn("File# 1", o)
+
+        o = self.build("b")
+        self.assertIn("File# 0", o)
+        b = self.artifacts(o)
+        self.tools.rmtree(b[0])
+        o = self.build("b")
+        self.assertIn("File# 0", o)
+
     def test_extract_zip(self):
         with self.tools.cwd(self.ws):
             self.tools.run("zip tests.zip ../../api_tools.jolt")
