@@ -245,3 +245,24 @@ class BuildCli(testsupport.JoltTest):
         r2 = self.build("-s 1 c")
         l2 = self.tasks(r2, local=True)
         self.assertEqual(l2, ["b"])
+
+    def test_fast_task_with_unavailable_resource_dep(self):
+        """
+        --- tasks:
+        class A(Task):
+            pass
+
+        class R(Resource):
+            requires = "a"
+
+        class B(Task):
+            fast = True
+            requires = "r"
+        ---
+        """
+        if not self.network:
+            self.skipTest("network build deployment required")
+
+        r1 = self.build("b")
+        l1 = self.tasks(r1, local=True)
+        self.assertEqual(l1, [])

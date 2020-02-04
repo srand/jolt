@@ -441,7 +441,10 @@ class DistributedStrategy(ExecutionStrategy, PruneStrategy):
             return self.executors.create_skipper(task)
 
         if task.is_resource():
-            return self.executors.create_local(task)
+            if task.deps_available_locally(self.cache):
+                return self.executors.create_local(task)
+            else:
+                return self.executors.create_skipper(task)
 
         if not task.is_cacheable():
             return self.executors.create_network(task)
@@ -458,7 +461,7 @@ class DistributedStrategy(ExecutionStrategy, PruneStrategy):
         else:
             if task.is_available_locally(self.cache) and task.is_uploadable(self.cache):
                 return self.executors.create_uploader(task)
-            if task.deps_available_locally(self.cache) and task.is_fast():
+            if task.is_fast() and task.deps_available_locally(self.cache):
                 return self.executors.create_local(task)
 
         if not task.is_goal():
