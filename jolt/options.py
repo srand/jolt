@@ -12,4 +12,5 @@ class JoltOptions(object):
         self.upload = True
         self.worker = False
         self.salt = None
+        self.jobs = 1
         self.__dict__.update(kwargs)

@@ -1,5 +1,6 @@
 from concurrent.futures import ThreadPoolExecutor, as_completed, Future
 from functools import partial
+import os
 import queue
 try:
     import asyncio
@@ -8,6 +9,7 @@ except:
     has_asyncio = False
 
 
+from jolt import config
 from jolt import log
 from jolt import utils
 from jolt import tools
@@ -17,6 +19,7 @@ from jolt.graph import PruneStrategy
 from jolt.manifest import ManifestExtension
 from jolt.manifest import ManifestExtensionRegistry
 from jolt.options import JoltOptions
+
 
 
 class JoltEnvironment(object):
@@ -323,7 +326,12 @@ class ExecutorFactory(object):
 
 class LocalExecutorFactory(ExecutorFactory):
     def __init__(self, options=None):
-        super(LocalExecutorFactory, self).__init__(options=options, max_workers=1)
+        max_workers = config.get(
+            "jolt", "parallel_tasks",
+            os.getenv("JOLT_PARALLEL_TASKS", 1 if options is None else options.jobs))
+        super(LocalExecutorFactory, self).__init__(
+            options=options,
+            max_workers=max_workers)
 
     def create(self, task, force=False):
         return LocalExecutor(self, task, force_build=force)

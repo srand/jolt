@@ -60,6 +60,12 @@ The ``[jolt]`` config section contains global configuration.
   The environment variable ``JOLT_THREADS`` can also be used.
   The default value is the number of CPUs available.
 
+* ``parallel_tasks = <integer>``
+  Used to control the number of tasks allowed to execute in parallel on the
+  local machine. The environment variable ``JOLT_PARALLEL_TASKS`` can also
+  be used as well as the ``-j/--jobs`` build command option.
+  The default value is 1.
+
 Network
 --------
 

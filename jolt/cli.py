@@ -101,6 +101,7 @@ def _autocomplete_tasks(ctx, args, incomplete):
 @click.option("-l", "--local", is_flag=True, default=False, help="Disable all network operations.")
 @click.option("-k", "--keep-going", is_flag=True, default=False, help="Build as many tasks as possible, don't abort on first failure.")
 @click.option("-i", "--identity", type=str, help="Expected hash identity")
+@click.option("-j", "--jobs", type=int, default=1, help="Number of tasks allowed to execute in parallel (1). ")
 @click.option("--no-download", is_flag=True, default=False,
               help="Don't download artifacts from remote storage")
 @click.option("--no-upload", is_flag=True, default=False,
@@ -123,7 +124,7 @@ def _autocomplete_tasks(ctx, args, incomplete):
 @click.pass_context
 def build(ctx, task, network, keep_going, identity, default, local,
           no_download, no_upload, download, upload, worker, force,
-          salt, copy, debug, result):
+          salt, copy, debug, result, jobs):
     """
     Execute specified task.
 
@@ -174,7 +175,8 @@ def build(ctx, task, network, keep_going, identity, default, local,
                           default=default,
                           worker=worker,
                           debug=debug,
-                          salt=salt)
+                          salt=salt,
+                          jobs=jobs)
 
     acache = cache.ArtifactCache.get(options)
 
