@@ -1,5 +1,5 @@
-from base64 import decodestring as base64_decodestring
-from base64 import encodestring as base64_encodestring
+from base64 import decodebytes as base64_decodebytes
+from base64 import encodebytes as base64_encodebytes
 import codecs
 from xml.etree.ElementTree import Element
 from xml.etree.ElementTree import ElementTree
@@ -74,7 +74,7 @@ class Attribute(object):
                     return ''
                 value = self.get(attribute)
                 if base64:
-                    value = base64_decodestring(value.encode())
+                    value = base64_decodebytes(value.encode())
                     if zlib:
                         value = codecs.decode(value, "zlib")
                     value = value.decode()
@@ -93,7 +93,7 @@ class Attribute(object):
                     value = value.encode()
                     if zlib:
                         value = codecs.encode(value, "zlib")
-                    value = base64_encodestring(value).decode()
+                    value = base64_encodebytes(value).decode()
                 return self.set(attribute, value)
 
             def child_get(self):
@@ -104,7 +104,7 @@ class Attribute(object):
                 if value is None:
                     return None
                 if base64:
-                    value = base64_decodestring(value.encode())
+                    value = base64_decodebytes(value.encode())
                     if zlib:
                         value = codecs.decode(value, "zlib")
                     value = value.decode()
@@ -121,7 +121,7 @@ class Attribute(object):
                     value = value.encode()
                     if zlib:
                         value = codecs.encode(value, "zlib")
-                    value = base64_encodestring(value).decode()
+                    value = base64_encodebytes(value).decode()
                 getattr(self,'_'+varname).text = value
 
             if not child:

@@ -21,12 +21,12 @@ class Export(object):
 
     def assign(self, value):
         value = value or ""
-        self.value = base64.decodestring(value.encode()).decode() if self.encoded else value
+        self.value = base64.decodebytes(value.encode()).decode() if self.encoded else value
 
     def export(self, task):
         value = self.value if self.value is not None else self.exported_value(task)
         if value:
-            value = base64.encodestring(value.encode()).decode() if self.encoded else value
+            value = base64.encodebytes(value.encode()).decode() if self.encoded else value
         return value
 
 

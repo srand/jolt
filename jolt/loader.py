@@ -31,7 +31,8 @@ class JoltLoader(object):
         classes = []
 
         directory = fs.path.dirname(path)
-        name, ext = fs.path.splitext(fs.path.basename(path))
+        name, ext = fs.path.splitext(path)
+        name = utils.canonical(name)
 
         if not joltproject:
             with open(path) as f:
@@ -155,7 +156,7 @@ class RecipeExtension(ManifestExtension):
         for path, source in loader.get_sources():
             manifest_recipe = manifest.create_recipe()
             manifest_recipe.path = fs.path.basename(path)
-            manifest_recipe.source = base64.encodestring(source.encode()).decode()
+            manifest_recipe.source = base64.encodebytes(source.encode()).decode()
 
         projects = set([task.task.joltproject for task in [task] + task.children])
         for project in filter(lambda x: x is not None, projects):
@@ -180,7 +181,7 @@ class RecipeExtension(ManifestExtension):
 
         for recipe in manifest.recipes:
             with open(recipe.path, "w") as f:
-                f.write(base64.decodestring(recipe.source.encode()).decode())
+                f.write(base64.decodebytes(recipe.source.encode()).decode())
 
         for project in manifest.projects:
             for recipe in project.recipes:
