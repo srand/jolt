@@ -10,6 +10,7 @@ except:
 
 from jolt import log
 from jolt import utils
+from jolt import tools
 from jolt.error import raise_error
 from jolt.error import raise_task_error_if
 from jolt.graph import PruneStrategy
@@ -210,11 +211,11 @@ class ExecutorRegistry(object):
 
     def create_downloader(self, task):
         # TODO: Switch to concurrent factory once the progress bar can handle it
-        return Downloader(self._local_factory, task)
+        return Downloader(self._concurrent_factory, task)
 
     def create_uploader(self, task):
         # TODO: Switch to concurrent factory once the progress bar can handle it
-        return Uploader(self._local_factory, task)
+        return Uploader(self._concurrent_factory, task)
 
     def create_local(self, task, force=False):
         return self._local_factory.create(task, force=force)
@@ -330,7 +331,10 @@ class LocalExecutorFactory(ExecutorFactory):
 
 class ConcurrentLocalExecutorFactory(ExecutorFactory):
     def __init__(self, options=None):
-        super(ConcurrentLocalExecutorFactory, self).__init__(options=options)
+        max_workers = tools.Tools().thread_count()
+        super(ConcurrentLocalExecutorFactory, self).__init__(
+            options=options,
+            max_workers=max_workers)
 
     def create(self, task):
         raise NotImplementedError()
