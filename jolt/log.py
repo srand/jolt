@@ -97,18 +97,37 @@ class Filter(logging.Filter):
         return self.filterfn(record)
 
 
+class TqdmStream(object):
+    def __init__(self, stream):
+        self.stream = stream
+
+    def write(self, msg):
+        with tqdm.tqdm.external_write_mode(file=self.stream, nolock=False):
+            self.stream.write(msg)
+
+    def flush(self):
+        getattr(self.stream, 'flush', lambda: None)()
+        pass
+
+
 # create logger
 _logger = logging.getLogger('jolt')
 _logger.setLevel(logging.DEBUG)
 
 _console_formatter = ConsoleFormatter('[{levelname:>7}] {message}')
 
-_stdout = logging.StreamHandler(sys.stdout)
+if sys.stdout.isatty() and sys.stderr.isatty():
+    _stdout = logging.StreamHandler(TqdmStream(sys.stdout))
+else:
+    _stdout = logging.StreamHandler(sys.stdout)
 _stdout.setLevel(INFO)
 _stdout.setFormatter(_console_formatter)
 _stdout.addFilter(Filter(lambda r: r.levelno < ERROR))
 
-_stderr = logging.StreamHandler(sys.stderr)
+if sys.stdout.isatty() and sys.stderr.isatty():
+    _stderr = logging.StreamHandler(TqdmStream(sys.stdout))
+else:
+    _stderr = logging.StreamHandler(sys.stderr)
 _stderr.setLevel(INFO)
 _stderr.setFormatter(_console_formatter)
 _stderr.addFilter(Filter(lambda r: r.levelno >= ERROR))

@@ -229,27 +229,30 @@ def build(ctx, task, network, keep_going, identity, default, local,
         if not dag.has_tasks():
             return
 
-        while dag.has_tasks():
-            # Find all tasks ready to be executed
-            leafs = dag.select(lambda graph, task: task.is_ready())
+        with log.progress("Progress", dag.number_of_tasks(), "tasks") as p:
+            while dag.has_tasks():
+                # Find all tasks ready to be executed
+                leafs = dag.select(lambda graph, task: task.is_ready())
 
-            # Order the tasks by their weights to improve build times
-            leafs.sort(key=lambda x: x.weight)
+                # Order the tasks by their weights to improve build times
+                leafs.sort(key=lambda x: x.weight)
 
-            while leafs:
-                task = leafs.pop()
-                queue.submit(acache, task)
+                while leafs:
+                    task = leafs.pop()
+                    queue.submit(acache, task)
 
-            task, error = queue.wait()
-            if not task:
-                dag.debug()
-                raise_error_if(not task, "no more tasks in progress, only blocked tasks remain")
-            elif task.is_goal() and task.duration_running:
-                goal_task_duration += task.duration_running.seconds
+                task, error = queue.wait()
+                p.update(1)
 
-            if not keep_going and error is not None:
-                queue.abort()
-                raise error
+                if not task:
+                    dag.debug()
+                    raise_error_if(not task, "no more tasks in progress, only blocked tasks remain")
+                elif task.is_goal() and task.duration_running:
+                    goal_task_duration += task.duration_running.seconds
+
+                if not keep_going and error is not None:
+                    queue.abort()
+                    raise error
 
         for goal in goal_tasks:
             if acache.is_available_locally(goal):

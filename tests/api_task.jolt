@@ -271,3 +271,14 @@ class TaskApi(JoltTest):
         r = self.build("influence:arg=2 noinfluence:arg=2")
         self.assertBuild(r, "influence:arg=2")
         self.assertNoBuild(r, "noinfluence:arg=2")
+
+    def test_run_output(self):
+        """
+        --- tasks:
+        class Log(Task):
+            def run(self, d, t):
+                t.run("echo Hello > /dev/stdout")
+                t.run("echo World > /dev/stderr")
+        ---
+        """
+        self.jolt("build log")
