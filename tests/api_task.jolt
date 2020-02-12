@@ -185,12 +185,20 @@ class TaskApi(JoltTest):
 
             def run(self, deps, tools):
                 raise_error_if(not deps["base"], "dependency missing")
+
+        class Duplicate(Task):
+            requires = "base", "base", "base"
         ---
         """
         r = self.jolt("build consumer:i=1")
         self.assertBuild(r, "base")
         r = self.jolt("build consumer:i=2")
         self.assertNoBuild(r, "base")
+
+        r = self.jolt("clean base")
+        r = self.jolt("build duplicate -j2")
+        t = self.tasks(r)
+        self.assertEqual(t, ["base", "duplicate"])
 
     def test_selfsustained(self):
         """
