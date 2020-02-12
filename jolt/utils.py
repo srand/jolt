@@ -6,7 +6,7 @@ from string import Formatter
 import os
 import hashlib
 import sys
-from fasteners import process_lock
+from fasteners import lock, process_lock
 import errno
 import json
 
@@ -21,6 +21,10 @@ try:
     getattr_safe = getattr_static
 except:
     getattr_safe = getattr
+
+
+locked = lock.locked
+
 
 def is_str(s):
     try:

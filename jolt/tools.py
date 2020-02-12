@@ -265,6 +265,9 @@ class _AutoTools(object):
             artifact.collect(files, *args, **kwargs)
 
 
+
+
+
 class Tools(object):
     """ A collection of useful tools.
 
@@ -273,6 +276,9 @@ class Tools(object):
     associated task's parameters and properties. Relative paths are
     made absolute by prepending the current working directory.
     """
+
+    _builddir_lock = threading.RLock()
+
 
     def __init__(self, task=None, cwd=None):
         self._cwd = cwd or os.getcwd()
@@ -360,6 +366,7 @@ class Tools(object):
         """ Creates an AutoTools invokation helper """
         return _AutoTools(deps, self)
 
+    @utils.locked(lock='_builddir_lock')
     def builddir(self, name=None, incremental=False, unique=True):
         """ Creates a temporary build directory.
 
@@ -898,6 +905,7 @@ class Tools(object):
             if stde:
                 termios.tcsetattr(sys.stderr.fileno(), termios.TCSANOW, stde)
 
+    @utils.locked(lock='_builddir_lock')
     def sandbox(self, artifact, incremental=False):
         """ Creates a temporary build directory populated with the contents of an artifact.
 

@@ -220,3 +220,23 @@ class ToolsApi(JoltTest):
 
         s = self.tools.run(["sh", "-c", "echo Hello world"], shell=False)
         self.assertEqual(s, "Hello world")
+
+    def test_sandbox(self):
+        """
+        --- file: test.txt
+        test
+        --- tasks:
+        class A(Task):
+            def publish(self, a, t):
+                a.collect("test.txt", "test2.txt")
+
+        class B(Task):
+            requires = "a"
+
+            def run(self, d, t):
+                s = t.sandbox(d["a"])
+                c = t.read_file(s + "/test2.txt")
+                assert "test" in c, "unexpected file content: " + c
+        ---
+        """
+        self.build("b")
