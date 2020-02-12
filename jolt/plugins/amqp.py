@@ -280,6 +280,12 @@ class WorkerTaskConsumer(object):
             self.EXCHANGE,
             routing_key=self._routing_key,
             callback=cb)
+        log.info('Binding {} to {} with jolt_{}',
+                 self.EXCHANGE, queue_name, self._routing_key)
+        self._channel.queue_bind(
+            queue_name,
+            self.EXCHANGE,
+            routing_key="jolt_"+self._routing_key)
 
     def on_bindok(self, _unused_frame, userdata):
         """Invoked by pika when the Queue.Bind method has completed. At this
