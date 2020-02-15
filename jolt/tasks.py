@@ -499,8 +499,7 @@ class TaskBase(object):
         self._identity = None
         self.name = self.__class__.name
 
-        self._create_exports()
-        self._create_parameters()
+        self._create_exports_and_parameters()
         self._set_parameters(parameters)
 
         self.cacheable = self.__class__.cacheable
@@ -531,19 +530,19 @@ class TaskBase(object):
         source, lines = inspect.getsourcelines(func)
         return "\n".join(source)
 
-    def _create_exports(self):
+    def _create_exports_and_parameters(self):
+        self._exports = {}
+        self._parameters = {}
         for key in dir(self):
-            export = utils.getattr_safe(self, key)
-            if isinstance(export, Export):
-                export = copy.copy(export)
+            obj = utils.getattr_safe(self, key)
+            if isinstance(obj, Export):
+                export = copy.copy(obj)
                 setattr(self, key, export)
-
-    def _create_parameters(self):
-        for key in dir(self):
-            param = utils.getattr_safe(self, key)
-            if isinstance(param, Parameter):
-                param = copy.copy(param)
+                self._exports[key] = export
+            if isinstance(obj, Parameter):
+                param = copy.copy(obj)
                 setattr(self, key, param)
+                self._parameters[key] = param
 
     def _set_parameters(self, params):
         params = params or {}
@@ -584,17 +583,11 @@ class TaskBase(object):
 
     @utils.cached.instance
     def _get_export_objects(self):
-        return {
-            key: getattr(self, key) for key in dir(self)
-            if isinstance(utils.getattr_safe(self, key), Export)
-        }
+        return self._exports
 
     @utils.cached.instance
     def _get_parameter_objects(self, unset=False):
-        return {
-            key: getattr(self, key) for key in dir(self)
-            if isinstance(utils.getattr_safe(self, key), Parameter)
-        }
+        return self._parameters
 
     def _get_parameters(self, unset=False):
         return {
@@ -930,12 +923,19 @@ class _Test(Task):
     def _requires(self):
         return self.test_cls.requires
 
-    def _create_parameters(self):
+    def _create_exports_and_parameters(self):
+        self._exports = {}
+        self._parameters = {}
         for key in dir(self.test_cls):
-            param = utils.getattr_safe(self.test_cls, key)
-            if isinstance(param, Parameter):
-                param = copy.copy(param)
+            obj = utils.getattr_safe(self.test_cls, key)
+            if isinstance(obj, Export):
+                export = copy.copy(obj)
+                setattr(self, key, export)
+                self._exports[key] = obj
+            if isinstance(obj, Parameter):
+                param = copy.copy(obj)
                 setattr(self, key, param)
+                self._parameters[key] = obj
 
     def _get_test_names(self):
         return [attrib for attrib in dir(self.test_cls)

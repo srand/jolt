@@ -346,35 +346,34 @@ class GNUDepImporter(Rule):
 
 class Toolchain(object):
     def __init__(self):
-        self._rule_map = self.build_rule_map(self)
-        self.build_variables(self)
+        self._rules_by_ext = self.build_rules_and_vars(self)
 
     @staticmethod
-    def build_rule_map(cls):
+    def build_rules_and_vars(cls):
         rule_map = {}
-        for name, rule in Toolchain.all_rules(cls):
+        rules, vars = Toolchain.all_rules_and_vars(cls)
+        for name, rule in rules:
             rule.name = name
             for ext in rule.infiles:
                 rule_map[ext] = rule
+        for name, var in vars:
+            var.name = name
         return rule_map
 
-    @staticmethod
-    def build_variables(cls):
-        for name, var in Toolchain.all_variables(cls):
-            var.name = name
-
-    @staticmethod
-    def all_rules(cls):
-        return [(key, getattr(cls, key)) for key in dir(cls)
-                if isinstance(utils.getattr_safe(cls, key), Rule)]
-
     def find_rule(self, ext):
-        return self._rule_map.get(ext)
+        return self._rules_by_ext.get(ext)
 
     @staticmethod
-    def all_variables(cls):
-        return [(key, getattr(cls, key)) for key in dir(cls)
-                if isinstance(utils.getattr_safe(cls, key), Variable)]
+    def all_rules_and_vars(cls):
+        vars = []
+        rules = []
+        for key in dir(cls):
+            obj = getattr(cls, key)
+            if isinstance(obj, Variable):
+                vars.append((key, obj))
+            elif isinstance(obj, Rule):
+                rules.append((key, obj))
+        return rules, vars
 
     def __str__(self):
         return self.__class__.__name__
@@ -811,20 +810,26 @@ class CXXProject(Task):
                 self.influence.append(influence.FileInfluence(source))
         else:
             self._verify_influence()
-        self._init_variables()
-        self._init_rules()
-        self._rule_map = Toolchain.build_rule_map(self)
+        self._init_rules_and_vars()
 
-    def _init_variables(self):
-        for name, var in Toolchain.all_variables(self):
+    def _init_rules_and_vars(self):
+        self._rules_by_ext = {}
+        self._rules = []
+        self._variables = []
+
+        rules, variables = Toolchain.all_rules_and_vars(self)
+        for name, var in variables:
             var = copy.copy(var)
             setattr(self, name, var)
             var.name = name
-
-    def _init_rules(self):
-        for name, rule in Toolchain.all_rules(self):
+            self._variables.append(var)
+        for name, rule in rules:
             rule = copy.copy(rule)
             setattr(self, name, rule)
+            rule.name = name
+            for ext in rule.infiles:
+                self._rules_by_ext[ext] = rule
+            self._rules.append(rule)
 
     def _init_sources(self):
         self.sources = utils.as_list(utils.call_or_return(self, self.__class__._sources))
@@ -854,8 +859,7 @@ class CXXProject(Task):
     def _write_ninja_file(self, basedir, deps, tools):
         with open(fs.path.join(basedir, "build.ninja"), "w") as fobj:
             writer = ninja.Writer(fobj)
-            self._populate_variables(writer, deps, tools)
-            self._populate_rules(writer, deps, tools)
+            self._populate_rules_and_variables(writer, deps, tools)
             self._populate_inputs(writer, deps, tools)
             self._populate_project(writer, deps, tools)
             writer.close()
@@ -906,7 +910,7 @@ if __name__ == "__main__":
         tools.chmod(filepath, 0o777)
 
     def find_rule(self, ext):
-        rule = self._rule_map.get(ext)
+        rule = self._rules_by_ext.get(ext)
         if rule is None:
             rule = toolchain.find_rule(ext)
         raise_task_error_if(
@@ -914,22 +918,23 @@ if __name__ == "__main__":
             "no build rule available for files with extension '{0}'", ext)
         return rule
 
-    def _populate_variables(self, writer, deps, tools):
+    def _populate_rules_and_variables(self, writer, deps, tools):
+        tc_rules, tc_vars = Toolchain.all_rules_and_vars(self.toolchain)
+
         variables = set()
-        for name, var in Toolchain.all_variables(self):
+        for var in self._variables:
             var.create(self, writer, deps, tools)
-            variables.add(name)
-        for name, var in Toolchain.all_variables(self.toolchain):
+            variables.add(var.name)
+        for name, var in tc_vars:
             if name not in variables:
                 var.create(self, writer, deps, tools)
         writer.newline()
 
-    def _populate_rules(self, writer, deps, tools):
         rules = set()
-        for name, rule in Toolchain.all_rules(self):
+        for rule in self._rules:
             rule.create(self, writer, deps, tools)
-            rules.add(name)
-        for name, rule in Toolchain.all_rules(self.toolchain):
+            rules.add(rule.name)
+        for name, rule in tc_rules:
             if name not in rules:
                 rule.create(self, writer, deps, tools)
         writer.newline()

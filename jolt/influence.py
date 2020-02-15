@@ -27,7 +27,7 @@ class HashInfluenceRegistry(object):
     def apply_all(self, task, sha):
         for influence in self.get_strings(task):
             sha.update(influence.encode())
-            log.debug("{0}: {1}", task.name, influence)
+            #log.debug("{0}: {1}", task.name, influence)
 
     def get_strings(self, task):
         content = []
