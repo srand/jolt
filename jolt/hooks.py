@@ -39,16 +39,22 @@ class TaskHookRegistry(object):
                 utils.call_and_catch(ext.task_created, task)
 
     def task_started(self, task):
+        if task.is_resource():
+            return
         if self.env and not self.env.worker:
             for ext in self.hooks:
                 utils.call_and_catch(ext.task_started, task)
 
     def task_finished(self, task):
+        if task.is_resource():
+            return
         if self.env and not self.env.worker:
             for ext in self.hooks:
                 utils.call_and_catch(ext.task_finished, task)
 
     def task_failed(self, task):
+        if task.is_resource():
+            return
         if self.env and not self.env.worker:
             for ext in self.hooks:
                 utils.call_and_catch(ext.task_failed, task)
