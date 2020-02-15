@@ -1,4 +1,6 @@
 import copy
+import os
+import pygit2
 
 from jolt.tasks import Resource, WorkspaceResource, Parameter, BooleanParameter, Export, TaskRegistry
 from jolt.influence import HashInfluenceProvider, HashInfluenceRegistry, FileInfluence
@@ -28,6 +30,7 @@ class GitRepository(object):
         self.tools = Tools()
         self.url = url
         self.refspecs = utils.as_list(refspecs or [])
+        self.repository = pygit2.Repository(path) if os.path.exists(self._get_git_folder()) else None
 
     @utils.cached.instance
     def _get_git_folder(self):
@@ -37,25 +40,25 @@ class GitRepository(object):
     def _get_git_index(self):
         return fs.path.join(self.path, ".git", "index")
 
+    @utils.cached.instance
+    def _get_git_jolt_index(self):
+        return fs.path.join(self.path, ".git", "jolt-index")
+
     def is_cloned(self):
         return fs.path.exists(self._get_git_folder())
 
     def is_indexed(self):
         return fs.path.exists(self._get_git_index())
 
-    def _is_synced(self):
-        with self.tools.cwd(self.path):
-            return True if self.tools.run("git branch -r --contains HEAD", output_on_error=True) else False
-        return True
-
     def clone(self):
         log.info("Cloning into {0}", self.path)
         if fs.path.exists(self.path):
             with self.tools.cwd(self.path):
-                self.tools.run("git init && git remote add origin {} && git fetch",
-                               self.url, output_on_error=True)
+                self.repository = pygit2.init_repository(self.path)
+                remote = self.repository.remotes.create("origin", self.url.get_value())
+                remote.fetch()
         else:
-            self.tools.run("git clone {0} {1}", self.url, self.path, output_on_error=True)
+            self.repository = pygit2.clone_repository(self.url.get_value(), self.path)
         raise_error_if(
             not fs.path.exists(self._get_git_folder()),
             "git: failed to clone repository '{0}'", self.relpath)
@@ -86,7 +89,7 @@ class GitRepository(object):
     @utils.cached.instance
     def _head(self):
         with self.tools.cwd(self.path):
-            return self.tools.run("git rev-parse HEAD", output_on_error=True)
+            return str(self.repository.head.target)
 
     def head(self):
         return self._head() if self.is_cloned() else ""
@@ -96,7 +99,11 @@ class GitRepository(object):
 
     def rev_parse(self, rev):
         with self.tools.cwd(self.path):
-            return self.tools.run("git rev-parse {rev}", rev=rev, output_on_error=True)
+            try:
+                commit, ref = self.repository.resolve_refish(rev)
+            except KeyError:
+                raise_error("invalid git reference: {}", rev)
+            return str(commit.id)
 
     @utils.cached.instance
     def write_tree(self):
@@ -119,24 +126,26 @@ class GitRepository(object):
         return tree
 
     def tree_hash(self, sha="HEAD", path="/"):
+        path = fs.path.normpath(path)
         full_path = fs.path.join(self.path, path)
         value = _tree_hash_cache.get((full_path, sha))
         if value is None:
             if sha == "HEAD":
-                tree = self.write_tree()
+                tree = self.repository.get(self.write_tree())
             else:
                 try:
-                    with self.tools.cwd(self.path):
-                        tree = self.tools.run("git rev-parse {0}^{{tree}}", sha, output=False)
+                    commit, ref = self.repository.resolve_refish(sha)
                 except:
-                    with self.tools.cwd(self.path):
-                        self.fetch()
-                        tree = self.tools.run("git rev-parse {0}^{{tree}}", sha, output=False)
+                    self.fetch()
+                    try:
+                        commit, ref = self.repository.resolve_refish(sha)
+                    except Exception as e:
+                        raise_error("failed to resolve sha: {} ({})", sha, e)
+                tree = commit.tree
             if path == "/":
-                return tree
+                return tree.id
             with self.tools.cwd(self.path):
-                _tree_hash_cache[(full_path, sha)] = value = self.tools.run(
-                    "git rev-parse {0}:{1}".format(tree, path), output=False)
+                _tree_hash_cache[(full_path, sha)] = value = tree[path].id
         return value
 
     def clean(self):

@@ -1,6 +1,6 @@
-FROM python:3.7-alpine
+FROM python:3-buster
 
-RUN apk update && apk add gcc g++ make libffi-dev musl-dev openssl-dev git ninja
+RUN apt-get update && apt-get install -y gcc g++ make libffi-dev musl-dev libssl-dev git ninja-build python3-pygit2
 ADD . /opt/jolt
 RUN pip3 install -e /opt/jolt
 RUN pip3 install pika
