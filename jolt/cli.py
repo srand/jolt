@@ -511,7 +511,7 @@ def info(ctx, task, influence=False, artifacts=False, salt=None):
     manifest = ctx.obj["manifest"]
     try:
         task = task_registry.get_task(task_name, manifest=manifest)
-        for req in utils.as_list(utils.call_or_return(task, task.requires)):
+        for req in sorted(utils.as_list(utils.call_or_return(task, task.requires))):
             click.echo("    {0}".format(task.tools.expand(req)))
         if not task.requires:
             click.echo("    None")

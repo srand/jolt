@@ -57,7 +57,7 @@ class TaskAttributeInfluence(HashInfluenceProvider):
         self.name = attrib.title()
 
     def get_influence(self, task):
-        value = utils.getattr_safe(task, tools.Tools(task).expand(self._attrib), "N/A")
+        value = getattr(task, tools.Tools(task).expand(self._attrib), "N/A")
         try:
             value = value.__get__(task)
             if type(value) == list and self._sort:
@@ -103,7 +103,10 @@ class TaskSourceInfluence(HashInfluenceProvider):
 
     def get_influence(self, task):
         obj = self.obj or task
-        func = getattr(obj.__class__, self.funcname)
+        if type(obj.__class__) == type:
+            func = utils.getattr_safe(obj, self.funcname)
+        else:
+            func = utils.getattr_safe(obj.__class__, self.funcname)
         try:
             return func.__influence
         except AttributeError:
