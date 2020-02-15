@@ -1,4 +1,5 @@
 from contextlib import contextmanager
+import copy
 import hashlib
 import networkx as nx
 from os import getenv
@@ -75,8 +76,7 @@ class TaskProxy(object):
 
         HashInfluenceRegistry.get().apply_all(self.task, sha)
 
-        # print("{}: {}".format(self.name, [n.name for n in self.children]))
-        for node in self.children:
+        for node in self.neighbors:
             sha.update(node.identity.encode())
 
         if self._extended_task:
@@ -208,23 +208,24 @@ class TaskProxy(object):
         self.manifest = manifest
 
         # Find all direct and transitive dependencies
-        self.descendants = sorted(
-            nx.descendants(dag, self),
-            key=lambda t: t.qualified_name)
-
-        # Find all direct dependencies
-        self.neighbors = list(
-            filter(lambda n: dag.are_neighbors(self, n), self.descendants))
+        self.children = sorted(self.children, key=lambda n: n.qualified_name)
+        self.ancestors = set()
+        self.descendants = set()
+        if self.is_extension():
+            self.children.append(self.get_extended_task())
+        self.neighbors = copy.copy(self.children)
+        self.neighbors = sorted(self.neighbors, key=lambda n: n.qualified_name)
+        for n in self.children:
+            self.descendants.add(n)
+            self.descendants = self.descendants.union(n.descendants)
+            n.ancestors.add(self)
+        self.descendants = sorted(self.descendants, key=lambda n: n.qualified_name)
 
         # Exclude transitive alias and resources dependencies
         self.children = list(
             filter(lambda n: not n.is_alias() and (not n.is_resource() or \
                    dag.are_neighbors(self, n)),
                    self.descendants))
-
-        self.ancestors = list(nx.ancestors(dag, self))
-        self.direct_ancestors = list(
-            filter(lambda n: dag.are_neighbors(n, self), self.ancestors))
 
         return self.identity
 
@@ -480,7 +481,7 @@ class GraphBuilder(object):
             min_time = 0
             for node in topological_nodes:
                 max_time += node.task.weight
-                node.task.weight += max([a.weight for a in node.direct_ancestors] + [0])
+                node.task.weight += max([a.weight for a in node.ancestors] + [0])
                 min_time = max(node.task.weight, min_time)
 
             log.verbose("Time estimate: {}- {}",
