@@ -416,6 +416,7 @@ class GraphBuilder(object):
         self.options = options or JoltOptions()
 
     def _get_node(self, progress, name):
+        name = utils.stable_task_name(name)
         node = self.nodes.get(name)
         if not node:
             task = self.registry.get_task(name, manifest=self.manifest)
