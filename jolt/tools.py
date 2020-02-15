@@ -1,3 +1,4 @@
+import copy
 import subprocess
 import os
 import sys
@@ -282,7 +283,7 @@ class Tools(object):
 
     def __init__(self, task=None, cwd=None):
         self._cwd = cwd or os.getcwd()
-        self._env = {key: value for key, value in os.environ.items()}
+        self._env = copy.copy(os.environ)
         self._task = task
         self._builddir = {}
 

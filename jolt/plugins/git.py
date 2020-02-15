@@ -142,10 +142,9 @@ class GitRepository(object):
                     except Exception as e:
                         raise_error("failed to resolve sha: {} ({})", sha, e)
                 tree = commit.tree
-            if path == "/":
-                return tree.id
-            with self.tools.cwd(self.path):
-                _tree_hash_cache[(full_path, sha)] = value = tree[path].id
+            if path != "/":
+                tree = tree[path]
+            _tree_hash_cache[(full_path, sha)] = value = tree.id
         return value
 
     def clean(self):
