@@ -103,7 +103,12 @@ class TaskSourceInfluence(HashInfluenceProvider):
 
     def get_influence(self, task):
         obj = self.obj or task
-        return utils.sha1(task._get_source(getattr(obj, self.funcname)))
+        func = getattr(obj.__class__, self.funcname)
+        try:
+            return func.__influence
+        except AttributeError:
+            func.__influence = utils.sha1(task._get_source(func))
+        return func.__influence
 
 
 def source(name, obj=None):
