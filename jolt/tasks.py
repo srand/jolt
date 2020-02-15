@@ -86,6 +86,15 @@ class Parameter(object):
         """
         return self._default
 
+    @property
+    def default(self):
+        """ Get the default value of the parameter.
+
+        Returns:
+            The default value or None if no default was given.
+        """
+        return self._default
+
     def set_default(self, value):
         """ Set the default value of the parameter.
 
@@ -148,6 +157,15 @@ class Parameter(object):
     def get_value(self):
         """ Get the parameter value. """
         return self._value
+
+    @property
+    def value(self):
+        """ Get the parameter value. """
+        return self._value
+
+    def __eq__(self, value):
+        """ Compare parameter value """
+        return self._value == value
 
     def set_value(self, value):
         """ Set the parameter value.
