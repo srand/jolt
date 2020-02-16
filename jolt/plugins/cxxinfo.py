@@ -1,4 +1,5 @@
 from jolt import filesystem as fs
+from jolt import utils
 from jolt.cache import ArtifactStringAttribute
 from jolt.cache import ArtifactAttributeSet
 from jolt.cache import ArtifactAttributeSetProvider
@@ -19,7 +20,12 @@ class CppInfoListVariable(CppInfoVariable):
     def __init__(self, name):
         super(CppInfoListVariable, self).__init__(name)
 
+    def set_value(self, value):
+        values = utils.as_list(value)
+        super(CppInfoListVariable, self).set_value(":".join(values))
+
     def append(self, value):
+        value = ":".join(utils.as_list(value))
         if self.get_value():
             self.set_value(self.get_value() + ":" + value)
         else:
