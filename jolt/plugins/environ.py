@@ -1,4 +1,5 @@
 from jolt import filesystem as fs
+from jolt import utils
 from jolt.cache import ArtifactStringAttribute
 from jolt.cache import ArtifactAttributeSet
 from jolt.cache import ArtifactAttributeSetProvider
@@ -24,6 +25,10 @@ class EnvironmentVariable(ArtifactStringAttribute):
 class PathEnvironmentVariable(EnvironmentVariable):
     def __init__(self, name="PATH"):
         super(PathEnvironmentVariable, self).__init__(name)
+
+    def set_value(self, value):
+        values = utils.as_list(value)
+        super(PathEnvironmentVariable, self).set_value(fs.pathsep.join(values))
 
     def append(self, value):
         if self.get_value():
