@@ -6,7 +6,7 @@ import os
 import sys
 
 from jolt.tasks import Alias, Task, TaskGenerator, TaskRegistry, Test, WorkspaceResource
-from jolt.error import raise_task_error_if
+from jolt.error import raise_error_if, raise_task_error_if
 from jolt import config
 from jolt import filesystem as fs
 from jolt import log
@@ -15,83 +15,142 @@ from jolt.manifest import ManifestExtension
 from jolt.manifest import ManifestExtensionRegistry
 
 
+class Recipe(object):
+    def __init__(self, path, joltdir=None, project=None, source=None):
+        self.path = path
+        self.basepath = os.path.basename(path)
+        self.joltdir = joltdir
+        self.project = project
+        self.source = source
+        self.tasks = []
+        self.tests = []
+
+    def load(self):
+        raise_error_if(self.source is not None, "recipe already loaded: {}", self.path)
+
+        with open(self.path) as f:
+            self.source = f.read()
+
+    def save(self):
+        raise_error_if(self.source is None, "recipe source unknown: {}", self.path)
+
+        with open(self.path, "w") as f:
+            f.write(self.source)
+
+
+class NativeRecipe(Recipe):
+    @staticmethod
+    def _is_abstract(cls):
+        return cls.__dict__.get("abstract", False) or cls.__name__.startswith("_")
+
+    @staticmethod
+    def _is_generator(cls):
+        return inspect.isclass(cls) and \
+            issubclass(cls, TaskGenerator) and \
+            not NativeRecipe._is_abstract(cls)
+
+    @staticmethod
+    def _is_task(cls):
+        return inspect.isclass(cls) and \
+            issubclass(cls, Task) and \
+            not NativeRecipe._is_abstract(cls)
+
+    @staticmethod
+    def _is_test(cls):
+        return inspect.isclass(cls) and \
+            issubclass(cls, Test) and \
+            not NativeRecipe._is_abstract(cls)
+
+    def load(self):
+        super(NativeRecipe, self).load()
+
+        name = utils.canonical(self.path)
+        module = imp.load_source("joltfile_{0}".format(name), self.path)
+
+        tasks = inspect.getmembers(module, self._is_task)
+        tests = inspect.getmembers(module, self._is_test)
+        generators = inspect.getmembers(module, self._is_generator)
+
+        for _, cls in generators:
+            classes = utils.as_list(cls().generate())
+            tasks += [(c.__name__, c) for c in classes if self._is_task(c)]
+            tests += [(c.__name__, c) for c in classes if self._is_test(c)]
+
+        for name, task in tasks:
+            task.name = task.name or task.__name__.lower()
+            task.joltdir = self.joltdir or os.path.dirname(self.path)
+            task.joltproject = self.project
+            self.tasks.append(task)
+
+        for name, test in tests:
+            test.name = test.name or test.__name__.lower()
+            test.joltdir = self.joltdir or os.path.dirname(self.path)
+            test.joltproject = self.project
+            self.tests.append(test)
+
+        log.verbose("Loaded: {0}", self.path)
+
+
+class Loader(object):
+    def recipes(self):
+        pass
+
+
+class LoaderFactory(object):
+    def create(self):
+        raise NotImplementedError()
+
+
+class NativeLoader(Loader):
+    def __init__(self):
+        self._recipes = []
+        self._find_files()
+
+    def _find_files(self):
+        files = []
+        oldpath = None
+        curpath = os.getcwd()
+        while not self._recipes and oldpath != curpath:
+            files = glob.glob(fs.path.join(curpath, "*.jolt"))
+
+            for filepath in files:
+                recipe = NativeRecipe(filepath)
+                self._recipes.append(recipe)
+
+            oldpath = curpath
+            curpath = os.path.dirname(oldpath)
+        self.path = oldpath if self._recipes else None
+
+    @property
+    def recipes(self):
+        return self._recipes
+
+
+_loaders = []
+
+def register(factory):
+    raise_error_if(not issubclass(factory, LoaderFactory),
+                   "{} is not a LoaderFactory", factory.__name__)
+    _loaders.append(factory)
+
+
+@register
+class NativeLoaderFactory(LoaderFactory):
+    def create(self):
+        return NativeLoader()
+
+
 @utils.Singleton
 class JoltLoader(object):
     filename = "*.jolt"
 
     def __init__(self):
+        self._recipes = []
         self._tasks = []
         self._tests = []
-        self._source = {}
         self._path = None
         self._project_recipes = {}
         self._project_resources = {}
-
-    def _load_file(self, path, joltdir=None, joltproject=None):
-        classes = []
-
-        directory = fs.path.dirname(path)
-        name, ext = fs.path.splitext(path)
-        name = utils.canonical(name)
-
-        if not joltproject:
-            with open(path) as f:
-                self._source[path] = f.read()
-
-        module = imp.load_source("joltfile_{0}".format(name), path)
-        for name in module.__dict__:
-            obj = module.__dict__[name]
-            if inspect.isclass(obj):
-                classes.append(obj)
-
-        def is_abstract(cls):
-            return cls.__dict__.get("abstract", False)
-
-        generators = [cls for cls in classes
-                      if issubclass(cls, TaskGenerator) \
-                      and not cls.__name__.startswith("_") \
-                      and not is_abstract(cls)]
-        for gen in generators:
-            classes = utils.as_list(gen().generate()) + classes
-
-        tasks = [cls for cls in classes
-                 if issubclass(cls, Task) \
-                 and not cls.__name__.startswith("_") \
-                 and not is_abstract(cls)]
-        for task in tasks:
-            task.name = task.name or task.__name__.lower()
-            task.joltdir = joltdir or directory
-            task.joltproject = joltproject
-        self._tasks += tasks
-
-        tests = [cls for cls in classes if issubclass(cls, Test) \
-                 and not cls.__name__.startswith("_") \
-                 and not is_abstract(cls)]
-        for test in tests:
-            test.name = test.name or test.__name__.lower()
-            test.joltdir = joltdir or directory
-            test.joltproject = joltproject
-        self._tests += tests
-
-        log.verbose("Loaded: {0}", path)
-
-        return tasks
-
-    def _load_files(self):
-        files = []
-        path = os.getcwd()
-        while not files:
-            files = glob.glob(fs.path.join(path, JoltLoader.filename))
-            for file in files:
-                self._load_file(file)
-            if files:
-                self._path = path
-                break
-            opath = path
-            path = fs.path.dirname(path)
-            if path == opath:
-                break
-        return self._tasks, self._tests
 
     def _add_project_recipe(self, project, joltdir, src):
         recipes = self._project_recipes.get(project, [])
@@ -120,7 +179,16 @@ class JoltLoader(object):
                 self._load_file(fs.path.join(joltdir, src), joltdir, project)
 
     def load(self, manifest=None):
-        self._load_files()
+        for factory in _loaders:
+            loader = factory().create()
+            for recipe in loader.recipes:
+                recipe.load()
+                self._recipes.append(recipe)
+                self._tasks += recipe.tasks
+                self._tests += recipe.tests
+            if len(loader.recipes) > 0:
+                self.set_joltdir(loader.path)
+
         self._load_project_recipes()
         return self._tasks, self._tests
 
@@ -139,8 +207,17 @@ class JoltLoader(object):
                         imp.load_source("jolt.plugins." + section, module)
                         continue
 
-    def get_sources(self):
-        return self._source.items()
+    @property
+    def recipes(self):
+        return self._recipes
+
+    @property
+    def tasks(self):
+        return self._tasks
+
+    @property
+    def tests(self):
+        return self._tests
 
     @property
     def joltdir(self):
@@ -153,10 +230,11 @@ class JoltLoader(object):
 class RecipeExtension(ManifestExtension):
     def export_manifest(self, manifest, task):
         loader = JoltLoader.get()
-        for path, source in loader.get_sources():
+
+        for recipe in loader.recipes:
             manifest_recipe = manifest.create_recipe()
-            manifest_recipe.path = fs.path.basename(path)
-            manifest_recipe.source = base64.encodebytes(source.encode()).decode()
+            manifest_recipe.path = recipe.basepath
+            manifest_recipe.source = recipe.source
 
         projects = set([task.task.joltproject for task in [task] + task.children])
         for project in filter(lambda x: x is not None, projects):
@@ -180,8 +258,8 @@ class RecipeExtension(ManifestExtension):
         loader.set_joltdir(manifest.joltdir)
 
         for recipe in manifest.recipes:
-            with open(recipe.path, "w") as f:
-                f.write(base64.decodebytes(recipe.source.encode()).decode())
+            recipe = Recipe(recipe.path, source=recipe.source)
+            recipe.save()
 
         for project in manifest.projects:
             for recipe in project.recipes:
