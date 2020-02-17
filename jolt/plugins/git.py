@@ -30,7 +30,10 @@ class GitRepository(object):
         self.tools = Tools()
         self.url = url
         self.refspecs = utils.as_list(refspecs or [])
-        self.repository = pygit2.Repository(path) if os.path.exists(self._get_git_folder()) else None
+        self._init_repo()
+
+    def _init_repo(self):
+        self.repository = pygit2.Repository(self.path) if os.path.exists(self._get_git_folder()) else None
 
     @utils.cached.instance
     def _get_git_folder(self):
@@ -54,14 +57,14 @@ class GitRepository(object):
         log.info("Cloning into {0}", self.path)
         if fs.path.exists(self.path):
             with self.tools.cwd(self.path):
-                self.repository = pygit2.init_repository(self.path)
-                remote = self.repository.remotes.create("origin", self.url.get_value())
-                remote.fetch()
+                self.tools.run("git init && git remote add origin {} && git fetch",
+                               self.url, output_on_error=True)
         else:
-            self.repository = pygit2.clone_repository(self.url.get_value(), self.path)
+            self.tools.run("git clone {0} {1}", self.url, self.path, output_on_error=True)
         raise_error_if(
             not fs.path.exists(self._get_git_folder()),
             "git: failed to clone repository '{0}'", self.relpath)
+        self._init_repo()
 
     @utils.cached.instance
     def _diff(self, path="/"):
