@@ -12,6 +12,32 @@ import testsupport
 class BuildCli(testsupport.JoltTest):
     name = "cli/build"
 
+    def test_no_args(self):
+        """
+        --- tasks:
+        class Default(Task):
+            pass
+        ---
+        """
+        if self.network:
+            self.skipTest("network build not supported")
+        r1 = self.jolt("")
+        self.assertBuild(r1, "default")
+
+    def test_no_args_and_config(self):
+        """
+        --- config:
+        default=custom
+        --- tasks:
+        class Custom(Task):
+            pass
+        ---
+        """
+        if self.network:
+            self.skipTest("network build not supported")
+        r1 = self.jolt("")
+        self.assertBuild(r1, "custom")
+
     def test_return_value(self):
         """
         --- tasks:

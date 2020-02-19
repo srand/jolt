@@ -33,6 +33,12 @@ The ``[jolt]`` config section contains global configuration.
   Colorize output. When enabled, Jolt uses colors to make it easier to
   read the console log and to spot errors. The default is ``true``.
 
+* ``default = <task>``
+
+  When invoked without any arguments, Jolt by default tries to build a
+  task called ``default``. The name of the default task can be overridden
+  by setting this configuration key.
+
 * ``download = <boolean>``
 
   Configures if Jolt is allowed to download artifacts from remote storage

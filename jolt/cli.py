@@ -60,21 +60,57 @@ class PluginGroup(click.Group):
         return click.Group.get_command(self, ctx, cmd_name)
 
 
-@click.group(cls=PluginGroup)
-@click.option("-v", "--verbose", is_flag=True, help="Verbose.")
-@click.option("-vv", "--extra-verbose", is_flag=True, help="Verbose.")
-@click.option("-c", "--config", "config_file", multiple=True, type=str, help="Extra configuration as file or section.key=value string")
-@click.option("-d", "--debug", is_flag=True, help="Attach debugger on exception", hidden=True)
-@click.option("-p", "--profile", is_flag=True, help="Profile code while running", hidden=True)
+@click.group(cls=PluginGroup, invoke_without_command=True)
+@click.option("-v", "--verbose", is_flag=True, help="Verbose output.")
+@click.option("-vv", "--extra-verbose", is_flag=True, help="Extra verbose output.")
+@click.option("-c", "--config", "config_file", multiple=True, type=str,
+              help="Load a configuration file or set a configuration key.")
+@click.option("-d", "--debug-exception", is_flag=True, hidden=True,
+              help="Attach debugger on exception")
+@click.option("-p", "--profile", is_flag=True, hidden=True,
+              help="Profile code while running")
+@click.option("-f", "--force", is_flag=True, default=False, hidden=True,
+              help="Force rebuild of target tasks.")
+@click.option("-s", "--salt", type=str, hidden=True,
+              help="Add salt as task influence.")
+@click.option("-g", "--debug", is_flag=True, default=False, hidden=True,
+              help="Start debug shell before executing task.")
+@click.option("-n", "--network", is_flag=True, default=False, hidden=True,
+              help="Build on network.")
+@click.option("-l", "--local", is_flag=True, default=False, hidden=True,
+              help="Disable all network operations.")
+@click.option("-k", "--keep-going", is_flag=True, default=False, hidden=True,
+              help="Build as many tasks as possible, don't abort on first failure.")
+@click.option("-j", "--jobs", type=int, default=1, hidden=True,
+              help="Number of tasks allowed to execute in parallel (1). ")
 @click.pass_context
-def cli(ctx, verbose, extra_verbose, config_file, debug, profile):
-    """ Jolt - a task execution tool. """
+def cli(ctx, verbose, extra_verbose, config_file, debug_exception, profile,
+        force, salt, debug, network, local, keep_going, jobs):
+    """
+    Jolt - a task execution tool.
+
+    When invoked without any commands and arguments, Jolt by default tries
+    to execute and build the artifact of a task called `default`. If the
+    default task doesn't exist this help text is printed. All other tasks
+    can be executed with the build command. Note that most build command
+    options can be used also when executing the default task without
+    specifying a command. See the build command help for details.
+
+    To execute the default task and its dependencies without stopping on
+    failures, run:
+
+      $ jolt -k
+
+    """
 
     global debug_enabled
-    debug_enabled = debug
+    debug_enabled = debug_exception
 
     log.verbose("Jolt host: {}", environ.get("HOSTNAME", "localhost"))
     log.verbose("Jolt install path: {}", fs.path.dirname(__file__))
+
+    if ctx.invoked_subcommand is None:
+        build = ctx.command.get_command(ctx, "build")
 
     manifest = JoltManifest()
     utils.call_and_catch(manifest.parse)
@@ -87,6 +123,17 @@ def cli(ctx, verbose, extra_verbose, config_file, debug, profile):
         TaskRegistry.get().add_task_class(cls)
     for cls in tests:
         TaskRegistry.get().add_test_class(cls)
+
+    # If no command is given, we default to building the default task.
+    # If the default task doesn't exist, help is printed inside build().
+    if ctx.invoked_subcommand is None:
+        task = config.get("jolt", "default", "default")
+        if TaskRegistry.get().get_task_class(task) is not None:
+            ctx.invoke(build, task=[task], force=force, salt=salt, debug=debug,
+                       network=network, local=local, keep_going=keep_going, jobs=jobs)
+        else:
+            print(cli.get_help(ctx))
+            sys.exit(1)
 
 
 def _autocomplete_tasks(ctx, args, incomplete):
@@ -126,9 +173,8 @@ def build(ctx, task, network, keep_going, identity, default, local,
           no_download, no_upload, download, upload, worker, force,
           salt, copy, debug, result, jobs):
     """
-    Execute specified task.
+    Execute a specific task.
 
-    <WIP>
     """
     raise_error_if(network and local,
                    "The -n and -l flags are mutually exclusive")
