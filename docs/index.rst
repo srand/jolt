@@ -18,3 +18,4 @@ plugins.
    configuration
    plugins
    reference
+   changelog
