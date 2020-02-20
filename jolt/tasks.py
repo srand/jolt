@@ -949,11 +949,11 @@ class _Test(Task):
             if isinstance(obj, Export):
                 export = copy.copy(obj)
                 setattr(self, key, export)
-                self._exports[key] = obj
+                self._exports[key] = param
             if isinstance(obj, Parameter):
                 param = copy.copy(obj)
                 setattr(self, key, param)
-                self._parameters[key] = obj
+                self._parameters[key] = param
 
     def _get_test_names(self):
         return [attrib for attrib in dir(self.test_cls)
