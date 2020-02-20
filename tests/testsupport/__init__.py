@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from copy import copy
+from copy import copy, deepcopy
 import os
 import re
 
@@ -10,26 +10,19 @@ from jolt import filesystem as fs
 from jolt.tasks import TaskRegistry
 
 
-def enable_network_testing(cls):
-    tests = [attrib for attrib in dir(cls) if attrib.startswith("test_")]
-
-    cls.requires = ["jolt/amqp/deployment"]
-
-
-    def with_net(method):
-        def _with_net(self):
-            self.network = True
-            if not self.network_enabled:
-                self.skipTest("network build requirements not fulfilled")
-            return method(self)
-        _with_net.__doc__ = method.__doc__
-        return _with_net
-
-    for test in tests:
-        method = copy(getattr(cls, test))
-        setattr(cls, test+"_network", with_net(method))
-
-    return cls
+def enable_network_testing(cls, storage_providers=None):
+    class Gen(TaskGenerator):
+        def generate(self):
+            classes = []
+            for storage in storage_providers or ["http", "ftp"]:
+                class Net(cls):
+                    network = True
+                    name = cls.name + "/" + storage
+                    requires = ["jolt/amqp/deployment:storage=" + storage]
+                classes.append(Net)
+            cls.requires = [c.name for c in classes]
+            return classes + [cls]
+    return Gen
 
 
 def skip_if_no_deployment(method):

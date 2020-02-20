@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 import os
 import time
 
@@ -8,9 +10,12 @@ from jolt import *
 @influence.files("../jolt/**/*.py")
 @influence.files("../**/*.conf")
 @influence.files("../docker/Dockerfile.*")
-@influence.files("../docker/docker-compose.yml")
-class Jolt(Task):
+@influence.files("../docker/docker-compose-amqp-{storage}.yml")
+@influence.files("../docker/config-amqp-{storage}.conf")
+class JoltAmqp(Task):
     name = "jolt/amqp"
+
+    storage = Parameter()
 
     def publish(self, artifact, tools):
         with tools.cwd(".."):
@@ -18,33 +23,22 @@ class Jolt(Task):
             artifact.collect("**/*.py")
             artifact.collect("README.rst")
             artifact.collect("docker/Dockerfile.*", flatten=True)
-            artifact.collect("docker/docker-compose.yml", flatten=True)
-            artifact.strings.config = """
-[jolt]
-upload = false
-
-[network]
-config = [volume]
-  path = /tmp/jolt-cache/jolt
-
-[artifactory]
-uri = http://nginx-service.localhost/
-
-[amqp]
-host = amqp-service.localhost
-"""
+            artifact.collect("docker/docker-compose-amqp-{storage}.yml", flatten=True)
+            artifact.strings.config = tools.read_file("docker/config-amqp-{storage}.conf")
 
 
 class AmqpWorker(Resource):
     name = "jolt/amqp/deployment"
 
-    requires = ["jolt/amqp"]
+    storage = Parameter()
+
+    requires = ["jolt/amqp:storage={storage}"]
 
     def acquire(self, artifact, deps, tools):
-        jolt = deps["jolt/amqp"]
+        jolt = deps["jolt/amqp:storage={storage}"]
         with tools.cwd(jolt.path):
             try:
-                tools.run("docker-compose up -d")
+                tools.run("docker-compose -f docker-compose-amqp-{storage}.yml up -d")
                 output = ""
                 while "Queue bound" not in output:
                     time.sleep(1)
@@ -58,7 +52,7 @@ class AmqpWorker(Resource):
 
 
     def release(self, artifact, deps, tools):
-        jolt = deps["jolt/amqp"]
+        jolt = deps["jolt/amqp:storage={storage}"]
         with tools.cwd(jolt.path):
             if artifact.active:
-                tools.run("docker-compose down --volumes")
+                tools.run("docker-compose -f docker-compose-amqp-{storage}.yml down --volumes")

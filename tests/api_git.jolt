@@ -15,7 +15,7 @@ class GitApi(testsupport.JoltTest):
 
     def _recipe(self):
         return "from jolt.plugins.ninja import *\nfrom jolt.plugins import git\n" + \
-            super(GitApi, self)._recipe()
+            super()._recipe()
 
     def append(self, filepath, content):
         self.tools.append_file(os.path.join(self.ws, filepath), content)
