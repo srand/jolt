@@ -1,6 +1,7 @@
 import copy
 import os
 import pygit2
+import re
 
 from jolt.tasks import Resource, WorkspaceResource, Parameter, BooleanParameter, Export, TaskRegistry
 from jolt.influence import HashInfluenceProvider, HashInfluenceRegistry, FileInfluence
@@ -101,6 +102,8 @@ class GitRepository(object):
         return self.is_indexed() and self.head() == rev
 
     def rev_parse(self, rev):
+        if re.match(r"[0-9a-f]{40}", rev):
+            return rev
         with self.tools.cwd(self.path):
             try:
                 commit, ref = self.repository.resolve_refish(rev)
