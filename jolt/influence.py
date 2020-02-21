@@ -97,7 +97,7 @@ def attribute(name, sort=False):
 
 class TaskSourceInfluence(HashInfluenceProvider):
     def __init__(self, funcname, obj=None):
-        self.name = "Source:" + funcname
+        self.name = "Source"
         self.funcname = funcname
         self.obj = obj
 
@@ -108,10 +108,10 @@ class TaskSourceInfluence(HashInfluenceProvider):
         else:
             func = utils.getattr_safe(obj.__class__, self.funcname)
         try:
-            return func.__influence
+            return func.__influence + ": " + self.funcname
         except AttributeError:
             func.__influence = utils.sha1(task._get_source(func))
-        return func.__influence
+        return func.__influence + ": " + self.funcname
 
 
 def source(name, obj=None):
@@ -141,6 +141,17 @@ def source(name, obj=None):
         cls._influence = _influence
         return cls
     return _decorate
+
+
+class TaskRequirementInfluence(HashInfluenceProvider):
+    name = "Requirement"
+
+    def __init__(self, proxy):
+        self._identity = proxy.identity
+        self._name = proxy.short_qualified_name
+
+    def get_influence(self, task):
+        return "{}: {}".format(self._identity,self._name)
 
 
 @HashInfluenceRegistry.Register

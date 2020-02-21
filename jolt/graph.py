@@ -8,7 +8,7 @@ import uuid
 
 from jolt.tasks import Alias, Resource, Export
 #from jolt.utils import *
-from jolt.influence import HashInfluenceRegistry
+from jolt.influence import HashInfluenceRegistry, TaskRequirementInfluence
 from jolt import log
 from jolt import utils
 from jolt import colors
@@ -73,16 +73,9 @@ class TaskProxy(object):
             return self.task.identity
 
         sha = hashlib.sha1()
-
         HashInfluenceRegistry.get().apply_all(self.task, sha)
-
-        for node in self.neighbors:
-            sha.update(node.identity.encode())
-
-        if self._extended_task:
-            sha.update(self._extended_task.identity.encode())
-
         self.task.identity = sha.hexdigest()
+
         return str(self.task.identity)
 
     @identity.setter
@@ -226,6 +219,10 @@ class TaskProxy(object):
             filter(lambda n: not n.is_alias() and (not n.is_resource() or \
                    dag.are_neighbors(self, n)),
                    self.descendants))
+
+        self.task.influence += [TaskRequirementInfluence(n) for n in self.neighbors]
+        if self.is_extension():
+            self.task.influence.append(TaskRequirementInfluence(self.get_extended_task()))
 
         return self.identity
 
