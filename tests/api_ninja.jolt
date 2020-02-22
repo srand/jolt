@@ -118,6 +118,32 @@ class NinjaApi(JoltTest):
         self.jolt("build lib:arg=1337 exe:arg=1337")
 
 
+    def test_headers(self):
+        """
+        --- file: test.h
+        #define TEST 0
+        --- file: test.cpp
+        #include "lib/test.h"
+        int main() {{return TEST;}}
+
+        --- tasks:
+        class Lib(CXXLibrary):
+            headers = ["test.h"]
+            publishapi = "include/lib/"
+
+            def publish(self, a, t):
+                super().publish(a, t)
+                a.cxxinfo.incpaths.append("include")
+
+        class Exe(CXXExecutable):
+            requires = "lib"
+            sources = ["test.cpp"]
+
+        ---
+        """
+        self.build("exe")
+
+
     def test_incpaths(self):
         """
         --- file: inc/test.h

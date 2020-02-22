@@ -3,7 +3,7 @@
 #include <cstdlib>
 #include <iostream>
 
-#include "lib.h"
+#include "lib/lib.h"
 
 
 int main()

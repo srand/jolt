@@ -700,7 +700,7 @@ class Task(TaskBase):
 
     def clean(self, tools):
         """
-        Cleans up resources and intermediate files and created by the task.
+        Cleans up resources and intermediate files created by the task.
 
         The method is invoked in response to the user running clean
         on the command line. It should restore the environment to its
@@ -768,8 +768,10 @@ class Task(TaskBase):
         """
         Invoked to start a debug shell.
 
-        The environment will be prepared with attributes exported by
-        task requirements.
+        The method prepares the environment with attributes exported by task requirement
+        artifacts. The shell is entered by passing the ``-g`` flag to the build command.
+
+        Task execution resumes normally when exiting the shell.
         """
         with tools.environ(PS1="jolt$ ") as env:
             subprocess.call(["bash", "--norc"], env=env, cwd=tools._cwd)

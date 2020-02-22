@@ -438,7 +438,7 @@ returning a message. The program calls this function and prints the message.
 
     #include <cstdlib>
     #include <iostream>
-    #include "message.h"
+    #include "lib/message.h"
 
     int main() {
       std::cout << message() << std::endl;
@@ -456,13 +456,9 @@ To build the library and the program we use this Jolt recipe:
 
     class Message(CXXLibrary):
         recipient = Parameter(default="world", help="Name of greeting recipient.")
+	headers = ["lib/message.h"]
         sources = ["lib/message.cpp"]
 	macros = ['RECIPIENT="{recipient}"']
-
-        def publish(self, artifact, tools):
-	    super(Message, self).publish(artifact, tools)
-            artifact.collect("lib/*.h", "include/", flatten=True)
-            artifact.cxxinfo.incpaths.append("include")
 
 
     class HelloWorld(CXXExecutable):
@@ -472,9 +468,26 @@ To build the library and the program we use this Jolt recipe:
 
 Jolt automatically configures include paths, link libraries, and other build
 attributes for the ``HelloWorld`` program based on metadata found in the artifact
-of the ``Message`` library task. In the example, the ``Message`` library sets up
-an include path to its published header file while linking metadata is
-automatically provided by ``CXXLibrary.publish``.
+of the ``Message`` library task. In the example, the ``Message`` library task relies
+upon ``CXXLibrary.publish`` to collect public headers and to export the required
+metadata such as include paths and linking information. Customization is possible
+by overriding the publish method as illustrated below. These two implementations
+of ``Message`` are equivalent.
+
+.. code-block:: python
+
+    class Message(CXXLibrary):
+        recipient = Parameter(default="world", help="Name of greeting recipient.")
+        sources = ["lib/message.*"]
+	macros = ['RECIPIENT="{recipient}"']
+
+	def publish(self, artifact, tools):
+	    with tools.cwd("{outdir}"):
+	        artifact.collect("*.a", "lib/")
+		artifact.cxxinfo.libpaths.append("lib")
+	    artifact.collect("lib/*.h", "include/")
+	    artifact.cxxinfo.incpaths.append("include")
+
 
 The ``cxxinfo`` artifact metadata can be used with other build systems too,
 such as CMake, Meson and Autotools. It enables your Ninja tasks to stay oblivious to

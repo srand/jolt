@@ -675,19 +675,6 @@ else:
     toolchain = GNUToolchain()
 
 
-@influence.attribute("asflags")
-@influence.attribute("cflags")
-@influence.attribute("cxxflags")
-@influence.attribute("depimports")
-@influence.attribute("incpaths")
-@influence.attribute("ldflags")
-@influence.attribute("libpaths")
-@influence.attribute("libraries")
-@influence.attribute("macros")
-@influence.attribute("sources")
-@influence.attribute("binary")
-@influence.attribute("publishdir")
-@influence.attribute("toolchain")
 class CXXProject(Task):
     """
 
@@ -805,6 +792,21 @@ class CXXProject(Task):
         self.macros = utils.as_list(utils.call_or_return(self, self.__class__._macros))
         self._pch_out = None
         self.publishdir = self.expand(self.__class__.publishdir or '')
+
+        self.influence.append(influence.TaskAttributeInfluence("asflags"))
+        self.influence.append(influence.TaskAttributeInfluence("cflags"))
+        self.influence.append(influence.TaskAttributeInfluence("cxxflags"))
+        self.influence.append(influence.TaskAttributeInfluence("depimports"))
+        self.influence.append(influence.TaskAttributeInfluence("incpaths"))
+        self.influence.append(influence.TaskAttributeInfluence("ldflags"))
+        self.influence.append(influence.TaskAttributeInfluence("libpaths"))
+        self.influence.append(influence.TaskAttributeInfluence("libraries"))
+        self.influence.append(influence.TaskAttributeInfluence("macros"))
+        self.influence.append(influence.TaskAttributeInfluence("sources"))
+        self.influence.append(influence.TaskAttributeInfluence("binary"))
+        self.influence.append(influence.TaskAttributeInfluence("publishdir"))
+        self.influence.append(influence.TaskAttributeInfluence("toolchain"))
+
         if self.source_influence:
             for source in self.sources:
                 self.influence.append(influence.FileInfluence(source))
@@ -988,6 +990,16 @@ if __name__ == "__main__":
         tools.rmtree(self.outdir, ignore_errors=True)
 
     def run(self, deps, tools):
+        """
+        Generates a Ninja build file and invokes Ninja to build the project.
+
+        The build file and all intermediate files are written to a build
+        directory within the workspace. By default, the directory persists
+        between different invokations of Jolt to allow projects to be built
+        incrementally. The behavior can be changed with the ``incremental``
+        class attribute.
+        """
+
         self._expand_sources()
         self.outdir = tools.builddir("ninja", self.incremental)
         self._write_ninja_file(self.outdir, deps, tools)
@@ -997,6 +1009,19 @@ if __name__ == "__main__":
         tools.run("ninja -d keepdepfile {2} -C {0} {1}", self.outdir, verbose, threads)
 
     def shell(self, deps, tools):
+        """
+        Invoked to start a debug shell.
+
+        The method prepares the environment with attributes exported by task requirement
+        artifacts. The shell is entered by passing the ``-g`` flag to the build command.
+
+        For Ninja tasks, a special ``compile`` command is made available inside
+        the shell. The command can be used to compile individual source files which
+        is useful when troubleshooting compilation errors. Run ``compile -h`` for
+        help.
+
+        Task execution resumes normally when exiting the shell.
+        """
         self._expand_sources()
         self.outdir = tools.builddir("ninja", self.incremental)
         self._write_ninja_file(self.outdir, deps, tools)
@@ -1008,7 +1033,6 @@ if __name__ == "__main__":
             super(CXXProject, self).shell(deps, tools)
 
 
-@influence.attribute("shared")
 class CXXLibrary(CXXProject):
     """
     Builds a C/C++ library.
@@ -1017,11 +1041,28 @@ class CXXLibrary(CXXProject):
     abstract = True
     shared = False
 
+    headers = []
+    """ List of public headers to be published with the artifact """
+
+    publishapi = "include/"
+    """ The artifact path where public headers are published. """
+
     publishdir = "lib/"
     """ The artifact path where the library is published. """
 
     def __init__(self, *args, **kwargs):
         super(CXXLibrary, self).__init__(*args, **kwargs)
+        self.headers = utils.as_list(utils.call_or_return(self, self.__class__._headers))
+        self.publishlib = self.publishdir
+        if self.source_influence:
+            for header in self.headers:
+                self.influence.append(influence.FileInfluence(header))
+        self.influence.append(influence.TaskAttributeInfluence("headers"))
+        self.influence.append(influence.TaskAttributeInfluence("publishapi"))
+        self.influence.append(influence.TaskAttributeInfluence("shared"))
+
+    def _headers(self):
+        return utils.call_or_return(self, self.__class__.headers)
 
     def _populate_inputs(self, writer, deps, tools):
         self.depimports += self.toolchain.depimport.build(self, writer, deps)
@@ -1034,12 +1075,31 @@ class CXXLibrary(CXXProject):
             self.outfiles = self.toolchain.archiver.build(self, writer, self.objects)
 
     def publish(self, artifact, tools):
+        """
+        Publishes the library.
+
+        By default, the library is collected into a directory as specified
+        by the ``publishdir`` class attribute. Library path metadata
+        for this directory as well as linking metadata is automatically exported.
+        The relative path of the library within the artifact is also exported as
+        a metadata string. It can be read by consumers by accessing
+        ``artifact.strings.library``.
+
+        Public headers listed in the ``headers`` class attribute are collected into
+        a directory as specified by the ``publishapi`` class attribute.
+        Include path metadata for this directory is automatically exported.
+
+        """
         with tools.cwd(self.outdir):
-            artifact.collect("*{binary}.a", self.publishdir)
-            artifact.collect("*{binary}.dll", self.publishdir)
-            artifact.collect("*{binary}.lib", self.publishdir)
-            artifact.collect("*{binary}.so", self.publishdir)
-        artifact.cxxinfo.libpaths.append(self.publishdir)
+            artifact.collect("*{binary}.a", self.publishlib)
+            artifact.collect("*{binary}.dll", self.publishlib)
+            artifact.collect("*{binary}.lib", self.publishlib)
+            artifact.collect("*{binary}.so", self.publishlib)
+        if self.headers:
+            for header in self.headers:
+                artifact.collect(header, self.publishapi)
+            artifact.cxxinfo.incpaths.append(self.publishapi)
+        artifact.cxxinfo.libpaths.append(self.publishlib)
         artifact.cxxinfo.libraries.append(self.binary)
         artifact.strings.library = fs.path.join(
             self.publishdir, fs.path.basename(self.outfiles[0]))
@@ -1047,7 +1107,6 @@ class CXXLibrary(CXXProject):
 CXXLibrary.__doc__ += CXXProject.__doc__
 
 
-@influence.attribute("strip")
 class CXXExecutable(CXXProject):
     """
     Builds a C/C++ executable.
@@ -1065,6 +1124,7 @@ class CXXExecutable(CXXProject):
     def __init__(self, *args, **kwargs):
         super(CXXExecutable, self).__init__(*args, **kwargs)
         self.strip = utils.call_or_return(self, self.__class__._strip)
+        self.influence.append(influence.TaskAttributeInfluence("strip"))
 
     def _populate_inputs(self, writer, deps, tools):
         self.depimports += self.toolchain.depimport.build(self, writer, deps)
@@ -1077,6 +1137,19 @@ class CXXExecutable(CXXProject):
         return utils.call_or_return(self, self.__class__.strip)
 
     def publish(self, artifact, tools):
+        """
+        Publishes the linked executable.
+
+        By default, the executable is collected into a directory as specified
+        by the ``publishdir`` class attribute. The relative path of the executable
+        within the artifact is exported as a metadata string. It can be read by
+        consumers by accessing ``artifact.strings.executable``.
+
+        The method appends the ``PATH`` environment variable with the path to
+        the executable to allow consumers to run it easily.
+
+        """
+
         with tools.cwd(self.outdir):
             if os.name == "nt":
                 artifact.collect(self.binary + '.exe', self.publishdir)

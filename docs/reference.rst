@@ -223,11 +223,14 @@ CXXExecutable
   .. autoattribute:: CXXProject.cxxflags
   .. autoattribute:: CXXProject.incpaths
   .. autoattribute:: CXXProject.incremental
-  .. autoattribute:: ldflags
-  .. autoattribute:: libpaths
-  .. autoattribute:: libraries
+  .. autoattribute:: CXXProject.ldflags
+  .. autoattribute:: CXXProject.libpaths
+  .. autoattribute:: CXXProject.libraries
   .. autoattribute:: CXXProject.macros
-  .. autoattribute:: publishdir
+  .. autoattribute:: CXXExecutable.publishdir
+  .. automethod:: CXXLibrary.publish
+  .. automethod:: CXXProject.run
+  .. automethod:: CXXProject.shell
   .. autoattribute:: CXXProject.sources
   .. autoattribute:: CXXProject.source_influence
 
@@ -244,12 +247,21 @@ CXXLibrary
   .. autoattribute:: CXXProject.binary
   .. autoattribute:: CXXProject.cflags
   .. autoattribute:: CXXProject.cxxflags
+  .. autoattribute:: CXXLibrary.headers
   .. autoattribute:: CXXProject.incpaths
   .. autoattribute:: CXXProject.incremental
+  .. autoattribute:: CXXProject.ldflags
+  .. autoattribute:: CXXProject.libpaths
+  .. autoattribute:: CXXProject.libraries
   .. autoattribute:: CXXProject.macros
-  .. autoattribute:: publishdir
+  .. automethod:: CXXProject.run
+  .. autoattribute:: CXXLibrary.publishapi
+  .. autoattribute:: CXXLibrary.publishdir
+  .. automethod:: CXXLibrary.publish
+  .. automethod:: CXXProject.shell
   .. autoattribute:: CXXProject.sources
   .. autoattribute:: CXXProject.source_influence
+
 
 .. reference-ninja-cxxlibrary-end
 
@@ -265,5 +277,3 @@ Rule
 .. reference-ninja-rule-end
 
 .. reference-ninja-end
-
-

@@ -12,7 +12,7 @@ class Toolchain(Task):
     compiler = Parameter("msvc" if os.name == "nt" else "gcc")
 
     def publish(self, artifact, tools):
-        if self.compiler.get_value() == "gcc":
+        if self.compiler == "gcc":
             cflags = ""
             if self.debug.is_true:
                 cflags += " -g"
@@ -35,35 +35,32 @@ class Toolchain(Task):
                 artifact.environ.CC = "arm-linux-gnueabi-gcc"
                 artifact.environ.CXX = "arm-linux-gnueabi-g++"
                 artifact.environ.LD = "arm-linux-gnueabi-g++"
-
             artifact.environ.CFLAGS = cflags
             artifact.environ.CXXFLAGS = cflags
 
-        if self.compiler.get_value() == "msvc":
+        if self.compiler == "msvc":
             cflags = "/EHsc "
-
             artifact.environ.CFLAGS = cflags
             artifact.environ.CXXFLAGS = cflags
-
 
 
 class Lib(CXXLibrary):
     requires = "toolchain"
-    sources = "lib/*"
-    rename = Rule("cp $in $out", infiles=[".x"], outfiles=["{outdir}/{in_path}/{in_base}.c"])
+    headers = "lib/*.h"
+    sources = ["lib/*.cpp", "lib/*.x"]
     recipient = Parameter("world")
     macros = ['RECIPIENT="{recipient}"']
-
-    def publish(self, artifact, tools):
-        super(Lib, self).publish(artifact, tools)
-        artifact.collect("lib/*.h", "include/", flatten=True)
-        artifact.cxxinfo.incpaths.append("include")
+    rename_rule = Rule("cp $in $out", infiles=[".x"], outfiles=["{outdir}/{in_path}/{in_base}.c"])
 
 
 class Exe(CXXExecutable):
     binary = "executable"
     requires = "lib"
-    sources = "test.cpp"
+    sources = "exe/test.cpp"
+
+
+class Default(Alias):
+    requires = "exe"
 
 
 # jolt build exe -d toolchain:arch=x86,debug=true
