@@ -290,3 +290,19 @@ class TaskApi(JoltTest):
         ---
         """
         self.jolt("build log")
+
+    def test_prerequisites(self):
+        """
+        --- tasks:
+        @prerequisite.command("echo hello", "hello")
+        class Pass(Task):
+            pass
+
+        @prerequisite.command("echo hello", "hello2")
+        class Fail(Task):
+            pass
+        ---
+        """
+        self.build("pass")
+        with self.assertRaises(Exception, msg="unsatisfied"):
+            self.build("fail")

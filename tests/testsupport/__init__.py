@@ -76,6 +76,7 @@ class JoltTest(Test):
         with tools.cwd(self.ws):
             tools.write_file("test.jolt", """
 from jolt import *
+from jolt import prerequisite
 from jolt.error import raise_error_if
 from jolt.influence import global_string
 global_string("{test}")

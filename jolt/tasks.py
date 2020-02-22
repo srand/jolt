@@ -477,6 +477,9 @@ class TaskBase(object):
     name = None
     """ Name of the task. Derived from class name if not set. """
 
+    prerequisites = []
+    """ List of prerequisites that must be satisfied before task can execute. """
+
     requires = []
     """ List of dependencies to other tasks. """
 
@@ -531,12 +534,21 @@ class TaskBase(object):
         self.influence.append(TaskSourceInfluence("run"))
         self.influence.append(TaskSourceInfluence("unpack"))
         self.influence.append(TaintInfluenceProvider())
+        self.prerequisites = utils.call_or_return_list(self, self.__class__._prerequisites)
         self.requires = self.expand(utils.call_or_return_list(self, self.__class__._requires))
         self.selfsustained = utils.call_or_return(self, self.__class__._selfsustained)
         self.tools = Tools(self, self.joltdir)
 
     def _influence(self):
         return utils.as_list(self.__class__.influence)
+
+    def _prerequisites(self):
+        return utils.call_or_return_list(self, self.__class__.prerequisites)
+
+    def check_prerequisites(self):
+        for prereq in self.prerequisites:
+            raise_task_error_if(not prereq.is_satisfied(), self,
+                                "unsatisfied task prerequisite: {}", prereq)
 
     def _requires(self):
         return utils.call_or_return_list(self, self.__class__.requires)

@@ -303,6 +303,7 @@ class TaskProxy(object):
                     with cache.get_context(self) as context:
                         self.running()
                         with self.tools.cwd(self.task.joltdir):
+                            self.task.check_prerequisites()
                             if self.is_goal() and self.options.debug:
                                 log.info("Entering debug shell")
                                 self.task.shell(context, self.tools)
