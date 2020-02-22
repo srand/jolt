@@ -4,6 +4,7 @@ try:
     from StringIO import StringIO
 except:
     from io import StringIO
+import os
 
 from jolt import filesystem as fs
 from jolt import utils
@@ -176,6 +177,13 @@ def get_logpath():
 
 def get_cachedir():
     return get("jolt", "cachedir") or fs.path.join(fs.path.expanduser("~"), ".cache", "jolt")
+
+
+def get_shell():
+    cmd = os.getenv("SHELL", "bash")
+    if "bash" in cmd:
+        cmd = cmd + " --norc"
+    return get("jolt", "shell", cmd)
 
 
 def set(section, key, value, alias=None):

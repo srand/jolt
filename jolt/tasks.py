@@ -774,7 +774,8 @@ class Task(TaskBase):
         Task execution resumes normally when exiting the shell.
         """
         with tools.environ(PS1="jolt$ ") as env:
-            subprocess.call(["bash", "--norc"], env=env, cwd=tools._cwd)
+            from jolt import config
+            subprocess.call(config.get_shell().split(), env=env, cwd=tools._cwd)
 
 
 class Resource(Task):

@@ -61,6 +61,10 @@ The ``[jolt]`` config section contains global configuration.
   A list of one or more directory names, separated by colon, specifying
   additional search paths for plugins.
 
+* ``shell = <str>``
+
+  The shell to use when entering the interactive task debug shell.
+
 * ``threads = <integer>``
   Used to limit the number of threads used by third party tools such as Ninja.
   The environment variable ``JOLT_THREADS`` can also be used.
@@ -71,6 +75,7 @@ The ``[jolt]`` config section contains global configuration.
   local machine. The environment variable ``JOLT_PARALLEL_TASKS`` can also
   be used as well as the ``-j/--jobs`` build command option.
   The default value is 1.
+
 
 Network
 --------
