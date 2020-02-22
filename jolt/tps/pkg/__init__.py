@@ -1,3 +1,0 @@
-import jenkins
-
-jenkins = jenkins
