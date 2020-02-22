@@ -199,12 +199,12 @@ class JoltLoader(object):
 
         import jolt.plugins
 
-        for section in config.sections():
+        for plugin in config.plugins():
             for path in searchpath:
-                if "jolt.plugins." + section not in sys.modules:
-                    module = fs.path.join(fs.path.dirname(__file__), path, section + ".py")
+                if "jolt.plugins." + plugin not in sys.modules:
+                    module = fs.path.join(fs.path.dirname(__file__), path, plugin + ".py")
                     if fs.path.exists(module):
-                        imp.load_source("jolt.plugins." + section, module)
+                        imp.load_source("jolt.plugins." + plugin, module)
                         continue
 
     @property

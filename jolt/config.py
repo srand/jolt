@@ -14,102 +14,218 @@ from jolt.manifest import ManifestExtension, ManifestExtensionRegistry
 location = fs.path.join(fs.path.expanduser("~"), ".config", "jolt", "config")
 location_user = fs.path.join(fs.path.expanduser("~"), ".config", "jolt", "user")
 
-_file = SafeConfigParser()
-_file.read(location)
-_file.read(location_user)
 
-if not _file.has_section("jolt"):
-    _file.add_section("jolt")
-if not _file.has_section("cxxinfo"):
-    _file.add_section("cxxinfo")
-if not _file.has_section("environ"):
-    _file.add_section("environ")
-if not _file.has_section("python"):
-    _file.add_section("python")
-if not _file.has_section("strings"):
-    _file.add_section("strings")
+class ConfigFile(SafeConfigParser):
+    def __init__(self, location, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._location = location
+        if location is not None:
+            dirname = fs.path.dirname(location)
+            if dirname:
+                fs.makedirs(dirname)
 
-def get(section, key, default=None, expand=True):
-    try:
-        value = _file.get(section, key)
-        return utils.expand(value) if expand else value
-    except (NoOptionError, NoSectionError):
+    def load(self):
+        if self._location:
+            super().read(self._location)
+            if not self.has_section("jolt"):
+                self.add_section("jolt")
+
+    def save(self):
+        if self._location is None:
+            return
+        with open(self._location, 'w') as configfile:
+            super().write(configfile)
+
+    def delete(self, section, key):
+        if key is None:
+            return self.remove_section(section)
+        try:
+            success = self.remove_option(section, key)
+            if success and len(self[section].items()) <= 0:
+                self.remove_section(section)
+            return success
+        except NoSectionError:
+            return False
+
+    def set(self, section, key, value):
+        if not self.has_section(section):
+            self.add_section(section)
+        super().set(section, key, value)
+
+
+class Config(object):
+    def __init__(self):
+        self._configs = []
+
+    def configs(self, alias=None):
+        if alias:
+            for name, config in self._configs:
+                if name == alias:
+                    return [config]
+            return []
+        return [config for _, config in self._configs]
+
+    def add_file(self, alias, location):
+        file = ConfigFile(location)
+        self._configs.append((alias, file))
+        return file
+
+    def get(self, section, key, default, alias=None):
+        for config in reversed(self.configs(alias)):
+            try:
+                return config.get(section, key)
+            except (NoOptionError, NoSectionError):
+                continue
         return default
 
-def getint(section, key, default=None):
-    try:
-        return _file.getint(section, key)
-    except (NoOptionError, NoSectionError):
-        return default
+    def set(self, section, key, value, alias=None):
+        count = 0
+        for config in self.configs(alias):
+            config.set(section, key, value)
+            count += 1
+        return count
 
-def getsize(section, key, default=None):
+    def delete(self, section, key, alias=None):
+        count = 0
+        for config in self.configs(alias):
+            count += int(config.delete(section, key))
+        return count
+
+    def sections(self, alias=None):
+        s = []
+        for config in self.configs(alias):
+            s += config.sections()
+        return sorted(s)
+
+    def options(self, section, alias=None):
+        s = []
+        for config in self.configs(alias):
+            if config.has_section(section):
+                s += config[section].items()
+        return sorted(s)
+
+    def items(self, alias=None):
+        o = {}
+        for section in self.sections(alias):
+            for option, value in self.options(section):
+                o[(section, option)] = value
+            if not o:
+                o[(section, None)] = None
+        return [(section, option, value) for (section, option), value in o.items()]
+
+    def load(self):
+        for config in self.configs():
+            config.load()
+
+    def save(self):
+        for config in self.configs():
+            config.save()
+
+
+_config = Config()
+_config.add_file("global", location)
+_config.add_file("user", location_user)
+_config.add_file("cli", None)
+_config.load()
+
+
+def get(section, key, default=None, expand=True, alias=None):
+    val = _config.get(section, key, default, alias)
+    return utils.expand(val) if expand and val is not None else val
+
+
+def getint(section, key, default=None, alias=None):
+    return int(_config.get(section, key, default, alias))
+
+
+def getsize(section, key, default=None, alias=None):
     units = {"B": 1, "K": 1024, "M": 1024**2, "G": 1024**3, "T": 1024**4}
-    try:
-        value = _file.get(section, key)
-        value = value.strip()
-        value = value.split()
-        if len(value) == 1 and value[0][-1] in units:
-            size, unit = value[0][:-1], value[0][-1]
-        else:
-            raise_error_if(
-                len(value) != 2,
-                "config: size invalid for '{0}.{1}', expected '<size> <unit>'", section, key)
-            size, unit = value[0], value[1]
+    value = _config.get(section, key, None, alias)
+    if value is None:
+        return default
+    value = value.strip()
+    value = value.split()
+    if len(value) == 1 and value[0][-1] in units:
+        size, unit = value[0][:-1], value[0][-1]
+    else:
         raise_error_if(
-            unit not in units,
-            "config: unit invalid for '{0}.{1}', expected [B,K,M,G,T]", section, key)
-        return int(size)*units[unit]
-    except (NoOptionError, NoSectionError):
-        return default
+            len(value) != 2,
+            "config: size '{2}' invalid for '{0}.{1}', expected '<size> <unit>'", value, section, key)
+        size, unit = value[0], value[1]
+    raise_error_if(
+        unit not in units,
+        "config: unit invalid for '{0}.{1}', expected [B,K,M,G,T]", section, key)
+    return int(size)*units[unit]
 
-def getfloat(section, key, default=None):
-    try:
-        return _file.getfloat(section, key)
-    except (NoOptionError, NoSectionError):
-        return default
 
-def getboolean(section, key, default=None):
-    try:
-        return _file.getboolean(section, key)
-    except (NoOptionError, NoSectionError):
-        return default
+def getfloat(section, key, default=None, alias=None):
+    return float(_config.get(section, key, default, alias))
+
+
+def getboolean(section, key, default=None, alias=None):
+    return bool(_config.get(section, key, default, alias))
+
 
 def get_jolthome():
     return fs.path.join(fs.path.expanduser("~"), ".jolt")
 
+
 def get_logpath():
     return get_jolthome()
+
 
 def get_cachedir():
     return get("jolt", "cachedir") or fs.path.join(fs.path.expanduser("~"), ".cache", "jolt")
 
-def set(section, key, value):
-    if not _file.has_section(section):
-        _file.add_section(section)
-    _file.set(section, key, value)
+
+def set(section, key, value, alias=None):
+    _config.set(section, key, value, alias or "user")
+
 
 def load(file):
-    _file.read(file)
+    _config.load()
+
 
 def load_or_set(file_or_str):
     if fs.path.exists(file_or_str):
-        _file.read(file_or_str)
+        _config.add_file("cli", file_or_str)
+        _config.load()
     else:
         key_value = file_or_str.split("=", 1)
         raise_error_if(len(key_value) <= 1, "syntax error in configuration: '{}'".format(file_or_str))
         section_key = key_value[0].split(".", 1)
         raise_error_if(len(section_key) <= 1, "syntax error in configuration: '{}'".format(file_or_str))
-        set(section_key[0], section_key[1], key_value[1])
+        _config.set(section_key[0], section_key[1], key_value[1], alias="cli")
+
 
 def save():
-    fs.makedirs(fs.path.dirname(location))
-    config = StringIO()
-    _file.write(config)
-    with open(location, 'wb') as configfile:
-        configfile.write(config.getvalue().encode())
+    _config.save()
 
-def sections():
-    return _file.sections()
+
+def delete(key, alias=None):
+    section, option = split(key)
+    return _config.delete(section, option, alias)
+
+
+def sections(alias=None):
+    return _config.sections(alias)
+
+
+def plugins():
+    automatic = ["cxxinfo", "environ", "python", "strings"]
+    return sections() + automatic
+
+
+def items(alias=None):
+    return _config.items(alias)
+
+
+def split(string):
+    try:
+        section, key = string.split(".", 1)
+    except ValueError:
+        section, key = string, None
+    return section, key
 
 
 class ConfigExtension(ManifestExtension):
@@ -118,7 +234,7 @@ class ConfigExtension(ManifestExtension):
 
     def import_manifest(self, manifest):
         if manifest.config:
-            _file.read_string(manifest.config)
+            _global.read_string(manifest.config)
             from jolt.loader import JoltLoader
             JoltLoader.get().load_plugins()
 

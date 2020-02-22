@@ -372,6 +372,118 @@ def clean(ctx, task, deps, expired):
         acache.discard_all(expired)
 
 
+@cli.command(name="config")
+@click.option("-l", "--list", is_flag=True,
+              help="List all configuration keys and values.")
+@click.option("-d", "--delete", is_flag=True,
+              help="Delete configuration key.")
+@click.option("-g", "--global", "global_", is_flag=True,
+              help="List, set or get configuration keys in the global config.")
+@click.option("-u", "--user", is_flag=True,
+              help="List, set or get configuration keys in the user config.")
+@click.argument("key", type=str, nargs=1, required=False)
+@click.argument("value", type=str, nargs=1, required=False)
+@click.pass_context
+def _config(ctx, list, delete, global_, user, key, value):
+    """
+    Configure Jolt.
+
+    You can query/set/replace/unset configuration keys with this command.
+    Key strings are constructed from the configuration section and the
+    option separated by a dot.
+
+    There are tree different configuration sources:
+
+       - A global configuration file
+
+       - A user configuration file
+
+       - Temporary configuration passed on the command line.
+
+    When reading, the values are read from all configuration sources.
+    The options --global and --user can be used to tell the command to read
+    from only one of the sources. If a configuration key is available from
+    multiple sources, temporary CLI configuration has priority followed by
+    the user configuration file and lastly the global configuration file.
+
+    When writing, the new values are written to the user configuration by default.
+    The options --global and --user can be used to tell the command to write
+    to only one of the sources.
+
+    When removing keys, the values are removed from all sources.
+    The options --global and --user can be used to restrict removal to one of
+    the sources.
+
+    To assign a value to a key:
+
+      $ jolt config jolt.default all   # Change name of the default task
+
+    To list existing keys:
+
+      $ jolt config -l                 # List all existing keys
+
+      $ jolt config -l -g              # List keys in the global config file
+
+      $ jolt config jolt.colors        # Display the value of a key.
+
+    To delete an existing key:
+
+      $ jolt config -d jolt.colors
+
+    To pass temporary configuration:
+
+      $ jolt -c jolt.colors=true config -l
+
+    """
+
+    if delete and not key:
+        raise click.UsageError("--delete requires KEY")
+
+    if not key and not list and not key:
+        print(ctx.get_help())
+        sys.exit(1)
+
+    if global_ and user:
+        raise click.UsageError("--global and --user are mutually exclusive")
+
+    alias = None
+
+    if global_:
+        alias = "global"
+    if user:
+        alias = "user"
+
+    def _print_key(section, opt):
+        value = config.get(section, opt, alias=alias)
+        assert value is not None, "no such key: {}".format(key)
+        print("{} = {}".format(key, value))
+
+    if list:
+        for section, option, value in config.items(alias):
+            if option:
+                print("{}.{} = {}".format(section, option, value))
+            else:
+                print(section)
+    elif delete:
+        raise_error_if(config.delete(key, alias) <= 0,
+                       "no such key: {}", key)
+        config.save()
+    elif key:
+        try:
+            section, opt = config.split(key)
+            if value:
+                config.set(section, opt, value, alias)
+                config.save()
+            else:
+                if opt:
+                    _print_key(section, opt)
+                else:
+                    _print_section(section)
+        except:
+            log.exception()
+            assert False, "no such key: {}".format(key)
+
+
 @cli.command()
 @click.argument("task", type=str, nargs=-1, required=False, autocompletion=_autocomplete_tasks)
 @click.option("-p", "--prune", is_flag=True, help="Omit tasks with cached artifacts.")

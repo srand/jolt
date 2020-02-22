@@ -326,7 +326,7 @@ class ExecutorFactory(object):
 
 class LocalExecutorFactory(ExecutorFactory):
     def __init__(self, options=None):
-        max_workers = config.get(
+        max_workers = config.getint(
             "jolt", "parallel_tasks",
             os.getenv("JOLT_PARALLEL_TASKS", 1 if options is None else options.jobs))
         super(LocalExecutorFactory, self).__init__(
