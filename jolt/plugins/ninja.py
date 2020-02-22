@@ -10,7 +10,7 @@ from jolt import influence
 from jolt import log
 from jolt import utils
 from jolt import filesystem as fs
-from jolt.error import raise_task_error_if
+from jolt.error import raise_task_error_if, JoltCommandError
 
 
 class Variable(object):
@@ -989,6 +989,13 @@ if __name__ == "__main__":
         self.outdir = tools.builddir("ninja", self.incremental)
         tools.rmtree(self.outdir, ignore_errors=True)
 
+    def _get_keepdepfile(self, tools):
+        try:
+            tools.run("ninja -d list", output=False)
+        except JoltCommandError as e:
+            return " -d keepdepfile" if "keepdepfile" in "".join(e.stdout) else ""
+        return ""
+
     def run(self, deps, tools):
         """
         Generates a Ninja build file and invokes Ninja to build the project.
@@ -1003,10 +1010,11 @@ if __name__ == "__main__":
         self._expand_sources()
         self.outdir = tools.builddir("ninja", self.incremental)
         self._write_ninja_file(self.outdir, deps, tools)
-        verbose = "-v" if log.is_verbose() else ""
+        verbose = " -v" if log.is_verbose() else ""
         threads = config.get("jolt", "threads", tools.getenv("JOLT_THREADS", None))
         threads = "-j " + threads if threads else ""
-        tools.run("ninja -d keepdepfile {2} -C {0} {1}", self.outdir, verbose, threads)
+        depsfile = self._get_keepdepfile(tools)
+        tools.run("ninja{3}{2} -C {0} {1}", self.outdir, verbose, threads, depsfile)
 
     def shell(self, deps, tools):
         """
