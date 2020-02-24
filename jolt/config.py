@@ -127,6 +127,7 @@ _config = Config()
 _config.add_file("global", location)
 _config.add_file("user", location_user)
 _config.add_file("cli", None)
+_manifest = _config.add_file("manifest", None)
 _config.load()
 
 
@@ -242,7 +243,7 @@ class ConfigExtension(ManifestExtension):
 
     def import_manifest(self, manifest):
         if manifest.config:
-            _global.read_string(manifest.config)
+            _manifest.read_string(manifest.config)
             from jolt.loader import JoltLoader
             JoltLoader.get().load_plugins()
 
