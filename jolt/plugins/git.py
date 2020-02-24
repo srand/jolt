@@ -133,7 +133,7 @@ class GitRepository(object):
 
     def tree_hash(self, sha="HEAD", path="/"):
         path = fs.path.normpath(path)
-        full_path = fs.path.join(self.path, path)
+        full_path = fs.path.join(self.path, path) if path != "/" else self.path
         value = _tree_hash_cache.get((full_path, sha))
         if value is None:
             if sha == "HEAD":

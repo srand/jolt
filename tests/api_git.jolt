@@ -115,3 +115,112 @@ class GitApi(testsupport.JoltTest):
         self.append("hello_world/01_hello_world/hello.c", '#error "xfailx"\n')
         r = self.build("exe")
         self.assertNoBuild(r, "exe")
+
+    def test_influence_copies(self):
+        """
+        --- tasks:
+        class A(Task):
+            requires = ["git:url=https://github.com/gideont/hello_world.git,path=a"]
+        class B(Task):
+            requires = ["git:url=https://github.com/gideont/hello_world.git,path=b"]
+        ---
+        """
+        r1 = self.build("a b")
+        orig = self.artifacts(r1)
+        self.assertEqual(len(orig), 2)
+
+        self.tools.write_file("{ws}/a/file.txt", "data")
+        r2 = self.build("a b")
+        a2 = self.artifacts(r2)
+        self.assertBuild(r2, "a")
+        self.assertNoBuild(r2, "b")
+        self.assertEqual(len(set(orig).intersection(set(a2))), 1)
+
+        self.tools.run("rm {ws}/a/file.txt")
+        self.tools.write_file("{ws}/b/file.txt", "data")
+        r3 = self.build("a b")
+        a3 = self.artifacts(r2)
+        self.assertNoBuild(r3, "a")
+        self.assertBuild(r3, "b")
+        self.assertEqual(len(set(orig).intersection(set(a3))), 1)
+
+        self.tools.run("rm {ws}/b/file.txt")
+        r4 = self.build("a b")
+        self.assertNoBuild(r4, "a")
+        self.assertNoBuild(r4, "b")
+        reverted = self.artifacts(r4)
+        self.assertEqual(orig, reverted)
+
+    def test_explicit_influence_copies(self):
+        """
+        --- tasks:
+        @git.influence("a")
+        class A(Task):
+            requires = ["git-src:url=https://github.com/gideont/hello_world.git,path=a"]
+        @git.influence("b")
+        class B(Task):
+            requires = ["git-src:url=https://github.com/gideont/hello_world.git,path=b"]
+        ---
+        """
+        r1 = self.build("a b")
+        orig = self.artifacts(r1)
+        self.assertEqual(len(orig), 2)
+
+        self.tools.write_file("{ws}/a/file.txt", "data")
+        r2 = self.build("a b")
+        a2 = self.artifacts(r2)
+        self.assertBuild(r2, "a")
+        self.assertNoBuild(r2, "b")
+        self.assertEqual(len(set(orig).intersection(set(a2))), 1)
+
+        self.tools.run("rm {ws}/a/file.txt")
+        self.tools.write_file("{ws}/b/file.txt", "data")
+        r3 = self.build("a b")
+        a3 = self.artifacts(r2)
+        self.assertNoBuild(r3, "a")
+        self.assertBuild(r3, "b")
+        self.assertEqual(len(set(orig).intersection(set(a3))), 1)
+
+        self.tools.run("rm {ws}/b/file.txt")
+        r4 = self.build("a b")
+        self.assertNoBuild(r4, "a")
+        self.assertNoBuild(r4, "b")
+        reverted = self.artifacts(r4)
+        self.assertEqual(orig, reverted)
+
+    def test_explicit_influence_copies_subdir(self):
+        """
+        --- tasks:
+        @git.influence("a/01_hello_world")
+        class A(Task):
+            requires = ["git-src:url=https://github.com/gideont/hello_world.git,path=a"]
+        @git.influence("b/01_hello_world")
+        class B(Task):
+            requires = ["git-src:url=https://github.com/gideont/hello_world.git,path=b"]
+        ---
+        """
+        r1 = self.build("a b")
+        orig = self.artifacts(r1)
+        self.assertEqual(len(orig), 2)
+
+        self.tools.write_file("{ws}/a/01_hello_world/file.txt", "data")
+        r2 = self.build("a b")
+        a2 = self.artifacts(r2)
+        self.assertBuild(r2, "a")
+        self.assertNoBuild(r2, "b")
+        self.assertEqual(len(set(orig).intersection(set(a2))), 1)
+
+        self.tools.run("rm {ws}/a/01_hello_world/file.txt")
+        self.tools.write_file("{ws}/b/01_hello_world/file.txt", "data")
+        r3 = self.build("a b")
+        a3 = self.artifacts(r2)
+        self.assertNoBuild(r3, "a")
+        self.assertBuild(r3, "b")
+        self.assertEqual(len(set(orig).intersection(set(a3))), 1)
+
+        self.tools.run("rm {ws}/b/01_hello_world/file.txt")
+        r4 = self.build("a b")
+        self.assertNoBuild(r4, "a")
+        self.assertNoBuild(r4, "b")
+        reverted = self.artifacts(r4)
+        self.assertEqual(orig, reverted)
