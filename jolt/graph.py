@@ -221,8 +221,6 @@ class TaskProxy(object):
                    self.descendants))
 
         self.task.influence += [TaskRequirementInfluence(n) for n in self.neighbors]
-        if self.is_extension():
-            self.task.influence.append(TaskRequirementInfluence(self.get_extended_task()))
 
         return self.identity
 
