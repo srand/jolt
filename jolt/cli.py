@@ -694,6 +694,7 @@ def info(ctx, task, influence=False, artifacts=False, salt=None):
         tasks = dag.select(lambda graph, node: graph.is_root(node))
         assert len(tasks) == 1, "unexpected graph generated"
         proxy = tasks[0]
+        task = proxy.task
 
         click.echo("  Cache")
         click.echo("    Identity          {0}".format(proxy.identity))
