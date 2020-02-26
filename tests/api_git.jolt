@@ -20,6 +20,33 @@ class GitApi(testsupport.JoltTest):
     def append(self, filepath, content):
         self.tools.append_file(os.path.join(self.ws, filepath), content)
 
+    def test_diffsize(self):
+        """
+        --- tasks:
+        class Exe(CXXLibrary):
+            requires = ["git:url=https://github.com/gideont/hello_world.git"]
+            sources = ["hello_world/01_hello_world/*.c"]
+            source_influence = False
+        ---
+        """
+        if not self.network:
+            self.skipTest("network deployment required")
+        r = self.build("exe")
+
+        # Diff size below threshold
+        self.append("hello_world/01_hello_world/hello.c", ' ' * 0xFFF000)
+        r = self.build("exe")
+
+        # Diff size now above threshold
+        self.append("hello_world/01_hello_world/hello.c", ' ' * 0x2000)
+        with self.assertRaises(Exception, msg="diff size"):
+            r = self.build("exe")
+
+        # Diff size below threshold through explicit config key
+        self.append("hello_world/01_hello_world/hello.c", ' ' * 0x2000)
+        r = self.jolt("-c git.diffsize=2M build -n exe")
+
+
     def test_head(self):
         """
         --- tasks:

@@ -144,7 +144,10 @@ def getsize(section, key, default=None, alias=None):
     units = {"B": 1, "K": 1024, "M": 1024**2, "G": 1024**3, "T": 1024**4}
     value = _config.get(section, key, None, alias)
     if value is None:
-        return default
+        if type(default) == int:
+            return default
+        else:
+            value = str(default)
     value = value.strip()
     value = value.split()
     if len(value) == 1 and value[0][-1] in units:

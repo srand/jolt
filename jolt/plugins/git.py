@@ -7,6 +7,7 @@ from jolt.tasks import Resource, WorkspaceResource, Parameter, BooleanParameter,
 from jolt.influence import HashInfluenceProvider, HashInfluenceRegistry, FileInfluence
 from jolt.tools import Tools
 from jolt.loader import JoltLoader
+from jolt import config
 from jolt import filesystem as fs
 from jolt import log
 from jolt import utils
@@ -78,7 +79,13 @@ class GitRepository(object):
                                       output_rstrip=False)
 
     def diff(self, path="/"):
-        return self._diff(path) if self.is_indexed() else ""
+        d = self._diff(path) if self.is_indexed() else ""
+        dlim = config.getsize("git", "maxdiffsize", "1M")
+        raise_error_if(
+            len(d) > dlim,
+            "git patch for '{}' exceeds configured size limit of {} bytes - actual size {}"
+            .format(self.path, dlim, len(d)))
+        return d
 
     def patch(self, patch):
         if not patch:
