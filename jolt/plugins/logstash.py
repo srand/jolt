@@ -15,8 +15,8 @@ log.verbose("[LogStash] Loaded")
 class LogStashHooks(TaskHook):
     def __init__(self):
         self._uri = config.get("logstash", "http.uri")
-        self._failed_enabled = config.get("logstash", "failed", False)
-        self._finished_enabled = config.get("logstash", "finished", False)
+        self._failed_enabled = config.getboolean("logstash", "failed", False)
+        self._finished_enabled = config.getboolean("logstash", "finished", False)
         raise_error_if(not self._uri, "logstash.http.uri not configured")
 
     def _get_uri(self, task):
