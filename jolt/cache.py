@@ -675,6 +675,16 @@ class Context(object):
         """
 
         key = self._node.task.expand(key)
+
+        # Parameters may be unordered, sort them
+        key = utils.stable_task_name(key)
+
+        # Parameters may be overspecified, resolve task
+        if key not in self._artifacts_index:
+            from jolt.tasks import TaskRegistry
+            task = TaskRegistry.get().get_task(key)
+            key = task.short_qualified_name if task is not None else key
+
         raise_task_error_if(
             key not in self._artifacts_index,
             self._node,

@@ -290,3 +290,50 @@ class TaskApi(JoltTest):
         ---
         """
         self.jolt("build log")
+
+    def test_context_indexing(self):
+        """
+        --- tasks:
+        class A(Task):
+            a = Parameter()
+            b = Parameter("b")
+            c = Parameter("c")
+
+        class Pass1(Task):
+            requires = ["a:a=1"]
+
+            def run(self, deps, tools):
+                print(deps["a:a=1"].path)
+
+        class Pass2(Task):
+            requires = ["a:a=1"]
+
+            def run(self, deps, tools):
+                print(deps["a:a=1,b=b,c=c"].path)
+
+        class Pass3(Task):
+            requires = ["a:a=1"]
+
+            def run(self, deps, tools):
+                print(deps["a:a=1,b=b"].path)
+
+        class Pass4(Task):
+            requires = ["a:a=1"]
+
+            def run(self, deps, tools):
+                print(deps["a:b=b,a=1"].path)
+
+        class Fail1(Task):
+            requires = ["a:a=1"]
+
+            def run(self, deps, tools):
+                print(deps["a:a=1,b=1"].path)
+
+
+        class T1(Task):
+            requires = ["a"]
+        ---
+        """
+        self.build("pass1 pass2 pass3 pass4")
+        with self.assertRaises(Exception, msg="no such dependency"):
+            self.build("fail1")
