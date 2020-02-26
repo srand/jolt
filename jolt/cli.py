@@ -14,6 +14,7 @@ from jolt import log
 from jolt.log import logfile
 from jolt import config
 from jolt.loader import JoltLoader
+from jolt import tools
 from jolt import utils
 from jolt.influence import HashInfluenceRegistry
 from jolt.options import JoltOptions
@@ -614,7 +615,7 @@ def _list(ctx, task=None, reverse=False):
 
 @cli.command(name="log")
 @click.option("-f", "--follow", is_flag=True, help="Display log output as it appears")
-@click.option("-D", "--delete", is_flag=True, help="Delete the log file")
+@click.option("-d", "--delete", is_flag=True, help="Delete the log file")
 def _log(follow, delete):
     """
     Access the Jolt log file.
@@ -626,8 +627,12 @@ def _log(follow, delete):
     elif delete:
         fs.unlink(logfile)
     else:
-        subprocess.call("less {0}".format(logfile), shell=True)
-
+        t = tools.Tools()
+        configured_pager = config.get("jolt", "pager", os.getenv("PAGER", None))
+        for pager in [configured_pager, "less", "more", "cat"]:
+            if pager and t.which(pager):
+                return subprocess.call("{1} {0}".format(logfile, pager), shell=True)
+        print(t.read_file(logfile))
 
 @cli.command()
 @click.argument("task", autocompletion=_autocomplete_tasks)

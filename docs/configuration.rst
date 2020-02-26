@@ -56,6 +56,12 @@ The ``[jolt]`` config section contains global configuration.
   providers or not when building locally. The option has no effect on
   distributed network builds. The default value is ``true``.
 
+* ``pager = <str>``
+
+  The pager to use, e.g. when viewing the logfile. Defaults to
+  the PAGER environment variable followed by less, more and cat,
+  in that order.
+
 * ``pluginpath = <str>``
 
   A list of one or more directory names, separated by colon, specifying
