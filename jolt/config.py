@@ -165,7 +165,8 @@ def getfloat(section, key, default=None, alias=None):
 
 
 def getboolean(section, key, default=None, alias=None):
-    return bool(_config.get(section, key, default, alias))
+    value = _config.get(section, key, default, alias)
+    return value is not None and str(value).lower() in ["true", "yes", "on", "1"]
 
 
 def get_jolthome():
