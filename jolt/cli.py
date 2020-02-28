@@ -628,7 +628,7 @@ def _log(follow, delete):
         fs.unlink(logfile)
     else:
         t = tools.Tools()
-        configured_pager = config.get("jolt", "pager", os.getenv("PAGER", None))
+        configured_pager = config.get("jolt", "pager", environ.get("PAGER", None))
         for pager in [configured_pager, "less", "more", "cat"]:
             if pager and t.which(pager):
                 return subprocess.call("{1} {0}".format(logfile, pager), shell=True)
