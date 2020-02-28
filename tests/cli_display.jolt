@@ -1,0 +1,30 @@
+#!/usr/bin/env python3
+
+import re
+import sys
+import time
+sys.path.append(".")
+
+from testsupport import JoltTest
+
+
+class DisplayCli(JoltTest):
+    name = "cli/display"
+
+    def test_name(self):
+        """
+        --- tasks:
+        class ATask(Task):
+            pass
+
+        class BTask(Task):
+            requires = "atask"
+
+        class All(Task):
+            requires = "btask"
+        ---
+        """
+        r = self.jolt("display all")
+        self.assertIn("all", r)
+        self.assertIn("atask", r)
+        self.assertIn("btask", r)

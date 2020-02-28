@@ -10,6 +10,7 @@ class All(Alias):
         "api/tools",
         "cli/build",
 	"cli/config",
+        "cli/display",
         "cli/info",
         "cli/list",
         "cli/list",

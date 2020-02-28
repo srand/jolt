@@ -487,28 +487,35 @@ def _config(ctx, list, delete, global_, user, key, value):
 
 @cli.command()
 @click.argument("task", type=str, nargs=-1, required=False, autocompletion=_autocomplete_tasks)
-@click.option("-p", "--prune", is_flag=True, help="Omit tasks with cached artifacts.")
 @click.pass_context
-def display(ctx, task, prune):
+def display(ctx, task):
     """
     Display a task and its dependencies visually.
 
-    <WIP>
     """
     registry = TaskRegistry.get()
     gb = graph.GraphBuilder(registry, ctx.obj["manifest"])
     dag = gb.build(task, influence=False)
-    if prune:
-        acache = cache.ArtifactCache.get()
-        dag.prune(lambda graph, task: task.is_available_locally(acache) or task.is_resource())
     if dag.has_tasks():
-        try:
-            gb.display()
-        except JoltError as e:
-            raise e
-        except Exception as e:
-            raise_error_if("requires pygraphviz" in str(e), "this features requires pygraphviz, please install it")
-            raise_error("an exception occurred during task dependency evaluation, see log for details")
+        def _display(task, indent=0, last=None):
+            header = ""
+            if indent > 0:
+                for pipe in last[:-1]:
+                    if pipe:
+                        header += "\u2502 "
+                    else:
+                        header += "  "
+                if last[-1]:
+                    header += "\u251c\u2574"
+                else:
+                    header += "\u2514\u2574"
+
+
+            print(header + task.short_qualified_name)
+            for i in range(0, len(task.children)):
+                _display(task.children[i], indent+1, last=(last or []) +[i+1!=len(task.children)])
+        for goal in dag.goals:
+            _display(goal)
     else:
         log.info("no tasks to display")
 

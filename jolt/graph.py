@@ -494,15 +494,6 @@ class GraphBuilder(object):
 
         return self.graph
 
-    def display(self):
-        from networkx.drawing.nx_agraph import write_dot
-
-        t = tools.Tools()
-        with t.tmpdir("dot") as tmpdir, t.cwd(tmpdir.get_path()):
-            write_dot(self.graph, fs.path.join(t.getcwd(), 'graph.dot'))
-            t.run('dot -Tsvg graph.dot -o graph.svg')
-            t.run('eog graph.svg')
-
 
 class PruneStrategy(object):
     def should_prune_requirements(self, task):
