@@ -259,8 +259,8 @@ class GitSrc(WorkspaceResource):
     sha = Parameter(required=False, help="Specific commit or tag to be checked out. Optional.")
     path = Parameter(required=False, help="Local path where the repository should be cloned.")
     defer = BooleanParameter(False, help="Defer cloning until a consumer task must be built.")
-    _revision = Export(value=lambda self: self._get_revision() or self.git.head())
-    _diff = Export(value=lambda self: self.git.diff(), encoded=True)
+    _revision = Export(value=lambda t: t.sha.value or t.git.head())
+    _diff = Export(value=lambda t: t.git.diff(), encoded=True)
 
     def __init__(self, *args, **kwargs):
         super(GitSrc, self).__init__(*args, **kwargs)
@@ -278,7 +278,7 @@ class GitSrc(WorkspaceResource):
         return name
 
     def _get_revision(self):
-        if self._revision.value is not None:
+        if self._revision.is_imported:
             return self._revision.value
         if not self.sha.is_unset():
             return self.sha.get_value()
@@ -296,11 +296,11 @@ class GitSrc(WorkspaceResource):
         rev = self._get_revision()
         if rev is not None:
             raise_task_error_if(
-                self._revision.value is None and not self.sha.is_unset() and self.git.diff(), self,
+                not self._revision.is_imported and not self.sha.is_unset() and self.git.diff(), self,
                 "explicit sha requested but git repo '{0}' has local changes", self.git.relpath)
             # Should be safe to do this now
             rev = self.git.rev_parse(rev)
-            if not self.git.is_head(rev) or self._revision.value is not None:
+            if not self.git.is_head(rev) or self._revision.is_imported:
                 self.git.checkout(rev)
                 self.git.clean()
                 self.git.patch(self._get_diff())
@@ -327,8 +327,8 @@ class Git(GitSrc):
     sha = Parameter(required=False, help="Specific commit or tag to be checked out. Optional.")
     path = Parameter(required=False, help="Local path where the repository should be cloned.")
     defer = None
-    _revision = Export(value=lambda self: self._get_revision())
-    _diff = Export(value=lambda self: self.git.diff(), encoded=True)
+    _revision = Export(value=lambda t: t._get_revision())
+    _diff = Export(value=lambda t: t.git.diff(), encoded=True)
 
     def __init__(self, *args, **kwargs):
         super(Git, self).__init__(*args, **kwargs)

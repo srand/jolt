@@ -15,19 +15,36 @@ from jolt.tools import Tools
 
 class Export(object):
     def __init__(self, value, encoded=False):
-        self.value = None
+        self._imported = False
+        self._task = None
+        self._value = None
         self.exported_value = value
         self.encoded = encoded
 
+    @property
+    def value(self):
+        if self._value is None:
+            self._value = self.exported_value(self._task)
+        return self._value
+
+    @property
+    def is_imported(self):
+        return self._imported
+
     def assign(self, value):
         value = value or ""
-        self.value = base64.decodebytes(value.encode()).decode() if self.encoded else value
+        self._value = base64.decodebytes(value.encode()).decode() if self.encoded else value
+        self._imported = True
 
     def export(self, task):
-        value = self.value if self.value is not None else self.exported_value(task)
+        value = self.value
         if value:
             value = base64.encodebytes(value.encode()).decode() if self.encoded else value
         return value
+
+    def set_task(self, task):
+        self._task = task
+
 
 
 class Parameter(object):
@@ -557,6 +574,7 @@ class TaskBase(object):
                 export = copy.copy(obj)
                 setattr(self, key, export)
                 self._exports[key] = export
+                export.set_task(self)
             if isinstance(obj, Parameter):
                 param = copy.copy(obj)
                 setattr(self, key, param)

@@ -292,3 +292,19 @@ class BuildCli(testsupport.JoltTest):
         r1 = self.build("b")
         l1 = self.tasks(r1, local=True)
         self.assertEqual(l1, [])
+
+    def test_export(self):
+        """
+        --- tasks:
+        import os
+
+        class Pass(Task):
+            export = Export(lambda x: os.getenv("USER"))
+
+            def run(self, deps, tools):
+                assert self.export.value is not None and self.export.value != "root"
+        ---
+        """
+        r = self.build("pass")
+        a = self.artifacts(r)
+        self.tools.run("cat {}/.build.log", a[0])
