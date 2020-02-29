@@ -278,7 +278,7 @@ def build(ctx, task, network, keep_going, identity, default, local,
         if not dag.has_tasks():
             return
 
-        with log.progress("Progress", dag.number_of_tasks(), " tasks", estimates=False) as p:
+        with log.progress("Progress", dag.number_of_tasks(), " tasks", estimates=False, debug=debug) as p:
             while dag.has_tasks():
                 # Find all tasks ready to be executed
                 leafs = dag.select(lambda graph, task: task.is_ready())
