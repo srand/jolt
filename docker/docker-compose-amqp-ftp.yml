@@ -15,14 +15,14 @@ services:
     ports:
       - "5672:5672"
   ftp-service:
-    image: teezily/ftpd
+    image: fauria/vsftpd
     environment:
       - FTP_USER=jolt
-      - FTP_PASSWORD=secret
+      - FTP_PASS=secret
       - PASV_MIN_PORT=65000
       - PASV_MAX_PORT=65004
     volumes:
-      - jolt-cache:/data/jolt
+      - jolt-cache:/home/vsftpd
     ports:
       - "21:21"
       - "65000-65004:65000-65004"

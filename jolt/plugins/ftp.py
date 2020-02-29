@@ -22,6 +22,7 @@ def catch(func, *args, **kwargs):
         val = func(*args, **kwargs)
         return val if val is not None else True
     except:
+        log.exception()
         return False
 
 
@@ -44,7 +45,7 @@ class FtpStorage(cache.StorageProvider):
 
         username = config.get(NAME, "keyring.username")
         if not username:
-            username = raw_input(NAME + " username: ")
+            username = input(NAME + " username: ")
             raise_error_if(not username, "no username configured for " + NAME)
             config.set(NAME, "keyring.username", username)
             config.save()

@@ -34,17 +34,16 @@ class GitApi(testsupport.JoltTest):
         r = self.build("exe")
 
         # Diff size below threshold
-        self.append("hello_world/01_hello_world/hello.c", ' ' * 0xFFF000)
+        self.append("hello_world/01_hello_world/hello.c", ' ' * 0xFFE00)
         r = self.build("exe")
 
         # Diff size now above threshold
-        self.append("hello_world/01_hello_world/hello.c", ' ' * 0x2000)
+        self.append("hello_world/01_hello_world/hello.c", ' ' * 0x200)
         with self.assertRaises(Exception, msg="diff size"):
             r = self.build("exe")
 
         # Diff size below threshold through explicit config key
-        self.append("hello_world/01_hello_world/hello.c", ' ' * 0x2000)
-        r = self.jolt("-c git.diffsize=2M build -n exe")
+        r = self.jolt("-c git.maxdiffsize=2M build -n exe")
 
 
     def test_head(self):

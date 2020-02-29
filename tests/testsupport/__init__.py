@@ -14,11 +14,19 @@ def enable_network_testing(cls, storage_providers=None):
     class Gen(TaskGenerator):
         def generate(self):
             classes = []
-            for storage in storage_providers or ["http", "ftp"]:
+            for provider in storage_providers or ["http"]:
                 class Net(cls):
                     network = True
-                    name = cls.name + "/" + storage
-                    requires = ["jolt/amqp/deployment:storage=" + storage]
+                    network_enabled = True
+                    name = cls.name + "/" + provider
+                    requires = ["jolt/amqp/deployment:storage=" + provider]
+                    storage = provider
+
+                    def __init__(self, *args, **kwargs):
+                        super().__init__(*args, **kwargs)
+                        self.network = True
+                        self.network_enabled = True
+
                 classes.append(Net)
             cls.requires = [c.name for c in classes]
             return classes + [cls]
@@ -33,6 +41,14 @@ def skip_if_no_deployment(method):
     return _wrap
 
 
+def skip_if_network(method):
+    def _wrap(self):
+        if self.network:
+            self.skipTest("network build not supported")
+        return method(self)
+    return _wrap
+
+
 @influence.files("../../jolt/**/*.py")
 class JoltTest(Test):
     abstract = True
@@ -40,14 +56,7 @@ class JoltTest(Test):
     def __init__(self, *args, **kwargs):
         super(JoltTest, self).__init__(*args, **kwargs)
         self.network = False
-
-    @property
-    def network_enabled(self):
-        if "jolt/amqp/deployment" not in self.requires:
-            return False
-        if self.deps["jolt/amqp/deployment"].active:
-            return True
-        return False
+        self.network_enabled = False
 
     def _files(self):
         if not self._testMethodDoc:
@@ -68,7 +77,8 @@ class JoltTest(Test):
         return common + "\n".join([l[8:] for l in lines.splitlines()])
 
     def _network_config(self):
-        return self.deps["jolt/amqp"].strings.config.get_value() if self.network_enabled else ""
+        return self.deps["jolt/amqp:storage="+self.storage].strings.config.get_value() \
+            if self.network_enabled else ""
 
     def setup(self, deps, tools):
         self.deps = deps
