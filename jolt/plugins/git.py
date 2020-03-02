@@ -206,9 +206,11 @@ class GitInfluenceProvider(FileInfluence):
         return JoltLoader.get().joltdir
 
     def _find_dotgit(self, path):
-        while path != self.joltdir:
+        ppath = None
+        while path != ppath:
             if fs.path.isdir(fs.path.join(path, ".git")):
                 return path
+            ppath = path
             path = fs.path.dirname(path)
         raise_error("no git repository found at '{}'", self.path)
 
