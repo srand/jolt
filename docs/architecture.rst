@@ -20,7 +20,7 @@ tasks to be executed on a cluster of workers. Resulting artifacts are stored
 on the file server, ready to be downloaded by users attempting to execute
 the same tasks.
 
-.. image:: /img/network3.png
+.. image:: img/overview.png
 
 
 Artifact Cache
@@ -31,17 +31,15 @@ They are content addressable, meaning they all have a unique and
 reproducible identity. This identity allows the artifacts to be
 consistently exchanged between local and remote caches.
 
-.. image:: /img/developer.png
+.. image:: img/caches.png
 
-The idendity is SHA1 sum of different attributes that may influence the
+The identity is a SHA1 sum of different attributes that may influence the
 output of the task, as illustrated below. Such influence includes the
 source code of the task, task parameters and their assigned
 values, the content of files and scm repositories, the identity of
 dependency tasks, etc.
 
-.. image:: /img/identity.png
-
-The SHA1 digest is used as a key when looking up artifacts
+The SHA1 digest is used as a key when looking up artifacts both
 locally and remotely.
 
 
@@ -51,6 +49,6 @@ Execution
 The diagram below illustrates what happens when a task is executed by
 a user.
 
-.. image:: /img/activity.png
+.. image:: img/buildflow.png
 
 .. architecture-end
