@@ -100,6 +100,7 @@ class WorkerTaskConsumer(object):
             "amqp", "routing_key",
             os.getenv("RABBITMQ_ROUTING_KEY", self.ROUTING_KEY_REQUEST))
         self._queue = self.QUEUE + "_" + self._routing_key
+        self._max_priority = config.getint("amqp", "max-priority", 1)
 
     def connect(self):
         """This method connects to RabbitMQ, returning the connection handle.
@@ -258,7 +259,10 @@ class WorkerTaskConsumer(object):
         cb = functools.partial(self.on_queue_declareok, userdata=queue_name)
         self._channel.queue_declare(
             queue=queue_name, callback=cb,
-            arguments={"x-message-deduplication": True})
+            arguments={
+                "x-message-deduplication": True,
+                "x-max-priority": self._max_priority
+            })
 
     def on_queue_declareok(self, _unused_frame, userdata):
         """Method invoked by pika when the Queue.Declare RPC call made in
@@ -643,6 +647,7 @@ class AmqpExecutor(scheduler.NetworkExecutor):
         self.factory = factory
         self.task = task
         self.callback_queue = None
+        self.priority = config.getint("amqp", "priority", 0)
 
     def _create_manifest(self):
         manifest = JoltManifest.export(self.task)
@@ -754,6 +759,7 @@ class AmqpExecutor(scheduler.NetworkExecutor):
     def publish_request(self, manifest, routing_key):
         props = pika.BasicProperties(
             correlation_id=self.corr_id,
+            priority=self.priority,
             headers={"x-deduplication-header": self.task.identity})
         self.response = None
         self.channel.basic_publish(

@@ -36,6 +36,18 @@ These configuration keys exist:
 
 * ``port`` - Port number of the AMQP service. Default: 5672
 
+* ``max-priority`` -
+  Optional worker configuration. Enables task priority queues. Tasks
+  that are waiting in queue for a worker will be dequeued in order of
+  priority. See ``priority``.
+  This value configures the number of priority levels that will be
+  available and should be a positive integer between 1 and 255.
+  Values between 1 and 10 are recommended. Default: 1.
+
+* ``priority`` -
+  Optional client configuration. Configures the default priority of
+  all tasks submitted to the queue. Default: 0.
+
 * ``routing_key`` -
   Optional. By using routing keys, tasks can be directed to different
   types of workers. When starting a worker by using the ``amqp-worker``
@@ -43,8 +55,8 @@ These configuration keys exist:
   To tag a task, set the ``routing_key`` task attribute. Default: default
 
 * ``workers`` -
-  Optional. The maximum number of tasks Jolt is allowed to run in parallel.
-  Defaults to 16.
+  Optional client configuration. The maximum number of tasks Jolt is
+  allowed to run in parallel. Default: 16.
 
 * ``keyring.username`` -
   Username to use when authenticating with the AMQP service.

@@ -190,7 +190,7 @@ class BuildCli(testsupport.JoltTest):
         self.assertBuild(r1, "pass2")
 
 
-    def test_task_deduplication(self):
+    def test_amqp_task_deduplication(self):
         """
         --- tasks:
         class Sleep(Task):
@@ -216,6 +216,46 @@ class BuildCli(testsupport.JoltTest):
         print(matches)
         self.assertEqual(len(matches), 1)
 
+    def test_amqp_task_priority(self):
+        """
+        --- tasks:
+        class Sleep2(Task):
+            t = Parameter()
+
+            def run(self, d, tools):
+                tools.run("sleep {{t}}")
+        ---
+        """
+        if not self.network:
+            self.skipTest("network build deployment required")
+
+        # Starting a task to keep the worker occupied
+        with self.assertRaises(Exception), self.tools.cwd(self.ws):
+            self.tools.run("timeout 2 jolt -c test.conf -c net.conf -c jolt.cachedir=c1 "
+                           "build -n sleep2:t=10")
+
+        # And a second task to be overtaken in the the queue
+        with self.assertRaises(Exception), self.tools.cwd(self.ws):
+            self.tools.run("timeout 2 jolt -c test.conf -c net.conf -c jolt.cachedir=c2 "
+                           "build -n sleep2:t=9")
+
+        # Then a third task to jump ahead in the queue.
+        with self.tools.cwd(self.ws):
+            self.tools.run("jolt -c test.conf -c net.conf -c jolt.cachedir=c3 -c amqp.priority=1 "
+                           "build -n sleep2:t=1")
+
+        # "Wait" for second task
+        with self.tools.cwd(self.ws):
+            r = self.tools.run("jolt -c test.conf -c net.conf -c jolt.cachedir=c4 "
+                               "build -n sleep2:t=9")
+
+        # Now check the execution order in the worker
+        log = self.tools.run("docker logs jolt_amqp_worker", output=False)
+        t = re.findall("xecution started.*?\((sleep2.*) [^ ]*\)", log)
+        print(t)
+        self.assertEqual(t[0], "sleep2:t=10")
+        self.assertEqual(t[1], "sleep2:t=1")
+        self.assertEqual(t[2], "sleep2:t=9")
 
     def test_fast_task(self):
         """
