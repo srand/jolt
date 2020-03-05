@@ -129,7 +129,8 @@ def cli(ctx, verbose, extra_verbose, config_file, debug_exception, profile,
     # If the default task doesn't exist, help is printed inside build().
     if ctx.invoked_subcommand is None:
         task = config.get("jolt", "default", "default")
-        if TaskRegistry.get().get_task_class(task) is not None:
+        taskname, _ = utils.parse_task_name(task)
+        if TaskRegistry.get().get_task_class(taskname) is not None:
             ctx.invoke(build, task=[task], force=force, salt=salt, debug=debug,
                        network=network, local=local, keep_going=keep_going, jobs=jobs)
         else:
