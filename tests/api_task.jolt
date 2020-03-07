@@ -229,7 +229,8 @@ class TaskApi(JoltTest):
         ---
         """
         self.jolt("build c1")
-        self.jolt("build c2")
+        with self.assertRaises(Exception, msg="no such dependency"):
+            self.jolt("build c2")
 
         # Because B1 is not selfsustained, A becomes a transitive dependency of C1
         self.jolt("clean a")
@@ -243,6 +244,8 @@ class TaskApi(JoltTest):
             self.jolt("build -f c2")
         self.assertNoBuild(self.lastLog(), "a")
         self.assertBuild(self.lastLog(), "c2")
+
+
 
     def test_weight(self):
         """

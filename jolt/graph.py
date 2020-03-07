@@ -210,7 +210,8 @@ class TaskProxy(object):
         self.neighbors = sorted(self.neighbors, key=lambda n: n.qualified_name)
         for n in self.children:
             self.descendants.add(n)
-            self.descendants = self.descendants.union(n.descendants)
+            if not n.task.selfsustained:
+                self.descendants = self.descendants.union(n.descendants)
             n.ancestors.add(self)
         self.descendants = sorted(self.descendants, key=lambda n: n.qualified_name)
 

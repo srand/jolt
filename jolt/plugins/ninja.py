@@ -1058,6 +1058,16 @@ class CXXLibrary(CXXProject):
     publishdir = "lib/"
     """ The artifact path where the library is published. """
 
+    selfsustained = False
+    """ Consume this library independently from its requirements.
+
+    When self-sustained, all static libraries listed as requirements are merged
+    into the final library. Merging can also be achieved by listing libraries
+    as source files.
+
+    See :func:`Task.selfsustained <jolt.Task.selfsustained>` for general information.
+    """
+
     def __init__(self, *args, **kwargs):
         super(CXXLibrary, self).__init__(*args, **kwargs)
         self.headers = utils.as_list(utils.call_or_return(self, self.__class__._headers))
@@ -1121,7 +1131,15 @@ class CXXExecutable(CXXProject):
     """
 
     abstract = True
+
     selfsustained = True
+    """ Consume this executable independently from its requirements.
+
+    When self-sustained, all shared libraries listed as requirements are
+    published toghether with the executable.
+
+    See :func:`Task.selfsustained <jolt.Task.selfsustained>` for general information.
+    """
 
     publishdir = "bin/"
     """ The artifact path where the binary is published. """

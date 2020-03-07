@@ -498,16 +498,16 @@ class TaskBase(object):
     """ List of dependencies to other tasks. """
 
     selfsustained = False
-    """ The task is self-sustained and consumed independently of its requirements.
+    """ Consume this task independently of its requirements.
 
     Requirements of a self-sustained task will be pruned if the task artifact
     is present in a cache. In other words, if the task is not executed its
     requirements are considered unnecessary.
 
     For example, consider the task graph A -> B -> C. If B is self-sustained
-    and present in a cache, C will never be executed and will not be an implicit
-    transitive requirement of A. If A requires C, it should be listed as an
-    explicit requirement.
+    and present in a cache, C will never be executed. C will also never be a
+    transitive requirement of A. If A requires C, it should be listed
+    as an explicit requirement.
 
     Using this attribute speeds up execution and reduces network
     traffic by allowing the task graph to be reduced.

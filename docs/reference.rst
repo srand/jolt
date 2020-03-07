@@ -178,6 +178,22 @@ Task
 
        List of dependencies to other tasks.
 
+    .. attribute:: selfsustained = False
+
+       Consume this task independently of its requirements.
+
+       Requirements of a self-sustained task will be pruned if the task artifact
+       is present in a cache. In other words, if the task is not executed its
+       requirements are considered unnecessary.
+
+       For example, consider the task graph A -> B -> C. If B is self-sustained
+       and present in a cache, C will never be executed. C will also never be a
+       transitive requirement of A. If A requires C, it should be listed
+       as an explicit requirement.
+
+       Using this attribute speeds up execution and reduces network
+       traffic by allowing the task graph to be reduced.
+
 .. reference-task-end
 
 
@@ -230,6 +246,7 @@ CXXExecutable
   .. autoattribute:: CXXExecutable.publishdir
   .. automethod:: CXXLibrary.publish
   .. automethod:: CXXProject.run
+  .. autoattribute:: CXXLibrary.selfsustained
   .. automethod:: CXXProject.shell
   .. autoattribute:: CXXProject.sources
   .. autoattribute:: CXXProject.source_influence
@@ -258,6 +275,7 @@ CXXLibrary
   .. autoattribute:: CXXLibrary.publishapi
   .. autoattribute:: CXXLibrary.publishdir
   .. automethod:: CXXLibrary.publish
+  .. autoattribute:: CXXLibrary.selfsustained
   .. automethod:: CXXProject.shell
   .. autoattribute:: CXXProject.sources
   .. autoattribute:: CXXProject.source_influence
