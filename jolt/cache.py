@@ -651,7 +651,7 @@ class Context(object):
         return self
 
     def __exit__(self, type, value, tb):
-        for name, artifact in self._artifacts.items():
+        for name, artifact in reversed(self._artifacts.items()):
             ArtifactAttributeSetRegistry.unapply_all(self._node.task, artifact)
             artifact.unapply()
 
