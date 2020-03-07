@@ -244,6 +244,80 @@ class NinjaApi(JoltTest):
         self.jolt("build lib:arg1={p},arg2={l} exe:arg1={p},arg2={l}", p=a[0], l="base")
 
 
+    def test_library_as_source(self):
+        """
+        --- file: lib.cpp
+        int lib() {{return 0;}}
+
+        --- file: test.cpp
+        extern int lib();
+        int main() {{return lib();}}
+
+        --- tasks:
+        class Lib1(CXXLibrary):
+            sources = ["lib.cpp"]
+
+        class Lib2(CXXLibrary):
+            sources = ["test.cpp", "lib/liblib1.a"]
+
+        class Lib2Sh(CXXLibrary):
+            sources = ["test.cpp", "lib/liblib1.a"]
+            shared = True
+
+        class Exe(CXXExecutable):
+            requires = ["lib2"]
+
+        class Exesh(CXXExecutable):
+            requires = ["lib2sh"]
+
+        ---
+        """
+        self.build("lib1 -c .")
+        self.build("exe")
+        self.build("exesh")
+
+    def test_library_is_selfsustained(self):
+        """
+        --- file: lib.cpp
+        int lib() {{return 0;}}
+
+        --- file: test.cpp
+        extern int lib();
+        int main() {{return lib();}}
+
+        --- tasks:
+        class Lib1(CXXLibrary):
+            sources = ["lib.cpp"]
+
+        class Lib2(CXXLibrary):
+            requires = "lib1"
+            sources = ["test.cpp"]
+            selfsustained = True
+
+        class Lib2Sh(CXXLibrary):
+            requires = "lib1"
+            sources = ["test.cpp"]
+            shared = True
+            selfsustained = True
+
+        class Exe(CXXExecutable):
+            requires = ["lib2"]
+
+        class Exesh(CXXExecutable):
+            requires = ["lib2sh"]
+
+        ---
+        """
+        self.build("lib1 -c .")
+        self.build("exe")
+        self.build("exesh")
+        r = self.build("lib2")
+        a = self.artifacts(r)
+        self.assertIn("T lib()", self.tools.run("nm -C {}/lib/liblib2.a", a[0]))
+        r = self.build("lib2sh")
+        a = self.artifacts(r)
+        self.assertIn("_Z3libv", self.tools.run("readelf -s {}/lib/liblib2sh.so", a[0]))
+
     def test_macros(self):
         """
         --- file: test.cpp

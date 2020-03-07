@@ -276,17 +276,41 @@ class FileListWriter(Rule):
 
         return digest == disk_digest
 
-    def _data(self, files):
+    def _data(self, project, files):
         data = "\n".join(files)
         return data, utils.sha1(data)
 
     def build(self, project, writer, infiles):
         file_list_path = fs.path.join(project.outdir, "{0}.list".format(self.name))
         file_list_hash_path = fs.path.join(project.outdir, "{0}.hash".format(self.name))
-        data, digest = self._data(infiles)
+        data, digest = self._data(project, infiles)
         if not self._identical(file_list_path, file_list_hash_path, data, digest):
             self._write(file_list_path, file_list_hash_path, data, digest)
         project.depimports.append(file_list_path)
+
+
+class GNUMRIWriter(FileListWriter):
+    """
+    Creates an AR instruction script.
+
+    All input object files and libraries are be added to the target libary.
+
+    """
+
+    def __init__(self, name, outfiles):
+        super().__init__(name)
+        self.outfiles = outfiles
+
+    def _data(self, project, infiles):
+        data = "create {}\n".format(self.outfiles[0])
+        for infile in infiles:
+            _, ext = fs.path.splitext(infile)
+            if ext == ".a":
+                data += "addlib {}\n".format(infile)
+            else:
+                data += "addmod {}\n".format(infile)
+        data += "save\nend\n"
+        return data, utils.sha1(data)
 
 
 class GNULinker(Rule):
@@ -309,13 +333,14 @@ class GNUArchiver(Rule):
         super(GNUArchiver, self).__init__(*args, **kwargs)
 
     def build(self, project, writer, infiles):
-        file_list = FileListWriter("objects")
-        file_list.build(project, writer, infiles)
-
         infiles_rel = [fs.path.relpath(infile, project.outdir) for infile in infiles]
         outfiles, variables = self._out(project, project.binary)
         outfiles_rel = [fs.path.relpath(outfile, project.outdir) for outfile in outfiles]
         writer.build(outfiles_rel, self.name, infiles_rel, implicit=project.depimports, variables=variables)
+
+        file_list = GNUMRIWriter("objects", outfiles)
+        file_list.build(project, writer, infiles)
+
         return outfiles
 
 
@@ -341,6 +366,10 @@ class GNUDepImporter(Rule):
         imports = []
         if isinstance(project, CXXExecutable):
             imports += self._build_archives(project, writer, deps)
+        if isinstance(project, CXXLibrary):
+            imports += self._build_archives(project, writer, deps)
+            if not project.shared and project.selfsustained:
+                project.sources.extend(imports)
         return imports
 
 
@@ -596,7 +625,7 @@ class GNUToolchain(Toolchain):
         implicit=["$ld_path", "$objcopy_path"])
 
     archiver = GNUArchiver(
-        command="rm -f $out && $ar cr $out @objects.list",
+        command="rm -f $out && $ar -M < objects.list",
         outfiles=["{outdir}/lib{binary}.a"],
         variables={"desc": "[AR] lib{binary}.a"},
         implicit=["$ld_path", "$ar_path"])
@@ -1117,10 +1146,11 @@ class CXXLibrary(CXXProject):
             for header in self.headers:
                 artifact.collect(header, self.publishapi)
             artifact.cxxinfo.incpaths.append(self.publishapi)
-        artifact.cxxinfo.libpaths.append(self.publishlib)
-        artifact.cxxinfo.libraries.append(self.binary)
-        artifact.strings.library = fs.path.join(
-            self.publishdir, fs.path.basename(self.outfiles[0]))
+        if self.objects:
+            artifact.cxxinfo.libpaths.append(self.publishlib)
+            artifact.cxxinfo.libraries.append(self.binary)
+            artifact.strings.library = fs.path.join(
+                self.publishdir, fs.path.basename(self.outfiles[0]))
 
 CXXLibrary.__doc__ += CXXProject.__doc__
 
