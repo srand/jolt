@@ -533,6 +533,7 @@ class GNUToolchain(Toolchain):
     cxx = ToolEnvironmentVariable(default="g++")
     ld = ToolEnvironmentVariable(default="g++", envname="CXX")
     objcopy = ToolEnvironmentVariable(default="objcopy")
+    ranlib = ToolEnvironmentVariable(default="ranlib")
 
     ccwrap = EnvironmentVariable(default="")
     cxxwrap = EnvironmentVariable(default="")
@@ -625,7 +626,7 @@ class GNUToolchain(Toolchain):
         implicit=["$ld_path", "$objcopy_path"])
 
     archiver = GNUArchiver(
-        command="rm -f $out && $ar -M < objects.list",
+        command="rm -f $out && $ar -M < objects.list && $ranlib $out",
         outfiles=["{outdir}/lib{binary}.a"],
         variables={"desc": "[AR] lib{binary}.a"},
         implicit=["$ld_path", "$ar_path"])
