@@ -137,12 +137,12 @@ def get(section, key, default=None, expand=True, alias=None):
 
 
 def getint(section, key, default=None, alias=None):
-    return int(_config.get(section, key, default, alias))
+    return int(get(section, key, default=default, alias=alias))
 
 
 def getsize(section, key, default=None, alias=None):
     units = {"B": 1, "K": 1024, "M": 1024**2, "G": 1024**3, "T": 1024**4}
-    value = _config.get(section, key, None, alias)
+    value = get(section, key, default=None, alias=alias)
     if value is None:
         if type(default) == int:
             return default
@@ -164,11 +164,11 @@ def getsize(section, key, default=None, alias=None):
 
 
 def getfloat(section, key, default=None, alias=None):
-    return float(_config.get(section, key, default, alias))
+    return float(get(section, key, default=default, alias=alias))
 
 
 def getboolean(section, key, default=None, alias=None):
-    value = _config.get(section, key, default, alias)
+    value = get(section, key, default=default, alias=alias)
     return value is not None and str(value).lower() in ["true", "yes", "on", "1"]
 
 

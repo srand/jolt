@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import os
 import re
 import sys
 import time
@@ -17,6 +18,34 @@ class ConfigCli(testsupport.JoltTest):
             self.jolt("config -d section.key")
         except:
             pass
+
+    def test_config_expand(self):
+        from jolt import config
+
+        os.environ["TEST_STR"] = "testing"
+        os.environ["TEST_INT"] = "12345"
+        os.environ["TEST_FLOAT"] = "1.2345"
+        os.environ["TEST_BOOL"] = "true"
+
+        config.set("test", "test", "{ENV|TEST_STR}")
+        val = config.get("test", "test")
+        self.assertEqual(val, "testing")
+        self.assertEqual(type(val), str)
+
+        config.set("test", "test", "{ENV|TEST_INT}")
+        val = config.getint("test", "test")
+        self.assertEqual(val, 12345)
+        self.assertEqual(type(val), int)
+
+        config.set("test", "test", "{ENV|TEST_FLOAT}")
+        val = config.getfloat("test", "test")
+        self.assertEqual(val, 1.2345)
+        self.assertEqual(type(val), float)
+
+        config.set("test", "test", "{ENV|TEST_BOOL}")
+        val = config.getboolean("test", "test")
+        self.assertEqual(val, True)
+        self.assertEqual(type(val), bool)
 
     def test_config_default(self):
         self.jolt("config section.key value")
