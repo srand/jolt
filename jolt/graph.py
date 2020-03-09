@@ -417,7 +417,9 @@ class GraphBuilder(object):
         node = self.nodes.get(name)
         if not node:
             task = self.registry.get_task(name, manifest=self.manifest)
-            node = TaskProxy(task, self.graph, self.options)
+            node = self.nodes.get(task.qualified_name, None)
+            if node is None:
+                node = TaskProxy(task, self.graph, self.options)
             self.nodes[node.short_qualified_name] = node
             self.nodes[node.qualified_name] = node
             if self.options.salt:

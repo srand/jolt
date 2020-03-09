@@ -323,14 +323,18 @@ class TaskRegistry(object):
         cls = self.tasks.get(name)
         if cls:
             task = cls(parameters=params)
+            task = self.instances.get(task.qualified_name, task)
             self._apply_task_manifest(task, manifest)
+            self.instances[task.qualified_name] = task
             self.instances[full_name] = task
             return task
 
         cls = self.tests.get(name)
         if cls:
             task = _Test(cls, parameters=params)
+            task = self.instances.get(task.qualified_name, task)
             self._apply_task_manifest(task, manifest)
+            self.instances[task.qualified_name] = task
             self.instances[full_name] = task
             return task
 

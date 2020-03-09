@@ -283,6 +283,29 @@ class TaskApi(JoltTest):
         self.assertBuild(r, "influence:arg=2")
         self.assertNoBuild(r, "noinfluence:arg=2")
 
+    def test_param_explicit_default(self):
+        """
+        --- tasks:
+        class A(Task):
+            arg1 = Parameter("1")
+            arg2 = Parameter("2")
+
+        class B1(Task):
+            # Requires "A" with default parameters
+            requires = "a"
+
+        class B2(Task):
+            # Also requires "A" with default parameters, but with arg1 explicitly set
+            requires = "a:arg1=1"
+
+        class C(Task):
+            requires = "b1", "b2"
+        ---
+        """
+        r = self.build("c")
+        t = self.tasks(r)
+        self.assertEqual(len(t), 4)
+
     def test_run_output(self):
         """
         --- tasks:
