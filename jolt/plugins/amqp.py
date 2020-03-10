@@ -789,6 +789,8 @@ class AmqpExecutor(scheduler.NetworkExecutor):
                 extension.failed(TYPE)
             self.task.failed(TYPE)
             raise e
+        finally:
+            self.connection.close()
         return self.task
 
 
