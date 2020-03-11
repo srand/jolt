@@ -790,7 +790,7 @@ class AmqpExecutor(scheduler.NetworkExecutor):
             self.task.failed(TYPE)
             raise e
         finally:
-            self.connection.close()
+            utils.call_and_catch(self.connection.close)
         return self.task
 
 
