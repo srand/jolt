@@ -645,9 +645,10 @@ class AmqpExecutor(scheduler.NetworkExecutor):
     def __init__(self, factory, task):
         super(AmqpExecutor, self).__init__(factory)
         self.factory = factory
-        self.task = task
         self.callback_queue = None
+        self.connection = None
         self.priority = config.getint("amqp", "priority", 0)
+        self.task = task
 
     def _create_manifest(self):
         manifest = JoltManifest.export(self.task)
@@ -790,7 +791,8 @@ class AmqpExecutor(scheduler.NetworkExecutor):
             self.task.failed(TYPE)
             raise e
         finally:
-            utils.call_and_catch(self.connection.close)
+            if self.connection is not None:
+                utils.call_and_catch(self.connection.close)
         return self.task
 
 
