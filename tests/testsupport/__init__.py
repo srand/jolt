@@ -94,6 +94,7 @@ global_string("{test}")
             tools.write_file("net.conf", self._network_config())
 
             for filename, content in self._files():
+                content = "\n".join([l[8:] for l in content.splitlines()])
                 dirname = fs.path.dirname(filename)
                 if dirname:
                     print(dirname)

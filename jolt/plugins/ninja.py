@@ -99,7 +99,7 @@ class GNUPCHVariables(Variable):
         project._pch_out = project._pch + self.gch_ext
 
         writer.variable("pch", project._pch)
-        writer.variable("pch_flags", "-include $pch")
+        writer.variable("pch_flags", "")
         writer.variable("pch_out", project._pch_out)
 
 
@@ -465,7 +465,7 @@ class IncludePaths(Variable):
                 return path[1:]
             return tools.expand_relpath(fs.path.join(sandbox, path), project.outdir)
 
-        incpaths = [expand(path) for path in project.incpaths] + ["."]
+        incpaths = ["."] + [expand(path) for path in project.incpaths]
         for name, artifact in deps.items():
             incs = [path for path in artifact.cxxinfo.incpaths.items()]
             if incs:
