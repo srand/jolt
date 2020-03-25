@@ -34,6 +34,15 @@ class EnvironmentVariable(Variable):
         writer.variable(self.name, self._prefix + self.value)
 
 
+class ToolVariable(Variable):
+    def create(self, project, writer, deps, tools):
+        super().create(project, writer, deps, tool)
+        executable = self._value.split()[0]
+        executable_path = tools.which(executable)
+        if executable_path:
+            writer.variable(self.name + "_path", executable_path)
+
+
 class ToolEnvironmentVariable(EnvironmentVariable):
     def create(self, project, writer, deps, tools):
         super(ToolEnvironmentVariable, self).create(project, writer, deps, tools)
