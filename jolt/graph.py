@@ -27,7 +27,8 @@ class TaskProxy(object):
         self.options = options
 
         self.children = []
-        self.ancestors = []
+        self.ancestors = set()
+        self.descendants = set()
         self.neighbors = []
         self.extensions = []
         self.duration_queued = None
