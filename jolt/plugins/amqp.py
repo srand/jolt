@@ -677,6 +677,7 @@ class AmqpExecutor(scheduler.NetworkExecutor):
         return manifest.format(), routing_key
 
     def _run(self, env):
+        timeout = int(config.getint("amqp", "timeout", 300))
         manifest, routing_key = self._create_manifest()
 
         self.connect()
@@ -690,7 +691,9 @@ class AmqpExecutor(scheduler.NetworkExecutor):
 
         while self.response is None:
             try:
-                self.connection.process_data_events(None)
+                self.connection.process_data_events(time_limit=timeout)
+                if self.response is None:
+                    self.task.info("Remote execution still in progress")
             except (ConnectionError, AMQPConnectionError):
                 log.warning("[AMQP] Lost server connection")
                 self.connect()
