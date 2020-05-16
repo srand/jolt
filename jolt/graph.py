@@ -6,7 +6,7 @@ from os import getenv
 from threading import RLock
 import uuid
 
-from jolt.tasks import Alias, Resource, Export
+from jolt.tasks import Alias, Export, Resource, WorkspaceResource
 #from jolt.utils import *
 from jolt.influence import HashInfluenceRegistry, TaskRequirementInfluence
 from jolt import log
@@ -118,6 +118,9 @@ class TaskProxy(object):
     def is_resource(self):
         return isinstance(self.task, Resource)
 
+    def is_workspace_resource(self):
+        return isinstance(self.task, WorkspaceResource)
+
     def has_artifact(self):
         return self.is_cacheable() and not self.is_resource() and not self.is_alias()
 
@@ -214,6 +217,7 @@ class TaskProxy(object):
             if not n.task.selfsustained:
                 self.descendants = self.descendants.union(n.descendants)
             n.ancestors.add(self)
+
         self.descendants = sorted(self.descendants, key=lambda n: n.qualified_name)
 
         # Exclude transitive alias and resources dependencies
@@ -223,6 +227,11 @@ class TaskProxy(object):
                    self.descendants))
 
         self.task.influence += [TaskRequirementInfluence(n) for n in self.neighbors]
+
+        # Acquire workspace resources before calculating the identity
+        for n in self.children:
+            if n.is_workspace_resource():
+                n.task.acquire_ws()
 
         return self.identity
 

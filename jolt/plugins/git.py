@@ -20,40 +20,39 @@ from jolt.error import raise_task_error_if
 log.verbose("[Git] Loaded")
 
 
-_tree = {}
-_tree_hash_cache = {}
-
-
-
 class GitRepository(object):
     def __init__(self, url, path, relpath, refspecs=None):
         self.path = path
         self.relpath = relpath
         self.tools = Tools()
         self.url = url
-        self.refspecs = utils.as_list(refspecs or [])
+        self.refspecs = refspecs or []
+        self._tree_hash = {}
+        self._original_head = True
         self._init_repo()
 
     def _init_repo(self):
-        self.repository = pygit2.Repository(self.path) if os.path.exists(self._get_git_folder()) else None
+        self.repository = pygit2.Repository(self.path) if os.path.exists(self._git_folder()) else None
+        if self.is_cloned():
+            self.diff_unchecked()
 
     @utils.cached.instance
-    def _get_git_folder(self):
+    def _git_folder(self):
         return fs.path.join(self.path, ".git")
 
     @utils.cached.instance
-    def _get_git_index(self):
+    def _git_index(self):
         return fs.path.join(self.path, ".git", "index")
 
     @utils.cached.instance
-    def _get_git_jolt_index(self):
+    def _git_jolt_index(self):
         return fs.path.join(self.path, ".git", "jolt-index")
 
     def is_cloned(self):
-        return fs.path.exists(self._get_git_folder())
+        return fs.path.exists(self._git_folder())
 
     def is_indexed(self):
-        return fs.path.exists(self._get_git_index())
+        return fs.path.exists(self._git_index())
 
     def clone(self):
         log.info("Cloning into {0}", self.path)
@@ -64,28 +63,32 @@ class GitRepository(object):
         else:
             self.tools.run("git clone {0} {1}", self.url, self.path, output_on_error=True)
         raise_error_if(
-            not fs.path.exists(self._get_git_folder()),
+            not fs.path.exists(self._git_folder()),
             "git: failed to clone repository '{0}'", self.relpath)
         self._init_repo()
 
     @utils.cached.instance
-    def _diff(self, path="/"):
-        self.write_tree()
-        with self.tools.cwd(self.path):
-            index = fs.path.join(self.path, ".git", "jolt-index")
-            with self.tools.environ(GIT_INDEX_FILE=index):
-                return self.tools.run("git diff --binary --no-ext-diff HEAD .{0}".format(path),
-                                      output_on_error=True,
-                                      output_rstrip=False)
+    def diff_unchecked(self):
+        if not self.is_indexed():
+            return ""
 
-    def diff(self, path="/"):
-        d = self._diff(path) if self.is_indexed() else ""
+        # Build the jolt index file
+        self.write_tree()
+
+        # Diff against the jolt index
+        with self.tools.environ(GIT_INDEX_FILE=self._git_jolt_index()), self.tools.cwd(self.path):
+            return self.tools.run("git diff --binary --no-ext-diff HEAD ./",
+                                  output_on_error=True,
+                                  output_rstrip=False)
+
+    def diff(self):
+        diff = self.diff_unchecked()
         dlim = config.getsize("git", "maxdiffsize", "1M")
         raise_error_if(
-            len(d) > dlim,
+            len(diff) > dlim,
             "git patch for '{}' exceeds configured size limit of {} bytes - actual size {}"
-            .format(self.path, dlim, len(d)))
-        return d
+            .format(self.path, dlim, len(diff)))
+        return diff
 
     def patch(self, patch):
         if not patch:
@@ -97,19 +100,22 @@ class GitRepository(object):
             log.info("Applying patch to {0}", self.path)
             self.tools.run("git apply --whitespace=nowarn {patchfile}", patchfile=patchfile)
 
-    @utils.cached.instance
-    def _head(self):
-        with self.tools.cwd(self.path):
-            return str(self.repository.head.target)
-
     def head(self):
-        return self._head() if self.is_cloned() else ""
+        if not self.is_cloned():
+            return None
+        return str(self.repository.head.target)
 
     def is_head(self, rev):
         return self.is_indexed() and self.head() == rev
 
+    def is_original_head(self):
+        return self._original_head
+
+    def is_valid_sha(self, rev):
+        return re.match(r"[0-9a-f]{40}", rev)
+
     def rev_parse(self, rev):
-        if re.match(r"[0-9a-f]{40}", rev):
+        if self.is_valid_sha(rev):
             return rev
         with self.tools.cwd(self.path):
             try:
@@ -121,43 +127,54 @@ class GitRepository(object):
     @utils.cached.instance
     def write_tree(self):
         tools = Tools()
-        index = fs.path.join(self.path, ".git", "jolt-index")
-        gitpath = fs.path.dirname(index)
-
-        tree = _tree.get(gitpath)
-        if tree is not None:
-            return tree
-
-        with tools.environ(GIT_INDEX_FILE=index):
-            with tools.cwd(gitpath):
-                tools.copy("index", "jolt-index")
-            with tools.cwd(fs.path.dirname(gitpath)):
-                _tree[gitpath] = tree = tools.run(
-                    "git -c core.safecrlf=false add -A && git write-tree",
-                    output_on_error=True)
-
+        with tools.cwd(self._git_folder()):
+            tools.copy("index", "jolt-index")
+        with tools.environ(GIT_INDEX_FILE=self._git_jolt_index()), tools.cwd(self.path):
+            tree = tools.run(
+                "git -c core.safecrlf=false add -A && git write-tree",
+                output_on_error=True)
         return tree
 
-    def tree_hash(self, sha="HEAD", path="/"):
-        path = fs.path.normpath(path)
-        full_path = fs.path.join(self.path, path) if path != "/" else self.path
-        value = _tree_hash_cache.get((full_path, sha))
-        if value is None:
-            if sha == "HEAD":
+    def tree_hash(self, sha=None, path="/"):
+        # When sha is None, the caller want the tree hash of the repository's
+        # current workspace state. If no checkout has been made, that would be the
+        # tree that was written upon initialization of the repository as it
+        # includes any uncommitted changes. If a checkout has been made since
+        # the repo was initialized, make this an explicit request for the current
+        # head - there can be no local changes.
+        if sha is None:
+            if self.is_original_head():
                 tree = self.repository.get(self.write_tree())
             else:
+                sha = self.head()
+
+        path = fs.path.normpath(path)
+        full_path = fs.path.join(self.path, path) if path != "/" else self.path
+
+        # Lookup tree hash value in cache
+        value = self._tree_hash.get((full_path, sha))
+        if value is not None:
+            return value
+
+        # Translate explicit sha to tree
+        if sha is not None:
+            try:
+                commit, ref = self.repository.resolve_refish(sha)
+            except:
+                self.fetch()
                 try:
                     commit, ref = self.repository.resolve_refish(sha)
-                except:
-                    self.fetch()
-                    try:
-                        commit, ref = self.repository.resolve_refish(sha)
-                    except Exception as e:
-                        raise_error("failed to resolve sha: {} ({})", sha, e)
-                tree = commit.tree
-            if path != "/":
-                tree = tree[path]
-            _tree_hash_cache[(full_path, sha)] = value = tree.id
+                except Exception as e:
+                    raise_error("failed to resolve sha: {} ({})", sha, e)
+            tree = commit.tree
+
+        # Traverse tree from root to requested path
+        if path != "/":
+            tree = tree[path]
+
+        # Update tree hash cache
+        self._tree_hash[(full_path, sha)] = value = tree.id
+
         return value
 
     def clean(self):
@@ -186,14 +203,24 @@ class GitRepository(object):
             except:
                 self.fetch()
                 return self.tools.run("git checkout -f {rev}", rev=rev, output_on_error=True)
+        self._original_head = False
 
 
-class LocalGitRepository(GitRepository):
-    def fetch(self):
-        pass
 
-    def clone(self):
-        raise_error("attempt to clone local git repository at '{}'", self.relpath)
+_gits = {}
+
+def new_git(url, path, relpath, refspecs=None):
+    refspecs = utils.as_list(refspecs or [])
+    try:
+        git = _gits[path]
+        raise_error_if(git.url != url, "multiple git repositories required at {}", relpath)
+        raise_error_if(git.refspecs != refspecs,
+                       "conflicting refspecs detected for git repository at  {}", relpath)
+        return git
+    except:
+        git = _gits[path] = GitRepository(url, path, relpath, refspecs)
+        return git
+
 
 
 class GitInfluenceProvider(FileInfluence):
@@ -228,7 +255,7 @@ class GitInfluenceProvider(FileInfluence):
         if not fs.path.exists(path):
             return "{0}/{1}: N/A".format(git_rel, relpath)
         try:
-            git = LocalGitRepository(None, git_abs, git_rel)
+            git = new_git(None, git_abs, git_rel)
 
             return "{0}/{1}: {2}".format(git_rel, relpath, git.tree_hash(path=relpath or "/"))
         except JoltCommandError as e:
@@ -264,7 +291,7 @@ class GitSrc(WorkspaceResource):
     sha = Parameter(required=False, help="Specific commit or tag to be checked out. Optional.")
     path = Parameter(required=False, help="Local path where the repository should be cloned.")
     defer = BooleanParameter(False, help="Defer cloning until a consumer task must be built.")
-    _revision = Export(value=lambda t: t.sha.value or t.git.head())
+    _revision = Export(value=lambda t: t._export_revision())
     _diff = Export(value=lambda t: t.git.diff(), encoded=True)
 
     def __init__(self, *args, **kwargs):
@@ -273,8 +300,7 @@ class GitSrc(WorkspaceResource):
         self.relpath = str(self.path) or self._get_name()
         self.abspath = fs.path.join(self.joltdir, self.relpath)
         self.refspecs = kwargs.get("refspecs", [])
-        self.git = GitRepository(self.url, self.abspath, self.relpath, self.refspecs)
-        self.influence.append(self)
+        self.git = new_git(self.url, self.abspath, self.relpath, self.refspecs)
 
     @utils.cached.instance
     def _get_name(self):
@@ -282,15 +308,15 @@ class GitSrc(WorkspaceResource):
         name, _ = fs.path.splitext(repo)
         return name
 
+    def _export_revision(self):
+        return self.sha.value or self.git.head()
+
     def _get_revision(self):
         if self._revision.is_imported:
             return self._revision.value
         if not self.sha.is_unset():
             return self.sha.get_value()
         return None
-
-    def _get_diff(self):
-        return self._diff.value
 
     def acquire(self, artifact, env, tools):
         self.acquire_ws()
@@ -308,13 +334,7 @@ class GitSrc(WorkspaceResource):
             if not self.git.is_head(rev) or self._revision.is_imported:
                 self.git.checkout(rev)
                 self.git.clean()
-                self.git.patch(self._get_diff())
-
-    @utils.cached.instance
-    def get_influence(self, task):
-        if self.defer.is_false and not self.git.is_cloned():
-            self.git.clone()
-        return "Enabled"
+                self.git.patch(self._diff.value)
 
 
 TaskRegistry.get().add_task_class(GitSrc)
@@ -332,11 +352,12 @@ class Git(GitSrc):
     sha = Parameter(required=False, help="Specific commit or tag to be checked out. Optional.")
     path = Parameter(required=False, help="Local path where the repository should be cloned.")
     defer = None
-    _revision = Export(value=lambda t: t._get_revision())
+    _revision = Export(value=lambda t: t._export_revision())
     _diff = Export(value=lambda t: t.git.diff(), encoded=True)
 
     def __init__(self, *args, **kwargs):
         super(Git, self).__init__(*args, **kwargs)
+        self.influence.append(self)
 
     @utils.cached.instance
     def get_influence(self, task):
