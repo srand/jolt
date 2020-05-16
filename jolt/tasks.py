@@ -1,5 +1,6 @@
 import base64
 import copy
+import fnmatch
 import inspect
 import subprocess
 import unittest as ut
@@ -987,8 +988,9 @@ class _Test(Task):
     def run(self, deps, tools):
         testsuite = ut.TestSuite()
         for test in self._get_test_names():
-            testsuite.addTest(self.test_cls(
-                test, parameters=self._get_parameters(), deps=deps))
+            if self.pattern.is_unset() or fnmatch.fnmatch(test, str(self.pattern)):
+                testsuite.addTest(self.test_cls(
+                    test, parameters=self._get_parameters(), deps=deps))
         with log.stream() as logstream:
             self.testresult = ut.TextTestRunner(stream=logstream, verbosity=2).run(testsuite)
             raise_task_error_if(not self.testresult.wasSuccessful(), self, "tests failed")
@@ -1025,6 +1027,8 @@ class Test(ut.TestCase, TaskBase):
 
     Abstract test tasks can't be executed and won't be listed.
     """
+
+    pattern = Parameter(required=False, help="Test-case filter wildcard.")
 
     def __init__(self, method="runTest", deps=None, tools=None, *args, **kwargs):
         ut.TestCase.__init__(self, method)
