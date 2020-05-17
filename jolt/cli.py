@@ -582,13 +582,16 @@ def freeze(ctx, task, default, output, remove):
 
 @cli.command(name="list")
 @click.argument("task", type=str, nargs=-1, required=False, autocompletion=_autocomplete_tasks)
+@click.option("-r", "--reverse", type=str, help="List consumers of REVERSE if TASK is executed.")
 @click.pass_context
-def _list(ctx, task=None, reverse=False):
+def _list(ctx, task=None, reverse=None):
     """
     List all tasks, or dependencies of a specific task.
 
     <WIP>
     """
+
+    raise_error_if(not task and reverse, "TASK required with --reverse")
 
     registry = TaskRegistry.get()
 
@@ -601,6 +604,7 @@ def _list(ctx, task=None, reverse=False):
         return
 
     task = [utils.stable_task_name(t) for t in task]
+    reverse = [utils.stable_task_name(t) for t in utils.as_list(reverse or [])]
 
     try:
         dag = graph.GraphBuilder(registry, ctx.obj["manifest"]).build(task, influence=False)
@@ -609,15 +613,19 @@ def _list(ctx, task=None, reverse=False):
     except:
         raise_error("an exception occurred during task dependency evaluation, see log for details")
 
-    tasks = dag.select(lambda graph, node: \
+    task = reverse or task
+    nodes = dag.select(lambda graph, node: \
                        node.short_qualified_name in task or \
                        node.qualified_name in task)
-    successors = set()
-    for task in tasks:
-        for successor in dag.successors(task):
-            successors.add(successor.short_qualified_name)
 
-    for task in sorted(list(successors)):
+    tasklist = set()
+    iterator = dag.predecessors if reverse else dag.successors
+
+    for node in nodes:
+        for task in iterator(node):
+            tasklist.add(task.short_qualified_name)
+
+    for task in sorted(list(tasklist)):
         print(task)
 
 
