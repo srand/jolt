@@ -28,7 +28,7 @@ class ToolsApi(JoltTest):
         with self.tools.cwd(self.ws):
             self.tools.append_file("{filename}.txt", "appended-{filedata}")
             self.assertEqual(self.tools.read_file("{filename}.txt"),
-                             "        test\n        appended-test")
+                             "test\nappended-test")
 
     def test_archive_zip(self):
         """
