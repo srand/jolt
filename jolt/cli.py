@@ -488,8 +488,9 @@ def _config(ctx, list, delete, global_, user, key, value):
 
 @cli.command()
 @click.argument("task", type=str, nargs=-1, required=False, autocompletion=_autocomplete_tasks)
+@click.option("-r", "--reverse", type=str, help="Display consumers of REVERSE if TASK is executed.")
 @click.pass_context
-def display(ctx, task):
+def display(ctx, task, reverse=None):
     """
     Display a task and its dependencies visually.
 
@@ -497,6 +498,17 @@ def display(ctx, task):
     registry = TaskRegistry.get()
     gb = graph.GraphBuilder(registry, ctx.obj["manifest"])
     dag = gb.build(task, influence=False)
+
+    iterator = lambda task: task.children
+    tasklist = dag.goals
+
+    if reverse:
+        iterator = lambda task: list(dag.predecessors(task))
+        reverse = utils.as_list(reverse)
+        tasklist = dag.select(lambda graph, node: \
+                             node.short_qualified_name in reverse or \
+                             node.qualified_name in reverse)
+
     if dag.has_tasks():
         def _display(task, indent=0, last=None):
             header = ""
@@ -513,10 +525,11 @@ def display(ctx, task):
 
 
             print(header + task.short_qualified_name)
-            for i in range(0, len(task.children)):
-                _display(task.children[i], indent+1, last=(last or []) +[i+1!=len(task.children)])
-        for goal in dag.goals:
-            _display(goal)
+            children = iterator(task)
+            for i in range(0, len(children)):
+                _display(children[i], indent+1, last=(last or []) +[i+1!=len(children)])
+        for task in tasklist:
+            _display(task)
     else:
         log.info("no tasks to display")
 
