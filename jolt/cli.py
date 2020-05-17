@@ -9,6 +9,7 @@ from jolt.tasks import TaskRegistry, Parameter
 from jolt import scheduler
 from jolt import graph
 from jolt import cache
+from jolt import colors
 from jolt import filesystem as fs
 from jolt import log
 from jolt.log import logfile
@@ -489,8 +490,9 @@ def _config(ctx, list, delete, global_, user, key, value):
 @cli.command()
 @click.argument("task", type=str, nargs=-1, required=False, autocompletion=_autocomplete_tasks)
 @click.option("-r", "--reverse", type=str, help="Display consumers of REVERSE if TASK is executed.")
+@click.option("-c", "--cached", "show_cache", is_flag=True, help="Highlight cache presence with colors.")
 @click.pass_context
-def display(ctx, task, reverse=None):
+def display(ctx, task, reverse=None, show_cache=False):
     """
     Display a task and its dependencies visually.
 
@@ -498,6 +500,9 @@ def display(ctx, task, reverse=None):
     registry = TaskRegistry.get()
     gb = graph.GraphBuilder(registry, ctx.obj["manifest"])
     dag = gb.build(task, influence=False)
+
+    options = JoltOptions()
+    acache = cache.ArtifactCache.get(options)
 
     iterator = lambda task: task.children
     tasklist = dag.goals
@@ -523,8 +528,14 @@ def display(ctx, task, reverse=None):
                 else:
                     header += "\u2514\u2574"
 
+            if not show_cache:
+                colorize = str
+            elif not acache.is_available(task):
+                colorize = colors.red
+            else:
+                colorize = colors.green
 
-            print(header + task.short_qualified_name)
+            print(header + colorize(task.short_qualified_name))
             children = iterator(task)
             for i in range(0, len(children)):
                 _display(children[i], indent+1, last=(last or []) +[i+1!=len(children)])

@@ -13,7 +13,6 @@ class All(Alias):
         "cli/display",
         "cli/info",
         "cli/list",
-        "cli/list",
         "ext/autoweight",
         "ext/symlinks",
         "int/utils",
