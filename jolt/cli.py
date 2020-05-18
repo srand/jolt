@@ -504,8 +504,6 @@ def display(ctx, task, reverse=None, show_cache=False):
     options = JoltOptions()
     acache = cache.ArtifactCache.get(options)
 
-    iterator = lambda task: task.children
-    tasklist = dag.goals
 
     if reverse:
         iterator = lambda task: list(dag.predecessors(task))
@@ -513,6 +511,10 @@ def display(ctx, task, reverse=None, show_cache=False):
         tasklist = dag.select(lambda graph, node: \
                              node.short_qualified_name in reverse or \
                              node.qualified_name in reverse)
+    else:
+        tasklist = dag.requested_goals
+        iterator = lambda task: task.children
+
 
     if dag.has_tasks():
         def _display(task, indent=0, last=None):

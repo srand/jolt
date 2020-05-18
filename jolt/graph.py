@@ -496,6 +496,7 @@ class GraphBuilder(object):
                         utils.duration_diff(min_time),
                         utils.duration_diff(max_time))
 
+        self.graph.requested_goals = goals
         self.graph.goals = []
         for goal in goals:
             goal.set_goal()
