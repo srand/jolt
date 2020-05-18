@@ -693,7 +693,8 @@ class AmqpExecutor(scheduler.NetworkExecutor):
             try:
                 self.connection.process_data_events(time_limit=timeout)
                 if self.response is None:
-                    self.task.info("Remote execution still in progress")
+                    self.task.info("Remote execution still in progress after {}",
+                                   self.task.duration_queued)
             except (ConnectionError, AMQPConnectionError):
                 log.warning("[AMQP] Lost server connection")
                 self.connect()
