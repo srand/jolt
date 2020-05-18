@@ -13,12 +13,16 @@ from jolt import filesystem as fs
 from jolt.error import raise_task_error_if, JoltCommandError
 
 
-class Variable(object):
+class Variable(influence.HashInfluenceProvider):
     def __init__(self, value=None):
         self._value = value
 
     def create(self, project, writer, deps, tools):
         writer.variable(self.name, self._value)
+
+    @utils.cached.instance
+    def get_influence(self, task):
+        return "V: value={}".format(self._value)
 
 
 class EnvironmentVariable(Variable):
@@ -33,6 +37,11 @@ class EnvironmentVariable(Variable):
         self.value = tools.getenv(envname.upper(), self._default)
         writer.variable(self.name, self._prefix + self.value)
 
+    @utils.cached.instance
+    def get_influence(self, task):
+        return "EV: default={},envname={},prefix={}".format(
+            self._default, self._envname, self._prefix)
+
 
 class ToolVariable(Variable):
     def create(self, project, writer, deps, tools):
@@ -41,6 +50,10 @@ class ToolVariable(Variable):
         executable_path = tools.which(executable)
         if executable_path:
             writer.variable(self.name + "_path", executable_path)
+
+    @utils.cached.instance
+    def get_influence(self, task):
+        return "TV"
 
 
 class ToolEnvironmentVariable(EnvironmentVariable):
@@ -52,6 +65,11 @@ class ToolEnvironmentVariable(EnvironmentVariable):
         executable_path = tools.which(value)
         if executable_path:
             writer.variable(self.name + "_path", executable_path)
+
+    @utils.cached.instance
+    def get_influence(self, task):
+        return "TEV: default={},envname={},prefix={}".format(
+            self._default, self._envname, self._prefix)
 
 
 class ProjectVariable(Variable):
@@ -66,6 +84,10 @@ class ProjectVariable(Variable):
             value = " ".join(value)
         writer.variable(self.name, str(value))
 
+    @utils.cached.instance
+    def get_influence(self, task):
+        return "PV: default={},attrib={}".format(default, attrib)
+
 
 class SharedLibraryVariable(Variable):
     def __init__(self, name=None, default=None):
@@ -75,6 +97,10 @@ class SharedLibraryVariable(Variable):
     def create(self, project, writer, deps, tools):
         value = self._default if isinstance(project, CXXLibrary) and project.shared else ""
         writer.variable(self.name, str(value))
+
+    @utils.cached.instance
+    def get_influence(self, task):
+        return "SLV: default={}".format(default)
 
 
 class GNUPCHVariables(Variable):
@@ -102,8 +128,12 @@ class GNUPCHVariables(Variable):
         writer.variable("pch_flags", "")
         writer.variable("pch_out", project._pch_out)
 
+    @utils.cached.instance
+    def get_influence(self, task):
+        return "PCHV"
 
-class Rule(object):
+
+class Rule(influence.HashInfluenceProvider):
     """ A source transformation rule.
 
     Rules are used to transform files from one type to another.
@@ -226,6 +256,12 @@ class Rule(object):
             result.extend(outfiles)
         return result
 
+    @utils.cached.instance
+    def get_influence(self, task):
+        return "R: cmd={},var={},in={},out={},impl={},order={},dep={}.{}".format(
+            self.command, self.variables, self.infiles, self.outfiles,
+            self.implicit, self.order_only, self.deps, self.depfile)
+
 
 class Skip(Rule):
     def __init__(self, *args, **kwargs):
@@ -237,6 +273,10 @@ class Skip(Rule):
 
     def build(self, project, writer, infiles):
         return None
+
+    @utils.cached.instance
+    def get_influence(self, task):
+        return "S" + super().get_influence(task)
 
 
 class Objects(Rule):
@@ -251,6 +291,10 @@ class Objects(Rule):
         project.objects.extend(utils.as_list(infiles))
         return None
 
+    @utils.cached.instance
+    def get_influence(self, task):
+        return "O" + super().get_influence(task)
+
 
 class GNUCompiler(Rule):
     def __init__(self, *args, **kwargs):
@@ -261,6 +305,10 @@ class GNUCompiler(Rule):
         if GNUPCHVariables.pch_ext not in self.infiles and project._pch_out is not None:
             implicit.append(project._pch_out)
         return super(GNUCompiler, self).build(project, writer, infiles, implicit)
+
+    @utils.cached.instance
+    def get_influence(self, task):
+        return "GC" + super().get_influence(task)
 
 
 class FileListWriter(Rule):
@@ -297,6 +345,10 @@ class FileListWriter(Rule):
             self._write(file_list_path, file_list_hash_path, data, digest)
         project.depimports.append(file_list_path)
 
+    @utils.cached.instance
+    def get_influence(self, task):
+        return "FL" + super().get_influence(task)
+
 
 class GNUMRIWriter(FileListWriter):
     """
@@ -321,6 +373,10 @@ class GNUMRIWriter(FileListWriter):
         data += "save\nend\n"
         return data, utils.sha1(data)
 
+    @utils.cached.instance
+    def get_influence(self, task):
+        return "MRI" + super().get_influence(task)
+
 
 class GNULinker(Rule):
     def __init__(self, *args, **kwargs):
@@ -335,6 +391,10 @@ class GNULinker(Rule):
         outfiles_rel = [fs.path.relpath(outfile, project.outdir) for outfile in outfiles]
         writer.build(outfiles_rel, self.name, infiles_rel, implicit=project.depimports, variables=variables)
         return outfiles
+
+    @utils.cached.instance
+    def get_influence(self, task):
+        return "L" + super().get_influence(task)
 
 
 class GNUArchiver(Rule):
@@ -351,6 +411,9 @@ class GNUArchiver(Rule):
         file_list.build(project, writer, infiles)
 
         return outfiles
+
+    def get_influence(self, task):
+        return "GA" + super().get_influence(task)
 
 
 class GNUDepImporter(Rule):
@@ -380,6 +443,9 @@ class GNUDepImporter(Rule):
             if not project.shared and project.selfsustained:
                 project.sources.extend(imports)
         return imports
+
+    def get_influence(self, task):
+        return "GD" + super().get_influence(task)
 
 
 class Toolchain(object):
@@ -864,6 +930,7 @@ class CXXProject(Task):
             setattr(self, name, var)
             var.name = name
             self._variables.append(var)
+            self.influence.append(var)
         for name, rule in rules:
             rule = copy.copy(rule)
             setattr(self, name, rule)
@@ -871,6 +938,7 @@ class CXXProject(Task):
             for ext in rule.infiles:
                 self._rules_by_ext[ext] = rule
             self._rules.append(rule)
+            self.influence.append(rule)
 
     def _init_sources(self):
         self.sources = utils.as_list(utils.call_or_return(self, self.__class__._sources))
