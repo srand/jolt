@@ -119,10 +119,17 @@ class GitRepository(object):
             return rev
         with self.tools.cwd(self.path):
             try:
-                commit, ref = self.repository.resolve_refish(rev)
+                commit = self.repository.revparse_single(rev)
             except KeyError:
-                raise_error("invalid git reference: {}", rev)
-            return str(commit.id)
+                self.fetch()
+                try:
+                    commit = self.repository.revparse_single(rev)
+                except Exception as e:
+                    raise_error("invalid git reference: {}", rev)
+            try:
+                return str(commit.id)
+            except:
+                return str(commit)
 
     @utils.cached.instance
     def write_tree(self):
@@ -158,15 +165,8 @@ class GitRepository(object):
 
         # Translate explicit sha to tree
         if sha is not None:
-            try:
-                commit, ref = self.repository.resolve_refish(sha)
-            except:
-                self.fetch()
-                try:
-                    commit, ref = self.repository.resolve_refish(sha)
-                except Exception as e:
-                    raise_error("failed to resolve sha: {} ({})", sha, e)
-            tree = commit.tree
+            commit = self.rev_parse(sha)
+            tree = self.repository.get(commit).tree
 
         # Traverse tree from root to requested path
         if path != "/":
@@ -319,9 +319,13 @@ class GitSrc(WorkspaceResource):
         return None
 
     def acquire(self, artifact, env, tools):
-        self.acquire_ws()
+        self._acquire_ws()
 
     def acquire_ws(self):
+        if self.defer is None or self.defer.is_false:
+            self._acquire_ws()
+
+    def _acquire_ws(self):
         if not self.git.is_cloned():
             self.git.clone()
         rev = self._get_revision()
