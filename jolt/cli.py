@@ -297,7 +297,7 @@ def build(ctx, task, network, keep_going, identity, default, local,
 
                 if not task:
                     dag.debug()
-                    raise_error_if(not task, "no more tasks in progress, only blocked tasks remain")
+                    break
                 elif task.is_goal() and task.duration_running:
                     goal_task_duration += task.duration_running.seconds
 
@@ -305,16 +305,18 @@ def build(ctx, task, network, keep_going, identity, default, local,
                     queue.abort()
                     raise error
 
+        if dag.failed:
+            log.error("List of failed tasks")
+            for failed in dag.failed:
+                log.error("- {}", failed.log_name.strip("()"))
+            raise_error("no more tasks could be executed")
+
         for goal in goal_tasks:
             if acache.is_available_locally(goal):
                 with acache.get_artifact(goal) as artifact:
                     log.info("Location: {0}", artifact.path)
                     if copy:
                         artifact.copy("*", fs.path.join(getcwd(), click.format_filename(copy)))
-
-        log.info("Total execution time: {0} {1}",
-                 str(duration),
-                 str(queue.duration_acc) if network else '')
     except KeyboardInterrupt:
         print()
         log.warning("Interrupted by user")
@@ -326,6 +328,9 @@ def build(ctx, task, network, keep_going, identity, default, local,
             log.warning("Interrupted again, exiting")
             _exit(1)
     finally:
+        log.info("Total execution time: {0} {1}",
+                 str(duration),
+                 str(queue.duration_acc) if network else '')
         if result:
             manifest = JoltManifest()
             manifest.duration = str(goal_task_duration)

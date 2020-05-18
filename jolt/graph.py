@@ -255,6 +255,7 @@ class TaskProxy(object):
         self.error("{0} failed after {1} {2}", what,
                    self.duration_running,
                    self.duration_queued.diff(self.duration_running))
+        self.graph.add_failed(self)
         hooks.task_failed(self)
 
     def finished(self, what="Execution"):
@@ -350,6 +351,7 @@ class Graph(nx.DiGraph):
     def __init__(self):
         super(Graph, self).__init__()
         self._mutex = RLock()
+        self._failed = []
 
     def remove_node(self, node):
         with self._mutex:
@@ -357,6 +359,13 @@ class Graph(nx.DiGraph):
 
     def number_of_tasks(self):
         return len(self.nodes)
+
+    @property
+    def failed(self):
+        return self._failed
+
+    def add_failed(self, task):
+        self._failed.append(task)
 
     @property
     def tasks(self):
