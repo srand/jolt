@@ -499,7 +499,7 @@ def display(ctx, task, reverse=None, show_cache=False):
     """
     registry = TaskRegistry.get()
     gb = graph.GraphBuilder(registry, ctx.obj["manifest"])
-    dag = gb.build(task, influence=False)
+    dag = gb.build(task, influence=show_cache)
 
     options = JoltOptions()
     acache = cache.ArtifactCache.get(options)
@@ -530,7 +530,7 @@ def display(ctx, task, reverse=None, show_cache=False):
 
             if not show_cache:
                 colorize = str
-            elif not acache.is_available(task):
+            elif task.is_cacheable() and not acache.is_available(task):
                 colorize = colors.red
             else:
                 colorize = colors.green
