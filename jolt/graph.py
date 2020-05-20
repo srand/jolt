@@ -73,6 +73,11 @@ class TaskProxy(object):
         if self.task.identity is not None:
             return self.task.identity
 
+        # Acquire workspace resources before calculating the identity
+        for c in self.children:
+            if c.is_workspace_resource():
+                c.task.acquire_ws()
+
         sha = hashlib.sha1()
         HashInfluenceRegistry.get().apply_all(self.task, sha)
         self.task.identity = sha.hexdigest()
@@ -109,18 +114,6 @@ class TaskProxy(object):
     def has_ancestors(self):
         return len(self.ancestors) > 0
 
-    def is_cacheable(self):
-        return self.task.is_cacheable()
-
-    def is_alias(self):
-        return isinstance(self.task, Alias)
-
-    def is_resource(self):
-        return isinstance(self.task, Resource)
-
-    def is_workspace_resource(self):
-        return isinstance(self.task, WorkspaceResource)
-
     def has_artifact(self):
         return self.is_cacheable() and not self.is_resource() and not self.is_alias()
 
@@ -132,9 +125,6 @@ class TaskProxy(object):
             self._extended_task.add_extension(task)
         else:
             self.extensions.append(task)
-
-    def is_extension(self):
-        return self._extended_task is not None
 
     def set_extended_task(self, task):
         self._extended_task = task
@@ -152,6 +142,9 @@ class TaskProxy(object):
                 return False
         return True
 
+    def is_alias(self):
+        return isinstance(self.task, Alias)
+
     def is_available_locally(self, cache):
         tasks = [self] + self.extensions
         return all(map(cache.is_available_locally, tasks))
@@ -160,21 +153,27 @@ class TaskProxy(object):
         tasks = [self] + self.extensions
         return all(map(cache.is_available_remotely, tasks))
 
-    def is_uploadable(self, cache):
-        tasks = [self] + self.extensions
-        return all(map(cache.is_uploadable, tasks))
+    def is_cacheable(self):
+        return self.task.is_cacheable()
+
+    def is_completed(self):
+        return self._completed
 
     def is_downloadable(self):
         return self._download
 
-    def disable_download(self):
-        self._download = False
-        for extension in self.extensions:
-            extension.disable_download()
+    def is_extension(self):
+        return self._extended_task is not None
 
     def is_fast(self):
         tasks = [self.task] + [e.task for e in self.extensions]
         return all([task.fast for task in tasks])
+
+    def is_identified(self):
+        return self.task.identity is not None
+
+    def is_goal(self):
+        return self._goal or any([e.is_goal() for e in self.extensions])
 
     def in_progress(self):
         return self._in_progress
@@ -188,14 +187,23 @@ class TaskProxy(object):
 
         return self.graph.is_leaf(self)
 
-    def is_completed(self):
-        return self._completed
+    def is_resource(self):
+        return isinstance(self.task, Resource)
+
+    def is_uploadable(self, cache):
+        tasks = [self] + self.extensions
+        return all(map(cache.is_uploadable, tasks))
+
+    def is_workspace_resource(self):
+        return isinstance(self.task, WorkspaceResource)
+
+    def disable_download(self):
+        self._download = False
+        for extension in self.extensions:
+            extension.disable_download()
 
     def set_in_progress(self):
         self._in_progress = True
-
-    def is_goal(self):
-        return self._goal or any([e.is_goal() for e in self.extensions])
 
     def set_goal(self):
         self._goal = True
@@ -227,11 +235,6 @@ class TaskProxy(object):
                    self.descendants))
 
         self.task.influence += [TaskRequirementInfluence(n) for n in self.neighbors]
-
-        # Acquire workspace resources before calculating the identity
-        for n in self.children:
-            if n.is_workspace_resource():
-                n.task.acquire_ws()
 
         return self.identity
 
