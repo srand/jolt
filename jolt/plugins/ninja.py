@@ -259,8 +259,9 @@ class Rule(influence.HashInfluenceProvider):
     @utils.cached.instance
     def get_influence(self, task):
         return "R: cmd={},var={},in={},out={},impl={},order={},dep={}.{}".format(
-            self.command, self.variables, self.infiles, self.outfiles,
-            self.implicit, self.order_only, self.deps, self.depfile)
+            self.command, utils.as_stable_string_list(self.variables),
+            self.infiles, self.outfiles, self.implicit,
+            self.order_only, self.deps, self.depfile)
 
 
 class Skip(Rule):

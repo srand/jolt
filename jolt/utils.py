@@ -46,7 +46,7 @@ def as_stable_string_list(o):
         return sorted([str(item) for item in o])
     elif type(o) == dict:
         return sorted(["{0}={1}".format(key, as_stable_string_list(val))
-                       for key, val in o.itervalues()])
+                       for key, val in o.items()])
     else:
         return [str(o)]
 
