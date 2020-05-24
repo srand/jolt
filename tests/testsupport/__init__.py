@@ -157,5 +157,19 @@ global_string("{test}")
         if (task is not None and task in tasks) or (task is None and len(tasks) > 0):
             self.fail("tasks were executed: {}".format(" ".join(tasks)))
 
+    def assertDownload(self, r, task):
+        tasks = re.findall("Download started.*?\((.*) [^ ]*\)", r)
+        if len(tasks) <= 0:
+            self.fail("no artifacts were downloaded")
+        elif task not in tasks:
+            self.fail("{} was not downloaded".format(task))
+
+    def assertUpload(self, r, task):
+        tasks = re.findall("Upload started.*?\((.*) [^ ]*\)", r)
+        if len(tasks) <= 0:
+            self.fail("no artifacts were downloaded")
+        elif task not in tasks:
+            self.fail("{} was not downloaded".format(task))
+
     def assertExists(self, *args):
         self.assertTrue(os.path.exists(fs.path.join(self.ws, *args)))

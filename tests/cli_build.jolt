@@ -38,6 +38,42 @@ class BuildCli(testsupport.JoltTest):
         r1 = self.jolt("")
         self.assertBuild(r1, "custom")
 
+    def test_no_download(self):
+        """
+        --- tasks:
+        class A(Task):
+            pass
+        ---
+        """
+        if not self.network:
+            self.skipTest("only network build supported")
+
+        r = self.jolt("build -n --no-download a")
+        self.assertBuild(r, "a")
+        r = self.jolt("build a")
+        self.assertDownload(r, "a")
+
+    def test_no_upload(self):
+        """
+        --- tasks:
+        class A(Task):
+            pass
+        class B(Task):
+            pass
+        ---
+        """
+        if not self.network:
+            self.skipTest("only network build supported")
+
+        r = self.jolt("build a")
+        self.assertBuild(r, "a")
+        r = self.jolt("build -n --no-upload a")
+        self.assertBuild(r, "a")
+        r = self.jolt("build b")
+        self.assertBuild(r, "b")
+        r = self.jolt("build -n b")
+        self.assertUpload(r, "b")
+
     def test_return_value(self):
         """
         --- tasks:

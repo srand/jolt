@@ -861,8 +861,6 @@ class ArtifactCache(StorageProvider):
         return False
 
     def is_available_remotely(self, node):
-        if not self.download_enabled():
-            return False
         if not node.task.is_cacheable():
             return False
         if node.identity in self._remote_identity_cache:
