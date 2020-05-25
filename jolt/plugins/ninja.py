@@ -406,10 +406,11 @@ class GNUArchiver(Rule):
         infiles_rel = [fs.path.relpath(infile, project.outdir) for infile in infiles]
         outfiles, variables = self._out(project, project.binary)
         outfiles_rel = [fs.path.relpath(outfile, project.outdir) for outfile in outfiles]
-        writer.build(outfiles_rel, self.name, infiles_rel, implicit=project.depimports, variables=variables)
 
         file_list = GNUMRIWriter("objects", outfiles)
         file_list.build(project, writer, infiles)
+
+        writer.build(outfiles_rel, self.name, infiles_rel, implicit=project.depimports, variables=variables)
 
         return outfiles
 

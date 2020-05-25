@@ -431,6 +431,37 @@ class NinjaApi(JoltTest):
         r = self.jolt("build exe:arg=zyx")
         self.assertExists(self.artifacts(r)[0], "zyx", "exe")
 
+    def test_selfsustained_merge(self):
+        """
+        --- file: a.cpp
+        int main() {{return 0;}}
+
+        --- tasks:
+        class Lib(CXXLibrary):
+            sources = ["*.cpp"]
+
+        class Merged(CXXLibrary):
+            requires = ["lib"]
+            selfsustained = True
+
+        ---
+        """
+        r = self.jolt("build merged")
+
+        # Add one source file
+        with self.tools.cwd(self.ws):
+            self.tools.write_file("b.cpp", "#include <stdlib.h>")
+        self.jolt("build merged")
+
+        # Remove the new source file
+        with self.tools.cwd(self.ws):
+            self.tools.run("rm b.cpp")
+        self.tools.rmtree(self.artifacts(r)[0])
+
+        # Rebuild original library, verify that the new source file is not included
+        r = self.jolt("build merged")
+        r = self.tools.run("ar t {}/lib/libmerged.a", self.artifacts(r)[0])
+        self.assertNotIn("b.o", r)
 
     def test_sources(self):
         """
