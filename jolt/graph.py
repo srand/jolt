@@ -306,7 +306,8 @@ class TaskProxy(object):
                 available_locally = all(map(cache.is_available_locally, tasks))
                 if available_locally and not force_upload:
                     return
-                available_remotely = all(map(cache.is_available_remotely, tasks))
+                available_remotely = cache.download_enabled() and \
+                    all(map(cache.is_available_remotely, tasks))
                 if not available_locally and available_remotely:
                     available_locally = cache.download(self)
 
