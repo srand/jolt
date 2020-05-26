@@ -489,9 +489,9 @@ class Tools(object):
         prev = self._cwd
         try:
             raise_task_error_if(
-                not fs.path.exists(self._cwd) or not fs.path.isdir(self._cwd),
+                not fs.path.exists(path) or not fs.path.isdir(path),
                 self._task,
-                "failed to change directory to '{0}'", self._cwd)
+                "failed to change directory to '{0}'", path)
             self._cwd = path
             yield fs.path.normpath(self._cwd)
         finally:

@@ -196,6 +196,11 @@ class ToolsApi(JoltTest):
         o = self.build("b")
         self.assertIn("File# 0", o)
 
+    def test_cwd_non_existing(self):
+        with self.assertRaises(Exception, msg="failed to change directory"):
+            with self.tools.cwd("nonexisting"):
+                pass
+
     def test_extract_zip(self):
         with self.tools.cwd(self.ws):
             self.tools.run("zip tests.zip ../../api_tools.jolt")
