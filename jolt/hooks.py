@@ -14,6 +14,12 @@ class TaskHook(object):
     def task_failed(self, task):
         pass
 
+    def task_pruned(self, task):
+        pass
+
+    def task_skipped(self, task):
+        pass
+
 
 
 class TaskHookFactory(object):
@@ -55,6 +61,18 @@ class TaskHookRegistry(object):
         for ext in self.hooks:
             utils.call_and_catch(ext.task_failed, task)
 
+    def task_pruned(self, task):
+        if task.is_resource():
+            return
+        for ext in self.hooks:
+            utils.call_and_catch(ext.task_pruned, task)
+
+    def task_skipped(self, task):
+        if task.is_resource():
+            return
+        for ext in self.hooks:
+            utils.call_and_catch(ext.task_skipped, task)
+
 
 def task_created(task):
     TaskHookRegistry.get().task_created(task)
@@ -67,3 +85,9 @@ def task_failed(task):
 
 def task_finished(task):
     TaskHookRegistry.get().task_finished(task)
+
+def task_pruned(task):
+    TaskHookRegistry.get().task_pruned(task)
+
+def task_skipped(task):
+    TaskHookRegistry.get().task_skipped(task)

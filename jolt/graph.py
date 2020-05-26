@@ -279,6 +279,15 @@ class TaskProxy(object):
             self.graph.remove_node(self)
         except:
             self.warning("Pruned task was executed")
+        hooks.task_skipped(self)
+
+    def pruned(self):
+        self._completed = True
+        try:
+            self.graph.remove_node(self)
+        except:
+            self.warning("Pruned task was already pruned")
+        hooks.task_pruned(self)
 
     def clean(self, cache, expired):
         with self.tools:
@@ -563,6 +572,6 @@ class GraphPruner(object):
 
         for node in pruned:
             log.verbose("Excluded: {}", node.log_name)
-            graph.remove_node(node)
+            node.pruned()
 
         return graph

@@ -29,9 +29,16 @@ class SymlinkHooks(TaskHook):
             self._path,
             utils.canonical(task.short_qualified_name))
 
-        fs.unlink(destpath, ignore_errors=True)
-        fs.makedirs(fs.path.dirname(destpath))
-        fs.symlink(srcpath, destpath)
+        if fs.path.exists(srcpath):
+            fs.unlink(destpath, ignore_errors=True)
+            fs.makedirs(fs.path.dirname(destpath))
+            fs.symlink(srcpath, destpath)
+
+    def task_pruned(self, task):
+        self.task_finished(task)
+
+    def task_skipped(self, task):
+        self.task_finished(task)
 
 
 @TaskHookFactory.register
