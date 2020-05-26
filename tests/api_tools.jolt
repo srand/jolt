@@ -163,6 +163,7 @@ class ToolsApi(JoltTest):
 
             def publish(self, a, t):
                 bd = t.builddir("build", incremental=True)
+                print("Publish#", len(t.glob(bd+"/*")))
                 t.read_file(bd + "/test.txt")
 
         class B(Task):
@@ -178,10 +179,15 @@ class ToolsApi(JoltTest):
         """
         o = self.build("a")
         self.assertIn("File# 0", o)
+        self.assertIn("Publish# 1", o)
         a = self.artifacts(o)
         self.tools.rmtree(a[0])
         o = self.build("a")
         self.assertIn("File# 1", o)
+
+        o = self.build("-f a")
+        self.assertIn("File# 0", o)
+        self.assertIn("Publish# 1", o)
 
         o = self.build("b")
         self.assertIn("File# 0", o)
