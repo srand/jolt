@@ -13,7 +13,7 @@ class NinjaApi(JoltTest):
 
     def assertCompiled(self, r, filename):
         if filename not in r:
-            self.fail("{} was not compiled", filename)
+            self.fail("{} was not compiled".format(filename))
 
     def _recipe(self):
         return "from jolt.plugins.ninja import *\n" + super(NinjaApi, self)._recipe()
