@@ -6,9 +6,19 @@ import hashlib
 import json
 import errno
 import uuid
-
+join = os.path.join
 
 _hash_cache = {}
+
+
+def sha1sum(path):
+    sha = hashlib.sha1()
+    try:
+        with open(path, "rb") as f:
+            sha.update(f.read())
+    except:
+        sha.update(str(uuid.uuid4()).encode())
+    return sha.hexdigest()
 
 
 class Depfile(object):
@@ -16,7 +26,6 @@ class Depfile(object):
         self.valid = False
         self.product = ""
         self.cmdline = cmdline
-        self.dependencies = []
         self.path = objfile + ".d"
 
         if not dependencies:
@@ -46,14 +55,7 @@ class Depfile(object):
         digest = _hash_cache.get(filepath)
         if digest:
             return digest
-
-        sha = hashlib.sha1()
-        try:
-            with open(filepath, "rb") as f:
-                sha.update(f.read())
-        except:
-            sha.update(str(uuid.uuid4()).encode())
-        _hash_cache[filepath] = digest = sha.hexdigest()
+        _hash_cache[filepath] = digest = sha1sum(filepath)
         return digest
 
     @property
@@ -62,18 +64,20 @@ class Depfile(object):
         return sha_cmd.hexdigest()
 
     @property
-    def hash(self):
-        sha_cmd = hashlib.sha1()
-
+    def hash_deps(self):
+        if type(self.dependencies) == str:
+            return self.dependencies
         sha = hashlib.sha1()
-        sha.update(self.hash_cmdline.encode())
-
-        self.hash_files = []
         for dep in sorted(self.dependencies):
             fh = self._hash_file(dep)
-            self.hash_files.append(fh)
             sha.update(fh.encode())
+        return sha.hexdigest()
 
+    @property
+    def hash(self):
+        sha = hashlib.sha1()
+        sha.update(self.hash_cmdline.encode())
+        sha.update(self.hash_deps.encode())
         return sha.hexdigest()
 
 
@@ -100,9 +104,6 @@ class LibraryManifest(object):
     def add_object_file(self, object_file, cmdline):
         objname = os.path.basename(object_file)
         depfile = Depfile(object_file, cmdline=cmdline)
-
-        #print("add_object_file:\n  {}\n  {}\n  {}".format(
-        #    depfile.hash, depfile.hash_cmdline, depfile.hash_files))
         objects = self.objects
         objects[objname] = {"digest": depfile.hash, "deps": depfile.dependencies}
         self._data["objects"] = objects
@@ -115,11 +116,9 @@ class LibraryManifest(object):
     def get_object(self, objfile):
         objdir = os.path.dirname(objfile)
         objname = os.path.basename(objfile)
-        #print("Objname: ", objname)
         data = self.objects.get(objname)
         if not data:
             return False
-        #print("Data: ", data)
 
         try:
             os.makedirs(objdir)
@@ -145,50 +144,58 @@ class LibraryManifest(object):
     def library(self):
         return os.path.join(os.path.dirname(self._path), self._data["filename"])
 
+    @property
+    def path(self):
+        return self._path
+
 
 class Cache(object):
-    def __init__(self):
+    def __init__(self, builddir):
+        self._builddir = builddir
         self._objects = {}
-        self._dependencies = {}
+        self._sources = {}
 
     def add_manifest(self, manifest):
         objects = {}
-        for objname, objfile in manifest.objects.items():
-            objects[objfile["digest"]] = {"manifest": manifest}
-            deps = self._dependencies.get(str(objname), [])
-            deps += [objfile["deps"]]
-            self._dependencies[str(objname)] = deps
-            #print(objname, len(self._dependencies.get(objname, [])))
-        self._objects.update(objects)
+        for objname, objdata in manifest.objects.items():
+            obj = self._objects.get(str(objname), [])
+            deps = [join(self._builddir, dep) for dep in objdata["deps"]]
+            obj.append({
+                "digest": objdata["digest"],
+                "manifest": manifest.path,
+                "deps": Depfile(objname, dependencies=deps).hash_deps})
+            self._objects[str(objname)] = obj
 
-    def load(self, cachedir, task):
+    def load_manifests(self, cachedir, task):
         pattern = "{cachedir}/{task}/*/.ninja.json".format(cachedir=cachedir, task=task)
-        #print(pattern)
-        manifests = glob.glob(pattern)
-        #print(manifests)
-        for manifest in manifests:
+        for manifest in glob.glob(pattern):
             manifest = LibraryManifest(manifest)
             manifest.read()
             self.add_manifest(manifest)
 
+    def load(self):
+        try:
+            with open(join(self._builddir, ".cache.json")) as f:
+                self._objects = json.load(f)
+        except:
+            pass
+
+    def save(self):
+        with open(join(self._builddir, ".cache.json"), "w") as f:
+            json.dump(self._objects, f, indent=2)
+
     def lookup(self, objfile, cmdline):
         objname = os.path.basename(objfile)
-        depfile = Depfile(objfile)
-        for dependencies in [depfile.dependencies] + self._dependencies.get(objname, []):
-            depfile = Depfile(objfile, dependencies, cmdline=cmdline)
-            #print("lookup:\n  {}\n  {}\n  {}".format(
-            #    depfile.hash, depfile.hash_cmdline, depfile.hash_files))
-            entry = self._objects.get(depfile.hash)
-            #print(depfile.hash, entry)
-            if entry:
-                #print("Using cached object")
-                return entry
+        for objdata in self._objects.get(objname, []):
+            dep = Depfile(objname, objdata["deps"], cmdline)
+            if dep.hash == objdata["digest"]:
+                return LibraryManifest(objdata["manifest"])
 
 
 class LockFile(object):
     def __init__(self, path=".", *args, **kwargs):
         from fasteners import process_lock
-        self._file = process_lock.InterProcessLock(os.path.join(path, ".ninja_lock"))
+        self._file = process_lock.InterProcessLock(os.path.join(path, ".ninja.lock"))
 
     def __enter__(self, *args, **kwargs):
         self._file.acquire()
@@ -217,11 +224,13 @@ def cli(compiler_args):
     if os.getenv("NINJACACHE_DISABLE", "0") != "1":
         depfile = Depfile(objfile)
 
-        cache = Cache()
-        cache.load(os.getenv("JOLT_CACHEDIR"), os.getenv("JOLT_CANONTASK"))
-        result = cache.lookup(objfile, compiler_args)
-        if result:
-            if result["manifest"].get_object(objfile):
+        cache = Cache(os.getcwd())
+        cache.load()
+        manifest = cache.lookup(objfile, compiler_args)
+        if manifest:
+            print("match")
+            manifest.read()
+            if manifest.get_object(objfile):
                 with LockFile():
                     manifest = LibraryManifest(".ninja.json")
                     manifest.read()

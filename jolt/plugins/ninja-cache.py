@@ -27,6 +27,11 @@ def run_cache(self, artifact, tools):
     tools.setenv("JOLT_CANONTASK", utils.canonical(self.name))
     tools.setenv("NINJACACHE_DISABLE", disabled)
 
+    objcache = ninjacli.Cache(tools.builddir("ninja", self.incremental))
+    objcache.load_manifests(tools.getenv("JOLT_CACHEDIR"), tools.getenv("JOLT_CANONTASK"))
+    objcache.save()
+
+
 def publish_cache(self, artifact, tools):
     with tools.cwd(self.outdir):
         m = ninjacli.LibraryManifest(tools.expand_path(".ninja.json"))
@@ -56,4 +61,3 @@ def _decorate_shell(shell):
 ninja.CXXLibrary.run = _decorate_run(ninja.CXXLibrary.run)
 ninja.CXXLibrary.publish = _decorate_publish(ninja.CXXLibrary.publish)
 ninja.CXXLibrary.shell = _decorate_shell(ninja.CXXLibrary.shell)
-
