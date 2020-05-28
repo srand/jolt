@@ -61,7 +61,7 @@ class TaskApi(JoltTest):
         --- tasks:
         class WhenUnused(Task):
             i = Parameter()
-            expires = expires.WhenUnusedFor(seconds=2)
+            expires = expires.WhenUnusedFor(seconds=3)
 
         class WhenUnusedArgs(Task):
             expires = expires.After(weeks=1,days=1,hours=1,minutes=1,seconds=1)
