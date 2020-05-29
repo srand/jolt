@@ -18,6 +18,7 @@ class Depfile(object):
         self.product = ""
         self.cmdline = cmdline
         self.path = objfile + ".d"
+        self.dependencies = []
 
         if not dependencies:
             if not os.path.exists(self.path):
@@ -39,7 +40,7 @@ class Depfile(object):
             dependencies = [os.path.normpath(dep) for dep in dependencies]
 
         self.product = objfile
-        self.dependencies = dependencies
+        self.dependencies = dependencies or []
         self.valid = True
 
     def _hash_file(self, filepath):
