@@ -20,18 +20,21 @@ log.verbose("[NinjaCache] Loaded")
 
 def run_cache(self, artifact, tools):
     cli = fs.path.join(fs.path.dirname(__file__), "ninjacli.py")
+    disabled = config.getboolean("ninja-cache", "disable", False)
+
     tools.setenv("CCWRAP", "{} {} -- ".format(sys.executable, cli))
     tools.setenv("CXXWRAP", "{} {} -- ".format(sys.executable, cli))
     tools.setenv("JOLT_CACHEDIR", cache.ArtifactCache.get().root)
     tools.setenv("JOLT_CANONTASK", utils.canonical(self.name))
-    tools.setenv("NINJACACHE_DISABLE", "1" if config.getboolean("ninja-cache", "disable", False) else "0")
+    tools.setenv("NINJACACHE_DISABLE", "1" if disabled else "0")
     tools.setenv("NINJACACHE_MAXARTIFACTS", config.getint("ninja-cache", "maxartifacts", 0))
     if log.is_verbose():
         tools.setenv("NINJACACHE_VERBOSE", "1")
 
-    objcache = ninjacli.Cache(tools.builddir("ninja", self.incremental))
-    objcache.load_manifests(tools.getenv("JOLT_CACHEDIR"), tools.getenv("JOLT_CANONTASK"))
-    objcache.save()
+    if not disabled:
+        objcache = ninjacli.Cache(tools.builddir("ninja", self.incremental))
+        objcache.load_manifests(tools.getenv("JOLT_CACHEDIR"), tools.getenv("JOLT_CANONTASK"))
+        objcache.save()
 
 
 def publish_cache(self, artifact, tools):
