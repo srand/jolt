@@ -382,7 +382,7 @@ class TaskGenerator(object):
     task for the compilation of the library and another for
     the test, it is advisable to instead use a task generator
     when there are multiple libraries to build and test.
-    The generator will ensure that all libraries are build and
+    The generator will ensure that all libraries are built and
     tested identically. Additional tasks, such as sourcedoc
     generation, can be added for all libraries at a later
     point in time. Refactoring is simplified by gathering

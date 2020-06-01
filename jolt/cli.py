@@ -28,6 +28,7 @@ from jolt.error import raise_task_error_if
 
 
 debug_enabled = False
+workdir = getcwd()
 
 
 class ArgRequiredUnless(click.Argument):
@@ -316,7 +317,7 @@ def build(ctx, task, network, keep_going, identity, default, local,
                 with acache.get_artifact(goal) as artifact:
                     log.info("Location: {0}", artifact.path)
                     if copy:
-                        artifact.copy("*", fs.path.join(getcwd(), click.format_filename(copy)))
+                        artifact.copy("*", fs.path.join(workdir, click.format_filename(copy)))
     except KeyboardInterrupt:
         print()
         log.warning("Interrupted by user")
