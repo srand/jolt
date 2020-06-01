@@ -33,8 +33,6 @@ class GitRepository(object):
 
     def _init_repo(self):
         self.repository = pygit2.Repository(self.path) if os.path.exists(self._git_folder()) else None
-        if self.is_cloned():
-            self.diff_unchecked()
 
     @utils.cached.instance
     def _git_folder(self):
@@ -328,6 +326,8 @@ class GitSrc(WorkspaceResource):
     def _acquire_ws(self):
         if not self.git.is_cloned():
             self.git.clone()
+        if not self._revision.is_imported:
+            self.git.diff_unchecked()
         rev = self._get_revision()
         if rev is not None:
             raise_task_error_if(
@@ -367,6 +367,8 @@ class Git(GitSrc):
     def get_influence(self, task):
         if not self.git.is_cloned():
             self.git.clone()
+        if not self._revision.is_imported:
+            self.git.diff_unchecked()
         rev = self._get_revision()
         if rev is not None:
             return self.git.tree_hash(rev)
