@@ -89,6 +89,20 @@ class ToolsApi(JoltTest):
         """
         self.build("b")
 
+    def test_builddir_unique_param(self):
+        """
+        --- tasks:
+        class A(Task):
+            arg = Parameter()
+            def run(self, d, t):
+                self.bd = t.builddir("build", incremental=True)
+                assert len(t.glob("{{bd}}/*")) == 0
+                t.write_file("{{bd}}/test.txt", "test")
+        ---
+        """
+        self.build("a:arg=!")
+        self.build("a:arg=/")
+
     def test_builddir_shared(self):
         """
         --- tasks:
@@ -119,8 +133,8 @@ class ToolsApi(JoltTest):
         """
         self.build("a")
         dirs = " ".join(self.tools.glob(self.ws+"/build/*"))
-        self.assertIn("/a-a-", dirs)
-        self.assertIn("/test1234-a-", dirs)
+        self.assertIn("/build-a", dirs)
+        self.assertIn("/test1234-a", dirs)
 
     def test_builddir_incremental(self):
         """

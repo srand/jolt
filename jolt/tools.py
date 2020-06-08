@@ -384,34 +384,40 @@ class Tools(object):
         Returns:
             Path to the created directory.
         """
-        default_name = "builddir" if self._task is None else self._task.canonical_name
-        name = self.expand(name or default_name)
+        name = self.expand(name or "build")
         name = fs.path.join("build", name)
 
-        if incremental and self._task is not None:
-            if unique:
-                task_hash = utils.sha1(utils.format_task_name(
-                    self._task.name,
-                    self._task._get_parameters()))
-                dirname = fs.path.join(self.getcwd(), "{0}-{1}-{2}".format(
-                    name, self._task.canonical_name, task_hash[:8]))
-            else:
-                dirname = fs.path.join(self.getcwd(), name)
+        # Append task name
+        if self._task is not None and unique:
+            name += "-" + utils.canonical(self._task.short_qualified_name)
 
-            if self._task.taint is not None:
-                meta = fs.path.join(dirname, ".taint")
-                if not fs.path.exists(meta) or self.read_file(meta) != str(self._task.taint):
+        dirname = fs.path.join(self.getcwd(), name)
+
+        if incremental:
+            if self._task is not None and unique:
+                meta_task = fs.path.join(dirname, ".task")
+                if not fs.path.exists(meta_task) \
+                   or self.read_file(meta_task) != self._task.qualified_name:
                     fs.rmtree(dirname, ignore_errors=True)
                     fs.makedirs(dirname)
-                    self.write_file(meta, str(self._task.taint))
+
+                if self._task.taint is not None:
+                    meta = fs.path.join(dirname, ".taint")
+                    if not fs.path.exists(meta) or self.read_file(meta) != str(self._task.taint):
+                        fs.rmtree(dirname, ignore_errors=True)
+                        fs.makedirs(dirname)
+                        self.write_file(meta, str(self._task.taint))
+
+                self.write_file(meta_task, self._task.qualified_name)
             else:
                 fs.makedirs(dirname)
             return dirname
 
         if name not in self._builddir:
-            dirname = self.getcwd()
-            fs.makedirs(fs.path.join(dirname, fs.path.dirname(name)))
-            self._builddir[name] = fs.mkdtemp(prefix=name+"-", dir=dirname)
+            fs.makedirs(fs.path.dirname(dirname))
+            self._builddir[name] = fs.mkdtemp(
+                prefix=fs.path.basename(dirname) + "-",
+                dir=fs.path.dirname(dirname))
 
         return self._builddir[name]
 
