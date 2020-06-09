@@ -4,17 +4,18 @@ from jolt import *
 class All(Alias):
     requires = [
         "api/artifact/environ",
-	"api/git",
-	"api/ninja",
+        "api/git",
+        "api/ninja",
         "api/task",
         "api/tools",
         "cli/build",
-	"cli/config",
+        "cli/config",
         "cli/display",
         "cli/info",
         "cli/list",
         "ext/autoweight",
-	"ext/ninja-cache",
+        "ext/ninja-cache",
+        "ext/ninja-compdb",
         "ext/symlinks",
         "int/utils",
     ]

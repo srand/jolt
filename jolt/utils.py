@@ -38,6 +38,19 @@ def decode_str(s):
     except:
         return s
 
+def decorate_append(func, extra_func):
+    def _f(*args, **kwargs):
+        val = func(*args, **kwargs)
+        extra_func(*args, **kwargs)
+        return val
+    return _f
+
+def decorate_prepend(func, extra_func):
+    def _f(*args, **kwargs):
+        extra_func(*args, **kwargs)
+        return func(*args, **kwargs)
+    return _f
+
 def as_list(t):
     return [t] if type(t) == str else list(t)
 

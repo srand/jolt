@@ -1,0 +1,70 @@
+#!/usr/bin/env python
+
+import json
+import re
+import sys
+import time
+sys.path.append(".")
+
+from testsupport import JoltTest
+
+from jolt import filesystem as fs
+
+
+class CompDBExtension(JoltTest):
+    name = "ext/ninja-compdb"
+
+    def _recipe(self):
+        return "from jolt.plugins.ninja import *\n" + super(CompDBExtension, self)._recipe()
+
+    def test_compdb(self):
+        """
+        --- config:
+
+        [ninja-compdb]
+
+        --- file: lib.h
+        int lib();
+
+        --- file: lib.cpp
+        #include "lib.h"
+        int lib() {{return 0;}}
+
+        --- file: test.cpp
+        #include "lib.h"
+        int main() {{return lib();}}
+
+        --- tasks:
+        class Lib(CXXLibrary):
+            headers = ["lib.h"]
+            sources = ["lib.cpp"]
+
+        class Exe(CXXExecutable):
+            requires = "lib"
+            sources = ["test.cpp"]
+
+        ---
+        """
+        self.build("exe")
+
+        r = self.jolt("compdb exe")
+        db = re.findall("Compilation DB: (.*)", r, re.M)
+        self.assertTrue(len(db) == 1)
+
+        with open(db[0]) as f:
+            commands = json.load(f)
+
+        files = {fs.path.basename(command["file"]): command for command in commands}
+        self.assertTrue(len(files) >= 2)
+        self.assertIn("lib.cpp", files)
+        self.assertIn("test.cpp", files)
+
+        with self.tools.cwd(files["test.cpp"]["directory"]):
+            self.tools.run(files["test.cpp"]["command"])
+
+        with self.tools.cwd(self.ws):
+            self.tools.append_file("lib.h", "#error")
+
+        with self.tools.cwd(files["test.cpp"]["directory"]):
+            with self.assertRaises(Exception, msg="#error"):
+                self.tools.run(files["test.cpp"]["command"])

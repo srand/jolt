@@ -196,6 +196,30 @@ These configuration keys exist:
 - ``finished`` - Boolean. Stash logs when tasks finish successfully.
 
 
+Ninja Compilation Database
+--------------------------
+
+This plugin enables compilation database generation for Ninja C++
+tasks. The database is automatically published in task artifacts.
+Note that commands are recorded exactly as invoked by Ninja and
+they are therefore not immediately usable because of how Jolt
+sandboxes dependencies. A special command, ``compdb`` is made
+available to post-process published databases into a database that
+is usable with IDEs. The command takes an already built task as
+argument:
+
+.. code-block:: bash
+
+    $ jolt compdb <task>
+
+Upon completion, a path to the resulting database is printed.
+The database aggregates the databases of the task and all its
+dependencies.
+
+The plugin is enabled by adding a ``[ninja-compdb]`` section in
+the Jolt configuration. Ninja version >= 1.10.0 is required.
+
+
 Selfdeploy
 -----------
 

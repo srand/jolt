@@ -45,24 +45,6 @@ def publish_cache(self, artifact, tools):
         m.write()
         artifact.collect(".ninja.json")
 
-def _decorate_publish(publish):
-    def _publish(self, artifact, tools):
-        publish_cache(self, artifact, tools)
-        publish(self, artifact, tools)
-    return _publish
-
-def _decorate_run(run):
-    def _run(self, artifact, tools):
-        run_cache(self, artifact, tools)
-        run(self, artifact, tools)
-    return _run
-
-def _decorate_shell(shell):
-    def _shell(self, artifact, tools):
-        run_cache(self, artifact, tools)
-        shell(self, artifact, tools)
-    return _shell
-
-ninja.CXXLibrary.run = _decorate_run(ninja.CXXLibrary.run)
-ninja.CXXLibrary.publish = _decorate_publish(ninja.CXXLibrary.publish)
-ninja.CXXLibrary.shell = _decorate_shell(ninja.CXXLibrary.shell)
+ninja.CXXLibrary.run = utils.decorate_prepend(ninja.CXXLibrary.run, run_cache)
+ninja.CXXLibrary.publish = utils.decorate_prepend(ninja.CXXLibrary.publish, publish_cache)
+ninja.CXXLibrary.shell = utils.decorate_prepend(ninja.CXXLibrary.shell, run_cache)

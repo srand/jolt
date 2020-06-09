@@ -1220,6 +1220,7 @@ class CXXLibrary(CXXProject):
         Include path metadata for this directory is automatically exported.
 
         """
+
         with tools.cwd(self.outdir):
             artifact.collect("*{binary}.a", self.publishlib)
             artifact.collect("*{binary}.dll", self.publishlib)
