@@ -281,9 +281,9 @@ class Tools(object):
     _builddir_lock = threading.RLock()
 
 
-    def __init__(self, task=None, cwd=None):
+    def __init__(self, task=None, cwd=None, env=None):
         self._cwd = cwd or os.getcwd()
-        self._env = copy.deepcopy(os.environ)
+        self._env = copy.deepcopy(env or os.environ)
         self._task = task
         self._builddir = {}
 
@@ -629,7 +629,7 @@ class Tools(object):
 
         return fs.path.join(self.getcwd(), self.expand(pathname, *args, **kwargs))
 
-    def expand_relpath(self, pathname, relpath, *args, **kwargs):
+    def expand_relpath(self, pathname, relpath=None, *args, **kwargs):
         """ Expands keyword arguments/macros in a pathname format string.
 
         This function is identical to ``str.format()`` but it
@@ -641,7 +641,8 @@ class Tools(object):
 
         Args:
             pathname (str): The pathname to be expanded.
-            relpath (str): Directory to which the returned path will be relative.
+            relpath (str, optional): Directory to which the returned path will be relative.
+                If not provided, the ``joltdir`` attribute is used.
             args (str, optional): Additional positional values required
                 by the format pathname.
             kwargs (str, optional): Additional keyword values required by
@@ -652,7 +653,7 @@ class Tools(object):
         """
 
         pathname = self.expand(pathname, *args, **kwargs)
-        relpath = self.expand(relpath, *args, **kwargs)
+        relpath = self.expand(relpath or self._task.joltdir, *args, **kwargs)
         pathname = fs.path.join(self.getcwd(), pathname)
         return fs.path.relpath(pathname, relpath)
 
@@ -913,7 +914,7 @@ class Tools(object):
                 termios.tcsetattr(sys.stderr.fileno(), termios.TCSANOW, stde)
 
     @utils.locked(lock='_builddir_lock')
-    def sandbox(self, artifact, incremental=False):
+    def sandbox(self, artifact, incremental=False, reflect=False):
         """ Creates a temporary build directory populated with the contents of an artifact.
 
         Files are copied using rsync.
@@ -923,6 +924,11 @@ class Tools(object):
                 into the sandbox.
             incremental (boolean): If false, the created directory is
                 deleted upon completion of the task.
+            reflect (boolean): If true, a virtual sandbox is constructed
+                from artifact metadata only. Files are not copied, but
+                instead symlinks are created pointing at the origin of each
+                file contained within the artifact. The sandbox reflects
+                the artifact with a live view of the the current workspace.
 
         Returns:
             str: Path to the build directory..
@@ -939,19 +945,43 @@ class Tools(object):
             type(artifact) is not cache.Artifact,
             "non-artifact passed as argument to Tools.sandbox()")
 
-        canon_name = fs.path.basename(fs.path.dirname(artifact.path))
-        sandbox_name = "sandbox-{0}".format(utils.canonical(artifact.get_name()))
-        path = self.builddir(sandbox_name, incremental=incremental, unique=False)
-        meta = fs.path.join(self.getcwd(), path, ".artifact")
+        suffix = utils.canonical(artifact.get_task().qualified_name)
 
-        if not fs.path.exists(meta) or self.read_file(meta) != artifact.path:
+        if reflect:
+            sandbox_name = "sandbox-reflect-" + suffix
+        else:
+            sandbox_name = "sandbox-" + suffix
+
+        path = self.builddir(sandbox_name, incremental=incremental, unique=False)
+        if reflect:
+            return self._sandbox_reflect(artifact, path)
+        return self._sandbox_rsync(artifact, path)
+
+    def _sandbox_validate(self, artifact, path):
+        meta = fs.path.join(self.getcwd(), path, ".artifact")
+        return meta if not fs.path.exists(meta) or self.read_file(meta) != artifact.path else None
+
+    def _sandbox_rsync(self, artifact, path):
+        meta = self._sandbox_validate(artifact, path)
+        if meta:
             if shutil.which("rsync"):
                 self.run("rsync --delete -c -r {0}/ {1}", artifact.path, path, output_on_error=True)
             else:
                 fs.rmtree(path)
                 fs.copytree(artifact.path, path)
             self.write_file(meta, artifact.path)
+        return path
 
+    def _sandbox_reflect(self, artifact, path):
+        meta = self._sandbox_validate(artifact, path)
+        if meta:
+            fs.rmtree(path)
+            fs.makedirs(path)
+            for relsrcpath, reldstpath in artifact.files.items():
+                srcpath = fs.path.join(artifact.get_task().joltdir, relsrcpath)
+                dstpath = fs.path.join(path, reldstpath)
+                self.symlink(srcpath, dstpath)
+            self.write_file(meta, artifact.path)
         return path
 
     def setenv(self, key, value=None):
@@ -988,8 +1018,11 @@ class Tools(object):
         """
         src = self.expand_path(src) if not relative else self.expand(src)
         dst = self.expand_path(dst)
+        dstdir = fs.path.dirname(dst) if dst[-1] != fs.sep else dst
         if replace and fs.path.lexists(dst):
             self.unlink(dst)
+        if not fs.path.isdir(dstdir):
+            fs.makedirs(dstdir)
         fs.symlink(src, dst)
 
     def tmpdir(self, name):
