@@ -185,6 +185,47 @@ class ArtifactStringAttribute(ArtifactAttribute):
         return str(self._value)
 
 
+class ArtifactFileAttribute(object):
+    def __init__(self):
+        self._files = []
+
+    def apply(self, task, artifact):
+        pass
+
+    def unapply(self, task, artifact):
+        pass
+
+    def append(self, src, dst):
+        self._files.append((src, dst))
+
+    def assign(self, files):
+        self._files = files
+
+    def items(self):
+        return self._files
+
+
+@ArtifactAttributeSetProvider.Register
+class ArtifactFileAttributeProvider(ArtifactAttributeSetProvider):
+    def create(self, artifact):
+        setattr(artifact, "files", ArtifactFileAttribute())
+
+    def parse(self, artifact, content):
+        if "files" not in content:
+            return
+        for record in content["files"]:
+            artifact.files.append(record["src"], record["dst"])
+
+    def format(self, artifact, content):
+        content["files"] = [{"src": src, "dst": dst} for src, dst in artifact.files.items()]
+
+    def apply(self, task, artifact):
+        pass
+
+    def unapply(self, task, artifact):
+        pass
+
+
 def json_serializer(obj):
     if isinstance(obj, datetime):
         return dict(type="datetime", value=obj.strftime("%Y-%m-%d %H:%M:%S.%f"))
@@ -491,30 +532,42 @@ class Artifact(object):
             self._node,
             "can't collect files into an already published task artifact")
 
-        files = self._node.task.expand(files)
+        files = self.tools.expand_path(files)
         files = self.tools.glob(files)
-
-        dest = self._node.task.expand(dest) if dest is not None else None
+        dest = self.tools.expand(dest) if dest is not None else ""
 
         # Special case for renaming files
         safe_dest = dest or fs.sep
         if len(files) == 1 and safe_dest[-1] != fs.sep:
             src = files[0]
+            self.files.append(self.tools.expand_relpath(src), dest)
             self.tools.copy(src, fs.path.join(self._temp, dest), symlinks=symlinks)
             log.verbose("Collected {0} -> {2}/{1}", src, dest, self._temp)
             return
 
+
+        # Expand directories into full file list if flatting a tree
+        # Determine relative artifact destination paths
+        if flatten:
+            files = [q
+                for f in files
+                for q in ([p for p in fs.scandir(fs.path.join(self.tools.getcwd(), f))]
+                          if fs.path.isdir(fs.path.join(self.tools.getcwd(), f)) else [f])]
+            reldestfiles = [fs.path.join(dest, fs.path.basename(f)) for f in files]
+        else:
+            reldestfiles = [fs.path.join(dest, self.tools.expand_relpath(f, self.tools.getcwd()))
+                         for f in files]
+
         # General case
-        dirname = fs.path.join(self._temp, dest) if dest else self._temp + fs.sep
-        for src in files:
-            srcs = fs.scandir(src) if fs.path.isdir(src) and flatten else [src]
-            for src in srcs:
-                dest = fs.path.join(dirname, src) \
-                       if not flatten else \
-                          fs.path.join(dirname, fs.path.basename(src))
-                if symlinks or fs.path.exists(self.tools.expand_path(src)):
-                    self.tools.copy(src, dest, symlinks=symlinks)
-                    log.verbose("Collected {0} -> {1}", src, dest[len(self._temp):])
+        for srcpath, reldstpath in zip(files, reldestfiles):
+            relsrcpath = self.tools.expand_relpath(srcpath, self.tools.getcwd())
+            dstpath = fs.path.join(self._temp, reldstpath)
+
+            if symlinks or fs.path.exists(srcpath):
+                self.files.append(self.tools.expand_relpath(srcpath), reldstpath)
+                self.tools.copy(srcpath, dstpath, symlinks=symlinks)
+                log.verbose("Collected {0} -> {1}", relsrcpath, reldstpath)
+
 
     def copy(self, pathname, dest, flatten=False, symlinks=False):
         """ Copy files from the artifact.
