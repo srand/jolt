@@ -289,7 +289,7 @@ class Objects(Rule):
         pass
 
     def build(self, project, writer, infiles):
-        project.objects.extend(utils.as_list(infiles))
+        writer.objects.extend(utils.as_list(infiles))
         return None
 
     @utils.cached.instance
@@ -344,7 +344,7 @@ class FileListWriter(Rule):
         data, digest = self._data(project, infiles)
         if not self._identical(file_list_path, file_list_hash_path, data, digest):
             self._write(file_list_path, file_list_hash_path, data, digest)
-        project.depimports.append(file_list_path)
+        writer.depimports.append(file_list_path)
 
     @utils.cached.instance
     def get_influence(self, task):
@@ -390,7 +390,7 @@ class GNULinker(Rule):
         infiles_rel = [fs.path.relpath(infile, project.outdir) for infile in infiles]
         outfiles, variables = self._out(project, project.binary)
         outfiles_rel = [fs.path.relpath(outfile, project.outdir) for outfile in outfiles]
-        writer.build(outfiles_rel, self.name, infiles_rel, implicit=project.depimports, variables=variables)
+        writer.build(outfiles_rel, self.name, infiles_rel, implicit=writer.depimports, variables=variables)
         return outfiles
 
     @utils.cached.instance
@@ -410,7 +410,7 @@ class GNUArchiver(Rule):
         file_list = GNUMRIWriter("objects", outfiles)
         file_list.build(project, writer, infiles)
 
-        writer.build(outfiles_rel, self.name, infiles_rel, implicit=project.depimports, variables=variables)
+        writer.build(outfiles_rel, self.name, infiles_rel, implicit=writer.depimports, variables=variables)
 
         return outfiles
 
@@ -443,7 +443,7 @@ class GNUDepImporter(Rule):
         if isinstance(project, CXXLibrary):
             imports += self._build_archives(project, writer, deps)
             if not project.shared and project.selfsustained:
-                project.sources.extend(imports)
+                writer.sources.extend(imports)
         return imports
 
     def get_influence(self, task):
@@ -967,15 +967,19 @@ class CXXProject(Task):
             sources += l
         self.sources = sources
 
-    def _write_ninja_file(self, basedir, deps, tools):
-        with open(fs.path.join(basedir, "build.ninja"), "w") as fobj:
+    def _write_ninja_file(self, basedir, deps, tools, filename="build.ninja"):
+        with open(fs.path.join(basedir, filename), "w") as fobj:
             writer = ninja.Writer(fobj)
+            writer.depimports = copy.copy(self.depimports)
+            writer.objects = []
+            writer.sources = copy.copy(self.sources)
             self._populate_rules_and_variables(writer, deps, tools)
             self._populate_inputs(writer, deps, tools)
             self._populate_project(writer, deps, tools)
             writer.close()
+            return writer
 
-    def _write_shell_file(self, basedir, deps, tools):
+    def _write_shell_file(self, basedir, deps, tools, writer):
         filepath = fs.path.join(basedir, "compile")
         with open(filepath, "w") as fobj:
             data = """#!{executable}
@@ -1017,7 +1021,7 @@ if __name__ == "__main__":
             fobj.write(
                 data.format(
                     executable=sys.executable,
-                    objects=[fs.path.relpath(o, self.outdir) for o in self.objects]))
+                    objects=[fs.path.relpath(o, self.outdir) for o in writer.objects]))
         tools.chmod(filepath, 0o777)
 
     def find_rule(self, ext):
@@ -1051,8 +1055,7 @@ if __name__ == "__main__":
         writer.newline()
 
     def _populate_inputs(self, writer, deps, tools):
-        self.objects = []
-        sources = copy.copy(self.sources)
+        sources = copy.copy(writer.sources)
         while sources:
             source = sources.pop()
             _, ext = fs.path.splitext(source)
@@ -1118,7 +1121,7 @@ if __name__ == "__main__":
 
         self._expand_sources()
         self.outdir = tools.builddir("ninja", self.incremental)
-        self._write_ninja_file(self.outdir, deps, tools)
+        writer = self._write_ninja_file(self.outdir, deps, tools)
         verbose = " -v" if log.is_verbose() else ""
         threads = config.get("jolt", "threads", tools.getenv("JOLT_THREADS", None))
         threads = "-j " + threads if threads else ""
@@ -1141,8 +1144,8 @@ if __name__ == "__main__":
         """
         self._expand_sources()
         self.outdir = tools.builddir("ninja", self.incremental)
-        self._write_ninja_file(self.outdir, deps, tools)
-        self._write_shell_file(self.outdir, deps, tools)
+        writer = self._write_ninja_file(self.outdir, deps, tools)
+        self._write_shell_file(self.outdir, deps, tools, writer)
         pathenv = self.outdir + os.pathsep + tools.getenv("PATH")
         with tools.cwd(self.outdir), tools.environ(PATH=pathenv):
             print()
@@ -1192,14 +1195,14 @@ class CXXLibrary(CXXProject):
         return utils.call_or_return(self, self.__class__.headers)
 
     def _populate_inputs(self, writer, deps, tools):
-        self.depimports += self.toolchain.depimport.build(self, writer, deps)
+        writer.depimports += self.toolchain.depimport.build(self, writer, deps)
         super(CXXLibrary, self)._populate_inputs(writer, deps, tools)
 
     def _populate_project(self, writer, deps, tools):
         if self.shared:
-            self.outfiles = self.toolchain.dynlinker.build(self, writer, self.objects)
+            self.outfiles = self.toolchain.dynlinker.build(self, writer, writer.objects)
         else:
-            self.outfiles = self.toolchain.archiver.build(self, writer, self.objects)
+            self.outfiles = self.toolchain.archiver.build(self, writer, writer.objects)
 
     def publish(self, artifact, tools):
         """
@@ -1226,11 +1229,10 @@ class CXXLibrary(CXXProject):
             for header in self.headers:
                 artifact.collect(header, self.publishapi)
             artifact.cxxinfo.incpaths.append(self.publishapi)
-        if self.objects:
-            artifact.cxxinfo.libpaths.append(self.publishlib)
-            artifact.cxxinfo.libraries.append(self.binary)
-            artifact.strings.library = fs.path.join(
-                self.publishdir, fs.path.basename(self.outfiles[0]))
+        artifact.cxxinfo.libpaths.append(self.publishlib)
+        artifact.cxxinfo.libraries.append(self.binary)
+        artifact.strings.library = fs.path.join(
+            self.publishdir, fs.path.basename(self.outfiles[0]))
 
 CXXLibrary.__doc__ += CXXProject.__doc__
 
@@ -1263,11 +1265,11 @@ class CXXExecutable(CXXProject):
         self.influence.append(influence.TaskAttributeInfluence("strip"))
 
     def _populate_inputs(self, writer, deps, tools):
-        self.depimports += self.toolchain.depimport.build(self, writer, deps)
+        writer.depimports += self.toolchain.depimport.build(self, writer, deps)
         super(CXXExecutable, self)._populate_inputs(writer, deps, tools)
 
     def _populate_project(self, writer, deps, tools):
-        self.toolchain.linker.build(self, writer, [o for o in reversed(self.objects)])
+        self.toolchain.linker.build(self, writer, [o for o in reversed(writer.objects)])
 
     def _strip(self):
         return utils.call_or_return(self, self.__class__.strip)
