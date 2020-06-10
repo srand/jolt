@@ -384,6 +384,28 @@ class LocalStrategy(ExecutionStrategy, PruneStrategy):
         return False
 
 
+class DownloadStrategy(ExecutionStrategy, PruneStrategy):
+    def __init__(self, executors, cache):
+        self.executors = executors
+        self.cache = cache
+
+    def create_executor(self, task):
+        if task.is_alias():
+            return self.executors.create_skipper(task)
+        if task.is_resource():
+            return self.executors.create_local(task)
+        if not task.is_cacheable():
+            return self.executors.create_skipper(task)
+        if task.is_available_locally(self.cache):
+            return self.executors.create_skipper(task)
+        if self.cache.download_enabled() and task.is_available_remotely(self.cache):
+            return self.executors.create_downloader(task)
+        raise_task_error(task, "task must be built first")
+
+    def should_prune_requirements(self, task):
+        return False
+
+
 class CollaborativeDistributedStrategy(ExecutionStrategy, PruneStrategy):
     def __init__(self, executors, cache):
         self.executors = executors
