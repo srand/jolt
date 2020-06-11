@@ -328,6 +328,7 @@ class TaskProxy(object):
                     with cache.get_context(self) as context:
                         self.running()
                         with self.tools.cwd(self.task.joltdir):
+                            hooks.task_prerun(self, context, self.tools)
                             if self.is_goal() and self.options.debug:
                                 log.info("Entering debug shell")
                                 self.task.shell(context, self.tools)
@@ -340,6 +341,7 @@ class TaskProxy(object):
 
                     with cache.get_artifact(self) as artifact:
                         with self.tools.cwd(self.task.joltdir):
+                            hooks.task_prepublish(self, artifact, self.tools)
                             self.task.publish(artifact, self.tools)
                             hooks.task_postpublish(self, artifact, self.tools)
                         with open(fs.path.join(artifact.path, ".build.log"), "w") as f:

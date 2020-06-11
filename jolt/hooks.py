@@ -20,6 +20,12 @@ class TaskHook(object):
     def task_skipped(self, task):
         pass
 
+    def task_prerun(self, task, deps, tools):
+        pass
+
+    def task_prepublish(self, task, artifact, tools):
+        pass
+
     def task_postrun(self, task, deps, tools):
         pass
 
@@ -79,6 +85,18 @@ class TaskHookRegistry(object):
         for ext in self.hooks:
             utils.call_and_catch(ext.task_skipped, task)
 
+    def task_prerun(self, task, deps, tools):
+        if task.is_resource():
+            return
+        for ext in self.hooks:
+            utils.call_and_catch(ext.task_prerun, task, deps, tools)
+
+    def task_prepublish(self, task, artifact, tools):
+        if task.is_resource():
+            return
+        for ext in self.hooks:
+            utils.call_and_catch(ext.task_prepublish, task, artifact, tools)
+
     def task_postrun(self, task, deps, tools):
         if task.is_resource():
             return
@@ -109,6 +127,12 @@ def task_pruned(task):
 
 def task_skipped(task):
     TaskHookRegistry.get().task_skipped(task)
+
+def task_prerun(task, deps, tools):
+    TaskHookRegistry.get().task_prerun(task, deps, tools)
+
+def task_prepublish(task, artifact, tools):
+    TaskHookRegistry.get().task_prepublish(task, artifact, tools)
 
 def task_postrun(task, deps, tools):
     TaskHookRegistry.get().task_postrun(task, deps, tools)
