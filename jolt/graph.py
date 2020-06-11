@@ -332,6 +332,7 @@ class TaskProxy(object):
                                 log.info("Entering debug shell")
                                 self.task.shell(context, self.tools)
                             self.task.run(context, self.tools)
+                            hooks.task_postrun(self, context, self.tools)
 
                     if cache.is_available_locally(self):
                         with cache.get_artifact(self) as artifact:
@@ -340,6 +341,7 @@ class TaskProxy(object):
                     with cache.get_artifact(self) as artifact:
                         with self.tools.cwd(self.task.joltdir):
                             self.task.publish(artifact, self.tools)
+                            hooks.task_postpublish(self, artifact, self.tools)
                         with open(fs.path.join(artifact.path, ".build.log"), "w") as f:
                             f.write(buildlog.getvalue())
                         artifact.commit()

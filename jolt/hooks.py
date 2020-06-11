@@ -20,6 +20,12 @@ class TaskHook(object):
     def task_skipped(self, task):
         pass
 
+    def task_postrun(self, task, deps, tools):
+        pass
+
+    def task_postpublish(self, task, artifact, tools):
+        pass
+
 
 
 class TaskHookFactory(object):
@@ -73,6 +79,18 @@ class TaskHookRegistry(object):
         for ext in self.hooks:
             utils.call_and_catch(ext.task_skipped, task)
 
+    def task_postrun(self, task, deps, tools):
+        if task.is_resource():
+            return
+        for ext in self.hooks:
+            utils.call_and_catch(ext.task_postrun, task, deps, tools)
+
+    def task_postpublish(self, task, artifact, tools):
+        if task.is_resource():
+            return
+        for ext in self.hooks:
+            utils.call_and_catch(ext.task_postpublish, task, artifact, tools)
+
 
 def task_created(task):
     TaskHookRegistry.get().task_created(task)
@@ -91,3 +109,9 @@ def task_pruned(task):
 
 def task_skipped(task):
     TaskHookRegistry.get().task_skipped(task)
+
+def task_postrun(task, deps, tools):
+    TaskHookRegistry.get().task_postrun(task, deps, tools)
+
+def task_postpublish(task, artifact, tools):
+    TaskHookRegistry.get().task_postpublish(task, artifact, tools)
