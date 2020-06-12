@@ -26,6 +26,9 @@ class CompDBExtension(JoltTest):
         --- file: lib.h
         int lib();
 
+        --- file: custom.x
+        Hello
+
         --- file: lib.cpp
         #include "lib.h"
         int lib() {{return 0;}}
@@ -37,7 +40,13 @@ class CompDBExtension(JoltTest):
         --- tasks:
         class Lib(CXXLibrary):
             headers = ["lib.h"]
-            sources = ["lib.cpp"]
+            sources = ["lib.cpp", "custom.x"]
+            x_rule = Rule(infiles=[".x"], outfiles=["{{outdir}}/{{in_base}}.hpp"], command="cp $in $out")
+
+            def publish(self, artifact, tools):
+                super().publish(artifact, tools)
+                with tools.cwd(self.outdir):
+                    artifact.collect("custom.hpp")
 
         class Exe(CXXExecutable):
             requires = "lib"
@@ -47,6 +56,9 @@ class CompDBExtension(JoltTest):
         """
         self.build("exe")
 
+        with self.tools.cwd(self.ws):
+            self.tools.rmtree("build")
+
         r = self.jolt("compdb exe")
         db = re.findall("Compilation DB: (.*)", r, re.M)
         self.assertTrue(len(db) == 1)
@@ -55,7 +67,8 @@ class CompDBExtension(JoltTest):
             commands = json.load(f)
 
         files = {fs.path.basename(command["file"]): command for command in commands}
-        self.assertTrue(len(files) >= 2)
+        self.assertTrue(len(files) >= 3)
+        self.assertIn("custom.x", files)
         self.assertIn("lib.cpp", files)
         self.assertIn("test.cpp", files)
 
@@ -68,3 +81,7 @@ class CompDBExtension(JoltTest):
         with self.tools.cwd(files["test.cpp"]["directory"]):
             with self.assertRaises(Exception, msg="#error"):
                 self.tools.run(files["test.cpp"]["command"])
+
+        with self.tools.cwd(self.ws):
+            self.assertIn("Hello", self.tools.read_file("build/ninja-lib/custom.hpp"))
+

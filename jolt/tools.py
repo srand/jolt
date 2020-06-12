@@ -981,6 +981,10 @@ class Tools(object):
                 srcpath = fs.path.join(artifact.get_task().joltdir, relsrcpath)
                 dstpath = fs.path.join(path, reldstpath)
                 self.symlink(srcpath, dstpath)
+
+                # Restore missing srcfiles if they resided in a build directory
+                if relsrcpath.startswith("build") and not fs.path.exists(srcpath):
+                    fs.copy(fs.path.join(artifact.path, reldstpath), srcpath)
             self.write_file(meta, artifact.path)
         return path
 
