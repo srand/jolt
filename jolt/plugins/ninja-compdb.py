@@ -53,6 +53,21 @@ class CompDBHookFactory(TaskHookFactory):
         return CompDBHooks()
 
 
+def patch_commands(commands, task):
+    for command in commands:
+        # Patch commands to use reflected sandboxes
+        command["command"] = command["command"].replace(
+            "sandbox-", "sandbox-reflect-")
+
+        # Make directory relative to local joltdir
+        try:
+            command["directory"] = command["directory"].replace(
+                command["joltdir"], task.joltdir)
+        except Exception:
+            pass
+    return commands
+
+
 @cli.cli.command(name="compdb")
 @click.argument("task", type=str, nargs=-1, required=False, autocompletion=cli._autocomplete_tasks)
 @click.option("-d", "--default", type=str, multiple=True, help="Override default parameter values.")
@@ -125,6 +140,7 @@ def compdb(ctx, task, default):
             with goal.tools.cwd(artifact.path):
                 with open(goal.tools.expand_path("compile_commands.json")) as f:
                     all_commands = json.load(f)
+                patch_commands(all_commands, goal.task)
 
             # Load commands from goal task dependencies
             for name, artifact in context.items():
@@ -132,18 +148,9 @@ def compdb(ctx, task, default):
                     with goal.tools.cwd(artifact.path):
                         with open(goal.tools.expand_path("compile_commands.json")) as f:
                             commands = json.load(f)
-                    all_commands.extend(commands)
+                    patch_commands(commands, goal.task)
                     goal.tools.sandbox(artifact, incremental=True, reflect=True)
-                except Exception:
-                    pass
-
-            # Patch commands to use reflected sandboxes
-            for command in all_commands:
-                command["command"] = command["command"].replace(
-                    "sandbox-", "sandbox-reflect-")
-                try:
-                    command["directory"] = command["directory"].replace(
-                        command["joltdir"], artifact.get_task().joltdir)
+                    all_commands.extend(commands)
                 except Exception:
                     pass
 
