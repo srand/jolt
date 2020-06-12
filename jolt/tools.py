@@ -282,7 +282,7 @@ class Tools(object):
 
 
     def __init__(self, task=None, cwd=None, env=None):
-        self._cwd = cwd or os.getcwd()
+        self._cwd = fs.path.normpath(fs.path.join(os.getcwd(), cwd or os.getcwd()))
         self._env = copy.deepcopy(env or os.environ)
         self._task = task
         self._builddir = {}
