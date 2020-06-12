@@ -149,10 +149,10 @@ def compdb(ctx, task, default):
                         with open(goal.tools.expand_path("compile_commands.json")) as f:
                             commands = json.load(f)
                     patch_commands(commands, goal.task)
-                    goal.tools.sandbox(artifact, incremental=True, reflect=True)
                     all_commands.extend(commands)
                 except Exception:
                     pass
+                goal.tools.sandbox(artifact, incremental=True, reflect=True)
 
             # Write result
             with goal.tools.cwd(outdir):
