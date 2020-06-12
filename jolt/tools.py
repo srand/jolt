@@ -980,7 +980,13 @@ class Tools(object):
             for relsrcpath, reldstpath in artifact.files.items():
                 srcpath = fs.path.join(artifact.get_task().joltdir, relsrcpath)
                 dstpath = fs.path.join(path, reldstpath)
-                self.symlink(srcpath, dstpath)
+                if fs.path.isdir(dstpath):
+                    files = fs.scandir(srcpath)
+                    for file in files:
+                        relfile = file[len(srcpath)+1:]
+                        self.symlink(file, fs.path.join(dstpath, relfile))
+                else:
+                    self.symlink(srcpath, dstpath)
 
                 # Restore missing srcfiles if they resided in a build directory
                 if relsrcpath.startswith("build") and not fs.path.exists(srcpath):
