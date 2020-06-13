@@ -14,6 +14,7 @@ from jolt import log
 from jolt import utils
 from jolt import tools
 from jolt.error import raise_error
+from jolt.error import raise_task_error
 from jolt.error import raise_task_error_if
 from jolt.graph import PruneStrategy
 from jolt.manifest import ManifestExtension

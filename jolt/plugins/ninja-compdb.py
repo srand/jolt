@@ -73,7 +73,22 @@ def patch_commands(commands, task):
 @click.option("-d", "--default", type=str, multiple=True, help="Override default parameter values.")
 @click.pass_context
 def compdb(ctx, task, default):
-    """ Generate a compilation database for the specified task. """
+    """
+    Generate a compilation database for a task.
+
+    Aggregates compilation databases found in artifacts of the specified task and
+    its dependencies. The commands are then post-processed and localized to the
+    current workspace.
+
+    All task artifacts are sandboxed and their directory trees are recreated
+    using symlinks pointing to the origin of collected files. When opening a
+    file, an IDE can then follow the symlinks into the workspace instead of
+    opening files in the artifact cache.
+
+    The database must be regenerated if dependencies or the directory tree
+    of an artifact change.
+
+    """
 
     manifest = ctx.obj["manifest"]
     options = JoltOptions(default=default)
@@ -89,21 +104,6 @@ def compdb(ctx, task, default):
 
     gb = graph.GraphBuilder(registry, manifest, options, progress=True)
     dag = gb.build(task)
-
-    available_in_cache = [
-        (t.is_available_locally(acache) or (
-            t.is_available_remotely(acache) and acache.download_enabled()), t)
-        for t in dag.tasks if t.is_cacheable()]
-
-    for available, task in available_in_cache:
-        raise_task_error_if(
-            not available, task,
-            "task artifact is not available in any cache, build it first")
-
-    for goal in dag.goals:
-        raise_task_error_if(
-            not isinstance(goal.task, ninja.CXXProject),
-            "not a Ninja C++ task")
 
     try:
         with log.progress("Progress", dag.number_of_tasks(), " tasks", estimates=False, debug=False) as p:
@@ -133,22 +133,19 @@ def compdb(ctx, task, default):
 
     for goal in dag.goals:
         with acache.get_context(goal) as context:
+            all_commands = []
             outdir = goal.tools.builddir("ninja", True)
 
-            # Load commands from goal task
-            artifact = acache.get_artifact(goal)
-            with goal.tools.cwd(artifact.path):
-                with open(goal.tools.expand_path("compile_commands.json")) as f:
-                    all_commands = json.load(f)
-                patch_commands(all_commands, goal.task)
+            artifacts = [acache.get_artifact(goal)]
+            artifacts += [artifact for name, artifact in context.items()]
 
-            # Load commands from goal task dependencies
-            for name, artifact in context.items():
+            # Load commands from artifacts
+            for artifact in artifacts:
                 try:
                     with goal.tools.cwd(artifact.path):
                         with open(goal.tools.expand_path("compile_commands.json")) as f:
                             commands = json.load(f)
-                    patch_commands(commands, goal.task)
+                    patch_commands(commands, artifact.get_task())
                     all_commands.extend(commands)
                 except Exception:
                     pass
