@@ -13,6 +13,145 @@ from jolt import filesystem as fs
 from jolt.error import raise_task_error_if, JoltCommandError
 
 
+class attributes:
+    @staticmethod
+    def _concat(attrib, postfix):
+        def _decorate(cls):
+            _orig = getattr(cls, "_" + attrib)
+            def _get(self):
+                orig = _orig(self)
+                return orig + getattr(self, self.expand(postfix), type(orig)())
+            setattr(cls, "_" + attrib, _get)
+            return cls
+        return _decorate
+
+    @staticmethod
+    def asflags(attrib):
+        """
+        Decorates a task with an alternative ``asflags`` attribute.
+
+        The new attribute will be concatenated with the regular
+        ``asflags`` attribute.
+
+        Args:
+            attrib (str): Name of alternative attribute.
+                Keywords are expanded.
+        """
+        return attributes._concat("asflags", attrib)
+
+    @staticmethod
+    def cflags(attrib):
+        """
+        Decorates a task with an alternative ``cflags`` attribute.
+
+        The new attribute will be concatenated with the regular
+        ``asflags`` attribute.
+
+        Args:
+            attrib (str): Name of alternative attribute.
+                Keywords are expanded.
+        """
+        return attributes._concat("cflags", attrib)
+
+    @staticmethod
+    def cxxflags(attrib):
+        """
+        Decorates a task with an alternative ``cxxflags`` attribute.
+
+        The new attribute will be concatenated with the regular
+        ``cxxflags`` attribute.
+
+        Args:
+            attrib (str): Name of alternative attribute.
+                Keywords are expanded.
+        """
+        return attributes._concat("cxxflags", attrib)
+
+    @staticmethod
+    def incpaths(attrib):
+        """
+        Decorates a task with an alternative ``incpaths`` attribute.
+
+        The new attribute will be concatenated with the regular
+        ``incpaths`` attribute.
+
+        Args:
+            attrib (str): Name of alternative attribute.
+                Keywords are expanded.
+        """
+        return attributes._concat("incpaths", attrib)
+
+    @staticmethod
+    def ldflags(attrib):
+        """
+        Decorates a task with an alternative ``ldflags`` attribute.
+
+        The new attribute will be concatenated with the regular
+        ``ldflags`` attribute.
+
+        Args:
+            attrib (str): Name of alternative attribute.
+                Keywords are expanded.
+        """
+        return attributes._concat("ldflags", attrib)
+
+    @staticmethod
+    def libpaths(attrib):
+        """
+        Decorates a task with an alternative ``libpaths`` attribute.
+
+        The new attribute will be concatenated with the regular
+        ``libpaths`` attribute.
+
+        Args:
+            attrib (str): Name of alternative attribute.
+                Keywords are expanded.
+        """
+        return attributes._concat("libpaths", attrib)
+
+    @staticmethod
+    def libraries(attrib):
+        """
+        Decorates a task with an alternative ``libraries`` attribute.
+
+        The new attribute will be concatenated with the regular
+        ``libraries`` attribute.
+
+        Args:
+            attrib (str): Name of alternative attribute.
+                Keywords are expanded.
+        """
+        return attributes._concat("libraries", attrib)
+
+    @staticmethod
+    def macros(attrib):
+        """
+        Decorates a task with an alternative ``macros`` attribute.
+
+        The new attribute will be concatenated with the regular
+        ``macros`` attribute.
+
+        Args:
+            attrib (str): Name of alternative attribute.
+                Keywords are expanded.
+        """
+        return attributes._concat("macros", attrib)
+
+    @staticmethod
+    def sources(attrib):
+        """
+        Decorates a task with an alternative ``sources`` attribute.
+
+        The new attribute will be concatenated with the regular
+        ``sources`` attribute.
+
+        Args:
+            attrib (str): Name of alternative attribute.
+                Keywords are expanded.
+        """
+        return attributes._concat("sources", attrib)
+
+
 class Variable(influence.HashInfluenceProvider):
     def __init__(self, value=None):
         self._value = value
@@ -45,7 +184,7 @@ class EnvironmentVariable(Variable):
 
 class ToolVariable(Variable):
     def create(self, project, writer, deps, tools):
-        super().create(project, writer, deps, tool)
+        super().create(project, writer, deps, tools)
         executable = self._value.split()[0]
         executable_path = tools.which(executable)
         if executable_path:
@@ -491,7 +630,7 @@ class Macros(Variable):
 
     def create(self, project, writer, deps, tools):
         macros = [tools.expand(macro) for macro in project.macros]
-        for name, artifact in deps.items():
+        for _, artifact in deps.items():
             macros += artifact.cxxinfo.macros.items()
         macros = ["{0}{1}".format(self.prefix, macro) for macro in macros]
         writer.variable(self.name, " ".join(macros))
@@ -503,7 +642,7 @@ class ImportedFlags(Variable):
         cflags = []
         cxxflags = []
         ldflags = []
-        for name, artifact in deps.items():
+        for _, artifact in deps.items():
             asflags += artifact.cxxinfo.asflags.items()
             cflags += artifact.cxxinfo.cflags.items()
             cxxflags += artifact.cxxinfo.cxxflags.items()
@@ -534,7 +673,7 @@ class IncludePaths(Variable):
             return tools.expand_relpath(fs.path.join(sandbox, path), project.outdir)
 
         incpaths = ["."] + [expand(path) for path in project.incpaths]
-        for name, artifact in deps.items():
+        for _, artifact in deps.items():
             incs = [path for path in artifact.cxxinfo.incpaths.items()]
             if incs:
                 sandbox = tools.sandbox(artifact, project.incremental)
@@ -552,7 +691,7 @@ class LibraryPaths(Variable):
         if isinstance(project, CXXLibrary) and not project.shared:
             return
         libpaths = [tools.expand_relpath(path, project.outdir) for path in project.libpaths]
-        for name, artifact in deps.items():
+        for _, artifact in deps.items():
             libpaths += [fs.path.join(artifact.path, path)
                          for path in artifact.cxxinfo.libpaths.items()]
         libpaths = ["{0}{1}".format(self.prefix, path) for path in libpaths]
@@ -568,7 +707,7 @@ class Libraries(Variable):
         if isinstance(project, CXXLibrary) and not project.shared:
             return
         libraries = [tools.expand(lib) for lib in project._libraries()]
-        for name, artifact in deps.items():
+        for _, artifact in deps.items():
             libraries += artifact.cxxinfo.libraries.items()
         libraries = ["{0}{1}{2}".format(self.prefix, path, self.suffix) for path in libraries]
         writer.variable(self.name, " ".join(libraries))
@@ -1123,7 +1262,7 @@ if __name__ == "__main__":
 
         self._expand_sources()
         self.outdir = tools.builddir("ninja", self.incremental)
-        writer = self._write_ninja_file(self.outdir, deps, tools)
+        self._write_ninja_file(self.outdir, deps, tools)
         verbose = " -v" if log.is_verbose() else ""
         threads = config.get("jolt", "threads", tools.getenv("JOLT_THREADS", None))
         threads = "-j " + threads if threads else ""
