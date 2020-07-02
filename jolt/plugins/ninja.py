@@ -86,7 +86,7 @@ class ProjectVariable(Variable):
 
     @utils.cached.instance
     def get_influence(self, task):
-        return "PV: default={},attrib={}".format(default, attrib)
+        return "PV: default={},attrib={}".format(self._default, self._attrib)
 
 
 class SharedLibraryVariable(Variable):
@@ -100,7 +100,7 @@ class SharedLibraryVariable(Variable):
 
     @utils.cached.instance
     def get_influence(self, task):
-        return "SLV: default={}".format(default)
+        return "SLV: default={}".format(self._default)
 
 
 class GNUPCHVariables(Variable):
