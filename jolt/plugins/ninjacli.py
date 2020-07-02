@@ -152,11 +152,25 @@ class Cache(object):
     def __init__(self, builddir):
         self._builddir = builddir
         self._objects = {}
+        self._objnames = {}
         self._sources = {}
 
     def add_manifest(self, manifest):
-        objects = {}
         for objpath, objdata in manifest.objects.items():
+            objname = os.path.basename(objpath)
+            objpath_known = self._objnames.get(objname, objpath)
+            if objpath_known != objpath:
+                # Multiple objects with the same basename.
+                # No way to know which object will be extracted
+                # from the archive. Remove entries and fall back
+                # to compilation.
+                try:
+                    self._objnames[objname] = None
+                    del self._objects[objpath_known]
+                except KeyError:
+                    pass
+                continue
+            self._objnames[objname] = objpath
             obj = self._objects.get(str(objpath), [])
             deps = [join(self._builddir, dep) for dep in objdata["deps"]]
             obj.append({
