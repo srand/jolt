@@ -1025,6 +1025,8 @@ if __name__ == "__main__":
         tools.chmod(filepath, 0o777)
 
     def find_rule(self, ext):
+        if not ext:
+            return Skip()
         rule = self._rules_by_ext.get(ext)
         if rule is None:
             rule = toolchain.find_rule(ext)
@@ -1054,8 +1056,8 @@ if __name__ == "__main__":
                 rule.create(self, writer, deps, tools)
         writer.newline()
 
-    def _populate_inputs(self, writer, deps, tools):
-        sources = copy.copy(writer.sources)
+    def _populate_inputs(self, writer, deps, tools, sources=None):
+        sources = copy.copy(sources or writer.sources)
         while sources:
             source = sources.pop()
             _, ext = fs.path.splitext(source)
@@ -1270,7 +1272,8 @@ class CXXExecutable(CXXProject):
         super(CXXExecutable, self)._populate_inputs(writer, deps, tools)
 
     def _populate_project(self, writer, deps, tools):
-        self.toolchain.linker.build(self, writer, [o for o in reversed(writer.objects)])
+        outputs = self.toolchain.linker.build(self, writer, [o for o in reversed(writer.objects)])
+        super(CXXExecutable, self)._populate_inputs(writer, deps, tools, outputs)
 
     def _strip(self):
         return utils.call_or_return(self, self.__class__.strip)
