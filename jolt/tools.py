@@ -627,7 +627,7 @@ class Tools(object):
             str: Expanded string.
         """
 
-        return fs.path.join(self.getcwd(), self.expand(pathname, *args, **kwargs))
+        return fs.path.normpath(fs.path.join(self.getcwd(), self.expand(pathname, *args, **kwargs)))
 
     def expand_relpath(self, pathname, relpath=None, *args, **kwargs):
         """ Expands keyword arguments/macros in a pathname format string.
