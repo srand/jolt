@@ -1265,7 +1265,7 @@ if __name__ == "__main__":
         self._write_ninja_file(self.outdir, deps, tools)
         verbose = " -v" if log.is_verbose() else ""
         threads = config.get("jolt", "threads", tools.getenv("JOLT_THREADS", None))
-        threads = "-j " + threads if threads else ""
+        threads = " -j" + threads if threads else ""
         depsfile = self._get_keepdepfile(tools)
         tools.run("ninja{3}{2} -C {0} {1}", self.outdir, verbose, threads, depsfile)
 
