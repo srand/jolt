@@ -4,7 +4,6 @@ from jolt import *
 from jolt import cache
 from jolt import config
 from jolt import filesystem as fs
-from jolt import loader
 from jolt import log
 from jolt import utils
 from jolt.error import raise_error_if
@@ -25,7 +24,7 @@ class SymlinkHooks(TaskHook):
 
         srcpath = cache.ArtifactCache.get().get_path(task)
         destpath = fs.path.join(
-            loader.JoltLoader.get().joltdir,
+            task.task.joltdir,
             self._path,
             utils.canonical(task.short_qualified_name))
 
