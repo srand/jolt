@@ -739,6 +739,7 @@ class GNUOptFlags(GNUFlags):
 class GNUToolchain(Toolchain):
     hh = Skip(infiles=[".h", ".hh", ".hpp", ".hxx", GNUPCHVariables.gch_ext])
     obj = Objects(infiles=[".o", ".obj", ".a"])
+    bin = Skip(infiles=[".dll", ".elf", ".exe", ".out", ".so"])
 
     joltdir = ProjectVariable()
     outdir = ProjectVariable()
@@ -861,6 +862,7 @@ MSVCDepImporter = GNUDepImporter
 class MSVCToolchain(Toolchain):
     hh = Skip(infiles=[".h", ".hh", ".hpp", ".hxx"])
     obj = Objects(infiles=[".o", ".obj", ".a"])
+    bin = Skip(infiles=[".dll", ".exe"])
 
     joltdir = ProjectVariable()
     outdir = ProjectVariable()
