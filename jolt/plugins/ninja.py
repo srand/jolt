@@ -6,7 +6,8 @@ import sys
 
 from jolt.tasks import Task
 from jolt import config
-from jolt import influence
+from jolt.influence import FileInfluence
+from jolt.influence import HashInfluenceProvider, TaskAttributeInfluence
 from jolt import log
 from jolt import utils
 from jolt import filesystem as fs
@@ -152,7 +153,7 @@ class attributes:
         return attributes._concat("sources", attrib)
 
 
-class Variable(influence.HashInfluenceProvider):
+class Variable(HashInfluenceProvider):
     def __init__(self, value=None):
         self._value = value
 
@@ -272,7 +273,7 @@ class GNUPCHVariables(Variable):
         return "PCHV"
 
 
-class Rule(influence.HashInfluenceProvider):
+class Rule(HashInfluenceProvider):
     """ A source transformation rule.
 
     Rules are used to transform files from one type to another.
@@ -1041,25 +1042,23 @@ class CXXProject(Task):
         self._pch_out = None
         self.publishdir = self.expand(self.__class__.publishdir or '')
 
-        self.influence.append(influence.TaskAttributeInfluence("asflags"))
-        self.influence.append(influence.TaskAttributeInfluence("cflags"))
-        self.influence.append(influence.TaskAttributeInfluence("cxxflags"))
-        self.influence.append(influence.TaskAttributeInfluence("depimports"))
-        self.influence.append(influence.TaskAttributeInfluence("incpaths"))
-        self.influence.append(influence.TaskAttributeInfluence("ldflags"))
-        self.influence.append(influence.TaskAttributeInfluence("libpaths"))
-        self.influence.append(influence.TaskAttributeInfluence("libraries"))
-        self.influence.append(influence.TaskAttributeInfluence("macros"))
-        self.influence.append(influence.TaskAttributeInfluence("sources"))
-        self.influence.append(influence.TaskAttributeInfluence("binary"))
-        self.influence.append(influence.TaskAttributeInfluence("publishdir"))
-        self.influence.append(influence.TaskAttributeInfluence("toolchain"))
+        self.influence.append(TaskAttributeInfluence("asflags"))
+        self.influence.append(TaskAttributeInfluence("cflags"))
+        self.influence.append(TaskAttributeInfluence("cxxflags"))
+        self.influence.append(TaskAttributeInfluence("depimports"))
+        self.influence.append(TaskAttributeInfluence("incpaths"))
+        self.influence.append(TaskAttributeInfluence("ldflags"))
+        self.influence.append(TaskAttributeInfluence("libpaths"))
+        self.influence.append(TaskAttributeInfluence("libraries"))
+        self.influence.append(TaskAttributeInfluence("macros"))
+        self.influence.append(TaskAttributeInfluence("sources"))
+        self.influence.append(TaskAttributeInfluence("binary"))
+        self.influence.append(TaskAttributeInfluence("publishdir"))
+        self.influence.append(TaskAttributeInfluence("toolchain"))
 
         if self.source_influence:
             for source in self.sources:
-                self.influence.append(influence.FileInfluence(source))
-        else:
-            self._verify_influence()
+                self.influence.append(FileInfluence(source))
         self._init_rules_and_vars()
 
     def _init_rules_and_vars(self):
@@ -1086,17 +1085,27 @@ class CXXProject(Task):
     def _init_sources(self):
         self.sources = utils.as_list(utils.call_or_return(self, self.__class__._sources))
 
-    def _verify_influence(self):
-        sources = set(self.sources)
-        for ip in self.influence:
-            if not isinstance(ip, influence.FileInfluence):
-                continue
-            ok = [source for source in sources
-                  if self.expand(source).startswith(self.expand(ip.path))]
-            sources.difference_update(ok)
-        for source in sources:
-            log.warning("Missing influence: {} ({})", source, self.name)
-            self.influence.append(influence.FileInfluence(source))
+    def _verify_influence(self, deps, artifact, tools):
+        # Verify that listed sources and their dependencies are influencing
+        sources = set(self.sources + getattr(self, "headers", []))
+        with tools.cwd(self.outdir):
+            depfiles = [obj + ".d" for obj in getattr(self._writer, "objects", [])]
+            for depfile in depfiles:
+                try:
+                    data = tools.read_file(depfile)
+                except:
+                    continue
+                data = data.replace("\n", "")
+                data = data.replace("\r", "")
+                data = data.replace("\\", "")
+                data = data.split(":", 1)
+                if len(data) <= 1:
+                    continue
+                data = data[1]
+                depsrcs = [dep for dep in data.split(" ") if dep]
+                depsrcs = [tools.expand_relpath(dep, self.joltdir) for dep in depsrcs]
+                sources = sources.union(depsrcs)
+        super()._verify_influence(deps, artifact, tools, sources)
 
     def _expand_sources(self):
         sources = []
@@ -1264,7 +1273,7 @@ if __name__ == "__main__":
 
         self._expand_sources()
         self.outdir = tools.builddir("ninja", self.incremental)
-        self._write_ninja_file(self.outdir, deps, tools)
+        self._writer = self._write_ninja_file(self.outdir, deps, tools)
         verbose = " -v" if log.is_verbose() else ""
         threads = config.get("jolt", "threads", tools.getenv("JOLT_THREADS", None))
         threads = " -j" + threads if threads else ""
@@ -1329,10 +1338,10 @@ class CXXLibrary(CXXProject):
         self.publishlib = self.publishdir
         if self.source_influence:
             for header in self.headers:
-                self.influence.append(influence.FileInfluence(header))
-        self.influence.append(influence.TaskAttributeInfluence("headers"))
-        self.influence.append(influence.TaskAttributeInfluence("publishapi"))
-        self.influence.append(influence.TaskAttributeInfluence("shared"))
+                self.influence.append(FileInfluence(header))
+        self.influence.append(TaskAttributeInfluence("headers"))
+        self.influence.append(TaskAttributeInfluence("publishapi"))
+        self.influence.append(TaskAttributeInfluence("shared"))
 
     def _headers(self):
         return utils.call_or_return(self, self.__class__.headers)
@@ -1406,7 +1415,7 @@ class CXXExecutable(CXXProject):
     def __init__(self, *args, **kwargs):
         super(CXXExecutable, self).__init__(*args, **kwargs)
         self.strip = utils.call_or_return(self, self.__class__._strip)
-        self.influence.append(influence.TaskAttributeInfluence("strip"))
+        self.influence.append(TaskAttributeInfluence("strip"))
 
     def _populate_inputs(self, writer, deps, tools):
         writer.depimports += self.toolchain.depimport.build(self, writer, deps)

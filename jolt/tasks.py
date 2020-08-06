@@ -10,7 +10,7 @@ from jolt import utils
 from jolt.cache import ArtifactAttributeSetProvider
 from jolt.error import raise_task_error, raise_task_error_if
 from jolt.expires import Immediately
-from jolt.influence import TaskSourceInfluence, TaintInfluenceProvider
+from jolt.influence import FileInfluence, TaskSourceInfluence, TaintInfluenceProvider
 from jolt.tools import Tools
 
 
@@ -567,7 +567,7 @@ class TaskBase(object):
         return utils.call_or_return(self, self.__class__.selfsustained)
 
     def _get_source(self, func):
-        source, lines = inspect.getsourcelines(func)
+        source, _ = inspect.getsourcelines(func)
         return "\n".join(source)
 
     def _create_exports_and_parameters(self):
@@ -621,6 +621,40 @@ class TaskBase(object):
             raise_task_error_if(
                 param.is_required() and param.is_unset(), self,
                 "required parameter '{0}' has not been set", key)
+
+    def _verify_influence(self, deps, artifact, tools, sources=None):
+        # Verify that any transformed sources are influencing
+        sources = set(sources or [])
+
+        # Verify that published files are influencing
+        for src, _ in artifact.files.items():
+            sources.add(src)
+
+        for _, dep in deps.items():
+            if isinstance(dep.get_task(), FileInfluence):
+                # Resource dependencies may cover the influence implicitly
+                sources = filter(lambda d: not d.startswith(str(dep.get_task().path)), sources)
+            else:
+                # As well as dependencies publishing files
+                sources = filter(lambda d: not d.startswith(dep.path), sources)
+
+        # Ignore any files in build directories
+        sources = filter(lambda d: not d.startswith(tools.buildroot), sources)
+        sources = set(sources)
+
+        for ip in self.influence:
+            if not isinstance(ip, FileInfluence):
+                continue
+            ok = [source for source in sources
+                  if self.tools.expand_relpath(source, self.joltdir).startswith(
+                          self.tools.expand_relpath(ip.path, self.joltdir))
+                  or fnmatch.fnmatch(
+                      self.tools.expand_relpath(source, self.joltdir),
+                      self.tools.expand_relpath(ip.path, self.joltdir))]
+            sources.difference_update(ok)
+        for source in sources:
+            log.warning("Missing influence: {} ({})", source, self.name)
+        raise_task_error_if(sources, self, "task is missing source influence")
 
     @utils.cached.instance
     def _get_export_objects(self):

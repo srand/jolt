@@ -14,14 +14,15 @@ class ArtifactEnvironApi(JoltTest):
         --- tasks:
         class A(Task):
             def publish(self, a, t):
-                t.write_file("bin.sh", "#!/bin/sh\\necho first")
-                t.write_file("sbin.sh", "#!/bin/sh\\necho second")
-                t.chmod("bin.sh", 0o755)
-                t.chmod("sbin.sh", 0o755)
-                a.collect("bin.sh", "bin/")
-                a.collect("sbin.sh", "sbin/")
-                a.environ.PATH.append("bin")
-                a.environ.PATH.append("sbin")
+                with t.cwd(t.builddir()):
+                    t.write_file("bin.sh", "#!/bin/sh\\necho first")
+                    t.write_file("sbin.sh", "#!/bin/sh\\necho second")
+                    t.chmod("bin.sh", 0o755)
+                    t.chmod("sbin.sh", 0o755)
+                    a.collect("bin.sh", "bin/")
+                    a.collect("sbin.sh", "sbin/")
+                    a.environ.PATH.append("bin")
+                    a.environ.PATH.append("sbin")
 
         class B(Task):
             name = "b"

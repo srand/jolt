@@ -173,6 +173,7 @@ class BuildCli(testsupport.JoltTest):
     def test_copy(self):
         """
         --- tasks:
+        @influence.files("test.jolt")
         class A(Task):
             def run(self, d, t):
                 pass

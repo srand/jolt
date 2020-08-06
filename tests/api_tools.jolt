@@ -251,6 +251,7 @@ class ToolsApi(JoltTest):
         --- file: test.txt
         test
         --- tasks:
+        @influence.files("test*")
         class A(Task):
             def publish(self, a, t):
                 a.collect("test.txt", "test2.txt")

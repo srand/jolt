@@ -156,16 +156,55 @@ class NinjaApi(JoltTest):
         class Lib(CXXLibrary):
             arg = Parameter()
             incpaths = ["{{arg}}"]
-            sources = ["test.cpp"]
+            sources = ["{{arg}}/*.h", "test.cpp"]
 
         class Exe(CXXExecutable):
             arg = Parameter()
             incpaths = ["{{arg}}"]
-            sources = ["test.cpp"]
+            sources = ["{{arg}}/*.h", "test.cpp"]
 
         ---
         """
         self.jolt("build lib:arg=inc exe:arg=inc")
+
+
+    def test_influence_missing(self):
+        """
+        --- file: inc/test.h
+
+        --- file: test.cpp
+        #include "test.h"
+        int main() {{return 0;}}
+
+        --- tasks:
+        @influence.files("inc/*.h")
+        class Api(Task):
+            def publish(self, artifact, tools):
+                artifact.collect("inc/*.h")
+                artifact.cxxinfo.incpaths.append("inc")
+
+        class Lib(CXXLibrary):
+            incpaths = ["inc"]
+            sources = ["test.cpp"]
+
+        class Exe(CXXExecutable):
+            incpaths = ["inc"]
+            sources = ["test.cpp"]
+
+        class Lib_req(CXXLibrary):
+            requires = ["api"]
+            sources = ["test.cpp"]
+
+        class Exe_req(CXXExecutable):
+            requires = ["api"]
+            sources = ["test.cpp"]
+        ---
+        """
+        with self.assertRaises(Exception, msg="influence missing"):
+            self.jolt("build lib")
+        with self.assertRaises(Exception, msg="influence missing"):
+            self.jolt("build exe")
+        self.jolt("build lib_req exe_req")
 
 
     def test_ldflags(self):
@@ -182,7 +221,7 @@ class NinjaApi(JoltTest):
 
         --- tasks:
         class Base(CXXLibrary):
-            sources = ["base.cpp"]
+            sources = ["base.*"]
 
         class Lib(CXXLibrary):
             arg1 = Parameter()
@@ -190,14 +229,14 @@ class NinjaApi(JoltTest):
             shared = True
             ldflags = ["-L{{arg1}}/lib"]
             libraries = ["{{arg2}}"]
-            sources = ["main.cpp"]
+            sources = ["base.h", "main.cpp"]
 
         class Exe(CXXExecutable):
             arg1 = Parameter()
             arg2 = Parameter()
             ldflags = ["-L{{arg1}}/lib"]
             libraries = ["{{arg2}}"]
-            sources = ["main.cpp"]
+            sources = ["base.h", "main.cpp"]
 
         ---
         """
@@ -220,7 +259,7 @@ class NinjaApi(JoltTest):
 
         --- tasks:
         class Base(CXXLibrary):
-            sources = ["base.cpp"]
+            sources = ["base.*"]
 
         class Lib(CXXLibrary):
             arg1 = Parameter()
@@ -228,14 +267,14 @@ class NinjaApi(JoltTest):
             shared = True
             libpaths = ["{{arg1}}/lib"]
             libraries = ["{{arg2}}"]
-            sources = ["main.cpp"]
+            sources = ["base.h", "main.cpp"]
 
         class Exe(CXXExecutable):
             arg1 = Parameter()
             arg2 = Parameter()
             libpaths = ["{{arg1}}/lib"]
             libraries = ["{{arg2}}"]
-            sources = ["main.cpp"]
+            sources = ["base.h", "main.cpp"]
 
         ---
         """

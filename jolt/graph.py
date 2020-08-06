@@ -335,18 +335,19 @@ class TaskProxy(object):
                             self.task.run(context, self.tools)
                             hooks.task_postrun(self, context, self.tools)
 
-                    if cache.is_available_locally(self):
-                        with cache.get_artifact(self) as artifact:
-                            artifact.discard()
+                        if cache.is_available_locally(self):
+                            with cache.get_artifact(self) as artifact:
+                                artifact.discard()
 
-                    with cache.get_artifact(self) as artifact:
-                        with self.tools.cwd(self.task.joltdir):
-                            hooks.task_prepublish(self, artifact, self.tools)
-                            self.task.publish(artifact, self.tools)
-                            hooks.task_postpublish(self, artifact, self.tools)
-                        with open(fs.path.join(artifact.path, ".build.log"), "w") as f:
-                            f.write(buildlog.getvalue())
-                        artifact.commit()
+                        with cache.get_artifact(self) as artifact:
+                            with self.tools.cwd(self.task.joltdir):
+                                hooks.task_prepublish(self, artifact, self.tools)
+                                self.task.publish(artifact, self.tools)
+                                self.task._verify_influence(context, artifact, self.tools)
+                                hooks.task_postpublish(self, artifact, self.tools)
+                            with open(fs.path.join(artifact.path, ".build.log"), "w") as f:
+                                f.write(buildlog.getvalue())
+                            artifact.commit()
 
             if force_build or force_upload or not available_remotely:
                 raise_task_error_if(

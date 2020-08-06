@@ -6,8 +6,10 @@ import time
 from jolt import *
 
 
+@influence.files("../README.rst")
 @influence.files("../setup.py")
-@influence.files("../jolt/**/*.py")
+@influence.files("../jolt/*.py")
+@influence.files("../jolt/plugins/*.py")
 @influence.files("../**/*.conf")
 @influence.files("../docker/Dockerfile.*")
 @influence.files("../docker/docker-compose-amqp-{storage}.yml")
@@ -20,7 +22,9 @@ class JoltAmqp(Task):
     def publish(self, artifact, tools):
         with tools.cwd(".."):
             artifact.collect("**/*.conf")
-            artifact.collect("**/*.py")
+            artifact.collect("setup.py")
+            artifact.collect("jolt/*.py")
+            artifact.collect("jolt/plugins/*.py")
             artifact.collect("README.rst")
             artifact.collect("docker/Dockerfile.*", flatten=True)
             artifact.collect("docker/docker-compose-amqp-{storage}.yml", flatten=True)

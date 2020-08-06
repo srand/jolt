@@ -33,7 +33,7 @@ class CompDBExtension(JoltTest):
         #include "lib.h"
         int lib() {{return 0;}}
 
-        --- file: test.cpp
+        --- file: test/test.cpp
         #include "lib.h"
         int main() {{return lib();}}
 
@@ -50,7 +50,7 @@ class CompDBExtension(JoltTest):
 
         class Exe(CXXExecutable):
             requires = "lib"
-            sources = ["test.cpp"]
+            sources = ["test/test.cpp"]
 
         ---
         """
@@ -73,6 +73,7 @@ class CompDBExtension(JoltTest):
         self.assertIn("test.cpp", files)
 
         with self.tools.cwd(files["test.cpp"]["directory"]):
+            self.tools.run("mkdir test")
             self.tools.run(files["test.cpp"]["command"])
 
         with self.tools.cwd(self.ws):

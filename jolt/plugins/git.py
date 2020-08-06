@@ -344,7 +344,7 @@ class GitSrc(WorkspaceResource):
 TaskRegistry.get().add_task_class(GitSrc)
 
 
-class Git(GitSrc):
+class Git(GitSrc, FileInfluence):
     """ Clones a Git repo.
 
     Also influences the hash of consuming tasks, causing tasks to
