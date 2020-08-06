@@ -1,0 +1,14 @@
+#!/usr/bin/env python3
+
+from jolt import *
+
+
+class Pass(Task):
+    cacheable=False
+
+
+class Fail(Task):
+    cacheable=False
+
+    def run(self, d, t):
+        assert False, "always fails"

@@ -1,0 +1,55 @@
+#!/usr/bin/env python
+
+import os
+import sys
+import time
+sys.path.append(".")
+
+from testsupport import JoltTest
+
+
+class NinjaCachePlugin(JoltTest):
+    name = "ext/ninja-cache"
+
+    def assertCompiled(self, r, filename):
+        if filename not in r:
+            self.fail("{} was not compiled".format(filename))
+
+    def _recipe(self):
+        return "from jolt.plugins.ninja import *\n" + super(NinjaCachePlugin, self)._recipe()
+
+    def test_reuse(self):
+        """
+        --- config:
+        [ninja-cache]
+
+        --- file: test1.h
+        int test1() {{return 1;}}
+
+        --- file: test2.h
+        #include "test1.h"
+        int test2() {{return test1();}}
+
+        --- file: test.cpp
+        #include "test2.h"
+        int test() {{return test2();}}
+
+        --- tasks:
+        class Lib(CXXLibrary):
+            headers = ["test*.h"]
+            sources = ["test.cpp"]
+        ---
+        """
+        self.jolt("build lib")
+
+        r = self.jolt("-vv build -f lib")
+        self.assertIn("Reusing test.o", r)
+
+        with self.tools.cwd(self.ws):
+            # Wait a while to make sure the file timestamp changes
+            time.sleep(2)
+            self.tools.write_file("test1.h", "int test1() {{return 2;}}")
+        r = self.jolt("build lib")
+
+        self.assertCompiled(r, "test.cpp")
+        self.assertNotIn("Reusing test.o", r)
