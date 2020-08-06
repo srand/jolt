@@ -385,7 +385,7 @@ class Tools(object):
             Path to the created directory.
         """
         name = self.expand(name or "build")
-        name = fs.path.join("build", name)
+        name = fs.path.join(self.buildroot, name)
 
         # Append task name
         if self._task is not None and unique:
@@ -420,6 +420,11 @@ class Tools(object):
                 dir=fs.path.dirname(dirname))
 
         return self._builddir[name]
+
+    @property
+    def buildroot(self):
+        """ Return the root path of all build directories """
+        return "build"
 
     def chmod(self, pathname, mode):
         """ Changes permissions of files and directories.
@@ -989,7 +994,7 @@ class Tools(object):
                     self.symlink(srcpath, dstpath)
 
                 # Restore missing srcfiles if they resided in a build directory
-                if relsrcpath.startswith("build") and not fs.path.exists(srcpath):
+                if relsrcpath.startswith(self.buildroot) and not fs.path.exists(srcpath):
                     fs.copy(fs.path.join(artifact.path, reldstpath), srcpath)
             self.write_file(meta, artifact.path)
         return path
