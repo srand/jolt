@@ -352,6 +352,11 @@ class FileInfluence(HashInfluenceProvider):
         return "\n".join(result)
 
 
+class DirectoryInfluence(FileInfluence):
+    def __init__(self, path):
+        super().__init__(path.rstrip(os.sep)+"/**")
+
+
 def files(pathname):
     """ Add file content hash influence.
 

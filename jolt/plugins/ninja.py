@@ -6,7 +6,7 @@ import sys
 
 from jolt.tasks import Task
 from jolt import config
-from jolt.influence import FileInfluence
+from jolt.influence import DirectoryInfluence, FileInfluence
 from jolt.influence import HashInfluenceProvider, TaskAttributeInfluence
 from jolt import log
 from jolt import utils
@@ -151,6 +151,36 @@ class attributes:
                 Keywords are expanded.
         """
         return attributes._concat("sources", attrib)
+
+
+class influence:
+    @staticmethod
+    def _list(attrib, provider=FileInfluence):
+        def _decorate(cls):
+            _old_influence = cls._influence
+            def _influence(self, *args, **kwargs):
+                influence = _old_influence(self, *args, *kwargs)
+                items = getattr(self, attrib, [])
+                if callable(items):
+                    items = items()
+                for item in items:
+                    influence.append(provider(item))
+                return influence
+            cls._influence = _influence
+            return cls
+        return _decorate
+
+    @staticmethod
+    def incpaths(provider=DirectoryInfluence):
+        return influence._list("_incpaths", provider)
+
+    @staticmethod
+    def libpaths(provider=DirectoryInfluence):
+        return influence._list("_libpaths", provider)
+
+    @staticmethod
+    def sources(provider=FileInfluence):
+        return influence._list("_sources", provider)
 
 
 class Variable(HashInfluenceProvider):
