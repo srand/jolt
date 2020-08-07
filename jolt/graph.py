@@ -483,6 +483,7 @@ class GraphBuilder(object):
             if child.is_alias():
                 for child_child in child.children:
                     self.graph.add_edges_from([(parent, child_child)])
+                    node.children.append(child_child)
             else:
                 self.graph.add_edges_from([(parent, child)])
             node.children.append(child)
