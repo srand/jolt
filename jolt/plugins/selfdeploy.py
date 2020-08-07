@@ -34,9 +34,10 @@ class Jolt(Task):
             influence.StringInfluence(
                 config.get("selfdeploy", "requires", "")))
         for e in self.extras:
-            self.influence.append(
-                influence.FileInfluence(
-                    fs.path.join(e, "**", "*.py")))
+            self.influence.append(influence.DirectoryInfluence(e))
+
+    def _verify_influence(self, *args, **kwargs):
+        pass  # FIXME: Validation doesn't work properly for directories
 
     @property
     def loaderdir(self):
