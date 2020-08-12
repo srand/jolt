@@ -72,6 +72,7 @@ class NativeRecipe(Recipe):
         generators = inspect.getmembers(module, self._is_generator)
 
         for _, cls in generators:
+            cls.joltdir = self.joltdir or os.path.dirname(self.path)
             classes = utils.as_list(cls().generate())
             tasks += [(c.__name__, c) for c in classes if self._is_task(c)]
             tests += [(c.__name__, c) for c in classes if self._is_test(c)]
@@ -176,7 +177,10 @@ class JoltLoader(object):
         for project, recipes in self._project_recipes.items():
             for joltdir, src in recipes:
                 joltdir = fs.path.join(self.joltdir, joltdir) if joltdir else self.joltdir
-                self._load_file(fs.path.join(joltdir, src), joltdir, project)
+                recipe = NativeRecipe(fs.path.join(self._path, src), joltdir, project)
+                recipe.load()
+                self._tasks += recipe.tasks
+                self._tests += recipe.tests
 
     def load(self, manifest=None):
         for factory in _loaders:
@@ -224,7 +228,8 @@ class JoltLoader(object):
         return self._path
 
     def set_joltdir(self, value):
-        self._path = value
+        if not self._path or len(value) < len(self._path):
+            self._path = value
 
 
 class RecipeExtension(ManifestExtension):
