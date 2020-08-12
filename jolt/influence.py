@@ -320,11 +320,15 @@ _fi_files = {}
 
 
 class FileInfluence(HashInfluenceProvider):
-    def __init__(self, path):
+    def __init__(self, path, ignore=False):
         self.path = path
         self.name = "File"
+        self.ignored = ignore
 
     def get_file_influence(self, path):
+        if self.ignored:
+            return "Ignored"
+
         sha = hashlib.sha1()
         with open(path, "rb") as f:
             for data in iter(lambda: f.read(0x10000), b''):
@@ -357,7 +361,7 @@ class DirectoryInfluence(FileInfluence):
         super().__init__(path.rstrip(os.sep)+"/**")
 
 
-def files(pathname):
+def files(pathname, ignore=False):
     """ Add file content hash influence.
 
     Args:
@@ -366,6 +370,10 @@ def files(pathname):
                 The pattern may contain simple shell-style
                 wildcards such as '*' and '?'. Note: files starting with a
                 dot are not matched by these wildcards.
+        ignore (boolean): Ignore files matched by pathname pattern.
+            Used to disable influence validation for published files that
+            were written to the workspace by a task. This cannot be used
+            to ignore files matched by another instance of the decorator.
 
     Example:
 
@@ -381,7 +389,7 @@ def files(pathname):
         _old_influence = cls._influence
         def _influence(self, *args, **kwargs):
             influence = _old_influence(self, *args, **kwargs)
-            influence.append(FileInfluence(pathname))
+            influence.append(FileInfluence(pathname, ignore=ignore))
             return influence
         cls._influence = _influence
         return cls
