@@ -424,7 +424,8 @@ class Tools(object):
     @property
     def buildroot(self):
         """ Return the root path of all build directories """
-        return "build"
+        root = self._task.joltdir if self._task else self.getcwd()
+        return fs.path.join(self.expand(root), "build")
 
     def chmod(self, pathname, mode):
         """ Changes permissions of files and directories.
@@ -632,7 +633,11 @@ class Tools(object):
             str: Expanded string.
         """
 
-        return fs.path.normpath(fs.path.join(self.getcwd(), self.expand(pathname, *args, **kwargs)))
+        path = fs.path.join(self.getcwd(), self.expand(pathname, *args, **kwargs))
+        # Ensure to retain any trailing path separator which is used as
+        # indicator of directory paths
+        psep = fs.sep if path[-1] == fs.sep else ""
+        return fs.path.normpath(path) + psep
 
     def expand_relpath(self, pathname, relpath=None, *args, **kwargs):
         """ Expands keyword arguments/macros in a pathname format string.
