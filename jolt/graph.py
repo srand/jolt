@@ -213,26 +213,29 @@ class TaskProxy(object):
         self.manifest = manifest
 
         # Find all direct and transitive dependencies
-        self.children = sorted(self.children, key=lambda n: n.qualified_name)
         self.ancestors = set()
         self.descendants = set()
+
         if self.is_extension():
             self.children.append(self.get_extended_task())
+
         self.neighbors = copy.copy(self.children)
         self.neighbors = sorted(self.neighbors, key=lambda n: n.qualified_name)
-        for n in self.children:
-            self.descendants.add(n)
-            if not n.task.selfsustained:
-                self.descendants = self.descendants.union(n.descendants)
-            n.ancestors.add(self)
 
-        self.descendants = sorted(self.descendants, key=lambda n: n.qualified_name)
+        for n in self.neighbors:
+            self.descendants.add(n)
+            self.descendants = self.descendants.union(n.descendants)
+            if not n.task.selfsustained:
+                self.children.extend(n.children)
+            n.ancestors.add(self)
 
         # Exclude transitive alias and resources dependencies
         self.children = list(
             filter(lambda n: not n.is_alias() and (not n.is_resource() or \
                    dag.are_neighbors(self, n)),
-                   self.descendants))
+                   utils.unique_list(self.children)))
+
+        self.descendants = list(self.descendants)
 
         self.task.influence += [TaskRequirementInfluence(n) for n in self.neighbors]
 
@@ -266,7 +269,7 @@ class TaskProxy(object):
         self._completed = True
         try:
             self.graph.remove_node(self)
-        except:
+        except nx.exception.NetworkXError:
             self.warning("Pruned task was executed")
         self.task.info(colors.green(what + " finished after {0} {1}" + self.log_name),
                        self.duration_running,
@@ -277,15 +280,15 @@ class TaskProxy(object):
         self._completed = True
         try:
             self.graph.remove_node(self)
-        except:
-            self.warning("Pruned task was executed")
+        except nx.exception.NetworkXError:
+            pass
         hooks.task_skipped(self)
 
     def pruned(self):
         self._completed = True
         try:
             self.graph.remove_node(self)
-        except:
+        except nx.exception.NetworkXError:
             self.warning("Pruned task was already pruned")
         hooks.task_pruned(self)
 

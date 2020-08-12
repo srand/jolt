@@ -118,6 +118,12 @@ def canonical(s):
     return "".join([c if c.isalnum() else '_' for c in s])
 
 
+def unique_list(seq):
+    seen = set()
+    seen_add = seen.add
+    return [x for x in seq if not (x in seen or seen_add(x))]
+
+
 class _SafeDict(object):
     def __init__(self, values, ignore_errors=False):
         self.values = values
