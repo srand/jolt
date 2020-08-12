@@ -5,6 +5,7 @@ import inspect
 import subprocess
 import unittest as ut
 
+from jolt import filesystem as fs
 from jolt import log
 from jolt import utils
 from jolt.cache import ArtifactAttributeSetProvider
@@ -553,7 +554,7 @@ class TaskBase(object):
         self.influence.append(TaskSourceInfluence("run"))
         self.influence.append(TaskSourceInfluence("unpack"))
         self.influence.append(TaintInfluenceProvider())
-        self.requires = self.expand(utils.call_or_return_list(self, self.__class__._requires))
+        self.requires = self.expand(utils.unique_list(utils.call_or_return_list(self, self.__class__._requires)))
         self.selfsustained = utils.call_or_return(self, self.__class__._selfsustained)
         self.tools = Tools(self, self.joltdir)
 
@@ -630,13 +631,18 @@ class TaskBase(object):
         for src, _ in artifact.files.items():
             sources.add(src)
 
+        sources = map(tools.expand_path, sources)
+        sources = map(fs.path.normpath, sources)
+
         for _, dep in deps.items():
             if isinstance(dep.get_task(), FileInfluence):
                 # Resource dependencies may cover the influence implicitly
-                sources = filter(lambda d: not d.startswith(str(dep.get_task().path)), sources)
+                deppath = self.tools.expand_path(str(dep.get_task().path))
+                sources = set(filter(lambda d: not d.startswith(deppath), sources))
             else:
                 # As well as dependencies publishing files
-                sources = filter(lambda d: not d.startswith(dep.path), sources)
+                deppath = self.tools.expand_path(dep.path)
+                sources = set(filter(lambda d: not d.startswith(deppath), sources))
 
         # Ignore any files in build directories
         sources = filter(lambda d: not d.startswith(tools.buildroot), sources)
