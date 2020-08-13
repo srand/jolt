@@ -16,7 +16,7 @@ class NinjaApi(JoltTest):
             self.fail("{} was not compiled".format(filename))
 
     def _recipe(self):
-        return "from jolt.plugins.ninja import *\n" + super(NinjaApi, self)._recipe()
+        return "import jolt\nfrom jolt.plugins.ninja import *\n" + super(NinjaApi, self)._recipe()
 
 
     def test_asflags(self):
@@ -177,7 +177,7 @@ class NinjaApi(JoltTest):
         int main() {{return 0;}}
 
         --- tasks:
-        @influence.files("inc/*.h")
+        @jolt.influence.files("inc/*.h")
         class Api(Task):
             def publish(self, artifact, tools):
                 artifact.collect("inc/*.h")

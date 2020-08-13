@@ -1,3 +1,5 @@
+import fnmatch
+import re
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from functools import partial
@@ -122,6 +124,13 @@ def unique_list(seq):
     seen = set()
     seen_add = seen.add
     return [x for x in seq if not (x in seen or seen_add(x))]
+
+
+def pathmatch(string, pattern):
+    pattern = fnmatch.translate(pattern)
+    pattern = pattern.replace('(?s:.*.*/', '(?s:(^|.*/)')
+    pattern = pattern.replace('/.*.*/', '.*/')
+    return re.compile(pattern).match(string)
 
 
 class _SafeDict(object):

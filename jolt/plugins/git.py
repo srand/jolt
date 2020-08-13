@@ -226,7 +226,7 @@ class GitInfluenceProvider(FileInfluence):
 
     def __init__(self, path):
         super(GitInfluenceProvider, self).__init__(path)
-        self.path = path
+        self.path = path.rstrip(fs.sep)
         self.name = GitInfluenceProvider.name
 
     @property
@@ -244,8 +244,8 @@ class GitInfluenceProvider(FileInfluence):
 
     @utils.cached.instance
     def get_influence(self, task):
-        tools = Tools(task)
-        path = tools.expand_path(fs.path.join(task.joltdir, self.path))
+        tools = Tools(task, task.joltdir)
+        path = tools.expand_path(self.path)
         git_abs = self._find_dotgit(path)
         git_rel = git_abs[len(self.joltdir)+1:]
         relpath = path[len(git_abs)+1:]
@@ -260,9 +260,13 @@ class GitInfluenceProvider(FileInfluence):
             stderr = "\n".join(e.stderr)
             if "exists on disk, but not in" in stderr:
                 return "{0}/{1}: N/A".format(git_rel, relpath)
-            #for line in e.stderr:
-            #    log.stderr(line)
             raise e
+
+    def is_influenced_by(self, task, path):
+        tools = Tools(task, task.joltdir)
+        gitpath = tools.expand_path(self.path).rstrip(fs.sep)
+        return path.startswith(gitpath + fs.sep)
+
 
 def global_influence(path, cls=GitInfluenceProvider):
     HashInfluenceRegistry.get().register(cls(path))
@@ -280,7 +284,7 @@ def influence(path, git_cls=GitInfluenceProvider):
     return _decorate
 
 
-class GitSrc(WorkspaceResource):
+class GitSrc(WorkspaceResource, FileInfluence):
     """ Clones a Git repo.
     """
 
@@ -340,11 +344,17 @@ class GitSrc(WorkspaceResource):
                 self.git.clean()
                 self.git.patch(self._diff.value)
 
+    def get_influence(self, task):
+        return None
+
+    def is_influenced_by(self, task, path):
+        return path.startswith(self.abspath + fs.sep) and self.sha.is_set()
+
 
 TaskRegistry.get().add_task_class(GitSrc)
 
 
-class Git(GitSrc, FileInfluence):
+class Git(GitSrc):
     """ Clones a Git repo.
 
     Also influences the hash of consuming tasks, causing tasks to
@@ -375,5 +385,9 @@ class Git(GitSrc, FileInfluence):
         return "{0}: {1}".format(
             self.git.relpath,
             self.git.tree_hash())
+
+    def is_influenced_by(self, task, path):
+        return path.startswith(self.abspath + fs.sep)
+
 
 TaskRegistry.get().add_task_class(Git)

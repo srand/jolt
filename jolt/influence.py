@@ -320,27 +320,35 @@ _fi_files = {}
 
 
 class FileInfluence(HashInfluenceProvider):
-    def __init__(self, path, ignore=False):
-        self.path = path
+    def __init__(self, path):
+        self.path = path.rstrip(fs.sep)
         self.name = "File"
-        self.ignored = ignore
+        self._files = {}
 
     def get_file_influence(self, path):
-        if self.ignored:
-            return "Ignored"
-
         sha = hashlib.sha1()
         with open(path, "rb") as f:
             for data in iter(lambda: f.read(0x10000), b''):
                 sha.update(data)
         return sha.hexdigest()
 
+    def get_filelist(self, task):
+        try:
+            return self._files[task]
+        except KeyError:
+            if fs.path.isdir(task.tools.expand_path(self.path)):
+                path = self.path + fs.sep + "**"
+            else:
+                path = self.path
+
+            files = task.tools.glob(path, expand=True)
+            files.sort()
+            self._files[task] = files
+            return files
+
     def get_influence(self, task):
         result = []
-        files = task.tools.glob(self.path)
-        files.sort()
-        for f in files:
-            f = task.tools.expand_path(f)
+        for f in self.get_filelist(task):
             if fs.path.isdir(f):
                 continue
             value = _fi_files.get(f)
@@ -352,8 +360,16 @@ class FileInfluence(HashInfluenceProvider):
             elif fs.path.lexists(f):
                 _fi_files[f] = value = fs.path.basename(f) + ": Symlink (broken)"
                 result.append(value)
-
         return "\n".join(result)
+
+    def is_influenced_by(self, task, path):
+        """
+        Return True if the path influences the task.
+
+        The path is always a file, never a directory.
+        """
+        path = task.tools.expand_path(path)
+        return path in self.get_filelist(task)
 
 
 class DirectoryInfluence(FileInfluence):
@@ -361,7 +377,7 @@ class DirectoryInfluence(FileInfluence):
         super().__init__(path.rstrip(os.sep)+"/**")
 
 
-def files(pathname, ignore=False):
+def files(pathname):
     """ Add file content hash influence.
 
     Args:
@@ -370,10 +386,6 @@ def files(pathname, ignore=False):
                 The pattern may contain simple shell-style
                 wildcards such as '*' and '?'. Note: files starting with a
                 dot are not matched by these wildcards.
-        ignore (boolean): Ignore files matched by pathname pattern.
-            Used to disable influence validation for published files that
-            were written to the workspace by a task. This cannot be used
-            to ignore files matched by another instance of the decorator.
 
     Example:
 
@@ -389,7 +401,7 @@ def files(pathname, ignore=False):
         _old_influence = cls._influence
         def _influence(self, *args, **kwargs):
             influence = _old_influence(self, *args, **kwargs)
-            influence.append(FileInfluence(pathname, ignore=ignore))
+            influence.append(FileInfluence(pathname))
             return influence
         cls._influence = _influence
         return cls
@@ -400,6 +412,62 @@ def files(pathname, ignore=False):
 def global_files(pathname, cls=FileInfluence):
     HashInfluenceRegistry.get().register(cls(pathname))
 
+
+class WhitelistInfluence(FileInfluence):
+    def __init__(self, path):
+        self.path = path.rstrip(fs.sep)
+        self.name = "Whitelist"
+
+    def get_influence(self, task):
+        return self.path
+
+    def is_influenced_by(self, task, path):
+        path = task.tools.expand_path(path)
+        pattern = task.tools.expand_path(self.path)
+        return utils.pathmatch(path, pattern)
+
+
+def whitelist(pathname):
+    """
+    Whitelist files published by a task, but don't let them influence
+    the hash.
+
+    This is typically used to whitelist files in the workspace. It
+    should only be used for files produced by the task, not for files
+    used as input. If possible, consider writing files to build
+    directories instead.
+
+    This decorator cannot be used to exclude influencing files matched
+    by another influence decorator. If there is an overlap of files
+    between decorators, some or all of the overlapping files files may
+    influence the hash.
+
+    Args:
+        pathname (str): A pathname pattern used to match whitelisted files.
+                The pattern may contain simple shell-style
+                wildcards such as '*' and '?'. Note: files starting with a
+                dot are not matched by these wildcards.
+
+    Example:
+
+    .. code-block:: python
+
+        from jolt import influence
+
+        @influence.whitelist("build/")
+        class Example(Task):
+
+    """
+    def _decorate(cls):
+        _old_influence = cls._influence
+        def _influence(self, *args, **kwargs):
+            influence = _old_influence(self, *args, **kwargs)
+            influence.append(WhitelistInfluence(pathname))
+            return influence
+        cls._influence = _influence
+        return cls
+
+    return _decorate
 
 
 class StringInfluence(HashInfluenceProvider):

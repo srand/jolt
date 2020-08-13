@@ -763,7 +763,7 @@ class Tools(object):
         """
         return self._env.get(key, default)
 
-    def glob(self, pathname):
+    def glob(self, pathname, expand=False):
         """ Enumerates files and directories.
 
         Args:
@@ -772,6 +772,7 @@ class Tools(object):
                 The pattern may contain simple shell-style
                 wildcards such as '*' and '?'. Note: files starting with a
                 dot are not matched by these wildcards.
+            expand (boolean): Expand matches to absolute paths. Default: false.
 
         Returns:
             A list of file and directory pathnames. The pathnames are relative
@@ -786,7 +787,9 @@ class Tools(object):
         """
         path = self.expand_path(pathname)
         files = utils.as_list(glob.glob(path, recursive=True))
-        if not fs.path.isabs(pathname):
+        if expand:
+            files = [self.expand_path(file) for file in files]
+        elif not fs.path.isabs(pathname):
             files = [file[len(self.getcwd())+1:] for file in files]
         return files
 
