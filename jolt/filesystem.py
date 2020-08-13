@@ -103,7 +103,8 @@ def copy(src, dest, symlinks=False):
 def scandir(scanpath):
     return [os.path.join(path, f)
             for path, dirs, files in os.walk(scanpath)
-            for f in files]
+            for f in files
+            if f[0] != "."]
 
 
 def get_archive(path):

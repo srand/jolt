@@ -625,20 +625,21 @@ class TaskBase(object):
 
     def _verify_influence(self, deps, artifact, tools, sources=None):
         # Verify that any transformed sources are influencing
-        sources = set(sources or [])
+        sources = set(map(tools.expand_path, sources or []))
 
         # Verify that published files are influencing
         for src, _ in artifact.files.items():
-            sources.add(src)
-
-        sources = map(tools.expand_path, sources)
-        sources = map(fs.path.normpath, sources)
+            src = tools.expand_path(src)
+            if fs.path.isdir(src):
+                sources.update(fs.scandir(src))
+            else:
+                sources.add(src)
 
         for _, dep in deps.items():
             if isinstance(dep.get_task(), FileInfluence):
                 # Resource dependencies may cover the influence implicitly
                 deppath = self.tools.expand_path(str(dep.get_task().path))
-                sources = set(filter(lambda d: not d.startswith(deppath), sources))
+                sources = set(filter(lambda d: not dep.get_task().is_influenced_by(self, d), sources))
             else:
                 # As well as dependencies publishing files
                 deppath = self.tools.expand_path(dep.path)
@@ -651,12 +652,7 @@ class TaskBase(object):
         for ip in self.influence:
             if not isinstance(ip, FileInfluence):
                 continue
-            ok = [source for source in sources
-                  if self.tools.expand_relpath(source, self.joltdir).startswith(
-                          self.tools.expand_relpath(ip.path, self.joltdir))
-                  or fnmatch.fnmatch(
-                      self.tools.expand_relpath(source, self.joltdir),
-                      self.tools.expand_relpath(ip.path, self.joltdir))]
+            ok = [source for source in sources if ip.is_influenced_by(self, source)]
             sources.difference_update(ok)
         for source in sources:
             log.warning("Missing influence: {} ({})", source, self.name)
