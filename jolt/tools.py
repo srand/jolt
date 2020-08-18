@@ -425,7 +425,7 @@ class Tools(object):
     def buildroot(self):
         """ Return the root path of all build directories """
         root = self._task.joltdir if self._task else self.getcwd()
-        return fs.path.join(self.expand(root), "build")
+        return fs.path.normpath(fs.path.join(self.expand(root), "build"))
 
     def chmod(self, pathname, mode):
         """ Changes permissions of files and directories.
