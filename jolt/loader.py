@@ -150,8 +150,17 @@ class JoltLoader(object):
         self._tasks = []
         self._tests = []
         self._path = None
+        self._project_modules = {}
         self._project_recipes = {}
         self._project_resources = {}
+
+    def _add_project_module(self, project, src):
+        modules = self._project_modules.get(project, [])
+        modules.append(src)
+        self._project_modules[project] = src
+
+    def _get_project_modules(self, project):
+        return self._project_modules.get(project, [])
 
     def _add_project_recipe(self, project, joltdir, src):
         recipes = self._project_recipes.get(project, [])
@@ -257,6 +266,10 @@ class RecipeExtension(ManifestExtension):
                 if joltdir:
                     recipe.joltdir = joltdir
 
+            for src in loader._get_project_modules(project):
+                module = manifest_project.create_module()
+                module.src = src
+
 
     def import_manifest(self, manifest):
         loader = JoltLoader.get()
@@ -278,5 +291,9 @@ class RecipeExtension(ManifestExtension):
                 raise_task_error_if(not isinstance(task, WorkspaceResource), task,
                                     "only workspace resources are allowed in manifest")
                 task.acquire_ws()
+
+            for module in project.modules:
+                loader._add_project_module(project, module.src)
+                sys.path.append(fs.path.join(manifest.joltdir, module.src))
 
 ManifestExtensionRegistry.add(RecipeExtension())

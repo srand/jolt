@@ -34,6 +34,12 @@ class _JoltProjectRecipe(SubElement):
         super(_JoltProjectRecipe, self).__init__('recipe', elem=elem)
 
 
+@Attribute('src')
+class _JoltProjectModule(SubElement):
+    def __init__(self, elem=None):
+        super(_JoltProjectModule, self).__init__('module', elem=elem)
+
+
 @Attribute('name')
 class _JoltProjectResource(SubElement):
     def __init__(self, elem=None):
@@ -42,6 +48,7 @@ class _JoltProjectResource(SubElement):
 
 @Attribute('name')
 @Composition(_JoltProjectLink, "link")
+@Composition(_JoltProjectModule, "module")
 @Composition(_JoltProjectRecipe, "recipe")
 @Composition(_JoltProjectResource, "resource")
 class _JoltProject(SubElement):
