@@ -16,17 +16,6 @@ from jolt.error import raise_task_error_if, JoltCommandError
 
 class attributes:
     @staticmethod
-    def _concat(attrib, postfix):
-        def _decorate(cls):
-            _orig = getattr(cls, "_" + attrib)
-            def _get(self):
-                orig = _orig(self)
-                return orig + getattr(self, self.expand(postfix), type(orig)())
-            setattr(cls, "_" + attrib, _get)
-            return cls
-        return _decorate
-
-    @staticmethod
     def asflags(attrib):
         """
         Decorates a task with an alternative ``asflags`` attribute.
@@ -38,7 +27,7 @@ class attributes:
             attrib (str): Name of alternative attribute.
                 Keywords are expanded.
         """
-        return attributes._concat("asflags", attrib)
+        return utils.concat_attributes("asflags", attrib)
 
     @staticmethod
     def cflags(attrib):
@@ -52,7 +41,7 @@ class attributes:
             attrib (str): Name of alternative attribute.
                 Keywords are expanded.
         """
-        return attributes._concat("cflags", attrib)
+        return utils.concat_attributes("cflags", attrib)
 
     @staticmethod
     def cxxflags(attrib):
@@ -66,7 +55,7 @@ class attributes:
             attrib (str): Name of alternative attribute.
                 Keywords are expanded.
         """
-        return attributes._concat("cxxflags", attrib)
+        return utils.concat_attributes("cxxflags", attrib)
 
     @staticmethod
     def incpaths(attrib):
@@ -80,7 +69,7 @@ class attributes:
             attrib (str): Name of alternative attribute.
                 Keywords are expanded.
         """
-        return attributes._concat("incpaths", attrib)
+        return utils.concat_attributes("incpaths", attrib)
 
     @staticmethod
     def ldflags(attrib):
@@ -94,7 +83,7 @@ class attributes:
             attrib (str): Name of alternative attribute.
                 Keywords are expanded.
         """
-        return attributes._concat("ldflags", attrib)
+        return utils.concat_attributes("ldflags", attrib)
 
     @staticmethod
     def libpaths(attrib):
@@ -108,7 +97,7 @@ class attributes:
             attrib (str): Name of alternative attribute.
                 Keywords are expanded.
         """
-        return attributes._concat("libpaths", attrib)
+        return utils.concat_attributes("libpaths", attrib)
 
     @staticmethod
     def libraries(attrib):
@@ -122,7 +111,7 @@ class attributes:
             attrib (str): Name of alternative attribute.
                 Keywords are expanded.
         """
-        return attributes._concat("libraries", attrib)
+        return utils.concat_attributes("libraries", attrib)
 
     @staticmethod
     def macros(attrib):
@@ -136,7 +125,7 @@ class attributes:
             attrib (str): Name of alternative attribute.
                 Keywords are expanded.
         """
-        return attributes._concat("macros", attrib)
+        return utils.concat_attributes("macros", attrib)
 
     @staticmethod
     def sources(attrib):
@@ -150,7 +139,7 @@ class attributes:
             attrib (str): Name of alternative attribute.
                 Keywords are expanded.
         """
-        return attributes._concat("sources", attrib)
+        return utils.concat_attributes("sources", attrib)
 
 
 class influence:

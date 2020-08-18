@@ -8,6 +8,7 @@ from .tasks import Resource
 from .tasks import Export
 from .tasks import Parameter
 from .tasks import BooleanParameter
+from .tasks import attributes
 
 from .cache import Artifact
 from .cache import Context

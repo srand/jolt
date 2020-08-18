@@ -331,6 +331,7 @@ def fromjson(filepath, ignore_errors=False):
             return {}
         raise e
 
+
 def tojson(filepath, data, ignore_errors=False, indent=2):
     try:
         with open(filepath, "w") as f:
@@ -339,3 +340,14 @@ def tojson(filepath, data, ignore_errors=False, indent=2):
         if ignore_errors:
             return
         raise e
+
+
+def concat_attributes(attrib, postfix):
+    def _decorate(cls):
+        _orig = getattr(cls, "_" + attrib)
+        def _get(self):
+            orig = _orig(self)
+            return orig + getattr(self, self.expand(postfix), type(orig)())
+        setattr(cls, "_" + attrib, _get)
+        return cls
+    return _decorate

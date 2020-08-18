@@ -415,6 +415,22 @@ class TaskGenerator(object):
 
 
 
+class attributes:
+    @staticmethod
+    def requires(attrib):
+        """
+        Decorates a task with an alternative ``requires`` attribute.
+
+        The new attribute will be concatenated with the regular
+        ``requires`` attribute.
+
+        Args:
+            attrib (str): Name of alternative attribute.
+                Keywords are expanded.
+        """
+        return utils.concat_attributes("requires", attrib)
+
+
 class TaskBase(object):
     """ Task base class """
 
