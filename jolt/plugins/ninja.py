@@ -818,7 +818,7 @@ class GNUToolchain(Toolchain):
         deps="gcc",
         depfile="$out.d",
         infiles=[".c"],
-        outfiles=["{outdir}/{in_path}/{in_base}.o"],
+        outfiles=["{outdir}/{in_path}/{in_base}{in_ext}.o"],
         variables={"desc": "[C] {in_base}{in_ext}"},
         implicit=["$cc_path"])
 
@@ -827,7 +827,7 @@ class GNUToolchain(Toolchain):
         deps="gcc",
         depfile="$out.d",
         infiles=[".cc", ".cpp", ".cxx"],
-        outfiles=["{outdir}/{in_path}/{in_base}.o"],
+        outfiles=["{outdir}/{in_path}/{in_base}{in_ext}.o"],
         variables={"desc": "[CXX] {in_base}{in_ext}"},
         implicit=["$cxx_path"])
 
@@ -836,7 +836,7 @@ class GNUToolchain(Toolchain):
         deps="gcc",
         depfile="$out.d",
         infiles=[".s", ".asm"],
-        outfiles=["{outdir}/{in_path}/{in_base}.o"],
+        outfiles=["{outdir}/{in_path}/{in_base}{in_ext}.o"],
         variables={"desc": "[ASM] {in_base}{in_ext}"},
         implicit=["$cc_path"])
 
@@ -845,7 +845,7 @@ class GNUToolchain(Toolchain):
         deps="gcc",
         depfile="$out.d",
         infiles=[".S"],
-        outfiles=["{outdir}/{in_path}/{in_base}.o"],
+        outfiles=["{outdir}/{in_path}/{in_base}{in_ext}.o"],
         variables={"desc": "[ASM] {in_base}{in_ext}"},
         implicit=["$cc_path"])
 
