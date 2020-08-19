@@ -16,7 +16,7 @@ from jolt.error import raise_task_error_if, JoltCommandError
 
 class attributes:
     @staticmethod
-    def asflags(attrib):
+    def asflags(attrib, prepend=False):
         """
         Decorates a task with an alternative ``asflags`` attribute.
 
@@ -26,11 +26,13 @@ class attributes:
         Args:
             attrib (str): Name of alternative attribute.
                 Keywords are expanded.
+            prepend (boolean): Prepend the value of the alternative
+                attribute. Default: false (append).
         """
-        return utils.concat_attributes("asflags", attrib)
+        return utils.concat_attributes("asflags", attrib, prepend)
 
     @staticmethod
-    def cflags(attrib):
+    def cflags(attrib, prepend=False):
         """
         Decorates a task with an alternative ``cflags`` attribute.
 
@@ -40,11 +42,13 @@ class attributes:
         Args:
             attrib (str): Name of alternative attribute.
                 Keywords are expanded.
+            prepend (boolean): Prepend the value of the alternative
+                attribute. Default: false (append).
         """
-        return utils.concat_attributes("cflags", attrib)
+        return utils.concat_attributes("cflags", attrib, prepend)
 
     @staticmethod
-    def cxxflags(attrib):
+    def cxxflags(attrib, prepend=False):
         """
         Decorates a task with an alternative ``cxxflags`` attribute.
 
@@ -54,11 +58,13 @@ class attributes:
         Args:
             attrib (str): Name of alternative attribute.
                 Keywords are expanded.
+            prepend (boolean): Prepend the value of the alternative
+                attribute. Default: false (append).
         """
-        return utils.concat_attributes("cxxflags", attrib)
+        return utils.concat_attributes("cxxflags", attrib, prepend)
 
     @staticmethod
-    def incpaths(attrib):
+    def incpaths(attrib, prepend=False):
         """
         Decorates a task with an alternative ``incpaths`` attribute.
 
@@ -68,11 +74,13 @@ class attributes:
         Args:
             attrib (str): Name of alternative attribute.
                 Keywords are expanded.
+            prepend (boolean): Prepend the value of the alternative
+                attribute. Default: false (append).
         """
-        return utils.concat_attributes("incpaths", attrib)
+        return utils.concat_attributes("incpaths", attrib, prepend)
 
     @staticmethod
-    def ldflags(attrib):
+    def ldflags(attrib, prepend=False):
         """
         Decorates a task with an alternative ``ldflags`` attribute.
 
@@ -82,11 +90,13 @@ class attributes:
         Args:
             attrib (str): Name of alternative attribute.
                 Keywords are expanded.
+            prepend (boolean): Prepend the value of the alternative
+                attribute. Default: false (append).
         """
-        return utils.concat_attributes("ldflags", attrib)
+        return utils.concat_attributes("ldflags", attrib, prepend)
 
     @staticmethod
-    def libpaths(attrib):
+    def libpaths(attrib, prepend=False):
         """
         Decorates a task with an alternative ``libpaths`` attribute.
 
@@ -96,11 +106,13 @@ class attributes:
         Args:
             attrib (str): Name of alternative attribute.
                 Keywords are expanded.
+            prepend (boolean): Prepend the value of the alternative
+                attribute. Default: false (append).
         """
-        return utils.concat_attributes("libpaths", attrib)
+        return utils.concat_attributes("libpaths", attrib, prepend)
 
     @staticmethod
-    def libraries(attrib):
+    def libraries(attrib, prepend=False):
         """
         Decorates a task with an alternative ``libraries`` attribute.
 
@@ -110,11 +122,13 @@ class attributes:
         Args:
             attrib (str): Name of alternative attribute.
                 Keywords are expanded.
+            prepend (boolean): Prepend the value of the alternative
+                attribute. Default: false (append).
         """
-        return utils.concat_attributes("libraries", attrib)
+        return utils.concat_attributes("libraries", attrib, prepend)
 
     @staticmethod
-    def macros(attrib):
+    def macros(attrib, prepend=False):
         """
         Decorates a task with an alternative ``macros`` attribute.
 
@@ -124,11 +138,13 @@ class attributes:
         Args:
             attrib (str): Name of alternative attribute.
                 Keywords are expanded.
+            prepend (boolean): Prepend the value of the alternative
+                attribute. Default: false (append).
         """
-        return utils.concat_attributes("macros", attrib)
+        return utils.concat_attributes("macros", attrib, prepend)
 
     @staticmethod
-    def sources(attrib):
+    def sources(attrib, prepend=False):
         """
         Decorates a task with an alternative ``sources`` attribute.
 
@@ -138,8 +154,10 @@ class attributes:
         Args:
             attrib (str): Name of alternative attribute.
                 Keywords are expanded.
+            prepend (boolean): Prepend the value of the alternative
+                attribute. Default: false (append).
         """
-        return utils.concat_attributes("sources", attrib)
+        return utils.concat_attributes("sources", attrib, prepend)
 
 
 class influence:

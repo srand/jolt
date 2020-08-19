@@ -342,12 +342,15 @@ def tojson(filepath, data, ignore_errors=False, indent=2):
         raise e
 
 
-def concat_attributes(attrib, postfix):
+def concat_attributes(attrib, postfix, prepend=False):
     def _decorate(cls):
         _orig = getattr(cls, "_" + attrib)
         def _get(self):
             orig = _orig(self)
-            return orig + getattr(self, self.expand(postfix), type(orig)())
+            if prepend:
+                return getattr(self, self.expand(postfix), type(orig)()) + orig
+            else:
+                return orig + getattr(self, self.expand(postfix), type(orig)())
         setattr(cls, "_" + attrib, _get)
         return cls
     return _decorate
