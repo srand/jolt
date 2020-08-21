@@ -5,6 +5,7 @@ import inspect
 import os
 import sys
 
+from jolt.tasks import attributes
 from jolt.tasks import Alias, Task, TaskGenerator, TaskRegistry, Test, WorkspaceResource
 from jolt.error import raise_error_if, raise_task_error_if
 from jolt import config
@@ -157,7 +158,7 @@ class JoltLoader(object):
     def _add_project_module(self, project, src):
         modules = self._project_modules.get(project, [])
         modules.append(src)
-        self._project_modules[project] = src
+        self._project_modules[project] = modules
 
     def _get_project_modules(self, project):
         return self._project_modules.get(project, [])
@@ -184,10 +185,17 @@ class JoltLoader(object):
 
     def _load_project_recipes(self):
         for project, recipes in self._project_recipes.items():
+            resources = [resource for _, resource in self._get_project_resources(project)]
             for joltdir, src in recipes:
                 joltdir = fs.path.join(self.joltdir, joltdir) if joltdir else self.joltdir
                 recipe = NativeRecipe(fs.path.join(self._path, src), joltdir, project)
                 recipe.load()
+                for task in recipe.tasks:
+                    task._resources = resources
+                    attributes.requires("_resources")(task)
+                for test in recipe.tests:
+                    test._resources = resources
+                    attributes.requires("_resources")(task)
                 self._tasks += recipe.tasks
                 self._tests += recipe.tests
 
@@ -293,7 +301,7 @@ class RecipeExtension(ManifestExtension):
                 task.acquire_ws()
 
             for module in project.modules:
-                loader._add_project_module(project, module.src)
+                loader._add_project_module(project.name, module.src)
                 sys.path.append(fs.path.join(manifest.joltdir, module.src))
 
 ManifestExtensionRegistry.add(RecipeExtension())
