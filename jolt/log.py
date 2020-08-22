@@ -2,6 +2,11 @@ from __future__ import print_function
 import os
 import sys
 import tqdm
+if os.name == "nt":
+    # FIXME: Workaround to make tqdm behave correctly on Windows
+    import colorama
+    colorama.deinit() # Undo the work of tqdm
+    os.system("")     # Hack to enable vt100
 import traceback
 from datetime import datetime
 import threading
