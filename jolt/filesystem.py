@@ -3,11 +3,17 @@ import errno
 import shutil
 import tempfile
 
+import ntpath
+import posixpath
+
 
 path = os.path
 sep = os.sep
 pathsep = os.pathsep
 
+
+def userhome():
+    return os.path.expanduser("~")
 
 def makedirs(path):
     try:

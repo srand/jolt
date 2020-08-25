@@ -12,8 +12,13 @@ from jolt.error import raise_error_if
 from jolt.manifest import ManifestExtension, ManifestExtensionRegistry
 
 
-location = fs.path.join(fs.path.expanduser("~"), ".config", "jolt", "config")
-location_user = fs.path.join(fs.path.expanduser("~"), ".config", "jolt", "user")
+if os.name == "nt":
+    appdata = os.getenv("APPDATA", fs.path.join(fs.userhome(), "AppData", "Roaming"))
+    location = fs.path.join(appdata, "Jolt", "config")
+    location_user = fs.path.join(appdata, "Jolt", "user")
+else:
+    location = fs.path.join(fs.userhome(), ".config", "jolt", "config")
+    location_user = fs.path.join(fs.userhome(), ".config", "jolt", "user")
 
 
 class ConfigFile(SafeConfigParser):
@@ -173,7 +178,10 @@ def getboolean(section, key, default=None, alias=None):
 
 
 def get_jolthome():
-    return fs.path.join(fs.path.expanduser("~"), ".jolt")
+    if os.name == "nt":
+        return fs.path.join(os.getenv("LOCALAPPDATA", fs.path.join(fs.userhome(), "AppData", "Local")), "Jolt")
+    else:
+        return fs.path.join(fs.userhome(), ".jolt")
 
 
 def get_logpath():
@@ -181,7 +189,11 @@ def get_logpath():
 
 
 def get_cachedir():
-    return get("jolt", "cachedir") or fs.path.join(fs.path.expanduser("~"), ".cache", "jolt")
+    if os.name == "nt":
+        default = fs.path.join(get_jolthome(), "Cache")
+    else:
+        default = fs.ospath.join(fs.userhome(), ".cache", "jolt")
+    return get("jolt", "cachedir", default)
 
 
 def get_shell():
