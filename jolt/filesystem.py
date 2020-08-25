@@ -1,16 +1,20 @@
 import os
 import errno
+import ntpath
+import pathlib
+import posixpath
 import shutil
 import tempfile
-
-import ntpath
-import posixpath
 
 
 path = os.path
 sep = os.sep
+anysep = [posixpath.sep, ntpath.sep]
 pathsep = os.pathsep
 
+
+def as_posix(path):
+    return pathlib.Path(path).as_posix()
 
 def userhome():
     return os.path.expanduser("~")

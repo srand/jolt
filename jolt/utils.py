@@ -1,5 +1,4 @@
 import fnmatch
-import pathlib
 import re
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -78,9 +77,6 @@ def as_human_size(size):
         size /= 1024
         index += 1
     return "{0} {1}".format(round(size, ndigits=unit_precision[index][1]), unit_precision[index][0])
-
-def as_posixpath(path):
-    return pathlib.Path(path).as_posix()
 
 def call_or_return(obj, t):
     return t(obj) if callable(t) else t

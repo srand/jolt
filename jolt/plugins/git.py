@@ -168,7 +168,7 @@ class GitRepository(object):
 
         # Traverse tree from root to requested path
         if path != "/":
-            tree = tree[utils.as_posixpath(path)]
+            tree = tree[fs.as_posix(path)]
 
         # Update tree hash cache
         self._tree_hash[(full_path, sha)] = value = tree.id

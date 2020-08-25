@@ -636,7 +636,7 @@ class Tools(object):
         path = fs.path.join(self.getcwd(), self.expand(pathname, *args, **kwargs))
         # Ensure to retain any trailing path separator which is used as
         # indicator of directory paths
-        psep = fs.sep if path[-1] == fs.sep else ""
+        psep = fs.sep if path[-1] in fs.anysep else ""
         return fs.path.normpath(path) + psep
 
     def expand_relpath(self, pathname, relpath=None, *args, **kwargs):
@@ -665,7 +665,10 @@ class Tools(object):
         pathname = self.expand(pathname, *args, **kwargs)
         relpath = self.expand(relpath or self._task.joltdir, *args, **kwargs)
         pathname = fs.path.join(self.getcwd(), pathname)
-        return fs.path.relpath(pathname, relpath)
+        # Ensure to retain any trailing path separator which is used as
+        # indicator of directory paths
+        psep = fs.sep if pathname[-1] in fs.anysep else ""
+        return fs.path.relpath(pathname, relpath) + psep
 
     def extract(self, filename, pathname, files=None):
         """ Extracts files in an archive.

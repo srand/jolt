@@ -196,7 +196,7 @@ class ArtifactFileAttribute(object):
         pass
 
     def append(self, src, dst):
-        self._files.append((src, dst))
+        self._files.append((fs.as_posix(src), fs.as_posix(dst)))
 
     def assign(self, files):
         self._files = files
@@ -534,7 +534,7 @@ class Artifact(object):
 
         files = self.tools.expand_path(files)
         files = self.tools.glob(files)
-        dest = self.tools.expand(dest) if dest is not None else ""
+        dest = self.tools.expand_relpath(dest, self.tools.getcwd()) if dest is not None else ""
 
         # Special case for renaming files
         safe_dest = dest or fs.sep
