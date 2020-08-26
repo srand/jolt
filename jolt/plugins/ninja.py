@@ -4,7 +4,7 @@ import platform
 import os
 import sys
 
-from jolt.tasks import Task
+from jolt.tasks import Task, attributes as task_attributes
 from jolt import config
 from jolt.influence import DirectoryInfluence, FileInfluence
 from jolt.influence import HashInfluenceProvider, TaskAttributeInfluence
@@ -470,6 +470,28 @@ class Skip(Rule):
         return "S" + super().get_influence(task)
 
 
+@task_attributes.system
+class MakeDirectory(Rule):
+    command_linux = "mkdir -p $out"
+    command_windows = "if not exist $out mkdir $out"
+
+    def __init__(self, name):
+        super(MakeDirectory, self).__init__(
+            command=getattr(self, "command_"+self.system))
+        self.dirname = name
+
+    def create(self, project, writer, deps, tools):
+        super().create(project, writer, deps, tools)
+        writer.build(fs.path.normpath(self.dirname), self.name, [], variables={"desc": "[MKDIR] "+self.dirname})
+
+    def build(self, project, writer, infiles):
+        return None
+
+    @utils.cached.instance
+    def get_influence(self, task):
+        return "MD" + super().get_influence(task)
+
+
 class Objects(Rule):
     def __init__(self, *args, **kwargs):
         super(Objects, self).__init__(*args, **kwargs)
@@ -585,7 +607,7 @@ class GNULinker(Rule):
         infiles_rel = [fs.path.relpath(infile, project.outdir) for infile in infiles]
         outfiles, variables = self._out(project, project.binary)
         outfiles_rel = [fs.path.relpath(outfile, project.outdir) for outfile in outfiles]
-        writer.build(outfiles_rel, self.name, infiles_rel, implicit=writer.depimports, variables=variables)
+        writer.build(outfiles_rel, self.name, infiles_rel, implicit=self.implicit+writer.depimports, variables=variables)
         return outfiles
 
     @utils.cached.instance
@@ -605,7 +627,7 @@ class GNUArchiver(Rule):
         file_list = GNUMRIWriter("objects", outfiles)
         file_list.build(project, writer, infiles)
 
-        writer.build(outfiles_rel, self.name, infiles_rel, implicit=writer.depimports, variables=variables)
+        writer.build(outfiles_rel, self.name, infiles_rel, implicit=self.implicit+writer.depimports, variables=variables)
 
         return outfiles
 
@@ -829,6 +851,8 @@ class GNUToolchain(Toolchain):
     libpaths = LibraryPaths(prefix="-L")
     libraries = Libraries(prefix="-l")
 
+    mkdir_debug = MakeDirectory(name=".debug")
+
     compile_pch = GNUCompiler(
         command="$cxxwrap $cxx -x c++-header $cxxflags $shared_flags $imported_cxxflags $extra_cxxflags $macros $incpaths -MMD -MF $out.d -c $in -o $out",
         deps="gcc",
@@ -876,26 +900,24 @@ class GNUToolchain(Toolchain):
     linker = GNULinker(
         command=" && ".join([
             "$ld $ldflags $imported_ldflags $extra_ldflags $libpaths -Wl,--start-group @objects.list -Wl,--end-group -o $out -Wl,--start-group $libraries -Wl,--end-group",
-            "mkdir -p .debug",
             "$objcopy --only-keep-debug $out .debug/$binary",
             "$objcopy --strip-all $out",
             "$objcopy --add-gnu-debuglink=.debug/$binary $out"
         ]),
         outfiles=["{outdir}/{binary}"],
         variables={"desc": "[LINK] {binary}"},
-        implicit=["$ld_path", "$objcopy_path"])
+        implicit=["$ld_path", "$objcopy_path", ".debug"])
 
     dynlinker = GNULinker(
         command=" && ".join([
             "$ld $ldflags -shared $imported_ldflags $extra_ldflags $libpaths -Wl,--start-group @objects.list -Wl,--end-group -o $out -Wl,--start-group $libraries -Wl,--end-group",
-            "mkdir -p $outdir/.debug",
             "$objcopy --only-keep-debug $out $outdir/.debug/$binary",
             "$objcopy --strip-all $out",
             "$objcopy --add-gnu-debuglink=$outdir/.debug/$binary $out"
         ]),
         outfiles=["{outdir}/lib{binary}.so"],
         variables={"desc": "[LINK] {binary}"},
-        implicit=["$ld_path", "$objcopy_path"])
+        implicit=["$ld_path", "$objcopy_path", ".debug"])
 
     archiver = GNUArchiver(
         command="$ar -M < objects.list && $ranlib $out",
