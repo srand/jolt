@@ -202,6 +202,18 @@ class Variable(HashInfluenceProvider):
         return "V: value={}".format(self._value)
 
 
+class HostVariable(Variable):
+    def __init__(self, value=None):
+        self._value = value
+
+    def create(self, project, writer, deps, tools):
+        writer.variable(self.name, self._value[os.name])
+
+    @utils.cached.instance
+    def get_influence(self, task):
+        return "HV: value={}".format(self._value)
+
+
 class EnvironmentVariable(Variable):
     def __init__(self, name=None, default=None, envname=None, prefix=None):
         self.name = name
@@ -419,7 +431,8 @@ class Rule(HashInfluenceProvider):
 
     def create(self, project, writer, deps, tools):
         if self.command is not None:
-            writer.rule(self.name, tools.expand(self.command), depfile=self.depfile, deps=self.deps, description="$desc")
+            command = "cmd /c " + self.command if os.name == "nt" else self.command
+            writer.rule(self.name, tools.expand(command), depfile=self.depfile, deps=self.deps, description="$desc")
             writer.newline()
 
     def build(self, project, writer, infiles, implicit=None):
@@ -478,6 +491,9 @@ class GNUCompiler(Rule):
     def __init__(self, *args, **kwargs):
         super(GNUCompiler, self).__init__(*args, **kwargs)
 
+    def create(self, project, writer, deps, tools):
+        super().create(project, writer, deps, tools)
+
     def build(self, project, writer, infiles, implicit=None):
         implicit = implicit or []
         if GNUPCHVariables.pch_ext not in self.infiles and project._pch_out is not None:
@@ -490,8 +506,9 @@ class GNUCompiler(Rule):
 
 
 class FileListWriter(Rule):
-    def __init__(self, name):
+    def __init__(self, name, posix=False):
         self.name = name
+        self.posix = posix
 
     def _write(self, flp, flhp, data, digest):
         with open(flp, "w") as f:
@@ -516,6 +533,7 @@ class FileListWriter(Rule):
         return data, utils.sha1(data)
 
     def build(self, project, writer, infiles):
+        infiles = [fs.as_posix(infile) for infile in infiles] if self.posix else infiles
         file_list_path = fs.path.join(project.outdir, "{0}.list".format(self.name))
         file_list_hash_path = fs.path.join(project.outdir, "{0}.hash".format(self.name))
         data, digest = self._data(project, infiles)
@@ -561,7 +579,7 @@ class GNULinker(Rule):
         super(GNULinker, self).__init__(*args, **kwargs)
 
     def build(self, project, writer, infiles):
-        file_list = FileListWriter("objects")
+        file_list = FileListWriter("objects", posix=True)
         file_list.build(project, writer, infiles)
 
         infiles_rel = [fs.path.relpath(infile, project.outdir) for infile in infiles]
@@ -789,7 +807,6 @@ class GNUToolchain(Toolchain):
     ld = ToolEnvironmentVariable(default="g++", envname="CXX")
     objcopy = ToolEnvironmentVariable(default="objcopy")
     ranlib = ToolEnvironmentVariable(default="ranlib")
-
     ccwrap = EnvironmentVariable(default="")
     cxxwrap = EnvironmentVariable(default="")
 
@@ -881,7 +898,7 @@ class GNUToolchain(Toolchain):
         implicit=["$ld_path", "$objcopy_path"])
 
     archiver = GNUArchiver(
-        command="rm -f $out && $ar -M < objects.list && $ranlib $out",
+        command="$ar -M < objects.list && $ranlib $out",
         outfiles=["{outdir}/lib{binary}.a"],
         variables={"desc": "[AR] lib{binary}.a"},
         implicit=["$ld_path", "$ar_path"])
@@ -1216,7 +1233,7 @@ if __name__ == "__main__":
             return Skip()
         rule = self._rules_by_ext.get(ext)
         if rule is None:
-            rule = toolchain.find_rule(ext)
+            rule = self.toolchain.find_rule(ext)
         raise_task_error_if(
             not rule, self,
             "no build rule available for files with extension '{0}'", ext)
