@@ -192,7 +192,7 @@ def get_cachedir():
     if os.name == "nt":
         default = fs.path.join(get_jolthome(), "Cache")
     else:
-        default = fs.ospath.join(fs.userhome(), ".cache", "jolt")
+        default = fs.path.join(fs.userhome(), ".cache", "jolt")
     return get("jolt", "cachedir", default)
 
 
