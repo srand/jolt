@@ -2,6 +2,7 @@ import base64
 import copy
 import fnmatch
 import inspect
+import platform
 import subprocess
 import unittest as ut
 
@@ -475,6 +476,17 @@ class attributes:
                 source_influence(target)(cls)
             return cls
         return _decorate
+
+
+    @staticmethod
+    def system(cls):
+        """
+        Decorates a task with a property returning the operating system name.
+
+        Examples: "linux", "windows"
+        """
+        cls.system = property(lambda t: platform.system().lower())
+        return cls
 
 
 class TaskBase(object):
