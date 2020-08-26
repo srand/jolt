@@ -12,6 +12,7 @@ from jolt.cache import ArtifactAttributeSetProvider
 from jolt.error import raise_task_error, raise_task_error_if
 from jolt.expires import Immediately
 from jolt.influence import FileInfluence, TaskSourceInfluence, TaintInfluenceProvider
+from jolt.influence import source as source_influence, attribute as attribute_influence
 from jolt.tools import Tools
 
 
@@ -429,6 +430,51 @@ class attributes:
                 Keywords are expanded.
         """
         return utils.concat_attributes("requires", attrib)
+
+    @staticmethod
+    def attribute(alias, target, influence=True):
+        """
+        Decorates a task with an alias for another attribute.
+
+        Args:
+            attrib (str): Name of alias attribute.
+            target (str): Name of target attribute.
+                Keywords are expanded.
+            influence (boolean): Add value of target
+                attribute as influence of the task.
+
+        """
+        def _decorate(cls):
+            def _get(self):
+                return getattr(self, self.expand(target))
+            setattr(cls, alias, property(_get))
+            if influence:
+                attribute_influence(target)(cls)
+            return cls
+        return _decorate
+
+
+    @staticmethod
+    def method(alias, target, influence=True):
+        """
+        Decorates a task with an alias for another method.
+
+        Args:
+            attrib (str): Name of alias method.
+            target (str): Name of target method.
+                Keywords are expanded.
+            influence (boolean): Add source of target
+                method as influence of the task.
+
+        """
+        def _decorate(cls):
+            def _call(self, *args, **kwargs):
+                return getattr(self, self.expand(target))(*args, **kwargs)
+            setattr(cls, alias, _call)
+            if influence:
+                source_influence(target)(cls)
+            return cls
+        return _decorate
 
 
 class TaskBase(object):
