@@ -911,9 +911,9 @@ class GNUToolchain(Toolchain):
     dynlinker = GNULinker(
         command=" && ".join([
             "$ld $ldflags -shared $imported_ldflags $extra_ldflags $libpaths -Wl,--start-group @objects.list -Wl,--end-group -o $out -Wl,--start-group $libraries -Wl,--end-group",
-            "$objcopy --only-keep-debug $out $outdir/.debug/$binary",
+            "$objcopy --only-keep-debug $out .debug/lib$binary.so",
             "$objcopy --strip-all $out",
-            "$objcopy --add-gnu-debuglink=$outdir/.debug/$binary $out"
+            "$objcopy --add-gnu-debuglink=.debug/lib$binary.so $out"
         ]),
         outfiles=["{outdir}/lib{binary}.so"],
         variables={"desc": "[LINK] {binary}"},
@@ -1454,6 +1454,8 @@ class CXXLibrary(CXXProject):
             artifact.collect("*{binary}.dll", self.publishlib)
             artifact.collect("*{binary}.lib", self.publishlib)
             artifact.collect("*{binary}.so", self.publishlib)
+            if self.shared and not self.strip:
+                artifact.collect(".debug", self.publishdir)
         if self.headers:
             for header in self.headers:
                 artifact.collect(header, self.publishapi)
