@@ -103,7 +103,11 @@ class TaskSourceInfluence(HashInfluenceProvider):
 
     def get_influence(self, task):
         obj = self.obj or task
-        funcname = getattr(obj, "expand", lambda s: s)(self.funcname)
+        try:
+            funcname = self.funcname
+            funcname = obj.expand(funcname)
+        except:
+            pass
         if type(obj.__class__) == type:
             func = utils.getattr_safe(obj, funcname)
         else:
