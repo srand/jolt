@@ -1408,6 +1408,12 @@ class CXXLibrary(CXXProject):
     See :func:`Task.selfsustained <jolt.Task.selfsustained>` for general information.
     """
 
+    strip = True
+    """ Strip binary from debug information.
+
+    Only applicable to shared libraries.
+    """
+
     def __init__(self, *args, **kwargs):
         super(CXXLibrary, self).__init__(*args, **kwargs)
         self.headers = utils.as_list(utils.call_or_return(self, self.__class__._headers))
