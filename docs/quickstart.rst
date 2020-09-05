@@ -419,6 +419,10 @@ build files and build your projects for you. All you have to do is to tell Jolt 
 source files to compile. You can also define custom build rules for file types not
 recognized by Jolt, see the :class:`Rule <jolt.plugins.ninja.Rule>` class.
 
+
+Basics
+~~~~~~
+
 Below is an example of a library and a program. The library contains a function
 returning a message. The program calls this function and prints the message.
 
@@ -466,6 +470,9 @@ To build the library and the program we use this Jolt recipe:
         sources = "program/main.cpp"
 
 
+Metadata
+~~~~~~~~
+
 Jolt automatically configures include paths, link libraries, and other build
 attributes for the ``HelloWorld`` program based on metadata found in the artifact
 of the ``Message`` library task. In the example, the ``Message`` library task relies
@@ -495,8 +502,160 @@ whatever build system their dependencies use as long as binary compatibility
 is guaranteed.
 
 
+
+Parameterization
+~~~~~~~~~~~~~~~~
+
+To support build customization based on parameters, several class decorators can
+be used to extend a task with conditional build attributes.
+
+The first example uses a boolean debug parameter to disable optimizations and set a
+preprocessor macro. The decorators enable Ninja to consider alternative attributes,
+in addition to the default ``cxxflags`` and ``macros``. The names of alternatives
+are expanded with the values of parameters. When the debug parameter is assigned the
+value ``true``, the ``cxxflags_debug_true`` and ``macros_debug_true`` attributes will
+be matched and included in the build. If the debug parameter value is false,
+no extra flags or macros will be included because there are no ``cxxflags_debug_false``
+and ``macros_debug_false`` attributes in the class.
+
+.. code-block:: python
+
+    @ninja.attributes.cxxflags("cxxflags_debug_{debug}")
+    @ninja.attributes.macros("macros_debug_{debug}")
+    class Message(ninja.CXXLibrary):
+	debug = BooleanParameter()
+	cxxflags_debug_true = ["-g", "-Og"]
+	macros_debug_true = ["DEBUG"]
+        sources = ["lib/message.*"]
+
+
+The next example includes source files conditionally.
+
+
+.. code-block:: python
+
+    @ninja.attributes.sources("sources_{os}")
+    class Message(ninja.CXXLibrary):
+	os = Parameter(values=["linux", "windows"])
+        sources = ["lib/*.cpp"]
+        sources_linux = ["lib/posix/*.cpp"]
+        sources_windows = ["lib/win32/*.cpp"]
+
+
+
+Influence
+~~~~~~~~~
+
+The Ninja tasks automatically let the content of the listed header and source files
+influence the task identity. However, sometimes source files may #include headers which
+are not listed. This is an error which may result in objects not being correctly
+recompiled when the header changes. To protect against such errors, Jolt uses output
+from the compiler to ensure that files included during a compilation are properly
+influencing the task.
+
+In the example below, the ``message.h`` header is no longer listed in
+``headers``, nor in ``sources``.
+
+.. code-block:: python
+
+    from jolt import *
+    from jolt.plugins.ninja import *
+
+    class Message(CXXLibrary):
+        sources = ["lib/message.cpp"]
+
+
+Assuming ``message.cpp`` includes ``message.h``, this would be an error because Jolt no longer
+tracks the content of the ``message.h`` header and ``message.cpp`` would not be properly
+recompiled. However, thanks to the builtin sanity checks, trying to build this library
+would fail:
+
+
+.. code-block:: bash
+
+    $ jolt build message
+    [  ERROR] Execution started (message b9961000)
+    [ STDOUT] [1/2] [CXX] message.cpp
+    [ STDOUT] [1/2] [AR] libmessage.a
+    [WARNING] Missing influence: message.h
+    [  ERROR] Execution failed after 00s (message b9961000)
+    [  ERROR] task is missing source influence (message)
+
+
+The solution is to ensure that the header is covered by influence, either by listing
+it in ``headers`` or ``sources``, or by using an influence decorator such as
+``@influence.files``.
+
+.. code-block:: python
+
+    class Message(CXXLibrary):
+        sources = ["lib/message.h", "lib/message.cpp"]
+
+
+Headers from artifacts of dependencies are exempt from the sanity checks.
+They already influence the consuming task implicitly. This is also true for
+files in build directories.
+
+
+
+Custom Rules
+~~~~~~~~~~~~
+
+Rules are used to transform files from one type to another.
+An example is the rule that compiles a C/C++ file to an object file.
+Ninja tasks can be extended with additional rules beyond those
+already builtin and the builtin rules may also be overridden.
+
+To define a new rule for a type of file, assign a Rule object
+to an arbitrary attribute of the compilation task being defined.
+Below is an example where a rule has been added to generate Qt moc
+source files from headers.
+
+
+.. code-block:: python
+
+    class MyQtProject(CXXExecutable):
+        sources = ["myqtproject.h", "myqtproject.cpp"]
+
+        moc_rule = Rule(
+            command="moc -o $out $in",
+            infiles=[".h"],
+            outfiles=["{outdir}/{in_path}/{in_base}_moc.cpp"])
+
+
+The moc rule applies to all ``.h`` header files listed as sources,
+i.e. ``myqtproject.h``. It takes the input header file and generates
+a corresponding moc source file, ``myqtproject_moc.cpp``.
+The moc source file will then automatically be fed to the builtin
+compiler rule from which the output is an object file,
+``myqtproject_moc.o``.
+
+
+Below, another example illustrates how to override one of the builtin
+compilation rules. The example also defines an environment variable
+that will be accessible to the rule.
+
+.. code-block:: python
+
+    class MyQtProject(CXXExecutable):
+        sources = ["myqtproject.h", "myqtproject.cpp"]
+
+	custom_cxxflags = EnvironmentVariable()
+
+        cxx_rule = Rule(
+            command="g++ $custom_cxxflags -o $out -c $in",
+            infiles=[".cpp"],
+            outfiles=["{outdir}/{in_path}/{in_base}{in_ext}.o"])
+
+
+.. code-block:: bash
+
+    $ CUSTOM_CXXFLAGS=-DDEBUG jolt build myqtproject
+
+
+
 Toolchains
-----------
+~~~~~~~~~~
 
 Maintaining binary compatibility between libraries can be a pain. To ensure
 that a chain of dependencies stay compatible you could inject a synthetic
@@ -517,8 +676,14 @@ First, define a toolchain task:
 		artifact.environ.CC = "arm-linux-gnueabi-gcc"
 	    if self.arch.get_value() == "i386":
 		artifact.environ.CC = "x86_64-linux-gnu-gcc -m32"
-	    artifact.environ.CFLAGS = "-g -Og" if self.debug.is_true else "-O2"
+	    if self.debug.is_true:
+	        artifact.cxxinfo.cflags.append("-g")
+	        artifact.cxxinfo.cflags.append("-Og")
+	    else:
+	        artifact.cxxinfo.cflags.append("-O2")
 
+
+Flags can also be exported as environment variables, ``CFLAGS``, ``CXXFLAGS``, etc.
 
 Secondly, declare the toolchain as a dependency of all your compilation tasks:
 
@@ -530,9 +695,8 @@ Secondly, declare the toolchain as a dependency of all your compilation tasks:
         sources = "src/main.cpp"
 
 
-Don't assign explicit values to the toolchain's parameters, use default values
-and instead override these from the command line when you need to. For example,
-to build the ``HelloWorld`` task for the ARM architecture, run:
+Default toolchain parameter values can be overridden from the command line when you
+need to. For example, to build the ``HelloWorld`` task for the ARM architecture, run:
 
 .. code-block:: bash
 
@@ -542,3 +706,18 @@ The ``-d toolchain:arch=arm`` command line argument instructs Jolt to overide
 the default value of the ``arch`` parameter of the ``toolchain`` task. The new
 value changes the identity of the toolchain artifact which triggers a
 rebuild of all depending tasks.
+
+To build the ``HelloWorld`` task without optimizations and with debug information:
+
+
+.. code-block:: bash
+
+    $ jolt build helloworld -d toolchain:debug=true
+
+
+This approach with default valued parameters can also be used to enable other
+use-cases where you temporarily may want:
+
+  - code coverage builds
+  - builds with custom cflags
+  - etc
