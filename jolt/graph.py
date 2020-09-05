@@ -121,10 +121,7 @@ class TaskProxy(object):
         return len(self.extensions) > 0
 
     def add_extension(self, task):
-        if self.is_extension():
-            self._extended_task.add_extension(task)
-        else:
-            self.extensions.append(task)
+        self.extensions.append(task)
 
     def set_extended_task(self, task):
         self._extended_task = task
@@ -265,7 +262,7 @@ class TaskProxy(object):
         hooks.task_failed(self)
 
     def finished(self, what="Execution"):
-        assert not self._completed, "task has already been completed"
+        raise_task_error_if(self._completed, self, "task has already been completed")
         self._completed = True
         try:
             self.graph.remove_node(self)
@@ -476,6 +473,7 @@ class GraphBuilder(object):
             self.graph.add_edges_from([(node, extended_node)])
             node.set_extended_task(extended_node)
             extended_node.add_extension(node)
+            node.children.append(extended_node)
             parent = extended_node.get_extended_task()
         else:
             parent = node

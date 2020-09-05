@@ -149,12 +149,28 @@ class TaskApi(JoltTest):
 
             def run(self, deps, tools):
                 raise_error_if(not deps["base"], "dependency missing")
+
+        class ExtendedExtension(Task):
+            i = Parameter()
+
+            extends = "extended:i={{i}}"
+
+            def run(self, deps, tools):
+                raise_error_if(not deps[self.extends], "dependency missing")
         ---
         """
         r = self.jolt("build extended:i=1")
         self.assertBuild(r, "base")
+        self.assertNoBuild(r, "extended:i=2")
+        self.assertNoBuild(r, "extendedextension:i=3")
         r = self.jolt("build extended:i=2")
         self.assertBuild(r, "base")
+        self.assertBuild(r, "extended:i=2")
+        self.assertNoBuild(r, "extendedextension:i=3")
+        r = self.jolt("build extendedextension:i=3")
+        self.assertBuild(r, "base")
+        self.assertBuild(r, "extended:i=3")
+        self.assertBuild(r, "extendedextension:i=3")
 
     def test_extends_multiple(self):
         """
