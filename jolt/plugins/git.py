@@ -164,7 +164,11 @@ class GitRepository(object):
         # Translate explicit sha to tree
         if sha is not None:
             commit = self.rev_parse(sha)
-            tree = self.repository.get(commit).tree
+            obj = self.repository.get(commit)
+            try:
+                tree = obj.tree
+            except AttributeError:
+                tree = obj.get_object().tree
 
         # Traverse tree from root to requested path
         if path != "/":
