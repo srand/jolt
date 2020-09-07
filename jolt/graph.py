@@ -121,7 +121,10 @@ class TaskProxy(object):
         return len(self.extensions) > 0
 
     def add_extension(self, task):
-        self.extensions.append(task)
+        if self.is_extension():
+            self.get_extended_task().add_extension(task)
+        else:
+            self.extensions.append(task)
 
     def set_extended_task(self, task):
         self._extended_task = task
