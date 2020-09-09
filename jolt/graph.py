@@ -265,7 +265,9 @@ class TaskProxy(object):
         hooks.task_failed(self)
 
     def finished(self, what="Execution"):
-        raise_task_error_if(self._completed, self, "task has already been completed")
+        raise_task_error_if(
+            self.is_completed() and not self.is_extension(),
+            self, "task has already been completed")
         self._completed = True
         try:
             self.graph.remove_node(self)
