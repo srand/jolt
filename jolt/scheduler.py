@@ -501,6 +501,9 @@ class DistributedStrategy(ExecutionStrategy, PruneStrategy):
 
         if not task.is_goal():
             task.disable_download()
+        for extension in task.extensions:
+            if not extension.is_goal():
+                extension.disable_download()
 
         return self.executors.create_network(task)
 

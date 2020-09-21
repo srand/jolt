@@ -199,8 +199,6 @@ class TaskProxy(object):
 
     def disable_download(self):
         self._download = False
-        for extension in self.extensions:
-            extension.disable_download()
 
     def set_in_progress(self):
         self._in_progress = True
