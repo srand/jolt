@@ -742,10 +742,10 @@ def info(ctx, task, influence=False, artifacts=False, salt=None):
 
     if artifacts:
         acache = cache.ArtifactCache.get()
-        dag = graph.GraphBuilder(task_registry, manifest).build(
-            [utils.format_task_name(task.name, task._get_parameters())])
-        tasks = dag.select(lambda graph, node: graph.is_root(node))
-        assert len(tasks) == 1, "unexpected graph generated"
+        builder = graph.GraphBuilder(task_registry, manifest)
+        dag = builder.build([task.qualified_name])
+        tasks = dag.select(lambda graph, node: node.task is task)
+        assert len(tasks) == 1, "graph produced multiple tasks, one expected"
         proxy = tasks[0]
         task = proxy.task
 
