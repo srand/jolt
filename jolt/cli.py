@@ -754,9 +754,11 @@ def info(ctx, task, influence=False, artifacts=False, salt=None):
         if acache.is_available_locally(proxy):
             with acache.get_artifact(proxy) as artifact:
                 click.echo("    Location          {0}".format(artifact.path))
-            click.echo("    Local             {0} ({1})".format(
-                True, utils.as_human_size(acache.get_artifact(proxy).get_size())))
-            click.echo("    Remote            {0}".format(acache.is_available_remotely(proxy)))
+            click.echo("    Local             True ({0})".format(
+                utils.as_human_size(acache.get_artifact(proxy).get_size())))
+        else:
+            click.echo("    Local             False")
+        click.echo("    Remote            {0}".format(acache.is_available_remotely(proxy)))
         click.echo()
 
     if influence:
