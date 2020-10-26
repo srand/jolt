@@ -175,8 +175,9 @@ class _CMake(object):
     def configure(self, sourcedir, *args, **kwargs):
         sourcedir = self.tools.expand_path(sourcedir)
 
-        extra_args = ["-D{0}={1}".format(key, self.tools.expand(val))
-                      for key, val in kwargs.items()]
+        extra_args = list(args)
+        extra_args += ["-D{0}={1}".format(key, self.tools.expand(val))
+                       for key, val in kwargs.items()]
         extra_args = " ".join(extra_args)
 
         with self.tools.cwd(self.builddir):
