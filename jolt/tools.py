@@ -980,7 +980,7 @@ class Tools(object):
     def _sandbox_rsync(self, artifact, path):
         meta = self._sandbox_validate(artifact, path)
         if meta:
-            if shutil.which("rsync"):
+            if shutil.which("rsync") and os.name in ["posix"]:
                 self.run("rsync --delete -c -r {0}/ {1}", artifact.path, path, output_on_error=True)
             else:
                 fs.rmtree(path)
