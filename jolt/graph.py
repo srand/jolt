@@ -214,9 +214,6 @@ class TaskProxy(object):
         self.ancestors = set()
         self.descendants = set()
 
-        if self.is_extension():
-            self.children.append(self.get_extended_task())
-
         self.neighbors = copy.copy(self.children)
         self.neighbors = sorted(self.neighbors, key=lambda n: n.qualified_name)
 
@@ -231,7 +228,7 @@ class TaskProxy(object):
         self.children = list(
             filter(lambda n: not n.is_alias() and (not n.is_resource() or \
                    dag.are_neighbors(self, n)),
-                   utils.unique_list(self.children)))
+                   self.children))
 
         self.descendants = list(self.descendants)
 
@@ -491,6 +488,8 @@ class GraphBuilder(object):
             else:
                 self.graph.add_edges_from([(parent, child)])
             node.children.append(child)
+
+        node.children = utils.unique_list(node.children)
 
         return node
 
