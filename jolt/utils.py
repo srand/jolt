@@ -316,9 +316,18 @@ def map_concurrent(method, iterable, *args, **kwargs):
                     future.cancel()
     return [future.result() for future in futures]
 
+
 def sha1(string):
     sha = hashlib.sha1()
     sha.update(string.encode())
+    return sha.hexdigest()
+
+
+def filesha1(path):
+    sha = hashlib.sha1()
+    with open(path, "rb") as f:
+        for data in iter(lambda: f.read(0x10000), b''):
+            sha.update(data)
     return sha.hexdigest()
 
 

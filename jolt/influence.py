@@ -331,11 +331,7 @@ class FileInfluence(HashInfluenceProvider):
         self._files = {}
 
     def get_file_influence(self, path):
-        sha = hashlib.sha1()
-        with open(path, "rb") as f:
-            for data in iter(lambda: f.read(0x10000), b''):
-                sha.update(data)
-        return sha.hexdigest()
+        return utils.filesha1(path)
 
     def get_filelist(self, task):
         try:

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import os
 import sys
 import time
 sys.path.append(".")
@@ -245,6 +246,48 @@ class ToolsApi(JoltTest):
 
         s = self.tools.run(["sh", "-c", "echo Hello world"], shell=False)
         self.assertEqual(s, "Hello world")
+
+    def test_rsync(self):
+        """
+        --- file: a/new
+        --- file: a/test1.txt
+        test
+        --- file: a/test2.txt
+        test2
+        --- file: a/test3.txt
+        test3
+        --- file: b/deleted
+        --- file: b/test1.txt
+        tset
+        --- file: b/test2.txt
+        tset
+        --- file: b/test3.txt
+        test3
+        ---
+        """
+        with self.tools.cwd(self.ws):
+            def mtime(path):
+                return os.stat(self.tools.expand_path(path)).st_mtime
+            mtime_atest1 = mtime("a/test1.txt")
+            mtime_atest2 = mtime("a/test2.txt")
+            mtime_btest3_1 = mtime("b/test3.txt")
+            time.sleep(2)  # To make mtime differ
+            self.tools.rsync("a", "b")
+            self.assertExists("b/new")
+            self.assertNotExists("b/deleted")
+            self.assertEqual(self.tools.read_file("a/test1.txt"),
+                             self.tools.read_file("b/test1.txt"))
+            self.assertEqual(self.tools.read_file("a/test2.txt"),
+                             self.tools.read_file("b/test2.txt"))
+            self.assertEqual(self.tools.read_file("a/test3.txt"),
+                             self.tools.read_file("b/test3.txt"))
+
+            mtime_btest1 = mtime("b/test1.txt")
+            mtime_btest2 = mtime("b/test2.txt")
+            mtime_btest3_2 = mtime("b/test3.txt")
+            self.assertGreater(mtime_btest1, mtime_atest1+1)
+            self.assertGreater(mtime_btest2, mtime_atest2+1)
+            self.assertEqual(mtime_btest3_1, mtime_btest3_2)
 
     def test_sandbox(self):
         """

@@ -879,6 +879,56 @@ class Tools(object):
         pathname = self.expand_path(pathname, *args, **kwargs)
         return fs.rmtree(pathname, **kwargs)
 
+    def rsync(self, srcpath, dstpath, *args, **kwargs):
+        """ Synchronizes files from one directory to another.
+
+        The function performs a smart copy of files from the
+        ``srcpath`` directory to the ``dstpath`` directory in
+        such a way that ``dstpath`` will mirror ``srcpath``.
+
+        If ``dstpath`` is empty, the files are copied normally.
+
+        If ``dstpath`` already contains a sub or superset of the
+        files in ``srcpath``, files are either copied or deleted
+        depending on their presence in the source directory. Common
+        files are only copied if the file content differs, thereby
+        retaining metadata (such as timestamps) of identical files
+        already present in ``dstpath``.
+
+        The function only operates on files and not directories.
+        If files are removed from subdirectories of ``srcpath``,
+        those subdirectories will be left behind in ``dstpath``.
+
+        Args:
+            srcpath (str): Path to source directory.
+                The directory must exist.
+            dstpath (str): Path to destination directory.
+
+        """
+
+        srcpath = self.expand_path(srcpath, *args, **kwargs)
+        dstpath = self.expand_path(dstpath, *args, **kwargs)
+        srcfiles = set(fs.scandir(srcpath, relative=True))
+        dstfiles = set(fs.scandir(dstpath, relative=True))
+        added_files = srcfiles - dstfiles
+        deleted_files = dstfiles - srcfiles
+        common_files = srcfiles.intersection(dstfiles)
+
+        for fp in added_files:
+            src = fs.path.join(srcpath, fp)
+            dst = fs.path.join(dstpath, fp)
+            fs.copy(src, dst, metadata=False)
+
+        for fp in common_files:
+            src = fs.path.join(srcpath, fp)
+            dst = fs.path.join(dstpath, fp)
+            if not fs.identical_files(src, dst):
+                fs.copy(src, dst, metadata=False)
+
+        for fp in deleted_files:
+            dst = fs.path.join(dstpath, fp)
+            fs.unlink(dst)
+
     def run(self, cmd, *args, **kwargs):
         """ Runs a command in a shell interpreter.
 
@@ -981,11 +1031,8 @@ class Tools(object):
     def _sandbox_rsync(self, artifact, path):
         meta = self._sandbox_validate(artifact, path)
         if meta:
-            if shutil.which("rsync") and os.name in ["posix"]:
-                self.run("rsync --delete -c -r {0}/ {1}", artifact.path, path, output_on_error=True)
-            else:
-                fs.rmtree(path)
-                fs.copytree(artifact.path, path)
+            fs.unlink(meta, ignore_errors=True)
+            self.rsync(artifact.path, path)
             self.write_file(meta, artifact.path)
         return path
 

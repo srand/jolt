@@ -31,6 +31,17 @@ mkdtemp = tempfile.mkdtemp
 def exists(path):
     return os.path.exists(path)
 
+def identical_files(path1, path2):
+    stat1 = os.stat(path1)
+    stat2 = os.stat(path2)
+    if stat1.st_size != stat2.st_size:
+        return False
+    with open(path1, "rb") as f1, open(path2, "rb") as f2:
+        for data1, data2 in iter(lambda: (f1.read(0x10000), f2.read(0x10000)), (b'', b'')):
+            if data1 != data2:
+                return False
+    return True
+
 def rename(old, new):
     return os.rename(old, new)
 
@@ -54,7 +65,7 @@ def symlink(src, dest, *args, **kwargs):
     else:
         os.symlink(src, dest, *args, **kwargs)
 
-def copytree(src, dst, symlinks=False, ignore=None):
+def copytree(src, dst, symlinks=False, ignore=None, metadata=True):
     names = os.listdir(src)
     if ignore is not None:
         ignored_names = ignore(src, names)
@@ -74,26 +85,25 @@ def copytree(src, dst, symlinks=False, ignore=None):
                 os.symlink(linkto, dstname)
             elif os.path.isdir(srcname):
                 copytree(srcname, dstname, symlinks, ignore)
-            else:
+            elif metadata:
                 shutil.copy2(srcname, dstname)
-            # XXX What about devices, sockets etc.?
+            else:
+                shutil.copy(srcname, dstname)
         except (IOError, os.error) as why:
             errors.append((srcname, dstname, str(why)))
-        # catch the Error from the recursive copytree so that we can
-        # continue with other files
         except Exception as err:
             errors.extend(err.args[0])
     try:
-        shutil.copystat(src, dst)
+        if metadata:
+            shutil.copystat(src, dst)
     except WindowsError:
-        # can't copy file access times on Windows
         pass
     except OSError as why:
         errors.extend((src, dst, str(why)))
     if errors:
         raise Exception(errors)
 
-def copy(src, dest, symlinks=False):
+def copy(src, dest, symlinks=False, metadata=True):
     if not path.exists(dest):
         if dest[-1] == os.sep:
             makedirs(dest)
@@ -105,16 +115,23 @@ def copy(src, dest, symlinks=False):
             dest = path.join(dest, path.basename(src))
 
     if path.isdir(src):
-        copytree(src, dest, symlinks=symlinks)
-    else:
+        copytree(src, dest, symlinks=symlinks, metadata=metadata)
+    elif metadata:
         shutil.copy2(src, dest)
+    else:
+        shutil.copy(src, dest)
 
 
-def scandir(scanpath):
-    return [os.path.join(path, f)
+def scandir(scanpath, filterfn=lambda path: path[0] != ".", relative=False):
+    def relresult(path, fp):
+        return os.path.relpath(os.path.join(path, fp), scanpath)
+    def absresult(path, fp):
+        return os.path.join(path, fp)
+    resfn = relresult if relative else absresult
+    return [resfn(path, f)
             for path, dirs, files in os.walk(scanpath)
             for f in files
-            if f[0] != "."]
+            if filterfn(f)]
 
 
 def get_archive(path):
