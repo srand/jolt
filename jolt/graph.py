@@ -228,7 +228,7 @@ class TaskProxy(object):
         self.children = list(
             filter(lambda n: not n.is_alias() and (not n.is_resource() or \
                    dag.are_neighbors(self, n)),
-                   self.children))
+                   utils.unique_list(self.children)))
 
         self.descendants = list(self.descendants)
 
