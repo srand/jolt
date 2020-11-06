@@ -64,7 +64,7 @@ setup(
     install_requires=["requests", "click>=7.0", "networkx", "keyring", "keyrings.alt",
                       "jinja2", "python-jenkins", "multi_key_dict",
                       "tqdm<=4.29.1", "bz2file", "colorama", "ninja-syntax",
-                      "pyyaml", "fasteners", "pygit2"],
+                      "pyyaml", "fasteners", "ntfsutils", "pygit2"],
 
     dependency_links=[],
 
