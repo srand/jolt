@@ -1204,6 +1204,11 @@ class CXXProject(Task):
             self._populate_project(writer, deps, tools)
             writer.close()
             return writer
+        self._write_ninja_cache(deps, tools)
+
+    def _write_ninja_cache(self, deps, tools):
+        """ Hooked from ninja-cache plugin """
+        pass
 
     def _write_shell_file(self, basedir, deps, tools, writer):
         filepath = fs.path.join(basedir, "compile")

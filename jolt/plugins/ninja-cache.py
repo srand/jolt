@@ -1,4 +1,5 @@
 import click
+import functools
 import hashlib
 import json
 import os
@@ -25,8 +26,9 @@ class CacheHooks(TaskHook):
         if not isinstance(task.task, ninja.CXXLibrary) or task.task.shared:
             return
         task.task.influence.append(StringInfluence("NinjaCache"))
+        task.task._write_ninja_cache = functools.partial(self.task_post_ninja_file, task)
 
-    def task_prerun(self, task, deps, tools):
+    def task_post_ninja_file(self, task, deps, tools):
         if not isinstance(task.task, ninja.CXXLibrary) or task.task.shared:
             return
 
