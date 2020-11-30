@@ -101,6 +101,10 @@ class TaskSourceInfluence(HashInfluenceProvider):
         self.funcname = funcname
         self.obj = obj
 
+    @staticmethod
+    def _default_func():
+        pass
+
     def get_influence(self, task):
         obj = self.obj or task
         try:
@@ -108,15 +112,26 @@ class TaskSourceInfluence(HashInfluenceProvider):
             funcname = obj.expand(funcname)
         except:
             pass
-        if type(obj.__class__) == type:
-            func = utils.getattr_safe(obj, funcname)
+
+        # Collect all functions from the class hierarchy
+        if type(obj) == type:
+            funcs = [utils.getattr_safe(mro, funcname, TaskSourceInfluence._default_func)
+                     for mro in obj.mro()]
         else:
-            func = utils.getattr_safe(obj.__class__, funcname)
-        try:
-            return func.__influence + ": " + funcname
-        except AttributeError:
-            func.__influence = utils.sha1(task._get_source(func))
-        return func.__influence + ": " + funcname
+            funcs = [utils.getattr_safe(mro, funcname, TaskSourceInfluence._default_func)
+                     for mro in obj.__class__.mro()]
+
+        # Calculate sha1 sum for all functions
+        shasum = hashlib.sha1()
+        for func in funcs:
+            try:
+                func.__influence
+            except AttributeError:
+                func.__influence = utils.sha1(task._get_source(func))
+            finally:
+                shasum.update(func.__influence.encode())
+
+        return shasum.hexdigest() + ": " + funcname
 
 
 def source(name, obj=None):
