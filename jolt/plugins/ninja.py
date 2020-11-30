@@ -740,14 +740,14 @@ class IncludePaths(Variable):
             if path[0] in ['=', fs.sep]:
                 return tools.expand(path)
             if path[0] in ['-']:
-                return tools.expand(path[1:])
+                path = tools.expand_path(path[1:])
             return tools.expand_relpath(path, project.outdir)
 
         def expand_artifact(sandbox, path):
             if path[0] in ['=', fs.sep]:
                 return path
             if path[0] in ['-']:
-                return path[1:]
+                path = fs.path.join(project.joltdir, path[1:])
             return tools.expand_relpath(fs.path.join(sandbox, path), project.outdir)
 
         incpaths = ["."] + [expand(path) for path in project.incpaths]
