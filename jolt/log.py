@@ -71,9 +71,14 @@ class Formatter(logging.Formatter):
 
 
 class ConsoleFormatter(logging.Formatter):
-    def __init__(self, fmt, *args, **kwargs):
+    def __init__(self, fmt_prefix, fmt_noprefix, *args, **kwargs):
         super(ConsoleFormatter, self).__init__(*args, **kwargs)
-        self.fmt = fmt
+        self.fmt_prefix = fmt_prefix
+        self.fmt_noprefix = fmt_noprefix
+        self.always_prefix = False
+
+    def enable_prefixes(self):
+        self.always_prefix = True
 
     def format(self, record):
         try:
@@ -87,7 +92,16 @@ class ConsoleFormatter(logging.Formatter):
                 msg = colors.yellow(msg)
         record.message = msg
         record.asctime = datetime.fromtimestamp(record.created).strftime("%Y-%m-%d %H:%M:%S.%f")
-        return self.fmt.format(
+        record.prefix = True if record.__dict__.get("prefix", False) else False
+
+        if not record.prefix and \
+           not self.always_prefix and \
+           record.levelno in [STDOUT, STDERR]:
+            fmt = self.fmt_noprefix
+        else:
+            fmt = self.fmt_prefix
+
+        return fmt.format(
             levelname=record.levelname,
             message=record.message,
             asctime=record.asctime
@@ -119,7 +133,7 @@ class TqdmStream(object):
 _logger = logging.getLogger('jolt')
 _logger.setLevel(logging.DEBUG)
 
-_console_formatter = ConsoleFormatter('[{levelname:>7}] {message}')
+_console_formatter = ConsoleFormatter('[{levelname:>7}] {message}', '{message}')
 
 if sys.stdout.isatty() and sys.stderr.isatty():
     _stdout = logging.StreamHandler(TqdmStream(sys.stdout))
@@ -164,15 +178,15 @@ def debug(fmt, *args, **kwargs):
 def error(fmt, *args, **kwargs):
     _logger.error(fmt, *args, **kwargs)
 
-def stdout(line):
+def stdout(line, **kwargs):
     line = line.replace("{", "{{")
     line = line.replace("}", "}}")
-    _logger.log(STDOUT, line)
+    _logger.log(STDOUT, line, extra=kwargs)
 
-def stderr(line):
+def stderr(line, **kwargs):
     line = line.replace("{", "{{")
     line = line.replace("}", "}}")
-    _logger.log(STDERR, line)
+    _logger.log(STDERR, line, extra=kwargs)
 
 def exception(exc=None):
     if exc:
@@ -200,11 +214,11 @@ def transfer(line, context):
         outline1 = outline1.replace("}", "}}")
         _logger.log(EXCEPTION, outline1)
     elif line.startswith("[ STDERR]"):
-        stderr(outline1)
+        stderr(outline1, prefix=True)
     elif line.startswith("[ STDOUT]"):
-        stdout(outline1)
+        stdout(outline1, prefix=True)
     else:
-        stdout(outline2)
+        stdout(outline2, prefix=True)
 
 
 class _Progress(object):
@@ -238,6 +252,10 @@ def progress(desc, count, unit, estimates=True, debug=False):
 def set_level(level):
     _stdout.setLevel(level)
     _stderr.setLevel(level)
+
+
+def set_worker():
+    _console_formatter.enable_prefixes()
 
 
 def is_verbose():

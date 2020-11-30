@@ -232,6 +232,7 @@ def build(ctx, task, network, keep_going, identity, default, local,
 
     executors = scheduler.ExecutorRegistry.get(options)
     if worker:
+        log.set_worker()
         log.verbose("Local build as a worker")
         strategy = scheduler.WorkerStrategy(executors, acache)
     elif network:
