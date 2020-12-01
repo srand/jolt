@@ -1113,7 +1113,7 @@ class CXXProject(Task):
         super(CXXProject, self).__init__(*args, **kwargs)
         self._init_sources()
         self.toolchain = self.__class__.toolchain() if self.__class__.toolchain else toolchain
-        self.binary = self.expand(self.__class__.binary or self.canonical_name)
+        self.binary = self.expand(utils.call_or_return(self, self.__class__._binary))
 
         self.asflags = self.expand(utils.as_list(utils.call_or_return(self, self.__class__._asflags)))
         self.cflags = self.expand(utils.as_list(utils.call_or_return(self, self.__class__._cflags)))
@@ -1309,6 +1309,9 @@ if __name__ == "__main__":
 
     def _populate_project(self, writer, deps, tools):
         pass
+
+    def _binary(self):
+        return utils.call_or_return(self, self.__class__.binary) or self.canonical_name
 
     def _incpaths(self):
         return utils.call_or_return(self, self.__class__.incpaths)
