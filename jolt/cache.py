@@ -355,6 +355,8 @@ class Artifact(object):
         ArtifactAttributeSetRegistry.create_all(self)
         try:
             self._read_manifest()
+        except KeyboardInterrupt as e:
+            raise e
         except:
             log.exception()
             self.discard()
@@ -908,8 +910,13 @@ class ArtifactCache(StorageProvider):
         if not node.task.is_cacheable():
             return False
         if fs.path.exists(self.get_path(node)):
-            with self.get_artifact(node) as a:
-                self.stats.update(a)
+            try:
+                with self.get_artifact(node) as a:
+                    self.stats.update(a)
+            except KeyboardInterrupt as e:
+                raise e
+            except:
+                return False
             return True
         return False
 
@@ -1041,6 +1048,11 @@ class ArtifactCache(StorageProvider):
             if not node.task.is_cacheable():
                 continue
             if fs.path.exists(self.get_path(node)):
-                with Artifact(self, node) as artifact:
-                    self.stats.update(artifact, save=False)
+                try:
+                    with Artifact(self, node) as artifact:
+                        self.stats.update(artifact, save=False)
+                except KeyboardInterrupt as e:
+                    raise e
+                except:
+                    pass
         self.stats.save()
