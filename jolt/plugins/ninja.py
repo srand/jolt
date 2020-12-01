@@ -854,7 +854,7 @@ class GNUToolchain(Toolchain):
     mkdir_debug = MakeDirectory(name=".debug")
 
     compile_pch = GNUCompiler(
-        command="$cxxwrap $cxx -x c++-header $cxxflags $shared_flags $imported_cxxflags $extra_cxxflags $macros $incpaths -MMD -MF $out.d -c $in -o $out",
+        command="$cxxwrap $cxx_path -x c++-header $cxxflags $shared_flags $imported_cxxflags $extra_cxxflags $macros $incpaths -MMD -MF $out.d -c $in -o $out",
         deps="gcc",
         depfile="$out.d",
         infiles=[GNUPCHVariables.pch_ext],
@@ -862,7 +862,7 @@ class GNUToolchain(Toolchain):
         variables={"desc": "[PCH] {in_base}{in_ext}"})
 
     compile_c = GNUCompiler(
-        command="$ccwrap $cc -x c $pch_flags $cflags $shared_flags $imported_cflags $extra_cflags $macros $incpaths -MMD -MF $out.d -c $in -o $out",
+        command="$ccwrap $cc_path -x c $pch_flags $cflags $shared_flags $imported_cflags $extra_cflags $macros $incpaths -MMD -MF $out.d -c $in -o $out",
         deps="gcc",
         depfile="$out.d",
         infiles=[".c"],
@@ -871,7 +871,7 @@ class GNUToolchain(Toolchain):
         implicit=["$cc_path"])
 
     compile_cxx = GNUCompiler(
-        command="$cxxwrap $cxx -x c++ $pch_flags $cxxflags $shared_flags $imported_cxxflags $extra_cxxflags $macros $incpaths -MMD -MF $out.d -c $in -o $out",
+        command="$cxxwrap $cxx_path -x c++ $pch_flags $cxxflags $shared_flags $imported_cxxflags $extra_cxxflags $macros $incpaths -MMD -MF $out.d -c $in -o $out",
         deps="gcc",
         depfile="$out.d",
         infiles=[".cc", ".cpp", ".cxx"],
@@ -880,7 +880,7 @@ class GNUToolchain(Toolchain):
         implicit=["$cxx_path"])
 
     compile_asm = GNUCompiler(
-        command="$ccwrap $cc -x assembler $pch_flags $asflags $shared_flags $imported_asflags $extra_asflags -MMD -MF $out.d -c $in -o $out",
+        command="$ccwrap $cc_path -x assembler $pch_flags $asflags $shared_flags $imported_asflags $extra_asflags -MMD -MF $out.d -c $in -o $out",
         deps="gcc",
         depfile="$out.d",
         infiles=[".s", ".asm"],
@@ -889,7 +889,7 @@ class GNUToolchain(Toolchain):
         implicit=["$cc_path"])
 
     compile_asm_with_cpp = GNUCompiler(
-        "$ccwrap $cc -x assembler-with-cpp $pch_flags $asflags $shared_flags $imported_asflags $extra_asflags $macros $incpaths -MMD -MF $out.d -c $in -o $out",
+        "$ccwrap $cc_path -x assembler-with-cpp $pch_flags $asflags $shared_flags $imported_asflags $extra_asflags $macros $incpaths -MMD -MF $out.d -c $in -o $out",
         deps="gcc",
         depfile="$out.d",
         infiles=[".S"],
@@ -899,10 +899,10 @@ class GNUToolchain(Toolchain):
 
     linker = GNULinker(
         command=" && ".join([
-            "$ld $ldflags $imported_ldflags $extra_ldflags $libpaths -Wl,--start-group @objects.list -Wl,--end-group -o $out -Wl,--start-group $libraries -Wl,--end-group",
-            "$objcopy --only-keep-debug $out .debug/$binary",
-            "$objcopy --strip-all $out",
-            "$objcopy --add-gnu-debuglink=.debug/$binary $out"
+            "$ld_path $ldflags $imported_ldflags $extra_ldflags $libpaths -Wl,--start-group @objects.list -Wl,--end-group -o $out -Wl,--start-group $libraries -Wl,--end-group",
+            "$objcopy_path --only-keep-debug $out .debug/$binary",
+            "$objcopy_path --strip-all $out",
+            "$objcopy_path --add-gnu-debuglink=.debug/$binary $out"
         ]),
         outfiles=["{outdir}/{binary}"],
         variables={"desc": "[LINK] {binary}"},
@@ -910,17 +910,17 @@ class GNUToolchain(Toolchain):
 
     dynlinker = GNULinker(
         command=" && ".join([
-            "$ld $ldflags -shared $imported_ldflags $extra_ldflags $libpaths -Wl,--start-group @objects.list -Wl,--end-group -o $out -Wl,--start-group $libraries -Wl,--end-group",
-            "$objcopy --only-keep-debug $out .debug/lib$binary.so",
-            "$objcopy --strip-all $out",
-            "$objcopy --add-gnu-debuglink=.debug/lib$binary.so $out"
+            "$ld_path $ldflags -shared $imported_ldflags $extra_ldflags $libpaths -Wl,--start-group @objects.list -Wl,--end-group -o $out -Wl,--start-group $libraries -Wl,--end-group",
+            "$objcopy_path --only-keep-debug $out .debug/lib$binary.so",
+            "$objcopy_path --strip-all $out",
+            "$objcopy_path --add-gnu-debuglink=.debug/lib$binary.so $out"
         ]),
         outfiles=["{outdir}/lib{binary}.so"],
         variables={"desc": "[LINK] {binary}"},
         implicit=["$ld_path", "$objcopy_path", ".debug"])
 
     archiver = GNUArchiver(
-        command="$ar -M < objects.list && $ranlib $out",
+        command="$ar_path -M < objects.list && $ranlib $out",
         outfiles=["{outdir}/lib{binary}.a"],
         variables={"desc": "[AR] lib{binary}.a"},
         implicit=["$ld_path", "$ar_path"])
@@ -933,10 +933,10 @@ class GNUToolchain(Toolchain):
 class MinGWToolchain(GNUToolchain):
     linker = GNULinker(
         command=" && ".join([
-            "$ld $ldflags $imported_ldflags $extra_ldflags $libpaths -Wl,--start-group @objects.list -Wl,--end-group -o $out -Wl,--start-group $libraries -Wl,--end-group",
-            "$objcopy --only-keep-debug $out .debug/$binary.exe",
-            "$objcopy --strip-all $out",
-            "$objcopy --add-gnu-debuglink=.debug/$binary.exe $out"
+            "$ld_path $ldflags $imported_ldflags $extra_ldflags $libpaths -Wl,--start-group @objects.list -Wl,--end-group -o $out -Wl,--start-group $libraries -Wl,--end-group",
+            "$objcopy_path --only-keep-debug $out .debug/$binary.exe",
+            "$objcopy_path --strip-all $out",
+            "$objcopy_path --add-gnu-debuglink=.debug/$binary.exe $out"
         ]),
         outfiles=["{outdir}/{binary}.exe"],
         variables={"desc": "[LINK] {binary}"},
@@ -977,7 +977,7 @@ class MSVCToolchain(Toolchain):
     libraries = Libraries(suffix=".lib")
 
     compile_asm = MSVCCompiler(
-        command="$cl /nologo /showIncludes $asflags $extra_asflags $macros $incpaths /c /Tc$in /Fo$out",
+        command="$cl_path /nologo /showIncludes $asflags $extra_asflags $macros $incpaths /c /Tc$in /Fo$out",
         deps="msvc",
         infiles=[".asm", ".s", ".S"],
         outfiles=["{outdir}/{in_path}/{in_base}.obj"],
@@ -985,7 +985,7 @@ class MSVCToolchain(Toolchain):
         implicit=["$cl_path"])
 
     compile_c = MSVCCompiler(
-        command="$cl /nologo /showIncludes $cxxflags $extra_cxxflags $macros $incpaths /c /Tc$in /Fo$out",
+        command="$cl_path /nologo /showIncludes $cxxflags $extra_cxxflags $macros $incpaths /c /Tc$in /Fo$out",
         deps="msvc",
         infiles=[".c"],
         outfiles=["{outdir}/{in_path}/{in_base}.obj"],
@@ -993,7 +993,7 @@ class MSVCToolchain(Toolchain):
         implicit=["$cl_path"])
 
     compile_cxx = MSVCCompiler(
-        command="$cl /nologo /showIncludes $cxxflags $extra_cxxflags $macros $incpaths /c /Tp$in /Fo$out",
+        command="$cl_path /nologo /showIncludes $cxxflags $extra_cxxflags $macros $incpaths /c /Tp$in /Fo$out",
         deps="msvc",
         infiles=[".cc", ".cpp", ".cxx"],
         outfiles=["{outdir}/{in_path}/{in_base}.obj"],
@@ -1001,13 +1001,13 @@ class MSVCToolchain(Toolchain):
         implicit=["$cl_path"])
 
     linker = MSVCLinker(
-        command="$link /nologo $ldflags $extra_ldflags $libpaths @objects.list $libraries /out:$out",
+        command="$link_path /nologo $ldflags $extra_ldflags $libpaths @objects.list $libraries /out:$out",
         outfiles=["{outdir}/{binary}.exe"],
         variables={"desc": "[LIB] {binary}"},
         implicit=["$link_path"])
 
     archiver = MSVCArchiver(
-        command="$lib /nologo /out:$out @objects.list",
+        command="$lib_path /nologo /out:$out @objects.list",
         outfiles=["{outdir}/{binary}.lib"],
         variables={"desc": "[LIB] {binary}"},
         implicit=["$lib_path"])
