@@ -30,11 +30,30 @@ class ToolsApi(JoltTest):
             self.tools.append_file("{filename}.txt", "appended-{filedata}")
             self.assertEqual(self.tools.read_file("{filename}.txt"),
                              "test\nappended-test")
+    def test_archive_tar(self):
+        """
+        --- file: original/tests.txt
+        testtesttesttest
+        --- file: original/subdir/tests2.txt
+        testtesttesttest2
+        ---
+        """
+        self.filename = "tests"
+        with self.tools.cwd(self.ws):
+            self.tools.archive(self.ws+"/original", "{filename}.tar")
+            self.tools.run("mkdir {}/extracted", self.ws)
+            self.tools.run("tar -xvf tests.tar -C {}/extracted", self.ws)
+            self.assertEqual(self.tools.read_file(self.ws+"/original/tests.txt"),
+                             self.tools.read_file(self.ws+"/extracted/tests.txt"))
+            self.assertEqual(self.tools.read_file(self.ws+"/original/subdir/tests2.txt"),
+                             self.tools.read_file(self.ws+"/extracted/subdir/tests2.txt"))
 
     def test_archive_zip(self):
         """
         --- file: original/tests.txt
         testtesttesttest
+        --- file: original/subdir/tests2.txt
+        testtesttesttest2
         ---
         """
         self.filename = "tests"
@@ -43,11 +62,15 @@ class ToolsApi(JoltTest):
             self.tools.run("unzip tests.zip -d {}/extracted", self.ws)
             self.assertEqual(self.tools.read_file(self.ws+"/original/tests.txt"),
                              self.tools.read_file(self.ws+"/extracted/tests.txt"))
+            self.assertEqual(self.tools.read_file(self.ws+"/original/subdir/tests2.txt"),
+                             self.tools.read_file(self.ws+"/extracted/subdir/tests2.txt"))
 
     def test_archive_tar_gz(self):
         """
         --- file: original/tests.txt
         testtesttesttest
+        --- file: original/subdir/tests2.txt
+        testtesttesttest2
         ---
         """
         self.filename = "tests"
@@ -57,11 +80,15 @@ class ToolsApi(JoltTest):
             self.tools.run("tar xzvf tests.tar.gz -C {}/extracted", self.ws)
             self.assertEqual(self.tools.read_file(self.ws+"/original/tests.txt"),
                              self.tools.read_file(self.ws+"/extracted/tests.txt"))
+            self.assertEqual(self.tools.read_file(self.ws+"/original/subdir/tests2.txt"),
+                             self.tools.read_file(self.ws+"/extracted/subdir/tests2.txt"))
 
     def test_archive_tar_bz2(self):
         """
         --- file: original/tests.txt
         testtesttesttest
+        --- file: original/subdir/tests2.txt
+        testtesttesttest2
         ---
         """
         self.filename = "tests"
@@ -71,6 +98,26 @@ class ToolsApi(JoltTest):
             self.tools.run("tar xjvf tests.tar.bz2 -C {}/extracted", self.ws)
             self.assertEqual(self.tools.read_file(self.ws+"/original/tests.txt"),
                              self.tools.read_file(self.ws+"/extracted/tests.txt"))
+            self.assertEqual(self.tools.read_file(self.ws+"/original/subdir/tests2.txt"),
+                             self.tools.read_file(self.ws+"/extracted/subdir/tests2.txt"))
+
+    def test_archive_tar_xz(self):
+        """
+        --- file: original/tests.txt
+        testtesttesttest
+        --- file: original/subdir/tests2.txt
+        testtesttesttest2
+        ---
+        """
+        self.filename = "tests"
+        with self.tools.cwd(self.ws):
+            self.tools.archive(self.ws+"/original", "{filename}.tar.xz")
+            self.tools.run("mkdir {}/extracted", self.ws)
+            self.tools.run("tar xJvf tests.tar.xz -C {}/extracted", self.ws)
+            self.assertEqual(self.tools.read_file(self.ws+"/original/tests.txt"),
+                             self.tools.read_file(self.ws+"/extracted/tests.txt"))
+            self.assertEqual(self.tools.read_file(self.ws+"/original/subdir/tests2.txt"),
+                             self.tools.read_file(self.ws+"/extracted/subdir/tests2.txt"))
 
     def test_builddir_unique(self):
         """

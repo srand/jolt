@@ -310,6 +310,31 @@ class Tools(object):
         with open(pathname, "ab") as f:
             f.write(content.encode())
 
+    def _make_zipfile(self, filename, fmt, rootdir):
+        dirname = fs.path.dirname(filename)
+        if not fs.path.exists(dirname):
+            fs.makedirs(dirname)
+        with zipfile.ZipFile(filename, "w", zipfile.ZIP_DEFLATED) as zf:
+            for dirpath, dirnames, filenames in os.walk(rootdir):
+                for name in sorted(dirnames):
+                    path = os.path.normpath(os.path.join(dirpath, name))
+                    zippath = os.path.relpath(path, rootdir)
+                    zf.write(path, zippath)
+                for name in filenames:
+                    path = os.path.normpath(os.path.join(dirpath, name))
+                    zippath = os.path.relpath(path, rootdir)
+                    if os.path.isfile(path):
+                        zf.write(path, zippath)
+        return filename
+
+    def _make_tarfile(self, filename, fmt, rootdir):
+        dirname = os.path.dirname(filename)
+        if not os.path.exists(dirname):
+            fs.makedirs(dirname)
+        with tarfile.open(filename, 'w|%s' % fmt) as tar:
+            tar.add(rootdir, ".")
+        return filename
+
     def archive(self, pathname, filename):
         """ Creates a (compressed) archive.
 
@@ -340,25 +365,28 @@ class Tools(object):
             if shutil.which("tar") and shutil.which("pigz"):
                 self.run("tar -I pigz -cf {} -C {} .", filename, pathname)
                 return filename
-            fmt = "gztar"
+            fmt = "targz"
             basename = filename[:-7]
         elif filename.endswith(".tgz"):
             if shutil.which("tar") and shutil.which("pigz"):
                 self.run("tar -I pigz -cf {} -C {} .", filename, pathname)
                 return filename
-            fmt = "gztar"
+            fmt = "targz"
             basename = filename[:-4]
         elif filename.endswith(".tar.bz2"):
-            fmt = "bztar"
+            fmt = "tarbz2"
             basename = filename[:-8]
         elif filename.endswith(".tar.xz"):
-            fmt = "xztar"
+            fmt = "tarxz"
             basename = filename[:-7]
         raise_task_error_if(
             not fmt, self._task,
             "unknown archive type '{0}'", fs.path.basename(filename))
         try:
-            outfile = shutil.make_archive(basename, fmt, root_dir=pathname)
+            if fmt == "zip":
+                outfile = self._make_zipfile(filename, fmt, rootdir=pathname)
+            else:
+                outfile = self._make_tarfile(filename, fmt[3:], rootdir=pathname)
             if outfile != filename:
                 shutil.move(outfile, filename)
             return filename
