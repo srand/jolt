@@ -1536,8 +1536,8 @@ class CXXExecutable(CXXProject):
                 artifact.collect(self.binary + '.exe', self.publishdir)
             else:
                 artifact.collect(self.binary, self.publishdir)
-                if not self.strip:
-                    artifact.collect(".debug", self.publishdir)
+            if not self.strip:
+                artifact.collect(".debug", self.publishdir)
         artifact.environ.PATH.append(self.publishdir)
         artifact.strings.executable = fs.path.join(
             self.publishdir, self.binary)
