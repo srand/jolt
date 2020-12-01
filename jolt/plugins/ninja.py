@@ -930,6 +930,19 @@ class GNUToolchain(Toolchain):
         suffix=".a")
 
 
+class MinGWToolchain(GNUToolchain):
+    linker = GNULinker(
+        command=" && ".join([
+            "$ld $ldflags $imported_ldflags $extra_ldflags $libpaths -Wl,--start-group @objects.list -Wl,--end-group -o $out -Wl,--start-group $libraries -Wl,--end-group",
+            "$objcopy --only-keep-debug $out .debug/$binary.exe",
+            "$objcopy --strip-all $out",
+            "$objcopy --add-gnu-debuglink=.debug/$binary.exe $out"
+        ]),
+        outfiles=["{outdir}/{binary}.exe"],
+        variables={"desc": "[LINK] {binary}"},
+        implicit=["$ld_path", "$objcopy_path", ".debug"])
+
+
 MSVCCompiler = GNUCompiler
 MSVCArchiver = GNUArchiver
 MSVCLinker = GNULinker
