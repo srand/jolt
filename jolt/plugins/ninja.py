@@ -713,6 +713,10 @@ class Macros(Variable):
         macros = ["{0}{1}".format(self.prefix, macro) for macro in macros]
         writer.variable(self.name, " ".join(macros))
 
+    @utils.cached.instance
+    def get_influence(self, task):
+        return "Macros: prefix={}".format(self.prefix)
+
 
 class ImportedFlags(Variable):
     def create(self, project, writer, deps, tools):
@@ -760,6 +764,10 @@ class IncludePaths(Variable):
         incpaths = ["{0}{1}".format(self.prefix, path) for path in incpaths]
         writer.variable(self.name, " ".join(incpaths))
 
+    @utils.cached.instance
+    def get_influence(self, task):
+        return "IncludePaths: prefix={}".format(self.prefix)
+
 
 class LibraryPaths(Variable):
     def __init__(self, prefix=None):
@@ -775,6 +783,10 @@ class LibraryPaths(Variable):
         libpaths = ["{0}{1}".format(self.prefix, path) for path in libpaths]
         writer.variable(self.name, " ".join(libpaths))
 
+    @utils.cached.instance
+    def get_influence(self, task):
+        return "LibraryPaths: prefix={}".format(self.prefix)
+
 
 class Libraries(Variable):
     def __init__(self, prefix=None, suffix=None):
@@ -789,6 +801,10 @@ class Libraries(Variable):
             libraries += artifact.cxxinfo.libraries.items()
         libraries = ["{0}{1}{2}".format(self.prefix, path, self.suffix) for path in libraries]
         writer.variable(self.name, " ".join(libraries))
+
+    @utils.cached.instance
+    def get_influence(self, task):
+        return "Libraries: prefix={},suffix={}".format(self.prefix, self.suffix)
 
 
 class GNUFlags(object):
