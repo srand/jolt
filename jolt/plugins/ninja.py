@@ -945,9 +945,9 @@ class MSVCToolchain(Toolchain):
     outdir = ProjectVariable()
     binary = ProjectVariable()
 
-    cl = EnvironmentVariable(default="cl", envname="cl_exe")
-    lib = EnvironmentVariable(default="lib", envname="lib_exe")
-    link = EnvironmentVariable(default="link", envname="link_exe")
+    cl = ToolEnvironmentVariable(default="cl", envname="cl_exe")
+    lib = ToolEnvironmentVariable(default="lib", envname="lib_exe")
+    link = ToolEnvironmentVariable(default="link", envname="link_exe")
 
     asflags = EnvironmentVariable(default="")
     cflags = EnvironmentVariable(default="/EHsc")
@@ -967,27 +967,37 @@ class MSVCToolchain(Toolchain):
         command="$cl /nologo /showIncludes $asflags $extra_asflags $macros $incpaths /c /Tc$in /Fo$out",
         deps="msvc",
         infiles=[".asm", ".s", ".S"],
-        outfiles=["{outdir}/{in_path}/{in_base}.obj"])
+        outfiles=["{outdir}/{in_path}/{in_base}.obj"],
+        variables={"desc": "[ASM] {in_base}{in_ext}"},
+        implicit=["$cl_path"])
 
     compile_c = MSVCCompiler(
         command="$cl /nologo /showIncludes $cxxflags $extra_cxxflags $macros $incpaths /c /Tc$in /Fo$out",
         deps="msvc",
         infiles=[".c"],
-        outfiles=["{outdir}/{in_path}/{in_base}.obj"])
+        outfiles=["{outdir}/{in_path}/{in_base}.obj"],
+        variables={"desc": "[C] {in_base}{in_ext}"},
+        implicit=["$cl_path"])
 
     compile_cxx = MSVCCompiler(
         command="$cl /nologo /showIncludes $cxxflags $extra_cxxflags $macros $incpaths /c /Tp$in /Fo$out",
         deps="msvc",
         infiles=[".cc", ".cpp", ".cxx"],
-        outfiles=["{outdir}/{in_path}/{in_base}.obj"])
+        outfiles=["{outdir}/{in_path}/{in_base}.obj"],
+        variables={"desc": "[CXX] {in_base}{in_ext}"},
+        implicit=["$cl_path"])
 
     linker = MSVCLinker(
         command="$link /nologo $ldflags $extra_ldflags $libpaths @objects.list $libraries /out:$out",
-        outfiles=["{outdir}/{binary}.exe"])
+        outfiles=["{outdir}/{binary}.exe"],
+        variables={"desc": "[LIB] {binary}"},
+        implicit=["$link_path"])
 
     archiver = MSVCArchiver(
         command="$lib /nologo /out:$out @objects.list",
-        outfiles=["{outdir}/{binary}.lib"])
+        outfiles=["{outdir}/{binary}.lib"],
+        variables={"desc": "[LIB] {binary}"},
+        implicit=["$lib_path"])
 
     depimport = MSVCDepImporter(
         prefix="",
