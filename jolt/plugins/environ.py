@@ -6,8 +6,8 @@ from jolt.cache import ArtifactAttributeSetProvider
 
 
 class EnvironmentVariable(ArtifactStringAttribute):
-    def __init__(self, name):
-        super(EnvironmentVariable, self).__init__(name)
+    def __init__(self, artifact, name):
+        super(EnvironmentVariable, self).__init__(artifact, name)
         self._old_value = None
 
     def apply(self, task, artifact):
@@ -23,8 +23,8 @@ class EnvironmentVariable(ArtifactStringAttribute):
 
 
 class PathEnvironmentVariable(EnvironmentVariable):
-    def __init__(self, name="PATH"):
-        super(PathEnvironmentVariable, self).__init__(name)
+    def __init__(self, artifact, name="PATH"):
+        super(PathEnvironmentVariable, self).__init__(artifact, name)
 
     def set_value(self, value):
         values = utils.as_list(value)
@@ -47,25 +47,26 @@ class PathEnvironmentVariable(EnvironmentVariable):
 
 
 class EnvironmentVariableSet(ArtifactAttributeSet):
-    def __init__(self):
+    def __init__(self, artifact):
         super(EnvironmentVariableSet, self).__init__()
+        super(ArtifactAttributeSet, self).__setattr__("_artifact", artifact)
 
     def create(self, name):
         if name == "PATH":
-            return PathEnvironmentVariable(name)
+            return PathEnvironmentVariable(self._artifact, name)
         if name == "PYTHONPATH":
-            return PathEnvironmentVariable(name)
+            return PathEnvironmentVariable(self._artifact, name)
         if name == "LD_LIBRARY_PATH":
-            return PathEnvironmentVariable(name)
+            return PathEnvironmentVariable(self._artifact, name)
         if name == "PKG_CONFIG_PATH":
-            return PathEnvironmentVariable(name)
-        return EnvironmentVariable(name)
+            return PathEnvironmentVariable(self._artifact, name)
+        return EnvironmentVariable(self._artifact, name)
 
 
 @ArtifactAttributeSetProvider.Register
 class EnvironmentVariableSetProvider(ArtifactAttributeSetProvider):
     def create(self, artifact):
-        setattr(artifact, "environ", EnvironmentVariableSet())
+        setattr(artifact, "environ", EnvironmentVariableSet(artifact))
 
     def parse(self, artifact, content):
         if "environ" not in content:
@@ -78,8 +79,8 @@ class EnvironmentVariableSetProvider(ArtifactAttributeSetProvider):
         if "environ" not in content:
             content["environ"] = {}
 
-        for key, value in artifact.environ.items():
-            content["environ"][key] = str(value)
+        for key, attrib in artifact.environ.items():
+            content["environ"][key] = attrib.get_value()
 
     def apply(self, task, artifact):
         artifact.environ.apply(task, artifact)

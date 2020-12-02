@@ -4,8 +4,8 @@ from jolt.cache import ArtifactStringAttribute
 
 
 class StringVariable(ArtifactStringAttribute):
-    def __init__(self, name):
-        super(StringVariable, self).__init__(name)
+    def __init__(self, artifact, name):
+        super(StringVariable, self).__init__(artifact, name)
         self._old_value = None
 
     def apply(self, task, artifact):
@@ -16,17 +16,18 @@ class StringVariable(ArtifactStringAttribute):
 
 
 class StringVariableSet(ArtifactAttributeSet):
-    def __init__(self):
+    def __init__(self, artifact):
         super(StringVariableSet, self).__init__()
+        super(ArtifactAttributeSet, self).__setattr__("_artifact", artifact)
 
     def create(self, name):
-        return StringVariable(name)
+        return StringVariable(self._artifact, name)
 
 
 @ArtifactAttributeSetProvider.Register
 class StringVariableSetProvider(ArtifactAttributeSetProvider):
     def create(self, artifact):
-        setattr(artifact, "strings", StringVariableSet())
+        setattr(artifact, "strings", StringVariableSet(artifact))
 
     def parse(self, artifact, content):
         if "strings" not in content:

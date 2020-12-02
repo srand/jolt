@@ -12,7 +12,7 @@ from jolt import log
 from jolt import tools
 from jolt import utils
 from jolt.options import JoltOptions
-from jolt.error import raise_error
+from jolt.error import raise_error, raise_error_if
 from jolt.error import raise_task_error, raise_task_error_if
 from jolt.expires import ArtifactEvictionStrategyRegister
 
@@ -162,7 +162,8 @@ class ArtifactAttribute(object):
 
 
 class ArtifactStringAttribute(ArtifactAttribute):
-    def __init__(self, name):
+    def __init__(self, artifact, name):
+        self._artifact = artifact
         self._name = name
         self._value = None
 
@@ -170,7 +171,7 @@ class ArtifactStringAttribute(ArtifactAttribute):
         return self._name
 
     def set_value(self, value):
-        self._value = value
+        self._value = self._artifact.get_task().expand(str(value))
 
     def get_value(self):
         return self._value
@@ -183,6 +184,40 @@ class ArtifactStringAttribute(ArtifactAttribute):
 
     def __str__(self):
         return str(self._value)
+
+
+class ArtifactListAttribute(ArtifactAttribute):
+    def __init__(self, artifact, name):
+        self._artifact = artifact
+        self._name = name
+        self._value = []
+
+    def get_name(self):
+        return self._name
+
+    def set_value(self, value):
+        if type(value) == str:
+            value = value.split(":")
+        raise_error_if(type(value) != list, "illegal value assigned to artifact list attribute")
+        self._value = self._artifact.get_task().expand(value)
+
+    def get_value(self):
+        return self._value
+
+    def append(self, value):
+        if type(value) == list:
+            self._value.extend(self._artifact.get_task().expand(value))
+        else:
+            self._value.append(self._artifact.get_task().expand(value))
+
+    def items(self):
+        return list(self._value)
+
+    def apply(self, task, artifact):
+        pass
+
+    def unapply(self, task, artifact):
+        pass
 
 
 class ArtifactFileAttribute(object):
