@@ -5,6 +5,7 @@ import sys
 
 from jolt import cache
 from jolt import cli
+from jolt import config
 from jolt import graph
 from jolt import log
 from jolt import scheduler
@@ -31,41 +32,34 @@ class CompDBHooks(TaskHook):
         with tools.cwd(task.task.outdir):
             utils.call_and_catch(tools.run, "ninja -f build.ninja -t compdb > compile_commands.json")
 
-            # Add information about the workspace root
+    def task_postpublish(self, task, artifact, tools):
+        if isinstance(task.task, ninja.CXXProject):
+            with tools.cwd(task.task.outdir):
+                artifact.collect("*compile_commands.json")
+
+        with tools.cwd(artifact.path):
+            if not tools.glob("compile_commands.json"):
+                return
+
+            # Add information about the workspace and cachedir roots
             with open(tools.expand_path("compile_commands.json")) as f:
                 commands = json.load(f)
             for command in commands:
                 command["joltdir"] = task.task.joltdir
+                command["cachedir"] = config.get_cachedir()
             with open(tools.expand_path("compile_commands.json"), "w") as f:
                 json.dump(commands, f, indent=2)
 
-    def task_postpublish(self, task, artifact, tools):
-        if not isinstance(task.task, ninja.CXXProject):
-            return
 
-        with tools.cwd(task.task.outdir):
-            artifact.collect("*compile_commands.json")
+def patch(command, target, search, replace):
+    command[target] = command[target].replace(
+        command[search], replace)
 
 
 @TaskHookFactory.register
 class CompDBHookFactory(TaskHookFactory):
     def create(self, env):
         return CompDBHooks()
-
-
-def patch_commands(commands, task):
-    for command in commands:
-        # Patch commands to use reflected sandboxes
-        command["command"] = command["command"].replace(
-            "sandbox-", "sandbox-reflect-")
-
-        # Make directory relative to local joltdir
-        try:
-            command["directory"] = command["directory"].replace(
-                command["joltdir"], task.joltdir)
-        except Exception:
-            pass
-    return commands
 
 
 @cli.cli.command(name="compdb")
@@ -144,9 +138,16 @@ def compdb(ctx, task, default):
                 try:
                     with goal.tools.cwd(artifact.path):
                         with open(goal.tools.expand_path("compile_commands.json")) as f:
-                            commands = json.load(f)
-                    patch_commands(commands, artifact.get_task())
+                            data = f.read()
+                            data = data.replace("sandbox-", "sandbox-reflect-")
+                            commands = json.loads(data)
+                    for command in commands:
+                        utils.call_and_catch(patch, command, "command", "joltdir", task.task.joltdir)
+                        utils.call_and_catch(patch, command, "command", "cachedir", config.get_cachedir())
+                        utils.call_and_catch(patch, command, "directory", "joltdir", task.task.joltdir)
                     all_commands.extend(commands)
+                except KeyboardInterrupt as e:
+                    raise e
                 except Exception:
                     pass
                 goal.tools.sandbox(artifact, incremental=True, reflect=True)

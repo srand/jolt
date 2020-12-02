@@ -1094,7 +1094,7 @@ class Tools(object):
                     self.symlink(srcpath, dstpath)
 
                 # Restore missing srcfiles if they resided in a build directory
-                if relsrcpath.startswith(self.buildroot) and not fs.path.exists(srcpath):
+                if srcpath.startswith(self.buildroot) and not fs.path.exists(srcpath):
                     fs.copy(fs.path.join(artifact.path, reldstpath), srcpath)
             self.write_file(meta, artifact.path)
         return path
