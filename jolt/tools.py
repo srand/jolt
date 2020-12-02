@@ -1083,8 +1083,8 @@ class Tools(object):
             fs.rmtree(path)
             fs.makedirs(path)
             for relsrcpath, reldstpath in artifact.files.items():
-                srcpath = fs.path.join(artifact.get_task().joltdir, relsrcpath)
-                dstpath = fs.path.join(path, reldstpath)
+                srcpath = fs.path.normpath(fs.path.join(artifact.get_task().joltdir, relsrcpath))
+                dstpath = fs.path.normpath(fs.path.join(path, reldstpath))
                 if fs.path.isdir(dstpath):
                     files = fs.scandir(srcpath)
                     for file in files:
@@ -1094,7 +1094,8 @@ class Tools(object):
                     self.symlink(srcpath, dstpath)
 
                 # Restore missing srcfiles if they resided in a build directory
-                if srcpath.startswith(self.buildroot) and not fs.path.exists(srcpath):
+                if srcpath.startswith(artifact.get_task().tools.buildroot) and \
+                   not fs.path.exists(srcpath):
                     fs.copy(fs.path.join(artifact.path, reldstpath), srcpath)
             self.write_file(meta, artifact.path)
         return path
