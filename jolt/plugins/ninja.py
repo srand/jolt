@@ -1228,15 +1228,15 @@ class CXXProject(Task):
                     data = tools.read_file(depfile)
                 except:
                     continue
-                data = data.replace("\n", "")
-                data = data.replace("\r", "")
-                data = data.replace("\\", "")
                 data = data.split(":", 1)
                 if len(data) <= 1:
                     continue
-                data = data[1]
-                depsrcs = [dep for dep in data.split(" ") if dep]
-                depsrcs = [tools.expand_relpath(dep, self.joltdir) for dep in depsrcs]
+                depsrcs = data[1]
+                depsrcs = depsrcs.replace("\\r", "")
+                depsrcs = depsrcs.splitlines()
+                depsrcs = [f.rstrip("\\") for f in depsrcs]
+                depsrcs = [f.strip(" ") for f in depsrcs]
+                depsrcs = [tools.expand_relpath(dep, self.joltdir) for dep in filter(lambda n: n, depsrcs)]
                 sources = sources.union(depsrcs)
         super()._verify_influence(deps, artifact, tools, sources)
 
