@@ -959,8 +959,26 @@ class MinGWToolchain(GNUToolchain):
         implicit=["$ld_path", "$objcopy_path", ".debug"])
 
 
+class MSVCArchiver(Rule):
+    def __init__(self, *args, **kwargs):
+        super(MSVCArchiver, self).__init__(*args, **kwargs)
+
+    def build(self, project, writer, infiles):
+        infiles_rel = [fs.path.relpath(infile, project.outdir) for infile in infiles]
+        outfiles, variables = self._out(project, project.binary)
+        outfiles_rel = [fs.path.relpath(outfile, project.outdir) for outfile in outfiles]
+
+        file_list = FileListWriter("objects", outfiles)
+        file_list.build(project, writer, infiles)
+
+        writer.build(outfiles_rel, self.name, infiles_rel, implicit=self.implicit+writer.depimports, variables=variables)
+
+        return outfiles
+
+    def get_influence(self, task):
+        return "MSVCArchiver" + super().get_influence(task)
+
 MSVCCompiler = GNUCompiler
-MSVCArchiver = GNUArchiver
 MSVCLinker = GNULinker
 MSVCDepImporter = GNUDepImporter
 
@@ -993,7 +1011,7 @@ class MSVCToolchain(Toolchain):
     libraries = Libraries(suffix=".lib")
 
     compile_asm = MSVCCompiler(
-        command="$cl_path /nologo /showIncludes $asflags $extra_asflags $macros $incpaths /c /Tc$in /Fo$out",
+        command="\"$cl_path\" /nologo /showIncludes $asflags $extra_asflags $macros $incpaths /c /Tc$in /Fo$out",
         deps="msvc",
         infiles=[".asm", ".s", ".S"],
         outfiles=["{outdir}/{in_path}/{in_base}.obj"],
@@ -1001,7 +1019,7 @@ class MSVCToolchain(Toolchain):
         implicit=["$cl_path"])
 
     compile_c = MSVCCompiler(
-        command="$cl_path /nologo /showIncludes $cxxflags $extra_cxxflags $macros $incpaths /c /Tc$in /Fo$out",
+        command="\"$cl_path\" /nologo /showIncludes $cxxflags $extra_cxxflags $macros $incpaths /c /Tc$in /Fo$out",
         deps="msvc",
         infiles=[".c"],
         outfiles=["{outdir}/{in_path}/{in_base}.obj"],
@@ -1009,7 +1027,7 @@ class MSVCToolchain(Toolchain):
         implicit=["$cl_path"])
 
     compile_cxx = MSVCCompiler(
-        command="$cl_path /nologo /showIncludes $cxxflags $extra_cxxflags $macros $incpaths /c /Tp$in /Fo$out",
+        command="\"$cl_path\" /nologo /showIncludes $cxxflags $extra_cxxflags $macros $incpaths /c /Tp$in /Fo$out",
         deps="msvc",
         infiles=[".cc", ".cpp", ".cxx"],
         outfiles=["{outdir}/{in_path}/{in_base}.obj"],
@@ -1017,13 +1035,13 @@ class MSVCToolchain(Toolchain):
         implicit=["$cl_path"])
 
     linker = MSVCLinker(
-        command="$link_path /nologo $ldflags $extra_ldflags $libpaths @objects.list $libraries /out:$out",
+        command="\"$link_path\" /nologo $ldflags $extra_ldflags $libpaths @objects.list $libraries /out:$out",
         outfiles=["{outdir}/{binary}.exe"],
         variables={"desc": "[LIB] {binary}"},
         implicit=["$link_path"])
 
     archiver = MSVCArchiver(
-        command="$lib_path /nologo /out:$out @objects.list",
+        command="\"$lib_path\" /nologo /out:$out @objects.list",
         outfiles=["{outdir}/{binary}.lib"],
         variables={"desc": "[LIB] {binary}"},
         implicit=["$lib_path"])
