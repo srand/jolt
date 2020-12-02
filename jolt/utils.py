@@ -87,7 +87,19 @@ def call_or_return_list(obj, t):
 def call_and_catch(f, *args, **kwargs):
     try:
         return f(*args, **kwargs)
+    except KeyboardInterrupt as e:
+        raise e
     except:
+        return None
+
+def call_and_catch_and_log(f, *args, **kwargs):
+    try:
+        return f(*args, **kwargs)
+    except KeyboardInterrupt as e:
+        raise e
+    except:
+        from jolt import log
+        log.exception()
         return None
 
 def parse_task_name(name):
