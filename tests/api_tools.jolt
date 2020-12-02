@@ -296,14 +296,18 @@ class ToolsApi(JoltTest):
 
     def test_rsync(self):
         """
-        --- file: a/new
+        --- file: a/new/file
+        --- file: a/file/file
+        --- file: a/directory
         --- file: a/test1.txt
         test
         --- file: a/test2.txt
         test2
         --- file: a/test3.txt
         test3
-        --- file: b/deleted
+        --- file: b/deleted/file
+        --- file: b/file
+        --- file: b/directory/file
         --- file: b/test1.txt
         tset
         --- file: b/test2.txt
@@ -322,6 +326,9 @@ class ToolsApi(JoltTest):
             self.tools.rsync("a", "b")
             self.assertExists("b/new")
             self.assertNotExists("b/deleted")
+            self.assertNotExists("b/directory/file")
+            self.assertExists("b/directory")
+            self.assertExists("b/file/file")
             self.assertEqual(self.tools.read_file("a/test1.txt"),
                              self.tools.read_file("b/test1.txt"))
             self.assertEqual(self.tools.read_file("a/test2.txt"),

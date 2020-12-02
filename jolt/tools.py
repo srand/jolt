@@ -936,10 +936,6 @@ class Tools(object):
         retaining metadata (such as timestamps) of identical files
         already present in ``dstpath``.
 
-        The function only operates on files and not directories.
-        If files are removed from subdirectories of ``srcpath``,
-        those subdirectories will be left behind in ``dstpath``.
-
         Args:
             srcpath (str): Path to source directory.
                 The directory must exist.
@@ -947,28 +943,54 @@ class Tools(object):
 
         """
 
+        def _scandir(scanpath, filterfn=lambda path: path[0] != "."):
+            def relresult(path, fp):
+                return os.path.relpath(os.path.join(path, fp), scanpath)
+            resfn = relresult
+            result = []
+
+            for path, dirs, files in os.walk(scanpath):
+                for d in dirs:
+                    if filterfn(d):
+                        result.append((True, resfn(path, d)))
+                for f in files:
+                    if filterfn(f):
+                        result.append((False, resfn(path, f)))
+
+            return result
+
         srcpath = self.expand_path(srcpath, *args, **kwargs)
         dstpath = self.expand_path(dstpath, *args, **kwargs)
-        srcfiles = set(fs.scandir(srcpath, relative=True))
-        dstfiles = set(fs.scandir(dstpath, relative=True))
-        added_files = srcfiles - dstfiles
-        deleted_files = dstfiles - srcfiles
+        srcfiles = set(_scandir(srcpath))
+        dstfiles = set(_scandir(dstpath))
+        added_files = list(srcfiles - dstfiles)
+        deleted_files = list(dstfiles - srcfiles)
         common_files = srcfiles.intersection(dstfiles)
 
-        for fp in added_files:
+        # Remove files first, then directories
+        for dir, fp in sorted(deleted_files, key=lambda n: n[0]):
+            dst = fs.path.join(dstpath, fp)
+            if dir:
+                fs.rmtree(dst)
+            else:
+                fs.unlink(dst)
+
+        # Add new directories, then files
+        for dir, fp in sorted(added_files, key=lambda n: not n[0]):
             src = fs.path.join(srcpath, fp)
             dst = fs.path.join(dstpath, fp)
-            fs.copy(src, dst, metadata=False)
+            if dir:
+                fs.makedirs(dst)
+            else:
+                fs.copy(src, dst, metadata=False)
 
-        for fp in common_files:
+        # Refresh existing files
+        for dir, fp in filter(lambda n: not n[0], common_files):
             src = fs.path.join(srcpath, fp)
             dst = fs.path.join(dstpath, fp)
             if not fs.identical_files(src, dst):
                 fs.copy(src, dst, metadata=False)
 
-        for fp in deleted_files:
-            dst = fs.path.join(dstpath, fp)
-            fs.unlink(dst)
 
     def run(self, cmd, *args, **kwargs):
         """ Runs a command in a shell interpreter.
