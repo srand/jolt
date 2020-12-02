@@ -41,7 +41,8 @@ class CompDBExtension(JoltTest):
         class Lib(CXXLibrary):
             headers = ["lib.h"]
             sources = ["lib.cpp", "custom.x"]
-            x_rule = Rule(infiles=[".x"], outfiles=["{{outdir}}/{{in_base}}.hpp"], command="cp $in $out")
+            cp = HostVariable({{"nt": "copy", "posix": "cp"}})
+            x_rule = Rule(infiles=[".x"], outfiles=["{{outdir}}/{{in_base}}.hpp"], command="$cp $in $out")
 
             def publish(self, artifact, tools):
                 super().publish(artifact, tools)

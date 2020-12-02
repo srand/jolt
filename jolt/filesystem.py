@@ -6,6 +6,7 @@ import posixpath
 import shutil
 import tempfile
 
+from jolt.error import raise_error_if
 
 path = os.path
 sep = os.sep
@@ -60,8 +61,24 @@ def unlink(path, ignore_errors=False):
 
 def symlink(src, dest, *args, **kwargs):
     if os.name == "nt":
+        # Try to use junctions first.
         import ntfsutils.junction
-        ntfsutils.junction.create(src, dest)
+        try:
+            ntfsutils.junction.create(src, dest)
+            return
+        except KeyboardInterrupt as e:
+            raise e
+        except:
+            # Ok, probably linking a file and not a directory
+            # trying a regular symlink.
+            try:
+                os.symlink(src, dest, *args, **kwargs)
+            except OSError as e:
+                raise_error_if(
+                    e.errno == errno.EPERM,
+                    "Permission denied while attempting to create a symlink: {}\n"
+                    "Please ensure the 'Create symbolic links' right is granted "
+                    "to your user in the 'Local Security Policy'.", dest)
     else:
         os.symlink(src, dest, *args, **kwargs)
 
