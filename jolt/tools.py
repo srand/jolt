@@ -469,6 +469,38 @@ class Tools(object):
         # Sanitize all white spaces (space, tab, crlf), before calculating the SHA1 hash.
         return hashlib.sha1(b' '.join(content.split())).hexdigest()
 
+    def checksum_file(self, filelist, concat=False, hashfn=hashlib.sha1, filterfn=None):
+        """ Calculate a checksum of one or multiple files.
+
+        Args:
+            filelist (str,list): One or multiple files.
+            concat (boolean): Concatenate files and return a single digest. If False,
+                a list with one digest for each file is returned. Default: False.
+            hashfn: The hash algorithm used. Any type which provides an update() and
+                hexdigest() method is accepted. Default: hashlib.sha1
+            filterfn: An optional data filter function. It is called repeatedly
+                with each block of data read from files as its only argument.
+                It should return the data to be included in the checksum.
+                Default: None
+
+        Returns:
+            A list of checksum digests, or a single digest if files where concatenated.
+        """
+        files = [self.expand_path(fname) for fname in utils.as_list(filelist)]
+        filterfn = filterfn or (lambda data: data)
+        result = []
+        checksum = hashfn()
+
+        for fname in files:
+            with open(fname, "rb") as f:
+                for block in iter(lambda: f.read(0x10000), b''):
+                    checksum.update(bytes(filterfn(block)))
+                result.append(checksum.hexdigest())
+            if not concat:
+                checksum = hashfn()
+
+        return result[-1] if concat or type(filelist) == str else result
+
     def chmod(self, pathname, mode):
         """ Changes permissions of files and directories.
 
