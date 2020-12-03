@@ -905,7 +905,7 @@ class GNUToolchain(Toolchain):
         implicit=["$cc_path"])
 
     compile_asm_with_cpp = GNUCompiler(
-        "$ccwrap $cc_path -x assembler-with-cpp $pch_flags $asflags $shared_flags $imported_asflags $extra_asflags $macros $incpaths -MMD -MF $out.d -c $in -o $out",
+        command="$ccwrap $cc_path -x assembler-with-cpp $pch_flags $asflags $shared_flags $imported_asflags $extra_asflags $macros $incpaths -MMD -MF $out.d -c $in -o $out",
         deps="gcc",
         depfile="$out.d",
         infiles=[".S"],
