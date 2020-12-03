@@ -1232,8 +1232,7 @@ class CXXProject(Task):
                 if len(data) <= 1:
                     continue
                 depsrcs = data[1]
-                depsrcs = depsrcs.replace("\\r", "")
-                depsrcs = depsrcs.splitlines()
+                depsrcs = depsrcs.split()
                 depsrcs = [f.rstrip("\\") for f in depsrcs]
                 depsrcs = [f.strip(" ") for f in depsrcs]
                 depsrcs = [tools.expand_relpath(dep, self.joltdir) for dep in filter(lambda n: n, depsrcs)]
