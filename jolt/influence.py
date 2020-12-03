@@ -385,7 +385,8 @@ class FileInfluence(HashInfluenceProvider):
         The path is always a file, never a directory.
         """
         path = task.tools.expand_path(path)
-        return path in self.get_filelist(task)
+        return path in self.get_filelist(task) or \
+            utils.as_dirpath(path) in self.get_filelist(task)
 
 
 class DirectoryInfluence(FileInfluence):

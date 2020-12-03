@@ -78,6 +78,9 @@ def as_human_size(size):
         index += 1
     return "{0} {1}".format(round(size, ndigits=unit_precision[index][1]), unit_precision[index][0])
 
+def as_dirpath(dirpath):
+    return dirpath + os.path.sep if dirpath[-1] != os.path.sep else dirpath
+
 def call_or_return(obj, t):
     return t(obj) if callable(t) else t
 
