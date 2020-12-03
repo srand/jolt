@@ -282,7 +282,14 @@ def build(ctx, task, network, keep_going, identity, default, local,
         if not dag.has_tasks():
             return
 
-        with log.progress("Progress", dag.number_of_tasks(), " tasks", estimates=False, debug=debug) as p:
+        progress = log.progress(
+            "Progress",
+            dag.number_of_tasks(filterfn=lambda t: not t.is_resource()),
+            " tasks",
+            estimates=False,
+            debug=debug)
+
+        with progress:
             while dag.has_tasks():
                 # Find all tasks ready to be executed
                 leafs = dag.select(lambda graph, task: task.is_ready())
@@ -295,7 +302,9 @@ def build(ctx, task, network, keep_going, identity, default, local,
                     queue.submit(acache, task)
 
                 task, error = queue.wait()
-                p.update(1)
+
+                if not task.is_resource():
+                    progress.update(1)
 
                 if not task:
                     dag.debug()

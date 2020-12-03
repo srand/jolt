@@ -375,8 +375,8 @@ class Graph(nx.DiGraph):
         with self._mutex:
             super(Graph, self).remove_node(node)
 
-    def number_of_tasks(self):
-        return len(self.nodes)
+    def number_of_tasks(self, filterfn=None):
+        return len(list(filter(filterfn, self.nodes)) if filterfn else self.nodes)
 
     @property
     def failed(self):
