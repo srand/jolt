@@ -75,10 +75,11 @@ def symlink(src, dest, *args, **kwargs):
                 os.symlink(src, dest, *args, **kwargs)
             except OSError as e:
                 raise_error_if(
-                    e.errno == errno.EPERM,
+                    "symbolic link privilege not held" in str(e),
                     "Permission denied while attempting to create a symlink: {}\n"
                     "Please ensure the 'Create symbolic links' right is granted "
                     "to your user in the 'Local Security Policy'.", dest)
+                raise e
     else:
         os.symlink(src, dest, *args, **kwargs)
 
