@@ -213,6 +213,10 @@ class JoltLoader(object):
         self._load_project_recipes()
         return self._tasks, self._tests
 
+    def load_plugin(self, filepath):
+        plugin, ext = os.path.splitext(fs.path.basename(filepath))
+        imp.load_source("jolt.plugins." + plugin, filepath)
+
     def load_plugins(self):
         searchpath = config.get("jolt", "pluginpath")
         searchpath = searchpath.split(":") if searchpath else []
@@ -225,7 +229,7 @@ class JoltLoader(object):
                 if "jolt.plugins." + plugin not in sys.modules:
                     module = fs.path.join(fs.path.dirname(__file__), path, plugin + ".py")
                     if fs.path.exists(module):
-                        imp.load_source("jolt.plugins." + plugin, module)
+                        self.load_plugin(module)
                         continue
 
     @property
