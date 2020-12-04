@@ -1118,7 +1118,7 @@ class Tools(object):
                 # Restore missing srcfiles if they resided in a build directory
                 if srcpath.startswith(artifact.get_task().tools.buildroot) and \
                    not fs.path.exists(srcpath):
-                    fs.copy(fs.path.join(artifact.path, reldstpath), srcpath)
+                    fs.copy(fs.path.join(artifact.path, reldstpath), srcpath, symlinks=True)
             self.write_file(meta, artifact.path)
         return path
 

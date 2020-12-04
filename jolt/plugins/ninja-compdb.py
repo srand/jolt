@@ -92,6 +92,12 @@ def compdb(ctx, task, default):
     registry = TaskRegistry.get()
     strategy = scheduler.DownloadStrategy(executors, acache)
     queue = scheduler.TaskQueue(strategy)
+    reflect = True
+
+    # Symlinks are problematic on older versions of Windows.
+    # On those, we create regular copied sandboxes instead.
+    if os.name == "nt" and sys.getwindowsversion().major < 10:
+        reflect = False
 
     for params in default:
         registry.set_default_parameters(params)
@@ -150,11 +156,11 @@ def compdb(ctx, task, default):
                     raise e
                 except Exception:
                     pass
-                goal.tools.sandbox(artifact, incremental=True, reflect=True)
+                goal.tools.sandbox(artifact, incremental=True, reflect=reflect)
 
             # Write result
             with goal.tools.cwd(outdir):
                 with open(goal.tools.expand_path("all_compile_commands.json"), "w") as f:
                     json.dump(all_commands, f, indent=2)
 
-        log.info("Compilation DB: {}/all_compile_commands.json", outdir)
+        log.info("Compilation DB: {}", os.path.join(outdir, "all_compile_commands.json"))
