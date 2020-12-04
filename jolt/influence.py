@@ -2,7 +2,7 @@ import datetime
 import hashlib
 import os
 import uuid
-
+from pathlib import Path, PurePath
 
 from jolt import utils
 from jolt import log
@@ -357,36 +357,34 @@ class FileInfluence(HashInfluenceProvider):
             else:
                 path = self.path
 
-            files = task.tools.glob(path, expand=True)
-            files.sort()
-            self._files[task] = files
-            return files
+            filelist = task.tools.glob(path, expand=True)
+            filelist.sort()
+            filelist = [Path(fname) for fname in filelist]
+            self._files[task] = filelist
+            return filelist
 
     def get_influence(self, task):
         result = []
         for f in self.get_filelist(task):
-            if fs.path.isdir(f):
+            if f.is_dir():
                 continue
             value = _fi_files.get(f)
             if value:
                 result.append(value)
             elif fs.path.exists(f):
-                _fi_files[f] = value = fs.path.basename(f) + ":" + self.get_file_influence(f)
+                _fi_files[f] = value = f.name + ":" + self.get_file_influence(f)
                 result.append(value)
             elif fs.path.lexists(f):
-                _fi_files[f] = value = fs.path.basename(f) + ": Symlink (broken)"
+                _fi_files[f] = value = f.name + ": Symlink (broken)"
                 result.append(value)
         return "\n".join(result)
 
     def is_influenced_by(self, task, path):
         """
         Return True if the path influences the task.
-
-        The path is always a file, never a directory.
         """
         path = task.tools.expand_path(path)
-        return path in self.get_filelist(task) or \
-            utils.as_dirpath(path) in self.get_filelist(task)
+        return PurePath(path) in self.get_filelist(task)
 
 
 class DirectoryInfluence(FileInfluence):
@@ -441,7 +439,7 @@ class WhitelistInfluence(FileInfluence):
     def is_influenced_by(self, task, path):
         path = task.tools.expand_path(path)
         pattern = task.tools.expand_path(self.path)
-        return utils.pathmatch(path, pattern)
+        return path.match(pattern)
 
 
 def whitelist(pathname):

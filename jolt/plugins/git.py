@@ -268,11 +268,8 @@ class GitInfluenceProvider(FileInfluence):
 
     def is_influenced_by(self, task, path):
         tools = Tools(task, task.joltdir)
-        gitpath = tools.expand_path(self.path).rstrip(fs.sep)
-        if fs.path.isdir(gitpath):
-            return path.startswith(gitpath + fs.sep)
-        else:
-            return path.startswith(gitpath)
+        gitpath = tools.expand_path(self.path)
+        return fs.is_relative_to(path, gitpath)
 
 
 def global_influence(path, cls=GitInfluenceProvider):
@@ -355,7 +352,7 @@ class GitSrc(WorkspaceResource, FileInfluence):
         return None
 
     def is_influenced_by(self, task, path):
-        return path.startswith(self.abspath + fs.sep) and self.sha.is_set()
+        return fs.is_relative_to(path, self.abspath) and self.sha.is_set()
 
 
 TaskRegistry.get().add_task_class(GitSrc)

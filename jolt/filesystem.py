@@ -17,6 +17,13 @@ pathsep = os.pathsep
 def as_posix(path):
     return pathlib.Path(path).as_posix()
 
+def is_relative_to(pathname, rootdir):
+    try:
+        pathlib.Path(pathname).relative_to(pathlib.Path(rootdir))
+        return True
+    except ValueError:
+        return False
+
 def userhome():
     return os.path.expanduser("~")
 
@@ -154,3 +161,4 @@ def scandir(scanpath, filterfn=lambda path: path[0] != ".", relative=False):
 
 def get_archive(path):
     return path + ".tar.gz"
+

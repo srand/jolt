@@ -2,6 +2,7 @@ import base64
 import copy
 import fnmatch
 import inspect
+from pathlib import Path
 import platform
 import subprocess
 import unittest as ut
@@ -709,18 +710,24 @@ class TaskBase(object):
             else:
                 sources.add(src)
 
+        def _subpath_filter(rootpath):
+            def _filter(fname):
+                return not fs.is_relative_to(fname, rootpath)
+            return _filter
+
         for _, dep in deps.items():
-            if isinstance(dep.get_task(), FileInfluence):
+            deptask = dep.get_task()
+            if isinstance(deptask, FileInfluence):
                 # Resource dependencies may cover the influence implicitly
-                deppath = self.tools.expand_path(str(dep.get_task().path))
-                sources = set(filter(lambda d: not dep.get_task().is_influenced_by(self, d), sources))
+                deppath = self.tools.expand_path(str(deptask.path))
+                sources = set(filter(lambda d: not deptask.is_influenced_by(self, d), sources))
             else:
-                # As well as dependencies publishing files
+                # Ignore any files in artifacts
                 deppath = self.tools.expand_path(dep.path)
-                sources = set(filter(lambda d: not d.startswith(deppath), sources))
+                sources = set(filter(_subpath_filter(deppath), sources))
 
         # Ignore any files in build directories
-        sources = filter(lambda d: not d.startswith(tools.buildroot), sources)
+        sources = filter(_subpath_filter(tools.buildroot), sources)
         sources = set(sources)
 
         for ip in self.influence:
