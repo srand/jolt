@@ -261,11 +261,9 @@ class ToolEnvironmentVariable(Variable):
         executable_path = tools.which(executable)
 
         if executable_path:
-            executable_path = executable_path.replace(" ", "\\ ")
             writer.variable(self.name + "_path", executable_path)
-
-        if self._fullpath:
-            executable_and_args[0] = executable_path
+            if self._fullpath:
+                executable_and_args[0] = utils.quote_path(executable_path)
 
         writer.variable(self.name, self._prefix + " ".join(executable_and_args))
 

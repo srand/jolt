@@ -148,6 +148,10 @@ def pathmatch(string, pattern):
     return re.compile(pattern).match(string)
 
 
+def quote_path(string):
+    return '"' + string + '"' if ' ' in string else string
+
+
 class _SafeDict(object):
     def __init__(self, values, ignore_errors=False):
         self.values = values
