@@ -303,14 +303,14 @@ def build(ctx, task, network, keep_going, identity, default, local,
 
                 task, error = queue.wait()
 
-                if not task.is_resource():
-                    progress.update(1)
-
                 if not task:
                     dag.debug()
                     break
                 elif task.is_goal() and task.duration_running:
                     goal_task_duration += task.duration_running.seconds
+
+                if not task.is_resource():
+                    progress.update(1)
 
                 if not keep_going and error is not None:
                     queue.abort()
