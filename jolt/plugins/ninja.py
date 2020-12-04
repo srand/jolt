@@ -246,12 +246,12 @@ class ToolVariable(Variable):
 
 
 class ToolEnvironmentVariable(Variable):
-    def __init__(self, name=None, default=None, envname=None, prefix=None, fullpath=False):
+    def __init__(self, name=None, default=None, envname=None, prefix=None, abspath=False):
         self.name = name
         self._default = default or ''
         self._envname = envname
         self._prefix = prefix or ""
-        self._fullpath = fullpath
+        self._abspath = abspath
 
     def create(self, project, writer, deps, tools):
         envname = self._envname or self.name
@@ -262,15 +262,15 @@ class ToolEnvironmentVariable(Variable):
 
         if executable_path:
             writer.variable(self.name + "_path", executable_path)
-            if self._fullpath:
+            if self._abspath:
                 executable_and_args[0] = utils.quote_path(executable_path)
 
         writer.variable(self.name, self._prefix + " ".join(executable_and_args))
 
     @utils.cached.instance
     def get_influence(self, task):
-        return "ToolEnvironment: default={},envname={},prefix={},fullpath={}".format(
-            self._default, self._envname, self._prefix, self._fullpath)
+        return "ToolEnvironment: default={},envname={},prefix={},abspath={}".format(
+            self._default, self._envname, self._prefix, self._abspath)
 
 
 class ProjectVariable(Variable):
@@ -851,12 +851,12 @@ class GNUToolchain(Toolchain):
     outdir = ProjectVariable()
     binary = ProjectVariable()
 
-    ar = ToolEnvironmentVariable(default="ar", fullpath=True)
-    cc = ToolEnvironmentVariable(default="gcc", fullpath=True)
-    cxx = ToolEnvironmentVariable(default="g++", fullpath=True)
-    ld = ToolEnvironmentVariable(default="g++", envname="CXX", fullpath=True)
-    objcopy = ToolEnvironmentVariable(default="objcopy", fullpath=True)
-    ranlib = ToolEnvironmentVariable(default="ranlib", fullpath=True)
+    ar = ToolEnvironmentVariable(default="ar", abspath=True)
+    cc = ToolEnvironmentVariable(default="gcc", abspath=True)
+    cxx = ToolEnvironmentVariable(default="g++", abspath=True)
+    ld = ToolEnvironmentVariable(default="g++", envname="CXX", abspath=True)
+    objcopy = ToolEnvironmentVariable(default="objcopy", abspath=True)
+    ranlib = ToolEnvironmentVariable(default="ranlib", abspath=True)
     ccwrap = EnvironmentVariable(default="")
     cxxwrap = EnvironmentVariable(default="")
 
@@ -1004,9 +1004,9 @@ class MSVCToolchain(Toolchain):
     outdir = ProjectVariable()
     binary = ProjectVariable()
 
-    cl = ToolEnvironmentVariable(default="cl", envname="cl_exe", fullpath=True)
-    lib = ToolEnvironmentVariable(default="lib", envname="lib_exe", fullpath=True)
-    link = ToolEnvironmentVariable(default="link", envname="link_exe", fullpath=True)
+    cl = ToolEnvironmentVariable(default="cl", envname="cl_exe", abspath=True)
+    lib = ToolEnvironmentVariable(default="lib", envname="lib_exe", abspath=True)
+    link = ToolEnvironmentVariable(default="link", envname="link_exe", abspath=True)
 
     asflags = EnvironmentVariable(default="")
     cflags = EnvironmentVariable(default="/EHsc")
