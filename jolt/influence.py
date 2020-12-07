@@ -439,7 +439,7 @@ class WhitelistInfluence(FileInfluence):
     def is_influenced_by(self, task, path):
         path = task.tools.expand_path(path)
         pattern = task.tools.expand_path(self.path)
-        return path.match(pattern)
+        return utils.pathmatch(path, pattern)
 
 
 def whitelist(pathname):
