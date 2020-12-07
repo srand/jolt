@@ -1243,10 +1243,10 @@ class CXXProject(Task):
                 data = data.split(":", 1)
                 if len(data) <= 1:
                     continue
+
                 depsrcs = data[1]
                 depsrcs = depsrcs.split()
-                depsrcs = [f.rstrip("\\") for f in depsrcs]
-                depsrcs = [f.strip(" ") for f in depsrcs]
+                depsrcs = [f.rstrip("\\").strip() for f in depsrcs]
                 depsrcs = [tools.expand_relpath(dep, self.joltdir) for dep in filter(lambda n: n, depsrcs)]
                 sources = sources.union(depsrcs)
         super()._verify_influence(deps, artifact, tools, sources)

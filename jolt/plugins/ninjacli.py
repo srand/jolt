@@ -25,19 +25,17 @@ class Depfile(object):
                 return
 
             with open(self.path) as f:
-                self.data = f.read()
+                data = f.read()
 
-            self.data = self.data.replace("\n", "")
-            self.data = self.data.replace("\r", "")
-            self.data = self.data.replace("\\", "")
-
-            index = self.data.find(":")
-            if index < 0:
+            data = data.split(":", 1)
+            if len(data) <= 1:
                 return
 
-            self.data = self.data[index+1:]
-            dependencies = [dep for dep in self.data.split(" ") if dep]
-            dependencies = [os.path.normpath(dep) for dep in dependencies]
+            dependencies = data[1]
+            dependencies = dependencies.split()
+            dependencies = [f.rstrip("\\").strip() for f in dependencies]
+            dependencies = [os.path.normpath(f)
+                            for f in filter(lambda n: n, dependencies)]
 
         self.product = objfile
         self.dependencies = dependencies or []

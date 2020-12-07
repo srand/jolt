@@ -43,7 +43,7 @@ class NinjaCachePlugin(JoltTest):
         self.jolt("build lib")
 
         r = self.jolt("-vv build -f lib")
-        self.assertIn("Reusing test.o", r)
+        self.assertIn("Reusing test.cpp.o", r)
 
         with self.tools.cwd(self.ws):
             # Wait a while to make sure the file timestamp changes
