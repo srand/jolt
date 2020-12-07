@@ -1251,6 +1251,16 @@ class CXXProject(Task):
                 sources = sources.union(depsrcs)
         super()._verify_influence(deps, artifact, tools, sources)
 
+    def _expand_headers(self):
+        headers = []
+        for header in getattr(self, "headers", []):
+            l = self.tools.glob(header)
+            raise_task_error_if(
+                not l and not ('*' in header or '?' in header), self,
+                "header file '{0}' not found", fs.path.basename(header))
+            headers += l
+        self.headers = headers
+
     def _expand_sources(self):
         sources = []
         for source in self.sources:
@@ -1423,6 +1433,7 @@ if __name__ == "__main__":
         class attribute.
         """
 
+        self._expand_headers()
         self._expand_sources()
         self.outdir = tools.builddir("ninja", self.incremental)
         self._writer = self._write_ninja_file(self.outdir, deps, tools)
@@ -1446,6 +1457,7 @@ if __name__ == "__main__":
 
         Task execution resumes normally when exiting the shell.
         """
+        self._expand_headers()
         self._expand_sources()
         self.outdir = tools.builddir("ninja", self.incremental)
         writer = self._write_ninja_file(self.outdir, deps, tools)
