@@ -1272,6 +1272,7 @@ class CXXProject(Task):
         self.sources = sources
 
     def _write_ninja_file(self, basedir, deps, tools, filename="build.ninja"):
+        self._write_ninja_cache(deps, tools)
         with open(fs.path.join(basedir, filename), "w") as fobj:
             writer = ninja.Writer(fobj)
             writer.depimports = copy.copy(self.depimports)
@@ -1282,7 +1283,6 @@ class CXXProject(Task):
             self._populate_project(writer, deps, tools)
             writer.close()
             return writer
-        self._write_ninja_cache(deps, tools)
 
     def _write_ninja_cache(self, deps, tools):
         """ Hooked from ninja-cache plugin """
