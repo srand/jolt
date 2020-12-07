@@ -407,7 +407,7 @@ class Rule(HashInfluenceProvider):
         self.deps = deps
         self.infiles = infiles or []
         self.outfiles = utils.as_list(outfiles or [])
-        self.implicit = implicit
+        self.implicit = implicit or []
         self.order_only = order_only
 
     def _out(self, project, infile):
