@@ -13,6 +13,7 @@ class All(Alias):
         "cli/display",
         "cli/info",
         "cli/list",
+        "ext/alias",
         "ext/autoweight",
         "ext/ninja-cache",
         "ext/ninja-compdb",

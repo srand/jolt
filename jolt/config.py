@@ -245,6 +245,10 @@ def items(alias=None):
     return _config.items(alias)
 
 
+def options(section, alias=None):
+    return _config.options(section, alias)
+
+
 def split(string):
     try:
         section, key = string.split(".", 1)

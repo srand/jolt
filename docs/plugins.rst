@@ -4,6 +4,29 @@ Plugins
 Jolt can be extended through plugins. Those already built-in and their
 configuration options are described below.
 
+
+Alias
+-----
+This plugin can be used to create user-defined task aliases
+through configuration keys. An alias points to one or many
+other tasks. For example, to create an alias called ``deploy``
+which deploys a fictitious smartphone app to all supported devices,
+run:
+
+.. code-block:: bash
+
+    $ jolt config alias.deploy "deploy/android deploy/iphone"
+    $ jolt build deploy
+
+Alternatively, edit the configuration manually:
+
+.. code-block:: bash
+
+    [alias]
+    deploy = deploy/android deploy/iphone
+
+Aliases cannot be used to override the names of tasks loaded from recipes.
+
 AMQP
 ----
 
