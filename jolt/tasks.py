@@ -727,7 +727,7 @@ class TaskBase(object):
                 sources = set(filter(_subpath_filter(deppath), sources))
 
         # Ignore any files in build directories
-        sources = filter(_subpath_filter(tools.buildroot), sources)
+        sources = filter(_subpath_filter(tools.expand_path(tools.buildroot)), sources)
         sources = set(sources)
 
         for ip in self.influence:
