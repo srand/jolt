@@ -145,7 +145,8 @@ def compdb(ctx, task, default):
                     with goal.tools.cwd(artifact.path):
                         with open(goal.tools.expand_path("compile_commands.json")) as f:
                             data = f.read()
-                            data = data.replace("sandbox-", "sandbox-reflect-")
+                            if reflect:
+                                data = data.replace("sandbox-", "sandbox-reflect-")
                             commands = json.loads(data)
                     for command in commands:
                         utils.call_and_catch(patch, command, "command", "joltdir", task.task.joltdir)
