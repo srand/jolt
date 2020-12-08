@@ -1,0 +1,51 @@
+#!/usr/bin/env python
+
+import json
+import re
+import sys
+import time
+sys.path.append(".")
+
+from testsupport import JoltTest
+
+from jolt import filesystem as fs
+
+
+class AliasExtension(JoltTest):
+    name = "ext/alias"
+
+    def test_compdb(self):
+        """
+        --- config:
+
+        [alias]
+        my_a_alias = a
+
+        my_abc_alias = a b c:p=arg1
+        --- tasks:
+
+        class A(Task):
+            pass
+
+        class B(Task):
+            pass
+
+        class C(Task):
+            p = Parameter()
+
+        class Fail(Task):
+            def run(self, deps, tools):
+                assert False
+        ---
+        """
+
+        r = self.build("my_a_alias")
+        self.assertBuild(r, "a")
+
+        r = self.build("my_abc_alias")
+        self.assertNoBuild(r, "a")
+        self.assertBuild(r, "b")
+        self.assertBuild(r, "c:p=arg1")
+
+        # Trying to override an existing task name is silently ignored
+        r = self.jolt("-c alias.a=fail build a")
