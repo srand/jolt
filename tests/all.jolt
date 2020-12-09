@@ -14,6 +14,7 @@ class All(Alias):
         "cli/info",
         "cli/list",
         "ext/autoweight",
+        "ext/conan",
         "ext/ninja-cache",
         "ext/ninja-compdb",
         "ext/symlinks",

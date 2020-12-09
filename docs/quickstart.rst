@@ -721,3 +721,31 @@ use-cases where you temporarily may want:
   - code coverage builds
   - builds with custom cflags
   - etc
+
+
+
+Conan Package Manager
+~~~~~~~~~~~~~~~~~~~~~
+
+The Conan package manager is an excellent way to quickly obtain prebuilt binaries
+of third-party libraries. It has been integrated into Jolt allowing you to seemlessly
+use Conan packages with your Jolt Ninja tasks.
+
+In the example below, Conan is used to collect the Boost C++ libraries. Boost is then
+used in our example application. All build metadata is automatically configured.
+
+.. code-block:: python
+
+    from jolt.plugins.conan import Conan
+
+    class Boost(Conan):
+        requires = "toolchain"
+        packages = ["boost/1.74.0"]
+
+    class HelloWorld(CXXExecutable):
+        requires = ["toolchain", "boost"]
+        sources = "src/main.cpp"
+
+With the toolchain as a dependency also for Boost, Conan will be able to fetch
+the appropriate binaries that match your toolchain. If no such binaries are
+available, Conan will build them for you.
