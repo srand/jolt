@@ -221,6 +221,24 @@ Tools
 .. reference-tools-end
 
 
+Conan
+-----
+
+.. reference-conan-start
+
+Conan
+^^^^^^
+
+.. reference-conan-conan-start
+
+.. autoclass:: jolt.plugins.conan.Conan
+   :members:
+
+.. reference-conan-conan-end
+
+.. reference-conan-end
+
+
 Ninja
 ------
 

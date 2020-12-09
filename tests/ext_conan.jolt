@@ -1,0 +1,42 @@
+#!/usr/bin/env python
+
+import sys
+import time
+sys.path.append(".")
+
+from testsupport import JoltTest
+
+
+class ConanApi(JoltTest):
+    name = "ext/conan"
+
+    def test_build(self):
+        """
+        --- tasks:
+        from jolt.plugins.conan import Conan
+        from jolt.plugins import ninja
+
+        class SDL2(Conan):
+            packages = ["sdl2/2.0.12@bincrafters/stable"]
+            remotes = {{"bincrafters": "https://api.bintray.com/conan/bincrafters/public-conan"}}
+            options = ["sdl2:sdl2main=False"]
+
+        @attributes.system
+        @ninja.attributes.ldflags("ldflags_{{system}}")
+        class Test(ninja.CXXExecutable):
+            requires = ["sdl2"]
+            sources = ["main.cpp"]
+            ldflags_windows = ["/subsystem:console"]
+
+        --- file: main.cpp
+        #include <SDL.h>
+        #include <SDL_main.h>
+
+        int SDL_main(int argc, char *argv[])
+        {{
+            SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_EVENTS | SDL_INIT_TIMER);
+            return 0;
+        }}
+        ---
+        """
+        self.jolt("-v build test")
