@@ -232,7 +232,7 @@ Conan
 .. reference-conan-conan-start
 
 .. autoclass:: jolt.plugins.conan.Conan
-   :members:
+   :members: conanfile, generators, incremental, options, packages, remotes
 
 .. reference-conan-conan-end
 
