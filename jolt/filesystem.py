@@ -66,6 +66,19 @@ def unlink(path, ignore_errors=False):
         if not ignore_errors:
             raise
 
+_symlinks = None
+def has_symlinks():
+    global _symlinks
+    if _symlinks is None:
+        if os.name != "nt" or (
+                sys.getwindowsversion().major >= 10 and \
+                sys.version_info.major >= 3 and \
+                sys.version_info.minor >= 8):
+            _symlinks = True
+        else:
+            _symlinks = False
+    return _symlinks
+
 def symlink(src, dest, *args, **kwargs):
     if os.name == "nt":
         # Try to use junctions first.

@@ -213,6 +213,9 @@ class ArtifactListAttribute(ArtifactAttribute):
     def items(self):
         return list(self._value)
 
+    def count(self):
+        return len(self.items())
+
     def apply(self, task, artifact):
         pass
 

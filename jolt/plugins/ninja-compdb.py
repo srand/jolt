@@ -6,6 +6,7 @@ import sys
 from jolt import cache
 from jolt import cli
 from jolt import config
+from jolt import filesystem as fs
 from jolt import graph
 from jolt import log
 from jolt import scheduler
@@ -21,14 +22,77 @@ from jolt.tools import Tools
 log.verbose("[NinjaCompDB] Loaded")
 
 
+def patch(command, attrib, search, replace):
+    command[attrib] = command[attrib].replace(search, replace)
+
+def patchattrib(command, attrib, searchattrib, replace):
+    command[attrib] = command[attrib].replace(
+        command[searchattrib], replace)
+
+def delattrib(command, attrib):
+    del command[attrib]
+
+
+class CompDB(object):
+    def __init__(self, path="compile_commands.json", artifact=None):
+        self.commands = []
+        if artifact:
+            self.path = fs.path.join(artifact.path, path)
+        else:
+            self.path = path
+        if self.path:
+            self.read()
+
+    def read(self, path=None):
+        try:
+            with open(path or self.path) as f:
+                self.commands = json.load(f)
+        except OSError:
+            pass
+
+    def write(self, path=None, force=False):
+        if not force and not self.commands:
+            return
+        with open(path or self.path, "w") as f:
+            json.dump(self.commands, f, indent=2)
+
+    def annotate(self, task):
+        for command in self.commands:
+            command["joltdir"] = task.task.joltdir
+            command["cachedir"] = config.get_cachedir()
+
+    def relocate(self, task):
+        for command in self.commands:
+            utils.call_and_catch(patchattrib, command, "command", "joltdir", task.task.joltdir)
+            utils.call_and_catch(patchattrib, command, "command", "cachedir", config.get_cachedir())
+            utils.call_and_catch(patchattrib, command, "directory", "joltdir", task.task.joltdir)
+            utils.call_and_catch(patch, command, "directory", "sandbox-", "sandbox-reflect-")
+            utils.call_and_catch(delattrib, command, "joltdir")
+            utils.call_and_catch(delattrib, command, "cachedir")
+
+    def merge(self, db):
+        self.commands.extend(db.commands)
+
+def has_incpaths(artifact):
+    return artifact.cxxinfo.incpaths.count() > 0
+
+def stage_artifacts(artifacts, tools):
+    for artifact in filter(has_incpaths, artifacts):
+        tools.sandbox(artifact, incremental=True, reflect=fs.has_symlinks())
+
+def get_task_artifacts(task, artifact=None):
+    acache = cache.ArtifactCache.get()
+    artifact = artifact or acache.get_artifact(task)
+    return artifact, [acache.get_artifact(dep) for dep in task.children]
+
+
 class CompDBHooks(TaskHook):
     def task_created(self, task):
-        task.task.influence.append(StringInfluence("NinjaCompDB"))
+        task.task.influence.append(StringInfluence("NinjaCompDB: v2"))
 
     def task_postrun(self, task, deps, tools):
         if not isinstance(task.task, ninja.CXXProject):
             return
-
         with tools.cwd(task.task.outdir):
             utils.call_and_catch(tools.run, "ninja -f build.ninja -t compdb > compile_commands.json")
 
@@ -37,23 +101,34 @@ class CompDBHooks(TaskHook):
             with tools.cwd(task.task.outdir):
                 artifact.collect("*compile_commands.json")
 
-        with tools.cwd(artifact.path):
-            if not tools.glob("compile_commands.json"):
-                return
+        # Add information about the workspace and cachedir roots
+        db = CompDB(artifact=artifact)
+        db.annotate(task)
+        db.write()
 
-            # Add information about the workspace and cachedir roots
-            with open(tools.expand_path("compile_commands.json")) as f:
-                commands = json.load(f)
-            for command in commands:
-                command["joltdir"] = task.task.joltdir
-                command["cachedir"] = config.get_cachedir()
-            with open(tools.expand_path("compile_commands.json"), "w") as f:
-                json.dump(commands, f, indent=2)
+        if isinstance(task.task, ninja.CXXProject):
+            dbpath = fs.path.join(task.task.outdir, "all_compile_commands.json")
+            _, deps = get_task_artifacts(task, artifact)
+            db = CompDB(dbpath)
+            for dep in [artifact] + deps:
+                db.merge(CompDB(artifact=dep))
+            db.write()
+            artifact.collect(dbpath, flatten=True)
 
+    def task_finished(self, task):
+        if task.options.network or task.options.worker:
+            return
+        if isinstance(task.task, ninja.CXXProject):
+            artifact, deps = get_task_artifacts(task)
+            db = CompDB("all_compile_commands.json", artifact)
+            db.relocate(task)
+            outdir = task.tools.builddir("compdb", incremental=True)
+            dbpath = fs.path.join(outdir, "all_compile_commands.json")
+            db.write(dbpath, force=True)
+            stage_artifacts(deps+[artifact], task.tools)
 
-def patch(command, target, search, replace):
-    command[target] = command[target].replace(
-        command[search], replace)
+    def task_skipped(self, task):
+        self.task_finished(task)
 
 
 @TaskHookFactory.register
@@ -92,12 +167,6 @@ def compdb(ctx, task, default):
     registry = TaskRegistry.get()
     strategy = scheduler.DownloadStrategy(executors, acache)
     queue = scheduler.TaskQueue(strategy)
-    reflect = True
-
-    # Symlinks are problematic on older versions of Windows.
-    # On those, we create regular copied sandboxes instead.
-    if os.name == "nt" and sys.getwindowsversion().major < 10:
-        reflect = False
 
     for params in default:
         registry.set_default_parameters(params)
@@ -132,36 +201,11 @@ def compdb(ctx, task, default):
             os._exit(1)
 
     for goal in dag.goals:
-        with acache.get_context(goal) as context:
-            all_commands = []
-            outdir = goal.tools.builddir("ninja", True)
-
-            artifacts = [acache.get_artifact(goal)]
-            artifacts += [artifact for name, artifact in context.items()]
-
-            # Load commands from artifacts
-            for artifact in artifacts:
-                try:
-                    with goal.tools.cwd(artifact.path):
-                        with open(goal.tools.expand_path("compile_commands.json")) as f:
-                            data = f.read()
-                            if reflect:
-                                data = data.replace("sandbox-", "sandbox-reflect-")
-                            commands = json.loads(data)
-                    for command in commands:
-                        utils.call_and_catch(patch, command, "command", "joltdir", task.task.joltdir)
-                        utils.call_and_catch(patch, command, "command", "cachedir", config.get_cachedir())
-                        utils.call_and_catch(patch, command, "directory", "joltdir", task.task.joltdir)
-                    all_commands.extend(commands)
-                except KeyboardInterrupt as e:
-                    raise e
-                except Exception:
-                    pass
-                goal.tools.sandbox(artifact, incremental=True, reflect=reflect)
-
-            # Write result
-            with goal.tools.cwd(outdir):
-                with open(goal.tools.expand_path("all_compile_commands.json"), "w") as f:
-                    json.dump(all_commands, f, indent=2)
-
-        log.info("Compilation DB: {}", os.path.join(outdir, "all_compile_commands.json"))
+        artifact, deps = get_task_artifacts(goal)
+        db = CompDB("all_compile_commands.json", artifact)
+        db.relocate(goal)
+        outdir = goal.tools.builddir("compdb", incremental=True)
+        dbpath = fs.path.join(outdir, "all_compile_commands.json")
+        db.write(dbpath, force=True)
+        stage_artifacts(deps+[artifact], goal.tools)
+        log.info("Compilation DB: {}", dbpath)
