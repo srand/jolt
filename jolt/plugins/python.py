@@ -7,8 +7,8 @@ from jolt.cache import ArtifactAttributeSetProvider
 
 
 class PythonVariable(ArtifactStringAttribute):
-    def __init__(self, name):
-        super(PythonVariable, self).__init__(name)
+    def __init__(self, artifact, name):
+        super(PythonVariable, self).__init__(artifact, name)
 
     def apply(self, task, artifact):
         pass
@@ -18,8 +18,8 @@ class PythonVariable(ArtifactStringAttribute):
 
 
 class PythonListVariable(PythonVariable):
-    def __init__(self, name):
-        super(PythonListVariable, self).__init__(name)
+    def __init__(self, artifact, name):
+        super(PythonListVariable, self).__init__(artifact, name)
 
     def append(self, value):
         if self.get_value():
@@ -33,8 +33,8 @@ class PythonListVariable(PythonVariable):
 
 
 class PythonPathVariable(PythonListVariable):
-    def __init__(self, name):
-        super(PythonPathVariable, self).__init__(name)
+    def __init__(self, artifact, name):
+        super(PythonPathVariable, self).__init__(artifact, name)
 
     def append(self, value):
         if self.get_value():
@@ -57,8 +57,8 @@ class PythonPathVariable(PythonListVariable):
 
 
 class PythonDictVariable(PythonListVariable):
-    def __init__(self, name):
-        super(PythonDictVariable, self).__init__(name)
+    def __init__(self, artifact, name):
+        super(PythonDictVariable, self).__init__(artifact, name)
 
     def __setitem__(self, key, value=None):
         item = "{0}={1}".format(key, value) if value is not None else key
@@ -66,19 +66,20 @@ class PythonDictVariable(PythonListVariable):
 
 
 class Python(ArtifactAttributeSet):
-    def __init__(self):
+    def __init__(self, artifact):
         super(Python, self).__init__()
+        super(ArtifactAttributeSet, self).__setattr__("_artifact", artifact)
 
     def create(self, name):
         if name.lower() == "path":
-            return PythonPathVariable("PATH")
+            return PythonPathVariable(self._artifact, "PATH")
         assert False, "no such python attribute: {0}".format(name)
 
 
 @ArtifactAttributeSetProvider.Register
 class PythonProvider(ArtifactAttributeSetProvider):
     def create(self, artifact):
-        setattr(artifact, "python", Python())
+        setattr(artifact, "python", Python(artifact))
 
     def parse(self, artifact, content):
         if "python" not in content:
