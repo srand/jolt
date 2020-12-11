@@ -1,10 +1,12 @@
 import base64
 import copy
 import fnmatch
+import functools
 import inspect
 from pathlib import Path
 import platform
 import subprocess
+import sys
 import unittest as ut
 
 from jolt import filesystem as fs
@@ -1056,64 +1058,66 @@ class TaskException(Exception):
         super(TaskException, self).__init__(*args, **kwargs)
 
 
-class _Test(Task):
-    abstract = True
-    """ An abstract test class indended to be subclassed.
 
-    Abstract test tasks can't be executed and won't be listed.
-    """
-
-    def __init__(self, test_cls, *args, **kwargs):
-        self.test_cls = test_cls
-        self.__class__.cacheable = test_cls.cacheable
-        self.__class__.extends = test_cls.extends
-        self.__class__.expires = test_cls.expires
-        self.__class__.influence = test_cls.influence
-        self.__class__.joltdir = test_cls.joltdir
-        self.__class__.name = test_cls.name
-        self.__class__.requires = test_cls.requires
-
-        super(_Test, self).__init__(*args, **kwargs)
-
-        self.influence.append(TaskSourceInfluence("setup", self.test_cls))
-        self.influence.append(TaskSourceInfluence("cleanup", self.test_cls))
-        for name in self._get_test_names():
-            self.influence.append(TaskSourceInfluence(name, self.test_cls))
+__unittest = True
 
 
-    def _requires(self):
-        return self.test_cls.requires
+class _TestCase(ut.FunctionTestCase):
+    def __init__(self, task, deps, tools, testfunc, *args, **kwargs):
+        super().__init__(testfunc, *args, **kwargs)
+        self.task = task
+        self.deps = deps
+        self.tools = tools
+        self.testfunc = testfunc
 
-    def _create_exports_and_parameters(self):
-        self._exports = {}
-        self._parameters = {}
-        for key in dir(self.test_cls):
-            obj = utils.getattr_safe(self.test_cls, key)
-            if isinstance(obj, Export):
-                export = copy.copy(obj)
-                setattr(self, key, export)
-                self._exports[key] = param
-            if isinstance(obj, Parameter):
-                param = copy.copy(obj)
-                setattr(self, key, param)
-                self._parameters[key] = param
+    def runTest(self):
+        self.task._run(self)
 
-    def _get_test_names(self):
-        return [attrib for attrib in dir(self.test_cls)
-                if attrib.startswith("test_")]
+    def __str__(self):
+        return "{} ({})".format(self.task.__class__.__name__, self.testfunc.__name__)
 
-    def run(self, deps, tools):
-        testsuite = ut.TestSuite()
-        for test in self._get_test_names():
-            if self.pattern.is_unset() or fnmatch.fnmatch(test, str(self.pattern)):
-                testsuite.addTest(self.test_cls(
-                    test, parameters=self._get_parameters(), deps=deps))
-        with log.stream() as logstream:
-            self.testresult = ut.TextTestRunner(stream=logstream, verbosity=2).run(testsuite)
-            raise_task_error_if(not self.testresult.wasSuccessful(), self, "tests failed")
+    @property
+    def __doc__(self):
+        return self.testfunc.__doc__
 
 
-class Test(ut.TestCase, TaskBase):
+class _TestResult(ut.TextTestResult):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.successes = []
+
+    def _begin(self):
+        log.stdout(ut.TextTestResult.separator1)
+
+    def _end(self):
+        log.stdout(ut.TextTestResult.separator2)
+        log.stdout("")
+
+    def startTest(self, test):
+        self._begin()
+        super().startTest(test)
+        log.stdout(ut.TextTestResult.separator2)
+
+    def addSuccess(self, test):
+        super().addSuccess(test)
+        self.successes.append(test)
+        self._end()
+
+    def addError(self, test, err):
+        super().addError(test, err)
+        self._end()
+
+    def addFailure(self, test, err):
+        super().addFailure(test, err)
+        self._end()
+
+    def addSkip(self, test, reason):
+        super().addSkip(test, reason)
+        self._end()
+
+
+
+class Test(Task):
     """ A test task.
 
     The test task combines a regular Jolt task with a Python ``unittest.TestCase``.
@@ -1147,23 +1151,135 @@ class Test(ut.TestCase, TaskBase):
 
     pattern = Parameter(required=False, help="Test-case filter wildcard.")
 
-    def __init__(self, method="runTest", deps=None, tools=None, *args, **kwargs):
-        ut.TestCase.__init__(self, method)
-        TaskBase.__init__(self, **kwargs)
-        self.deps = deps
-        self.tools = Tools(self, self.joltdir)
-
-    def setUp(self):
-        self.setup(self.deps, self.tools)
-
-    def tearDown(self):
-        self.cleanup()
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.influence.append(TaskSourceInfluence("setup", self))
+        self.influence.append(TaskSourceInfluence("cleanup", self))
+        for name in self._get_test_names():
+            self.influence.append(TaskSourceInfluence(name, self))
 
     def setup(self, deps, tools):
         """ Implement this method to make preparations before a test """
 
     def cleanup(self):
         """ Implement this method to clean up after a test """
+
+    def skip(self, reason=""):
+        raise ut.SkipTest(self.tools.expand(reason))
+
+    def _get_test_names(self):
+        return [attrib for attrib in dir(self) if attrib.startswith("test_")]
+
+    def _setup(self, test):
+        self._curtest = test
+        self._testMethodName = test.testfunc.__name__
+        self._testMethodDoc = test.testfunc.__doc__
+        self.setup(test.deps, test.tools)
+
+    def _test(self, test):
+        test.testfunc()
+
+    def _cleanup(self, test):
+        self.cleanup()
+
+    def _run(self, test):
+        try:
+            self._setup(test)
+            self._test(test)
+        finally:
+            self._cleanup(test)
+
+    def assertTrue(self, *args, **kwargs):
+        return self._curtest.assertTrue(*args, **kwargs)
+
+    def assertFalse(self, *args, **kwargs):
+        return self._curtest.assertFalse(*args, **kwargs)
+
+    def assertIn(self, *args, **kwargs):
+        return self._curtest.assertIn(*args, **kwargs)
+
+    def assertNotIn(self, *args, **kwargs):
+        return self._curtest.assertNotIn(*args, **kwargs)
+
+    def assertIs(self, *args, **kwargs):
+        return self._curtest.assertIs(*args, **kwargs)
+
+    def assertIsNot(self, *args, **kwargs):
+        return self._curtest.assertIsNot(*args, **kwargs)
+
+    def assertIsInstance(self, *args, **kwargs):
+        return self._curtest.assertIsInstance(*args, **kwargs)
+
+    def assertIsNotInstance(self, *args, **kwargs):
+        return self._curtest.assertIsNotInstance(*args, **kwargs)
+
+    def assertIsNone(self, *args, **kwargs):
+        return self._curtest.assertIsNone(*args, **kwargs)
+
+    def assertIsNotNone(self, *args, **kwargs):
+        return self._curtest.assertIsNotNone(*args, **kwargs)
+
+    def assertEqual(self, *args, **kwargs):
+        return self._curtest.assertEqual(*args, **kwargs)
+
+    def assertNotEqual(self, *args, **kwargs):
+        return self._curtest.assertNotEqual(*args, **kwargs)
+
+    def assertAlmostEqual(self, *args, **kwargs):
+        return self._curtest.assertAlmostEqual(*args, **kwargs)
+
+    def assertAlmostNotEqual(self, *args, **kwargs):
+        return self._curtest.assertAlmostNotEqual(*args, **kwargs)
+
+    def assertGreater(self, *args, **kwargs):
+        return self._curtest.assertGreater(*args, **kwargs)
+
+    def assertGreaterEqual(self, *args, **kwargs):
+        return self._curtest.assertGreaterEqual(*args, **kwargs)
+
+    def assertLess(self, *args, **kwargs):
+        return self._curtest.assertLess(*args, **kwargs)
+
+    def assertLessEqual(self, *args, **kwargs):
+        return self._curtest.assertLessEqual(*args, **kwargs)
+
+    def assertRaises(self, *args, **kwargs):
+        return self._curtest.assertRaises(*args, **kwargs)
+
+    def assertRaisesRegex(self, *args, **kwargs):
+        return self._curtest.assertRaisesRegex(*args, **kwargs)
+
+    def assertRegex(self, *args, **kwargs):
+        return self._curtest.assertRegex(*args, **kwargs)
+
+    def assertRegex(self, *args, **kwargs):
+        return self._curtest.assertRegex(*args, **kwargs)
+
+    def assertCountEqual(self, *args, **kwargs):
+        return self._curtest.assertCountEqual(*args, **kwargs)
+
+    def skipTest(self, *args, **kwargs):
+        return self._curtest.skipTest(*args, **kwargs)
+
+    def subTest(self, *args, **kwargs):
+        return self._curtest.subTest(*args, **kwargs)
+
+    def run(self, deps, tools):
+        testsuite = ut.TestSuite()
+        for test in self._get_test_names():
+            if self.pattern.is_unset() or fnmatch.fnmatch(test, str(self.pattern)):
+                testfunc = getattr(self, test)
+                testsuite.addTest(
+                    _TestCase(self, deps, tools, testfunc))
+        with log.stream() as logstream:
+            self.testresult = ut.TextTestRunner(resultclass=_TestResult, stream=logstream, verbosity=2).run(testsuite)
+
+        raise_task_error_if(
+            not self.testresult.wasSuccessful(), self,
+            "{} tests out of {} were successful".format(
+                len(self.testresult.successes),
+                self.testresult.testsRun))
+
 
 
 @ArtifactAttributeSetProvider.Register

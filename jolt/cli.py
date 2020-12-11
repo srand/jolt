@@ -121,11 +121,9 @@ def cli(ctx, verbose, extra_verbose, config_file, debug_exception, profile,
     ctx.obj["manifest"] = manifest
 
     loader = JoltLoader.get()
-    tasks, tests = loader.load()
+    tasks = loader.load()
     for cls in tasks:
         TaskRegistry.get().add_task_class(cls)
-    for cls in tests:
-        TaskRegistry.get().add_test_class(cls)
 
     # If no command is given, we default to building the default task.
     # If the default task doesn't exist, help is printed inside build().
@@ -141,8 +139,8 @@ def cli(ctx, verbose, extra_verbose, config_file, debug_exception, profile,
 
 
 def _autocomplete_tasks(ctx, args, incomplete):
-    tasks, tests = JoltLoader.get().load()
-    tasks = [task.name for task in tasks + tests if task.name.startswith(incomplete or '')]
+    tasks = JoltLoader.get().load()
+    tasks = [task.name for task in tasks if task.name.startswith(incomplete or '')]
     return sorted(tasks)
 
 

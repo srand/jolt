@@ -6,7 +6,7 @@ import os
 import sys
 
 from jolt.tasks import attributes
-from jolt.tasks import Alias, Task, TaskGenerator, TaskRegistry, Test, WorkspaceResource
+from jolt.tasks import Alias, Task, TaskGenerator, TaskRegistry, WorkspaceResource
 from jolt.error import raise_error_if, raise_task_error_if
 from jolt import config
 from jolt import filesystem as fs
@@ -24,7 +24,6 @@ class Recipe(object):
         self.project = project
         self.source = source
         self.tasks = []
-        self.tests = []
 
     def load(self):
         raise_error_if(self.source is not None, "recipe already loaded: {}", self.path)
@@ -56,12 +55,6 @@ class NativeRecipe(Recipe):
             issubclass(cls, Task) and \
             not NativeRecipe._is_abstract(cls)
 
-    @staticmethod
-    def _is_test(cls):
-        return inspect.isclass(cls) and \
-            issubclass(cls, Test) and \
-            not NativeRecipe._is_abstract(cls)
-
     def load(self):
         super(NativeRecipe, self).load()
 
@@ -69,26 +62,18 @@ class NativeRecipe(Recipe):
         module = imp.load_source("joltfile_{0}".format(name), self.path)
 
         tasks = inspect.getmembers(module, self._is_task)
-        tests = inspect.getmembers(module, self._is_test)
         generators = inspect.getmembers(module, self._is_generator)
 
         for _, cls in generators:
             cls.joltdir = self.joltdir or os.path.dirname(self.path)
             classes = utils.as_list(cls().generate())
             tasks += [(c.__name__, c) for c in classes if self._is_task(c)]
-            tests += [(c.__name__, c) for c in classes if self._is_test(c)]
 
         for name, task in tasks:
             task.name = task.name or task.__name__.lower()
             task.joltdir = self.joltdir or os.path.dirname(self.path)
             task.joltproject = self.project
             self.tasks.append(task)
-
-        for name, test in tests:
-            test.name = test.name or test.__name__.lower()
-            test.joltdir = self.joltdir or os.path.dirname(self.path)
-            test.joltproject = self.project
-            self.tests.append(test)
 
         log.verbose("Loaded: {0}", self.path)
 
@@ -149,7 +134,6 @@ class JoltLoader(object):
     def __init__(self):
         self._recipes = []
         self._tasks = []
-        self._tests = []
         self._path = None
         self._project_modules = {}
         self._project_recipes = {}
@@ -193,11 +177,7 @@ class JoltLoader(object):
                 for task in recipe.tasks:
                     task._resources = resources
                     attributes.requires("_resources")(task)
-                for test in recipe.tests:
-                    test._resources = resources
-                    attributes.requires("_resources")(task)
                 self._tasks += recipe.tasks
-                self._tests += recipe.tests
 
     def load(self, manifest=None):
         for factory in _loaders:
@@ -206,12 +186,11 @@ class JoltLoader(object):
                 recipe.load()
                 self._recipes.append(recipe)
                 self._tasks += recipe.tasks
-                self._tests += recipe.tests
             if len(loader.recipes) > 0:
                 self.set_joltdir(loader.path)
 
         self._load_project_recipes()
-        return self._tasks, self._tests
+        return self._tasks
 
     def load_plugin(self, filepath):
         plugin, ext = os.path.splitext(fs.path.basename(filepath))
@@ -239,10 +218,6 @@ class JoltLoader(object):
     @property
     def tasks(self):
         return self._tasks
-
-    @property
-    def tests(self):
-        return self._tests
 
     @property
     def joltdir(self):
