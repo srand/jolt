@@ -457,18 +457,6 @@ class Tools(object):
         root = self._task.joltdir if self._task else self.getcwd()
         return fs.path.normpath(fs.path.join(self.expand(root), "build"))
 
-    def calculate_hash_from_files(self, filelist):
-        """ Calculate SHA1 over the content of the files in the provided list.
-
-        Args:
-            filelist: A list of files, which will be processed in sorted order
-        """
-        content = b''
-        for fname in sorted(filelist):
-            content += self.read_file(fname, binary=True)
-        # Sanitize all white spaces (space, tab, crlf), before calculating the SHA1 hash.
-        return hashlib.sha1(b' '.join(content.split())).hexdigest()
-
     def checksum_file(self, filelist, concat=False, hashfn=hashlib.sha1, filterfn=None):
         """ Calculate a checksum of one or multiple files.
 
