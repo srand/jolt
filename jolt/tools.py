@@ -855,7 +855,7 @@ class Tools(object):
         if expand:
             files = [self.expand_path(file) for file in files]
         elif not fs.path.isabs(pathname):
-            files = [file[len(self.getcwd())+1:] for file in files]
+            files = [self.expand_relpath(file, self.getcwd()) for file in files]
         return files
 
     def map_consecutive(self, callable, iterable):
