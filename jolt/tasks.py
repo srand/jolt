@@ -1070,6 +1070,14 @@ class _TestCase(ut.FunctionTestCase):
         self.tools = tools
         self.testfunc = testfunc
 
+    @property
+    def name(self):
+        return self.testfunc.__name__
+
+    @property
+    def fullname(self):
+        return "{}.{}".format(self.task.__class__.__name__, self.name)
+
     def runTest(self):
         self.task._run(self)
 

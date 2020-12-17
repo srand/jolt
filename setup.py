@@ -73,6 +73,7 @@ setup(
     # for example:
     # $ pip install -e .[dev,test]
     extras_require={
+        'allure': ['allure-python-commons'],
         'amqp': ['pika'],
         'dev': ['check-manifest'],
         'test': ['coverage'],

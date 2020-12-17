@@ -8,6 +8,7 @@ from jolt import *
 from jolt import error
 from jolt import filesystem as fs
 from jolt.tasks import TaskRegistry
+from jolt.plugins.allure import Test
 
 
 def enable_network_testing(cls, storage_providers=None):
