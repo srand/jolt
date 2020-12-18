@@ -5,6 +5,7 @@ import pathlib
 import posixpath
 import shutil
 import tempfile
+import sys
 
 from jolt.error import raise_error_if
 
