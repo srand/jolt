@@ -261,11 +261,20 @@ class ConfigExtension(ManifestExtension):
     def export_manifest(self, manifest, task):
         manifest.config = get("network", "config", "", expand=False)
 
+        for key, value in options("params"):
+            p = manifest.create_parameter()
+            p.key = "config." + key
+            p.value = value
+
     def import_manifest(self, manifest):
         if manifest.config:
             _manifest.read_string(manifest.config)
             from jolt.loader import JoltLoader
             JoltLoader.get().load_plugins()
+
+        for param in manifest.parameters:
+            if param.key.startswith("config."):
+                set("params", param.key.split(".", 1)[1], param.value)
 
 
 # High priority so that plugins are loaded before resources are acquired.
