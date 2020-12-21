@@ -346,7 +346,7 @@ class FileInfluence(HashInfluenceProvider):
         self._files = {}
 
     def get_file_influence(self, path):
-        return utils.filesha1(path)
+        return utils.filesha1(str(path))
 
     def get_filelist(self, task):
         try:
@@ -371,10 +371,10 @@ class FileInfluence(HashInfluenceProvider):
             value = _fi_files.get(f)
             if value:
                 result.append(value)
-            elif fs.path.exists(f):
+            elif f.exists():
                 _fi_files[f] = value = f.name + ":" + self.get_file_influence(f)
                 result.append(value)
-            elif fs.path.lexists(f):
+            elif fs.path.lexists(str(f)):
                 _fi_files[f] = value = f.name + ": Symlink (broken)"
                 result.append(value)
         return "\n".join(result)
