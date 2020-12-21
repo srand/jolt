@@ -322,6 +322,7 @@ class ToolsApi(JoltTest):
     def test_rsync(self):
         """
         --- file: a/new/file
+        --- file: a/new/directory/file
         --- file: a/file/file
         --- file: a/directory
         --- file: a/test1.txt
@@ -331,6 +332,7 @@ class ToolsApi(JoltTest):
         --- file: a/test3.txt
         test3
         --- file: b/deleted/file
+        --- file: b/deleted/directory/file
         --- file: b/file
         --- file: b/directory/file
         --- file: b/test1.txt

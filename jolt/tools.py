@@ -988,7 +988,7 @@ class Tools(object):
         common_files = srcfiles.intersection(dstfiles)
 
         # Remove files first, then directories
-        for dir, fp in sorted(deleted_files, key=lambda n: n[0]):
+        for dir, fp in sorted(deleted_files, key=lambda n: (n[0], -len(n[1]))):
             dst = fs.path.join(dstpath, fp)
             if dir:
                 fs.rmtree(dst)
@@ -996,7 +996,7 @@ class Tools(object):
                 fs.unlink(dst)
 
         # Add new directories, then files
-        for dir, fp in sorted(added_files, key=lambda n: not n[0]):
+        for dir, fp in sorted(added_files, key=lambda n: (not n[0], n[1])):
             src = fs.path.join(srcpath, fp)
             dst = fs.path.join(dstpath, fp)
             if dir:
