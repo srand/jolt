@@ -1275,7 +1275,8 @@ class CXXProject(Task):
         self._write_ninja_cache(deps, tools)
         with open(fs.path.join(basedir, filename), "w") as fobj:
             writer = ninja.Writer(fobj)
-            writer.depimports = copy.copy(self.depimports)
+            writer.depimports = [tools.expand_relpath(dep, self.outdir)
+                                 for dep in self.depimports]
             writer.objects = []
             writer.sources = copy.copy(self.sources)
             self._populate_rules_and_variables(writer, deps, tools)
