@@ -280,6 +280,43 @@ class TaskApi(JoltTest):
         r = self.jolt("build a b c")
         self.assertEqual(self.tasks(r), ["a", "c", "b"])
 
+    def test_param_bool(self):
+        """
+        --- tasks:
+        class Pos(Task):
+            arg = BooleanParameter()
+            def run(self, deps, tools):
+                assert self.arg, "unexpected value"
+
+        class Neg(Task):
+            arg = BooleanParameter()
+            def run(self, deps, tools):
+                assert not self.arg, "unexpected value"
+        ---
+        """
+        with self.assertRaises(Exception):
+            self.build("pos:arg=false")
+        self.build("pos:arg=true")
+        with self.assertRaises(Exception):
+            self.build("neg:arg=true")
+        self.build("neg:arg=false")
+
+
+    def test_param_bool_regular(self):
+        """
+        --- tasks:
+        class A(Task):
+            arg = Parameter(required=False)
+            def run(self, deps, tools):
+                assert self.arg, "unexpected value"
+        ---
+        """
+        with self.assertRaises(Exception):
+            self.build("a")
+        with self.assertRaises(Exception):
+            self.build("a:arg=")
+        self.build("a:arg=value")
+
     def test_param_influence(self):
         """
         --- tasks:

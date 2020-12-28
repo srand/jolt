@@ -187,6 +187,10 @@ class Parameter(object):
         """ Get the parameter value. """
         return self._value
 
+    def __bool__(self):
+        """ Returns True if the parameter value is a non-empty string. """
+        return self._value is not None and self._value != ""
+
     def __eq__(self, value):
         """ Compare parameter value """
         return self._value == value
@@ -263,6 +267,9 @@ class BooleanParameter(Parameter):
     def is_false(self):
         """ The parameter value is False. """
         return not self.is_true
+
+    def __bool__(self):
+        return self.is_true
 
 
 class TaskRegistry(object):
