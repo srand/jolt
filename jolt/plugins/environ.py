@@ -26,9 +26,9 @@ class PathEnvironmentVariable(EnvironmentVariable):
     def __init__(self, artifact, name="PATH"):
         super(PathEnvironmentVariable, self).__init__(artifact, name)
 
-    def set_value(self, value):
+    def set_value(self, value, expand=True):
         values = utils.as_list(value)
-        super(PathEnvironmentVariable, self).set_value(fs.pathsep.join(values))
+        super(PathEnvironmentVariable, self).set_value(fs.pathsep.join(values), expand)
 
     def append(self, value):
         if self.get_value():
@@ -73,7 +73,7 @@ class EnvironmentVariableSetProvider(ArtifactAttributeSetProvider):
             return
 
         for key, value in content["environ"].items():
-            setattr(artifact.environ, key, value)
+            getattr(artifact.environ, key).set_value(value, expand=False)
 
     def format(self, artifact, content):
         if "environ" not in content:

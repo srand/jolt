@@ -34,7 +34,7 @@ class StringVariableSetProvider(ArtifactAttributeSetProvider):
             return
 
         for key, value in content["strings"].items():
-            setattr(artifact.strings, key, value)
+            getattr(artifact.strings, key).set_value(value, expand=False)
 
     def format(self, artifact, content):
         if "strings" not in content:

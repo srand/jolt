@@ -52,7 +52,7 @@ class CppInfoProvider(ArtifactAttributeSetProvider):
         if "cxxinfo" not in content:
             return
         for key, value in content["cxxinfo"].items():
-            setattr(artifact.cxxinfo, key, value)
+            getattr(artifact.cxxinfo, key).set_value(value, expand=False)
 
     def format(self, artifact, content):
         if "cxxinfo" not in content:

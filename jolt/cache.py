@@ -145,7 +145,7 @@ class ArtifactAttribute(object):
     def get_name(self):
         return self._name
 
-    def set_value(self, value):
+    def set_value(self, value, expand=True):
         raise NotImplemented()
 
     def get_value(self):
@@ -170,8 +170,8 @@ class ArtifactStringAttribute(ArtifactAttribute):
     def get_name(self):
         return self._name
 
-    def set_value(self, value):
-        self._value = self._artifact.get_task().expand(str(value))
+    def set_value(self, value, expand=True):
+        self._value = self._artifact.get_task().expand(str(value)) if expand else str(value)
 
     def get_value(self):
         return self._value
@@ -195,11 +195,11 @@ class ArtifactListAttribute(ArtifactAttribute):
     def get_name(self):
         return self._name
 
-    def set_value(self, value):
+    def set_value(self, value, expand=True):
         if type(value) == str:
             value = value.split(":")
         raise_error_if(type(value) != list, "illegal value assigned to artifact list attribute")
-        self._value = self._artifact.get_task().expand(value)
+        self._value = self._artifact.get_task().expand(value) if expand else value
 
     def get_value(self):
         return self._value
