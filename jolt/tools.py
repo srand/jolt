@@ -1095,7 +1095,7 @@ class Tools(object):
             type(artifact) is not cache.Artifact,
             "non-artifact passed as argument to Tools.sandbox()")
 
-        suffix = utils.canonical(artifact.get_task().qualified_name)
+        suffix = utils.canonical(artifact.get_task().short_qualified_name)
 
         if reflect:
             sandbox_name = "sandbox-reflect-" + suffix
