@@ -2,12 +2,6 @@ from concurrent.futures import ThreadPoolExecutor, as_completed, Future
 from functools import partial
 import os
 import queue
-try:
-    import asyncio
-    has_asyncio = True
-except:
-    has_asyncio = False
-
 
 from jolt import config
 from jolt import log
@@ -104,10 +98,6 @@ class LocalExecutor(Executor):
     def run(self, env):
         if self.is_aborted():
             return
-        if has_asyncio:
-            loop = asyncio.SelectorEventLoop()
-            asyncio.set_event_loop(loop)
-
         try:
             self.task.started()
             self.task.run(
