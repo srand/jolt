@@ -470,6 +470,47 @@ class NinjaApi(JoltTest):
         r = self.jolt("build exe:arg=zyx")
         self.assertExists(self.artifacts(r)[0], "zyx", "exe")
 
+    def test_rule_combining(self):
+        """
+        --- file: test1.x
+        int x = 1;
+        --- file: test2.y
+        int y = 2;
+        --- file: test3.z
+        int z = 3;
+        --- file: test.cpp
+        extern int x, y, z;
+        int main() {{return x+y+z;}}
+
+        --- tasks:
+        class MyRule(Rule):
+            def build(self, project, writer, infiles, implicit=None):
+                assert len(infiles) == 2, "incorrect number of inputs: " + str(len(infiles))
+                return super().build(project, writer, infiles, implicit)
+
+        class Exe(CXXExecutable):
+            x_rule = Rule(
+                command="cp $in $out",
+                infiles=[".x"],
+                outfiles=["{{outdir}}/{{in_base}}.y"],
+            )
+            y_rule = Rule(
+                command="cat $in > $out",
+                infiles=[".y"],
+                outfiles=["{{outdir}}/{{in_base}}.z"],
+                aggregate=True,
+            )
+            z_rule = MyRule(
+                command="cat $in > $out",
+                infiles=[".z"],
+                outfiles=["{{outdir}}/{{in_base}}.cpp"],
+                aggregate=True,
+            )
+            sources = ["test1.x", "test2.y", "test3.z", "test.cpp"]
+        ---
+        """
+        self.build("exe")
+
     def test_selfsustained_merge(self):
         """
         --- file: a.cpp

@@ -366,7 +366,7 @@ class Rule(HashInfluenceProvider):
 
     """
 
-    def __init__(self, command=None, infiles=None, outfiles=None, depfile=None, deps=None, variables=None, implicit=None, order_only=None):
+    def __init__(self, command=None, infiles=None, outfiles=None, depfile=None, deps=None, variables=None, implicit=None, order_only=None, aggregate=False):
         """
         Creates a new rule.
 
@@ -400,6 +400,30 @@ class Rule(HashInfluenceProvider):
 
                     Rule(command="echo $extension", variables={"extension": "{in_ext}"}, ...)
 
+            aggregate (boolean, optional):
+                When this attribute is set, the Rule will aggregate all input
+                files and transform them with a single command. This is
+                useful, for example, when creating linking and archiving rules.
+                In aggregating rules the ``$in`` Ninja variable expands to all
+                matched input files, while the ``outfiles`` / ``$out`` variable
+                is expanded using the first input in the set, if the ``in_*``
+                keywords are used at all.
+
+                By default, a rule is applied once for each matched input file
+                for improved parallelism.
+
+                Example:
+
+                  In this example, the rule concatenates all header files into
+                  a single precompiled header.
+
+                  .. code-block:: python
+
+                    pch = Rule(
+                       command="cat $in > $out",
+                       infiles=["*.h"],
+                       outfiles=["{outdir}/all.pch"],
+                       aggregate=True)
         """
         self.command = command
         self.variables = variables or {}
@@ -409,6 +433,7 @@ class Rule(HashInfluenceProvider):
         self.outfiles = utils.as_list(outfiles or [])
         self.implicit = implicit or []
         self.order_only = order_only
+        self.aggregate = aggregate
 
     def _out(self, project, infile):
         in_dirname, in_basename = fs.path.split(infile)
@@ -447,15 +472,27 @@ class Rule(HashInfluenceProvider):
             writer.rule(self.name, tools.expand(command), depfile=self.depfile, deps=self.deps, description="$desc")
             writer.newline()
 
+    def output(self, project, infiles):
+        outfiles, _ = self._out(project, utils.as_list(infiles)[0])
+        return outfiles
+
     def build(self, project, writer, infiles, implicit=None):
         result = []
-        for infile in utils.as_list(infiles):
-            infile_rel = fs.path.relpath(infile, project.outdir)
-            outfiles, variables = self._out(project, infile)
+        infiles = utils.as_list(infiles)
+        infiles_rel = [fs.path.relpath(infile, project.outdir) for infile in infiles]
+        implicit = (self.implicit or []) + (implicit or [])
+
+        if self.aggregate:
+            outfiles, variables = self._out(project, infiles[0])
             outfiles_rel = [fs.path.relpath(outfile, project.outdir) for outfile in outfiles]
-            implicit = (self.implicit or []) + (implicit or [])
-            writer.build(outfiles_rel, self.name, infile_rel, variables=variables, implicit=implicit, order_only=self.order_only)
+            writer.build(outfiles_rel, self.name, infiles_rel, variables=variables, implicit=implicit, order_only=self.order_only)
             result.extend(outfiles)
+        else:
+            for infile, infile_rel in zip(infiles, infiles_rel):
+                outfiles, variables = self._out(project, infile)
+                outfiles_rel = [fs.path.relpath(outfile, project.outdir) for outfile in outfiles]
+                writer.build(outfiles_rel, self.name, infile_rel, variables=variables, implicit=implicit, order_only=self.order_only)
+                result.extend(outfiles)
         return result
 
     @utils.cached.instance
@@ -1367,13 +1404,33 @@ if __name__ == "__main__":
         writer.newline()
 
     def _populate_inputs(self, writer, deps, tools, sources=None):
+        # Source process queue
         sources = copy.copy(sources or writer.sources)
+
+        # Aggregated list of sources for each rule
+        rule_source_list = {}
+
         while sources:
             source = sources.pop()
             _, ext = fs.path.splitext(source)
             rule = self.find_rule(ext)
-            output = rule.build(self, writer, tools.expand_path(source))
-            sources.extend(output or [])
+            try:
+                rule_source_list[rule].append(source)
+                # Aggregating rules only have one set of outputs
+                # while regular rules produce one set of outputs
+                # for each input.
+                if not rule.aggregate:
+                    sources.extend(rule.output(self, source))
+            except KeyError:
+                rule_source_list[rule] = [source]
+                sources.extend(rule.output(self, source))
+
+        # No more inputs/outputs to process, now emit all build rules
+        for rule, source_list in rule_source_list.items():
+            source_list = list(map(tools.expand_path, source_list))
+            rule.build(self, writer, source_list)
+
+        # Done
         writer.newline()
 
     def _populate_project(self, writer, deps, tools):
