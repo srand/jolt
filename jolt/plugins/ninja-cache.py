@@ -55,7 +55,10 @@ class CacheHooks(TaskHook):
         with tools.cwd(task.task.outdir):
             m = ninjacli.LibraryManifest(tools.expand_path(".ninja.json"))
             m.read()
-            m.add_library(fs.path.join(task.task.publishdir, fs.path.basename(task.task.outfiles[0])))
+            if hasattr(artifact.strings, "library"):
+                m.add_library(fs.path.join(
+                    task.task.publishdir,
+                    fs.path.basename(str(artifact.strings.library))))
             m.write()
             artifact.collect(".ninja.json")
 

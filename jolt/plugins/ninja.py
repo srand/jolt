@@ -1,4 +1,5 @@
 import copy
+from itertools import zip_longest
 import ninja_syntax as ninja
 import platform
 import os
@@ -541,23 +542,6 @@ class MakeDirectory(Rule):
         return "MD" + super().get_influence(task)
 
 
-class Objects(Rule):
-    def __init__(self, *args, **kwargs):
-        super(Objects, self).__init__(*args, **kwargs)
-        self.command = None
-
-    def create(self, project, writer, deps, tools):
-        pass
-
-    def build(self, project, writer, infiles):
-        writer.objects.extend(utils.as_list(infiles))
-        return None
-
-    @utils.cached.instance
-    def get_influence(self, task):
-        return "O" + super().get_influence(task)
-
-
 class GNUCompiler(Rule):
     def __init__(self, *args, **kwargs):
         super(GNUCompiler, self).__init__(*args, **kwargs)
@@ -647,17 +631,13 @@ class GNUMRIWriter(FileListWriter):
 
 class GNULinker(Rule):
     def __init__(self, *args, **kwargs):
-        super(GNULinker, self).__init__(*args, **kwargs)
+        super(GNULinker, self).__init__(*args, aggregate=True, **kwargs)
 
     def build(self, project, writer, infiles):
+        writer._objects = infiles
         file_list = FileListWriter("objects", posix=True)
         file_list.build(project, writer, infiles)
-
-        infiles_rel = [fs.path.relpath(infile, project.outdir) for infile in infiles]
-        outfiles, variables = self._out(project, project.binary)
-        outfiles_rel = [fs.path.relpath(outfile, project.outdir) for outfile in outfiles]
-        writer.build(outfiles_rel, self.name, infiles_rel, implicit=self.implicit+writer.depimports, variables=variables)
-        return outfiles
+        return super().build(project, writer, infiles)
 
     @utils.cached.instance
     def get_influence(self, task):
@@ -666,19 +646,14 @@ class GNULinker(Rule):
 
 class GNUArchiver(Rule):
     def __init__(self, *args, **kwargs):
-        super(GNUArchiver, self).__init__(*args, **kwargs)
+        super(GNUArchiver, self).__init__(*args, aggregate=True, **kwargs)
 
     def build(self, project, writer, infiles):
-        infiles_rel = [fs.path.relpath(infile, project.outdir) for infile in infiles]
-        outfiles, variables = self._out(project, project.binary)
-        outfiles_rel = [fs.path.relpath(outfile, project.outdir) for outfile in outfiles]
-
-        file_list = GNUMRIWriter("objects", outfiles)
+        writer._objects = infiles
+        project._binaries, _ = self._out(project, project.binary)
+        file_list = GNUMRIWriter("objects", project._binaries)
         file_list.build(project, writer, infiles)
-
-        writer.build(outfiles_rel, self.name, infiles_rel, implicit=self.implicit+writer.depimports, variables=variables)
-
-        return outfiles
+        super().build(project, writer, infiles)
 
     def get_influence(self, task):
         return "GA" + super().get_influence(task)
@@ -881,7 +856,6 @@ class GNUOptFlags(GNUFlags):
 
 class GNUToolchain(Toolchain):
     hh = Skip(infiles=[".h", ".hh", ".hpp", ".hxx", GNUPCHVariables.gch_ext])
-    obj = Objects(infiles=[".o", ".obj", ".a"])
     bin = Skip(infiles=[".dll", ".elf", ".exe", ".out", ".so"])
 
     joltdir = ProjectVariable()
@@ -969,6 +943,7 @@ class GNUToolchain(Toolchain):
             "$objcopy_path --strip-all $out",
             "$objcopy_path --add-gnu-debuglink=.debug/$binary $out"
         ]),
+        infiles=[".o", ".obj", ".a"],
         outfiles=["{outdir}/{binary}"],
         variables={"desc": "[LINK] {binary}"},
         implicit=["$ld_path", "$objcopy_path", ".debug"])
@@ -980,12 +955,14 @@ class GNUToolchain(Toolchain):
             "$objcopy_path --strip-all $out",
             "$objcopy_path --add-gnu-debuglink=.debug/lib$binary.so $out"
         ]),
+        infiles=[".o", ".obj", ".a"],
         outfiles=["{outdir}/lib{binary}.so"],
         variables={"desc": "[LINK] {binary}"},
         implicit=["$ld_path", "$objcopy_path", ".debug"])
 
     archiver = GNUArchiver(
         command="$ar -M < objects.list && $ranlib $out",
+        infiles=[".o", ".obj", ".a"],
         outfiles=["{outdir}/lib{binary}.a"],
         variables={"desc": "[AR] lib{binary}.a"},
         implicit=["$ld_path", "$ar_path"])
@@ -1010,22 +987,18 @@ class MinGWToolchain(GNUToolchain):
 
 class MSVCArchiver(Rule):
     def __init__(self, *args, **kwargs):
-        super(MSVCArchiver, self).__init__(*args, **kwargs)
+        super(MSVCArchiver, self).__init__(*args, aggregate=True, **kwargs)
 
     def build(self, project, writer, infiles):
-        infiles_rel = [fs.path.relpath(infile, project.outdir) for infile in infiles]
-        outfiles, variables = self._out(project, project.binary)
-        outfiles_rel = [fs.path.relpath(outfile, project.outdir) for outfile in outfiles]
-
-        file_list = FileListWriter("objects", outfiles)
+        writer._objects = infiles
+        project._binaries, _ = self._out(project, project.binary)
+        file_list = FileListWriter("objects", project._binaries)
         file_list.build(project, writer, infiles)
-
-        writer.build(outfiles_rel, self.name, infiles_rel, implicit=self.implicit+writer.depimports, variables=variables)
-
-        return outfiles
+        super().build(project, writer, infiles)
 
     def get_influence(self, task):
         return "MSVCArchiver" + super().get_influence(task)
+
 
 MSVCCompiler = GNUCompiler
 MSVCLinker = GNULinker
@@ -1034,7 +1007,6 @@ MSVCDepImporter = GNUDepImporter
 
 class MSVCToolchain(Toolchain):
     hh = Skip(infiles=[".h", ".hh", ".hpp", ".hxx"])
-    obj = Objects(infiles=[".o", ".obj", ".a"])
     bin = Skip(infiles=[".dll", ".exe"])
 
     joltdir = ProjectVariable()
@@ -1248,6 +1220,14 @@ class CXXProject(Task):
         self._rules = []
         self._variables = []
 
+        if isinstance(self, CXXExecutable):
+            self._linker = self.toolchain.linker
+        elif isinstance(self, CXXLibrary):
+            if self.shared:
+                self._linker = self.toolchain.dynlinker
+            else:
+                self._linker = self.toolchain.archiver
+
         rules, variables = Toolchain.all_rules_and_vars(self)
         for name, var in variables:
             var = copy.copy(var)
@@ -1271,7 +1251,7 @@ class CXXProject(Task):
         # Verify that listed sources and their dependencies are influencing
         sources = set(self.sources + getattr(self, "headers", []))
         with tools.cwd(self.outdir):
-            depfiles = [obj + ".d" for obj in getattr(self._writer, "objects", [])]
+            depfiles = [obj + ".d" for obj in getattr(self._writer, "_objects", [])]
             for depfile in depfiles:
                 try:
                     data = tools.read_file(depfile)
@@ -1318,7 +1298,7 @@ class CXXProject(Task):
             writer.sources = copy.copy(self.sources)
             self._populate_rules_and_variables(writer, deps, tools)
             self._populate_inputs(writer, deps, tools)
-            self._populate_project(writer, deps, tools)
+            #self._populate_project(writer, deps, tools)
             writer.close()
             return writer
 
@@ -1405,25 +1385,39 @@ if __name__ == "__main__":
 
     def _populate_inputs(self, writer, deps, tools, sources=None):
         # Source process queue
-        sources = copy.copy(sources or writer.sources)
+        sources = sources or writer.sources
+        if not sources:
+            return
+
+        sources = list(zip_longest(copy.copy(sources), [None]))
 
         # Aggregated list of sources for each rule
         rule_source_list = {}
 
         while sources:
-            source = sources.pop()
+            source, origin = sources.pop()
             _, ext = fs.path.splitext(source)
             rule = self.find_rule(ext)
+
+            if rule is origin:
+                # Don't feed sources back to rules from where they originated,
+                # as it may cause dependency cycles.
+                continue
+
             try:
                 rule_source_list[rule].append(source)
                 # Aggregating rules only have one set of outputs
                 # while regular rules produce one set of outputs
                 # for each input.
                 if not rule.aggregate:
-                    sources.extend(rule.output(self, source))
+                    output = rule.output(self, source)
+                    if output:
+                        sources.extend(zip_longest(output, [rule]))
             except KeyError:
                 rule_source_list[rule] = [source]
-                sources.extend(rule.output(self, source))
+                output = rule.output(self, source)
+                if output:
+                    sources.extend(zip_longest(output, [rule]))
 
         # No more inputs/outputs to process, now emit all build rules
         for rule, source_list in rule_source_list.items():
@@ -1578,12 +1572,6 @@ class CXXLibrary(CXXProject):
         writer.depimports += self.toolchain.depimport.build(self, writer, deps)
         super(CXXLibrary, self)._populate_inputs(writer, deps, tools)
 
-    def _populate_project(self, writer, deps, tools):
-        if self.shared:
-            self.outfiles = self.toolchain.dynlinker.build(self, writer, writer.objects)
-        else:
-            self.outfiles = self.toolchain.archiver.build(self, writer, writer.objects)
-
     def publish(self, artifact, tools):
         """
         Publishes the library.
@@ -1612,10 +1600,11 @@ class CXXLibrary(CXXProject):
             for header in self.headers:
                 artifact.collect(header, self.publishapi)
             artifact.cxxinfo.incpaths.append(self.publishapi)
-        artifact.cxxinfo.libpaths.append(self.publishlib)
-        artifact.cxxinfo.libraries.append(self.binary)
-        artifact.strings.library = fs.path.join(
-            self.publishdir, fs.path.basename(self.outfiles[0]))
+        if hasattr(self, "_binaries"):
+            artifact.cxxinfo.libpaths.append(self.publishlib)
+            artifact.cxxinfo.libraries.append(self.binary)
+            artifact.strings.library = fs.path.join(
+                self.publishdir, fs.path.basename(self._binaries[0]))
 
 CXXLibrary.__doc__ += CXXProject.__doc__
 
