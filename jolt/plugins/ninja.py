@@ -440,7 +440,7 @@ class Rule(HashInfluenceProvider):
         in_dirname, in_basename = fs.path.split(infile)
         in_base, in_ext = fs.path.splitext(in_basename)
 
-        if in_dirname:
+        if in_dirname and fs.path.isabs(in_dirname):
             in_dirname = fs.path.relpath(in_dirname, project.joltdir)
 
         result_files = []
