@@ -635,6 +635,7 @@ class GNULinker(Rule):
 
     def build(self, project, writer, infiles):
         writer._objects = infiles
+        project._binaries, _ = self._out(project, project.binary)
         file_list = FileListWriter("objects", posix=True)
         file_list.build(project, writer, infiles)
         return super().build(project, writer, infiles)
@@ -1596,10 +1597,12 @@ class CXXLibrary(CXXProject):
             artifact.collect("*{binary}.so", self.publishlib)
             if self.shared and not self.strip:
                 artifact.collect(".debug", self.publishdir)
+
         if self.headers:
             for header in self.headers:
                 artifact.collect(header, self.publishapi)
             artifact.cxxinfo.incpaths.append(self.publishapi)
+
         if hasattr(self, "_binaries"):
             artifact.cxxinfo.libpaths.append(self.publishlib)
             artifact.cxxinfo.libraries.append(self.binary)
