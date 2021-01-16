@@ -38,6 +38,18 @@ Context
 
 .. reference-context-end
 
+
+Decorators
+----------
+
+.. reference-decorators-start
+
+.. autoclass:: jolt.attributes
+   :members: requires, system
+
+.. reference-decorators-end
+
+
 Influence
 ---------
 
@@ -72,7 +84,7 @@ BooleanParameter
 
 
 ListParameter
----------
+-------------
 
 .. reference-listparameter-start
 
@@ -311,6 +323,17 @@ CXXLibrary
 
 
 .. reference-ninja-cxxlibrary-end
+
+
+Decorators
+^^^^^^^^^^
+
+.. reference-ninja-decorators-start
+
+.. autoclass:: jolt.plugins.ninja.attributes
+  :members: asflags, cflags, cxxflags, incpaths, ldflags, libpaths, libraries, macros, sources
+
+.. reference-ninja-decorators-end
 
 
 Rule
