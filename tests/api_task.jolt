@@ -359,6 +359,109 @@ class TaskApi(JoltTest):
         t = self.tasks(r)
         self.assertEqual(len(t), 4)
 
+    def test_param_list(self):
+        """
+        --- tasks:
+        class A(Task):
+            arg = ListParameter(values=["a", "b", "c"])
+
+        class B(Task):
+            requires = ["a:arg=a+b"]
+
+            def run(self, deps, tools):
+                deps["a:arg=a+b"]
+                deps["a:arg=b+a"]
+                try:
+                    deps["a:arg=c"]
+                except:
+                    pass
+                else:
+                    assert False, "invalid dependency found"
+        ---
+        """
+        self.build("b")
+        r = self.build("a:arg=b+a")
+        self.assertNoBuild(r, "a:arg=b+a")
+        with self.assertRaises(Exception, msg="illegal value 'd' assigned to parameter 'arg'"):
+            self.build("a:arg=a+b+d")
+
+    def test_param_substitution(self):
+        """
+        --- tasks:
+        class A(Task):
+            arg1 = ListParameter(values=["a", "b"])
+            arg2 = BooleanParameter()
+            arg3 = BooleanParameter()
+
+            def run(self, deps, tools):
+                assert tools.expand("{{arg1[0]}}") == "a"
+                assert tools.expand("{{arg1[a]}}") == "a"
+                assert tools.expand("{{arg1[b]}}") == "None"
+                assert tools.expand("{{arg1[a,1,2]}}") == "1"
+                assert tools.expand("{{arg1[b,1,2]}}") == "2"
+
+                assert tools.expand("{{arg2}}") == "true"
+                assert tools.expand("{{arg2[enabled,disabled]}}") == "enabled"
+                assert tools.expand("{{arg3}}") == "false"
+                assert tools.expand("{{arg3[enabled,disabled]}}") == "disabled"
+        ---
+        """
+        self.build("a:arg1=a,arg2=true,arg3=false")
+
+    def test_param_list_bad_default(self):
+        """
+        --- tasks:
+        class A(Task):
+            arg = ListParameter(["d"], values=["a", "b", "c"])
+        ---
+        """
+        with self.assertRaises(Exception):
+            self.build("a")
+
+    def test_param_list_operators(self):
+        """
+        --- tasks:
+        class A(Task):
+            arg = ListParameter()
+            def run(self, deps, tools):
+                assert self.arg == ["a", "b"]
+                assert list(reversed(self.arg)) == ["b", "a"]
+                assert self.arg[0] == "a"
+                assert self.arg[1] == "b"
+                assert self.arg[0:] == ["a", "b"]
+                assert len(self.arg) == 2
+        ---
+        """
+        self.build("a:arg=b+a")
+
+    def test_param_list_expansion(self):
+        """
+        --- tasks:
+        @attributes.attribute("test1", "test_{{arg[a]}}")
+        @attributes.attribute("test2", "test_{{arg[a,a1]}}")
+        @attributes.attribute("test3", "test_{{arg[a,a2,c]}}")
+        @attributes.attribute("test4", "test_{{arg[c]}}")
+        @attributes.attribute("test5", "test_{{arg[c,a1]}}")
+        @attributes.attribute("test6", "test_{{arg[c,a2,c]}}")
+        class A(Task):
+            arg = ListParameter()
+            test_True = "1"
+            test_a1 = "2"
+            test_a2 = "3"
+            test_False = "4"
+            test_None = "5"
+            test_c = "6"
+            def run(self, deps, tools):
+                assert self.test1 == "1"
+                assert self.test2 == "2"
+                assert self.test3 == "3"
+                assert self.test4 == "4"
+                assert self.test5 == "5"
+                assert self.test6 == "6"
+        ---
+        """
+        self.build("a:arg=b+a")
+
     def test_run_output(self):
         """
         --- tasks:

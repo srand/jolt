@@ -271,6 +271,185 @@ class BooleanParameter(Parameter):
     def __bool__(self):
         return self.is_true
 
+    def __getitem__(self, key):
+        """
+        Returns a substitution string depending on the parameter value.
+
+        Args:
+            key (str): A special key syntax, ``enabled,disabled``, where
+            and either ``enabled`` or ``disabled`` would be returned
+            depending on the paramter value. See the example below.
+
+        Returns:
+            Substitution string.
+
+        Example:
+
+          .. code-block:: python
+
+            class Example(Task):
+               debug = BooleanParameter()
+
+               def run(self, deps, tools):
+                   self.info("debug is {debug[enabled,disabled]}")
+
+          .. code-block:: bash
+
+            $ jolt build example:debug=true
+            [INFO] debug is enabled (example)
+
+            $ jolt build example:debug=false
+            [INFO] debug is disabled (example)
+
+        """
+        key = key.split(",")
+        if len(key) != 2:
+            raise KeyError(key)
+        return key[0] if self.is_true else key[1]
+
+
+
+class ListParameter(Parameter):
+    """ List parameter type.
+
+    A list parameter allows multiple values to be assigned to it. Values are
+    separated by the '+' character in qualified task names. Each assigned value
+    is validated against the list of accepted values. They are sorted in
+    alphabetical order before the task is executed.
+
+    Example:
+
+      .. code-block:: python
+
+        class Example(Task):
+            arg = ListParameter(default=["c"], values=["a", "b", "c"], help="A list parameter")
+
+            def run(self, deps, tools):
+                for item in self.arg:
+                    print(item)
+
+      .. code-block:: bash
+
+        $ jolt build example example:arg=a example:arg=a+b
+
+    """
+
+    def __init__(self, *args, **kwargs):
+        """
+        Creates a new list parameter.
+
+        Args:
+            default (boolean, optional): An optional list of default values.
+            values (list, optional): A list of accepted values. An
+                assertion is raised if an unlisted value is assigned to the parameter.
+            required (boolean, optional): If required, the parameter must be assigned
+                a value before the task can be executed. The default is ``True``.
+            const (boolean, optional): If const is True, the parameter is immutable
+                and cannot be assigned a non-default value. This is useful in
+                a class hierarchy where a subclass may want to impose restrictions
+                on a parent class parameter. The default is ``False``.
+            influence (boolean, optional): If influence is False, the parameter value
+                will not influence the identity of the task artifact. The default is
+                True.
+            help (str, optional): Documentation for the parameter.
+                This text is displayed when running the ``info`` command on the
+                associated task.
+
+        Raises:
+            ValueError: If the parameter is assigned an illegal value.
+
+        """
+        super().__init__(*args, **kwargs)
+
+    def set_value(self, value):
+        """ Set the parameter value.
+
+        Args:
+            value (boolean): The new parameter value. Accepted values are:
+                False, True, "false, and "true", 0 and 1, "no" and "yes".
+
+        Raises:
+            ValueError: If the parameter is assigned an illegal value.
+        """
+        value = str(value).split("+") if type(value) == str else value
+        value.sort()
+        super().set_value(value)
+
+    def _validate(self, value):
+        if self._accepted_values is not None:
+            for item in value:
+                if item not in self._accepted_values:
+                    raise ValueError(item)
+
+    def get_value(self):
+        return "+".join(self._value)
+
+    def __bool__(self):
+        """ Returns True if the list is non-empty. """
+        return len(self._value) > 0
+
+    def __iter__(self):
+        """ Returns a sequence iterator. """
+        return iter(self._value)
+
+    def __len__(self):
+        """ Returns the length of the list. """
+        return len(self._value)
+
+    def __getitem__(self, key):
+        """
+        Returns an element or a slice from the list.
+
+        Args:
+            key (int, slice, str): Element index or slice. A key string can
+            be used to check for the existence of that value in the list.
+            If the key is present the same value is returned, otherwise None.
+
+            A special key syntax is also available to request an alternate return
+            value depending on the presence of the key. Instead of a list value
+            you pass ``value,present,absent`` and either ``present`` or ``absent``
+            will be returned. See the example below.
+
+        Returns:
+            Element value, or substitution.
+
+        Example:
+
+          .. code-block:: python
+
+            class Example(Task):
+               features = ListParameter(values=["optimize", "strip"], required=False)
+
+               def run(self, deps, tools):
+                   if len(self.features) > 0:
+                       self.info("first feature is {features[0]}")
+                       self.info("optimize == {features[optimize]}")
+                       self.info("optimization is {features[optimize,enabled,disabled]}")
+
+          .. code-block:: bash
+
+            $ jolt build example:features=optimize+strip
+            [INFO] first feature is optimize (example)
+            [INFO] optimize = optimize (example)
+            [INFO] optimization is enabled (example)
+
+            $ jolt build example:features=strip
+            [INFO] first feature is debug (example)
+            [INFO] optimize = None (example)
+            [INFO] optimization is disabled (example)
+
+        """
+        if type(key) == str:
+            key = key.split(",")
+            if len(key) == 1:
+                true = key[0]
+                false = None
+            else:
+                true = key[1] if len(key) > 1 else key[0]
+                false = key[2] if len(key) > 2 else None
+            return true if key[0] in self._value else false
+        return self._value[key]
+
 
 class TaskRegistry(object):
     _instance = None

@@ -66,9 +66,20 @@ BooleanParameter
 .. reference-booleanparameter-start
 
 .. autoclass:: jolt.BooleanParameter
-   :members: __init__, __str__, is_default, get_default, get_value, set_value, is_set, is_unset, is_true, is_false
+   :members: __bool__, __getitem__, __init__, __str__, is_default, get_default, get_value, set_value, is_set, is_unset, is_true, is_false
 
 .. reference-booleanparameter-end
+
+
+ListParameter
+---------
+
+.. reference-listparameter-start
+
+.. autoclass:: jolt.Parameter
+   :members: __getitem__, __init__, __iter__, __len__, __str__, is_default, get_default, get_value, set_value, is_set, is_unset
+
+.. reference-listparameter-end
 
 
 Resource
