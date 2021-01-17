@@ -434,34 +434,6 @@ class TaskApi(JoltTest):
         """
         self.build("a:arg=b+a")
 
-    def test_param_list_expansion(self):
-        """
-        --- tasks:
-        @attributes.attribute("test1", "test_{{arg[a]}}")
-        @attributes.attribute("test2", "test_{{arg[a,a1]}}")
-        @attributes.attribute("test3", "test_{{arg[a,a2,c]}}")
-        @attributes.attribute("test4", "test_{{arg[c]}}")
-        @attributes.attribute("test5", "test_{{arg[c,a1]}}")
-        @attributes.attribute("test6", "test_{{arg[c,a2,c]}}")
-        class A(Task):
-            arg = ListParameter()
-            test_True = "1"
-            test_a1 = "2"
-            test_a2 = "3"
-            test_False = "4"
-            test_None = "5"
-            test_c = "6"
-            def run(self, deps, tools):
-                assert self.test1 == "1"
-                assert self.test2 == "2"
-                assert self.test3 == "3"
-                assert self.test4 == "4"
-                assert self.test5 == "5"
-                assert self.test6 == "6"
-        ---
-        """
-        self.build("a:arg=b+a")
-
     def test_run_output(self):
         """
         --- tasks:
