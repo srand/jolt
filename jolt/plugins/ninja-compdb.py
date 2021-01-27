@@ -109,12 +109,10 @@ class CompDBHooks(TaskHook):
             dbpath = fs.path.join(task.task.outdir, "all_compile_commands.json")
             _, deps = get_task_artifacts(task, artifact)
             db = CompDB(dbpath)
-            print(db.path, len(db.commands))
             for dep in [artifact] + deps:
                 depdb = CompDB(artifact=dep)
                 depdb.read()
                 db.merge(depdb)
-                print(depdb.path, len(depdb.commands))
             db.write()
             artifact.collect(dbpath, flatten=True)
 
