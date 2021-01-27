@@ -40,8 +40,6 @@ class CompDB(object):
             self.path = fs.path.join(artifact.path, path)
         else:
             self.path = path
-        if self.path:
-            self.read()
 
     def read(self, path=None):
         try:
@@ -103,6 +101,7 @@ class CompDBHooks(TaskHook):
 
         # Add information about the workspace and cachedir roots
         db = CompDB(artifact=artifact)
+        db.read()
         db.annotate(task)
         db.write()
 
@@ -110,8 +109,12 @@ class CompDBHooks(TaskHook):
             dbpath = fs.path.join(task.task.outdir, "all_compile_commands.json")
             _, deps = get_task_artifacts(task, artifact)
             db = CompDB(dbpath)
+            print(db.path, len(db.commands))
             for dep in [artifact] + deps:
-                db.merge(CompDB(artifact=dep))
+                depdb = CompDB(artifact=dep)
+                depdb.read()
+                db.merge(depdb)
+                print(depdb.path, len(depdb.commands))
             db.write()
             artifact.collect(dbpath, flatten=True)
 
@@ -121,6 +124,7 @@ class CompDBHooks(TaskHook):
         if isinstance(task.task, ninja.CXXProject):
             artifact, deps = get_task_artifacts(task)
             db = CompDB("all_compile_commands.json", artifact)
+            db.read()
             db.relocate(task)
             outdir = task.tools.builddir("compdb", incremental=True)
             dbpath = fs.path.join(outdir, "all_compile_commands.json")
