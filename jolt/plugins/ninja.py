@@ -1058,12 +1058,14 @@ class MSVCToolchain(Toolchain):
 
     linker = MSVCLinker(
         command="$link /nologo $ldflags $extra_ldflags $libpaths @objects.list $libraries /out:$out",
+        infiles=[".o", ".obj", ".lib"],
         outfiles=["{outdir}/{binary}.exe"],
-        variables={"desc": "[LIB] {binary}"},
+        variables={"desc": "[LINK] {binary}"},
         implicit=["$link_path"])
 
     archiver = MSVCArchiver(
         command="$lib /nologo /out:$out @objects.list",
+        infiles=[".o", ".obj", ".lib"],
         outfiles=["{outdir}/{binary}.lib"],
         variables={"desc": "[LIB] {binary}"},
         implicit=["$lib_path"])
