@@ -49,8 +49,9 @@ class _ReporterTest(object):
             try:
                 yield reporter
             except ut.SkipTest as e:
-                    result.status = Status.SKIPPED
-                    result.statusDetails = StatusDetails(message=str(e))
+                with self._reporter._lifecycle.update_step() as step:
+                    step.status = Status.SKIPPED
+                    step.statusDetails = StatusDetails(message=str(e))
                     raise e
             except AssertionError as e:
                 with self._reporter._lifecycle.update_step() as step:
