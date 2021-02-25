@@ -252,7 +252,7 @@ class GitInfluenceProvider(FileInfluence):
         path = tools.expand_path(self.path)
         git_abs = self._find_dotgit(path)
         git_rel = git_abs[len(self.joltdir)+1:]
-        relpath = path[len(git_abs)+1:]
+        relpath = fs.as_posix(path[len(git_abs)+1:])
 
         if not fs.path.exists(path):
             return "{0}/{1}: N/A".format(git_rel, relpath)
