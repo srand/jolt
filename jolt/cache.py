@@ -733,7 +733,7 @@ class Context(object):
         self._artifacts_index = OrderedDict()
 
     def __enter__(self):
-        for dep in self._node.children:
+        for dep in reversed(self._node.children):
             self._cache.unpack(dep)
             with self._cache.get_artifact(dep) as artifact:
                 self._artifacts[dep.qualified_name] = artifact
@@ -791,7 +791,7 @@ class Context(object):
             Requirement dictionary items. Each item is a tuple with the
             requirement name and the artifact.
         """
-        return self._artifacts.items()
+        return reversed(self._artifacts.items())
 
 
 class CacheStats(object):

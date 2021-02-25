@@ -1,3 +1,5 @@
+#!/usr/bin/python
+
 import sys
 import time
 sys.path.append(".")
@@ -15,6 +17,20 @@ class ArtifactEnvironApi(JoltTest):
         class A(Task):
             def publish(self, a, t):
                 with t.cwd(t.builddir()):
+                    t.write_file("bin.sh", "#!/bin/sh\\necho fail")
+                    t.write_file("sbin.sh", "#!/bin/sh\\necho fail")
+                    t.chmod("bin.sh", 0o755)
+                    t.chmod("sbin.sh", 0o755)
+                    a.collect("bin.sh", "bin/")
+                    a.collect("sbin.sh", "sbin/")
+                    a.environ.PATH.append("bin")
+                    a.environ.PATH.append("sbin")
+                    a.environ.TESTVALUE = "FAIL"
+
+        class B(Task):
+            requires = ["a"]
+            def publish(self, a, t):
+                with t.cwd(t.builddir()):
                     t.write_file("bin.sh", "#!/bin/sh\\necho first")
                     t.write_file("sbin.sh", "#!/bin/sh\\necho second")
                     t.chmod("bin.sh", 0o755)
@@ -23,16 +39,16 @@ class ArtifactEnvironApi(JoltTest):
                     a.collect("sbin.sh", "sbin/")
                     a.environ.PATH.append("bin")
                     a.environ.PATH.append("sbin")
+                    a.environ.TESTVALUE = "PASS"
 
-        class B(Task):
-            name = "b"
-            requires = ["a"]
-
+        class C(Task):
+            requires = ["b"]
             def run(self, d, t):
+                assert t.getenv("TESTVALUE") == "PASS", "Incorrect env.var. value"
                 t.run("bin.sh")
                 t.run("sbin.sh")
         ---
         """
-        r = self.jolt("build b")
+        r = self.jolt("build c")
         self.assertIn("first", r)
         self.assertIn("second", r)
