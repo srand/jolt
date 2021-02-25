@@ -105,6 +105,26 @@ class Conan(Task):
 
     """
 
+    settings = []
+    """
+    A list of Conan settings to apply
+
+    The settings format is ``Option=Value``. See Conan
+    documentation for further details.
+
+    Any {keyword} arguments, or macros, found in the strings are automatically
+    expanded to the value of the associated task's parameters and properties.
+
+    Example:
+
+    .. code-block:: python
+
+        settings = [
+            "compiler.libcxx=libstdc++11",
+        ]
+
+    """
+
     generators = []
     """
     A list of Conan generators to use.
@@ -155,6 +175,9 @@ class Conan(Task):
     def _options(self):
         return [] + self.options
 
+    def _settings(self):
+        return [] + self.settings
+
     def _packages(self):
         return [] + self.packages
 
@@ -187,8 +210,8 @@ class Conan(Task):
                 self.info("Installing packages into the Conan cache")
                 generators = " ".join(["-g " + gen for gen in self._generators()])
                 options = " ".join(["-o " + opt for opt in self._options()])
-                #settings = " ".join(["-s " + opt for opt in self._settings()])
-                tools.run("conan install --build=missing -u -if . {} {} {}", generators, options, conanfile)
+                settings = " ".join(["-s " + opt for opt in self._settings()])
+                tools.run("conan install --build=missing -u -if . {} {} {} {}", generators, options, settings, conanfile)
 
             self.info("Parsing manifest")
             self._manifest = json.loads(tools.read_file("conanbuildinfo.json"))
