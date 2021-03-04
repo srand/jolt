@@ -486,19 +486,20 @@ def _config(ctx, list, delete, global_, user, key, value):
                        "no such key: {}", key)
         config.save()
     elif key:
-        try:
-            section, opt = config.split(key)
-            if value:
-                config.set(section, opt, value, alias)
+        section, opt = config.split(key)
+        if value:
+            raise_error_if(opt is None, "invalid configuration key: {}".format(key))
+            config.set(section, opt, value, alias)
+            try:
                 config.save()
+            except Exception as e:
+                log.exception()
+                raise_error("failed to write configuration file: {}".format(e))
+        else:
+            if opt:
+                _print_key(section, opt)
             else:
-                if opt:
-                    _print_key(section, opt)
-                else:
-                    _print_section(section)
-        except:
-            log.exception()
-            assert False, "no such key: {}".format(key)
+                _print_section(section)
 
 
 @cli.command()
