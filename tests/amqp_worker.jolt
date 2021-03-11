@@ -10,25 +10,15 @@ from jolt import *
 @influence.files("../setup.py")
 @influence.files("../jolt/*.py")
 @influence.files("../jolt/plugins/*.py")
-@influence.files("../**/*.conf")
 @influence.files("../docker/Dockerfile.*")
-@influence.files("../docker/docker-compose-amqp-{storage}.yml")
-@influence.files("../docker/config-amqp-{storage}.conf")
+@influence.files("../docker/swarm/*")
 class JoltAmqp(Task):
-    name = "jolt/amqp"
+    name = "jolt/image"
 
-    storage = Parameter()
-
-    def publish(self, artifact, tools):
+    def run(self, deps, tools):
         with tools.cwd(".."):
-            artifact.collect("**/*.conf")
-            artifact.collect("setup.py")
-            artifact.collect("jolt/*.py")
-            artifact.collect("jolt/plugins/*.py")
-            artifact.collect("README.rst")
-            artifact.collect("docker/Dockerfile.*", flatten=True)
-            artifact.collect("docker/docker-compose-amqp-{storage}.yml", flatten=True)
-            artifact.strings.config = tools.read_file("docker/config-amqp-{storage}.conf")
+            tools.run("docker build -t robrt/jolt:latest -f docker/Dockerfile.test .")
+            tools.run("docker build -t rabbitmq:latest -f docker/Dockerfile.rabbitmq .")
 
 
 class AmqpWorker(Resource):
@@ -36,27 +26,28 @@ class AmqpWorker(Resource):
 
     storage = Parameter()
 
-    requires = ["jolt/amqp:storage={storage}"]
+    requires = ["jolt/image"]
 
     def acquire(self, artifact, deps, tools):
-        jolt = deps["jolt/amqp:storage={storage}"]
-        with tools.cwd(jolt.path):
-            try:
-                tools.run("docker-compose -f docker-compose-amqp-{storage}.yml up -d")
-                output = ""
-                while "Queue bound" not in output:
-                    time.sleep(1)
-                    output = tools.run("docker logs jolt_amqp_worker", output_on_error=True)
-                artifact.active = True
-            except Exception as e:
-                if os.getenv("CI"):
-                    artifact.active = False
-                else:
-                    raise e
-
+        try:
+            with tools.cwd("../docker/swarm"):
+                tools.run("docker stack deploy -c jolt.yaml jolt_test", output_on_error=True)
+                tools.run("docker service scale jolt_test_worker=1", output_on_error=True)
+                artifact.strings.config = tools.read_file("client.conf")
+            artifact.active = True
+        except Exception as e:
+            if os.getenv("CI"):
+                artifact.active = False
+            else:
+                raise e
 
     def release(self, artifact, deps, tools):
-        jolt = deps["jolt/amqp:storage={storage}"]
-        with tools.cwd(jolt.path):
-            if artifact.active:
-                tools.run("docker-compose -f docker-compose-amqp-{storage}.yml down --volumes")
+        if artifact.active:
+            tools.run("docker stack rm jolt_test")
+            for i in range(0, 10):
+                try:
+                    tools.run("docker volume rm jolt_test_cache", output=False)
+                    break
+                except:
+                    time.sleep(1)
+                    continue

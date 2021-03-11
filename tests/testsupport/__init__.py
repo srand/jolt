@@ -78,7 +78,7 @@ class JoltTest(Test):
         return common + "\n".join([l[8:] for l in lines.splitlines()])
 
     def _network_config(self):
-        return self.deps["jolt/amqp:storage="+self.storage].strings.config.get_value() \
+        return self.deps["jolt/amqp/deployment:storage="+self.storage].strings.config.get_value() \
             if self.network_enabled else ""
 
     def setup(self, deps, tools):

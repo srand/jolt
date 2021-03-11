@@ -1,0 +1,32 @@
+version: "3.5"
+services:
+  amqp:
+    image: rabbitmq:latest
+    ports:
+      - "5672:5672"
+  cache:
+    image: nginx:latest
+    deploy:
+      replicas: 1
+    configs:
+      - source: nginx.conf
+        target: /etc/nginx/nginx.conf
+    ports:
+      - "80:80"
+    volumes:
+      - cache:/usr/share/nginx/html
+  worker:
+    image: robrt/jolt:latest
+    deploy:
+      replicas: 2
+    command: ["-c", "/opt/jolt/worker.conf", "amqp-worker"]
+    configs:
+      - source: worker.conf
+        target: /opt/jolt/worker.conf
+configs:
+  worker.conf:
+    file: ./worker.conf
+  nginx.conf:
+    file: ./nginx.conf
+volumes:
+  cache:

@@ -1,4 +1,5 @@
-FROM python:3-slim
+FROM python:3-buster
+RUN apt-get update && apt-get install -y gcc git make ninja-build
 
 COPY . /opt/jolt
 RUN pip3 install -e /opt/jolt[allure,amqp]

@@ -15,6 +15,7 @@ plugins.
    installing
    architecture
    quickstart
+   guides
    configuration
    plugins
    reference
