@@ -1,4 +1,7 @@
+import bz2
 import copy
+import gzip
+import lzma
 import subprocess
 import os
 import sys
@@ -503,6 +506,42 @@ class Tools(object):
     def cmake(self, deps=None):
         """ Creates a CMake invokation helper """
         return _CMake(deps, self)
+
+    def compress(self, src, dst):
+        """ Compress a file.
+
+        Supported formats are:
+
+        - .bz2
+        - .gz
+        - .xz
+
+        Args:
+            src (str): Source file to be compressed.
+            dst (str): Destination path for compressed file. The filename extension
+                determines the compression algorithm used.
+        """
+        src = self.expand_path(src)
+        dst = self.expand_path(dst)
+
+        ext = dst.rsplit(".", 1)[-1]
+        if ext == "bz2":
+            with open(src, 'rb') as infp:
+                with bz2.open(dst, 'wb') as outfp:
+                    for block in iter(lambda: infp.read(0x10000), b''):
+                        outfp.write(block)
+        elif ext == "gz":
+            if shutil.which("pigz"):
+                return self.run("pigz -p {} {}", self.thread_count(), src)
+            with open(src, 'rb') as infp:
+                with gzip.open(dst, 'wb') as outfp:
+                    for block in iter(lambda: infp.read(0x10000), b''):
+                        outfp.write(block)
+        elif ext == "xz":
+            with open(src, 'rb') as infp:
+                with lzma.open(dst, 'wb') as outfp:
+                    for block in iter(lambda: infp.read(0x10000), b''):
+                        outfp.write(block)
 
     def copy(self, src, dst, symlinks=False):
         """ Copies file and directories (recursively).

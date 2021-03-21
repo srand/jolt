@@ -1,0 +1,156 @@
+#!/usr/bin/env python
+
+import sys
+import time
+sys.path.append(".")
+
+from jolt import utils
+from os import path
+from testsupport import JoltTest
+
+
+class DockerExt(JoltTest):
+    name = "ext/docker"
+
+    def test_simple(self):
+        """
+        --- file: Dockerfile
+        FROM busybox:latest
+
+        --- tasks:
+        from jolt.plugins.docker import *
+
+        class Busybox(DockerImage):
+            pass
+
+        ---
+	"""
+
+        b = self.build("busybox")
+        a = self.artifacts(b)
+        self.assertExists(path.join(a[0], "busybox.tar"))
+
+
+    def test_dockerfile(self):
+        """
+        --- file: Testfile
+        FROM busybox:latest
+
+        --- tasks:
+        from jolt.plugins.docker import *
+
+        class Busybox(DockerImage):
+            dockerfile = "Testfile"
+
+        ---
+	"""
+
+        b = self.build("busybox")
+        a = self.artifacts(b)
+        self.assertExists(path.join(a[0], "busybox.tar"))
+
+
+
+    def test_dockerfile_as_source(self):
+        """
+        --- file: Testfile
+        FROM busybox:latest
+
+        --- tasks:
+        from jolt.plugins.docker import *
+
+        class Busybox(DockerImage):
+            dockerfile = \"\"\"
+            FROM busybox:latest
+            CMD ["busybox"]
+            \"\"\"
+
+        ---
+	"""
+
+        b = self.build("busybox")
+        a = self.artifacts(b)
+        self.assertExists(path.join(a[0], "busybox.tar"))
+
+
+    def test_imagefile(self):
+        """
+        --- file: Dockerfile
+        FROM busybox:latest
+
+        --- tasks:
+        from jolt.plugins.docker import *
+
+        class Busybox(DockerImage):
+            imagefile = "image.tar"
+
+        ---
+	"""
+
+        b = self.build("busybox")
+        a = self.artifacts(b)
+        self.assertExists(path.join(a[0], "image.tar"))
+
+
+    def test_compression(self):
+        """
+        --- file: Dockerfile
+        FROM busybox:latest
+
+        --- tasks:
+        from jolt.plugins.docker import *
+
+        class BusyboxBz2(DockerImage):
+            name = "busybox/bz2"
+            compression = "bz2"
+
+        class BusyboxGz(DockerImage):
+            name = "busybox/gz"
+            compression = "gz"
+
+        class BusyboxXz(DockerImage):
+            name = "busybox/xz"
+            compression = "xz"
+
+        ---
+	"""
+
+        b1 = self.build("busybox/bz2")
+        b2 = self.build("busybox/gz")
+        b3 = self.build("busybox/xz")
+        a1 = self.artifacts(b1)
+        a2 = self.artifacts(b2)
+        a3 = self.artifacts(b3)
+        f1 = path.join(a1[0], "busybox_bz2.tar.bz2")
+        f2 = path.join(a2[0], "busybox_gz.tar.gz")
+        f3 = path.join(a3[0], "busybox_xz.tar.xz")
+        self.assertExists(f1)
+        self.assertExists(f2)
+        self.assertExists(f3)
+        self.assertIn("bzip2", self.tools.run("file {}", f1))
+        self.assertIn("gzip", self.tools.run("file {}", f2))
+        self.assertIn("XZ compressed", self.tools.run("file {}", f3))
+
+
+    def test_tag(self):
+        """
+        --- file: Dockerfile
+        FROM busybox:latest
+
+        --- tasks:
+        from jolt.plugins.docker import *
+
+        class Busybox(DockerImage):
+            tag = "busybox:jolt"
+
+        ---
+	"""
+
+        b = self.build("busybox")
+        a = self.artifacts(b)
+        f = path.join(a[0], "busybox.tar")
+        self.assertExists(f)
+        try:
+            self.assertIn("busybox:jolt", self.tools.run("docker image load -i {}", f))
+        finally:
+            utils.call_and_catch(self.tools.run, "docker image rm busybox:jolt")

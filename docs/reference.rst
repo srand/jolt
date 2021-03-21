@@ -261,6 +261,23 @@ Conan
 
 .. reference-conan-end
 
+Docker
+------
+
+.. reference--start
+
+DockerImage
+^^^^^^^^^^^
+
+.. reference-docker-docker-start
+
+.. autoclass:: jolt.plugins.docker.DockerImage
+   :members: compression, context, dockerfile, imagefile, tag
+
+.. reference-docker-docker-end
+
+.. reference-docker-end
+
 
 Ninja
 ------
