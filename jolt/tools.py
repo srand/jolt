@@ -59,12 +59,12 @@ def _run(cmd, cwd, env, *args, **kwargs):
         env=env)
 
     class Reader(threading.Thread):
-        def __init__(self, parent, stream, output=None):
+        def __init__(self, parent, stream, output=None, logbuf=None):
             super(Reader, self).__init__()
             self.output = output
             self.parent = parent
             self.stream = stream
-            self.buffer = []
+            self.logbuf = logbuf if logbuf is not None else []
             self.start()
 
         def run(self):
@@ -77,36 +77,49 @@ def _run(cmd, cwd, env, *args, **kwargs):
                         line = line.decode(errors='ignore')
                         if self.output:
                             self.output(line)
-                        self.buffer.append(line)
+                        self.logbuf.append((self,line))
             except Exception as e:
                 if self.output:
                     self.output("{0}", str(e))
                     self.output(line)
-                self.buffer.append(line)
+                self.logbuf.append((self, line))
 
     stdout_func = log.stdout if not output_stdio else stdout_write
     stderr_func = log.stderr if not output_stdio else stderr_write
 
-    stdout = Reader(threading.current_thread(), p.stdout, output=stdout_func if output else None)
-    stderr = Reader(threading.current_thread(), p.stderr, output=stderr_func if output else None)
+    logbuf = []
+    stdout = Reader(
+        threading.current_thread(), p.stdout,
+        output=stdout_func if output else None, logbuf=logbuf)
+    stderr = Reader(
+        threading.current_thread(), p.stderr,
+        output=stderr_func if output else None, logbuf=logbuf)
     p.wait()
     stdout.join()
     stderr.join()
 
     if p.returncode != 0 and output_on_error:
-        log.stdout("STDOUT:")
-        for line in stdout.buffer:
-            log.stdout(line)
-        log.stderr("STDERR:\r\n")
-        for line in stderr.buffer:
-            log.stderr(line)
+        for reader, line in logbuf:
+            if reader is stdout:
+                log.stdout(line)
+            else:
+                log.stderr(line)
+
+    stdoutbuf = []
+    stderrbuf = []
+    for reader, line in logbuf:
+        if reader is stdout:
+            stdoutbuf.append(line)
+        else:
+            stderrbuf.append(line)
 
     if p.returncode != 0:
+        stderrbuf = [line for reader, line in logbuf if reader is stderr]
         raise JoltCommandError(
             "command failed: {0}".format(
                 " ".join(cmd) if type(cmd) == list else cmd.format(*args, **kwargs)),
-            stdout.buffer, stderr.buffer, p.returncode)
-    return "\n".join(stdout.buffer) if output_rstrip else "".join(stdout.buffer)
+            stdoutbuf, stderrbuf, p.returncode)
+    return "\n".join(stdoutbuf) if output_rstrip else "".join(stdoutbuf)
 
 
 class _String(object):
