@@ -419,9 +419,9 @@ class WorkerTaskConsumer(object):
                             raise e
 
                     return ". {}/bin/activate && jolt".format(env)
-                except:
+                except Exception as e:
                     log.exception()
-                return "jolt"
+                    raise e
 
             def run(self):
                 with open("default.joltxmanifest", "wb") as f:
