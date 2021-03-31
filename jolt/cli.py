@@ -215,68 +215,70 @@ def build(ctx, task, network, keep_going, identity, default, local,
         if upload:
             _upload = True
 
-    options = JoltOptions(network=network,
-                          local=local,
-                          download=_download,
-                          upload=_upload,
-                          keep_going=keep_going,
-                          default=default,
-                          worker=worker,
-                          debug=debug,
-                          salt=salt,
-                          jobs=jobs)
-
-    acache = cache.ArtifactCache.get(options)
-
-    executors = scheduler.ExecutorRegistry.get(options)
-    if worker:
-        log.set_worker()
-        log.verbose("Local build as a worker")
-        strategy = scheduler.WorkerStrategy(executors, acache)
-    elif network:
-        log.verbose("Distributed build as a user")
-        strategy = scheduler.DistributedStrategy(executors, acache)
-    else:
-        log.verbose("Local build as a user")
-        strategy = scheduler.LocalStrategy(executors, acache)
-
-    TaskHookRegistry.get(options)
-    registry = TaskRegistry.get(options)
-
-    for params in default:
-        registry.set_default_parameters(params)
-
-    manifest = ctx.obj["manifest"]
-
-    for mb in manifest.builds:
-        for mt in mb.tasks:
-            task.append(mt.name)
-        for mt in mb.defaults:
-            registry.set_default_parameters(mt.name)
-
-    gb = graph.GraphBuilder(registry, manifest, options, progress=True)
-    dag = gb.build(task)
-
-    if force:
-        for goal in dag.goals:
-            goal.taint()
-
-    # Inform cache about what task artifacts we will need.
-    acache.advise(dag.tasks)
-
-    if identity:
-        root = dag.select(lambda graph, task: task.identity.startswith(identity))
-        raise_error_if(len(root) < 1, "unknown hash identity, no such task '{0}'", identity)
-
-    gp = graph.GraphPruner(strategy)
-    dag = gp.prune(dag)
-
-    goal_tasks = dag.goals
-    goal_task_duration = 0
-
-    queue = scheduler.TaskQueue(strategy)
-
     try:
+
+        options = JoltOptions(
+            network=network,
+            local=local,
+            download=_download,
+            upload=_upload,
+            keep_going=keep_going,
+            default=default,
+            worker=worker,
+            debug=debug,
+            salt=salt,
+            jobs=jobs)
+
+        acache = cache.ArtifactCache.get(options)
+
+        executors = scheduler.ExecutorRegistry.get(options)
+        if worker:
+            log.set_worker()
+            log.verbose("Local build as a worker")
+            strategy = scheduler.WorkerStrategy(executors, acache)
+        elif network:
+            log.verbose("Distributed build as a user")
+            strategy = scheduler.DistributedStrategy(executors, acache)
+        else:
+            log.verbose("Local build as a user")
+            strategy = scheduler.LocalStrategy(executors, acache)
+
+        TaskHookRegistry.get(options)
+        registry = TaskRegistry.get(options)
+
+        for params in default:
+            registry.set_default_parameters(params)
+
+        manifest = ctx.obj["manifest"]
+
+        for mb in manifest.builds:
+            for mt in mb.tasks:
+                task.append(mt.name)
+            for mt in mb.defaults:
+                registry.set_default_parameters(mt.name)
+
+        gb = graph.GraphBuilder(registry, manifest, options, progress=True)
+        dag = gb.build(task)
+
+        if force:
+            for goal in dag.goals:
+                goal.taint()
+
+        # Inform cache about what task artifacts we will need.
+        acache.advise(dag.tasks)
+
+        if identity:
+            root = dag.select(lambda graph, task: task.identity.startswith(identity))
+            raise_error_if(len(root) < 1, "unknown hash identity, no such task '{0}'", identity)
+
+        gp = graph.GraphPruner(strategy)
+        dag = gp.prune(dag)
+
+        goal_tasks = dag.goals
+        goal_task_duration = 0
+
+        queue = scheduler.TaskQueue(strategy)
+
         if not dag.has_tasks():
             return
 
@@ -343,10 +345,12 @@ def build(ctx, task, network, keep_going, identity, default, local,
         if result:
             manifest = JoltManifest()
             manifest.duration = str(goal_task_duration)
+            _, manifest.exception, _ = sys.exc_info()
             for goal in goal_tasks:
                 mftask = manifest.create_task()
                 mftask.name = goal.qualified_name
                 mftask.identity = goal.identity
+                mftask.output = goal.buildlog.getvalue()
             manifest.write(result)
 
 

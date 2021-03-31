@@ -316,6 +316,9 @@ class LockFile(object):
     def __exit__(self, *args, **kwargs):
         pass
 
+    def release(self):
+        self._file.release()
+
 
 def map_consecutive(method, iterable):
     return list(map(method, iterable))

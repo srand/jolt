@@ -22,6 +22,7 @@ from jolt.error import JoltCommandError
 from jolt.error import raise_error
 from jolt.error import raise_task_error_if
 from jolt.error import raise_task_error_on_exception
+from jolt.plugins import selfdeploy
 
 
 NAME = "amqp"
@@ -387,7 +388,7 @@ class WorkerTaskConsumer(object):
                 self.properties = properties
                 self.body = body
 
-            def selfdeploy(self):
+            def do_selfdeploy(self):
                 """ Installs the correct version of Jolt as specified in execution request. """
 
                 tools = Tools()
@@ -396,22 +397,19 @@ class WorkerTaskConsumer(object):
                     manifest.parse()
                     ident = manifest.get_parameter("jolt_identity")
                     url = manifest.get_parameter("jolt_url")
-                    if not ident or not url:
-                        return "jolt"
-
                     requires = manifest.get_parameter("jolt_requires")
+                    if not ident:
+                        return "jolt"
+                    else:
+                        src = selfdeploy.download(ident, url)
 
-                    log.info("Jolt version: {}", ident)
+                    log.verbose("Jolt version: {}", ident)
 
-                    src = "build/selfdeploy/{}/src".format(ident)
                     env = "build/selfdeploy/{}/env".format(ident)
-
                     if not fs.path.exists(env):
                         try:
-                            fs.makedirs(src)
-                            tools.run("curl {} | tar zx -C {}", url, src)
                             tools.run("virtualenv {}", env)
-                            tools.run(". {}/bin/activate && pip install -e {}", env, src)
+                            tools.run(". {}/bin/activate && pip install -e {}[amqp]", env, src)
                             if requires:
                                 tools.run(". {}/bin/activate && pip install {}", env, requires)
                         except Exception as e:
@@ -424,66 +422,58 @@ class WorkerTaskConsumer(object):
                     raise e
 
             def run(self):
+                tools = Tools()
+
                 with open("default.joltxmanifest", "wb") as f:
                     f.write(self.body)
-
                 log.info("Manifest written")
 
-                tools = Tools()
-                for recipe in tools.glob("*.jolt"):
-                    tools.unlink(recipe)
+                with log.sink() as output:
+                    exception = False
+                    try:
+                        try:
+                            for recipe in tools.glob("*.jolt"):
+                                tools.unlink(recipe)
+                        except Exception as e:
+                            log.exception()
+                            exception = True
+                            raise Exception("Failed to prepare workspace") from e
 
-                try:
-                    jolt = self.selfdeploy()
-                    config_file = config.get("amqp", "config", "")
-                    if config_file:
-                        config_file = "-c " + config_file
+                        try:
+                            jolt = self.do_selfdeploy()
+                        except Exception as e:
+                            log.exception()
+                            exception = True
+                            raise Exception("Failed to deploy client version of Jolt") from e
 
-                    log.info("Running jolt")
-                    tools.run("{} -vv {} build --worker --result result.joltxmanifest",
-                              jolt, config_file, output_stdio=True)
-                except JoltCommandError as e:
-                    self.response = ""
+                        config_file = config.get("amqp", "config", "")
+                        if config_file:
+                            config_file = "-c " + config_file
+
+                        tools.run("{} -vv {} build --worker --result result.joltxmanifest",
+                                  jolt, config_file, output_transfer=True)
+                    except Exception as e:
+                        log.error("Task failed")
+                        result = "FAILED"
+                        if exception:
+                            exception = e
+                    else:
+                        log.error("Task succeeded")
+                        result = "SUCCESS"
+
+                    manifest = JoltManifest()
                     try:
-                        manifest = JoltManifest()
-                        try:
-                            manifest.parse("result.joltxmanifest")
-                        except:
-                            manifest.duration = "0"
-                        manifest.result = "FAILED"
-                        manifest.stdout = "\n".join(e.stdout)
-                        manifest.stderr = "\n".join(e.stderr)
-                        self.response = manifest.format()
+                        manifest.parse("result.joltxmanifest")
                     except:
-                        log.exception()
-                    log.error("Task failed")
-                except Exception as e:
-                    log.exception()
-                    self.response = ""
-                    try:
-                        manifest = JoltManifest()
-                        try:
-                            manifest.parse("result.joltxmanifest")
-                        except:
-                            manifest.duration = "0"
-                        manifest.result = "FAILED"
-                        self.response = manifest.format()
-                    except:
-                        log.exception()
-                    log.error("Task failed")
-                else:
-                    self.response = ""
-                    try:
-                        manifest = JoltManifest()
-                        try:
-                            manifest.parse("result.joltxmanifest")
-                        except:
-                            manifest.duration = "0"
-                        manifest.result = "SUCCESS"
-                        self.response = manifest.format()
-                    except:
-                        log.exception()
-                    log.info("Task succeeded")
+                        manifest.duration = "0"
+                    if not manifest.exception:
+                        manifest.exception = exception
+                    manifest.stderr = ""
+                    manifest.stdout = ""
+                    if len(manifest.tasks) <= 0:
+                        manifest.stdout = output.getvalue()
+                    manifest.result = result
+                    self.response = manifest.format()
 
                 utils.call_and_catch(tools.unlink, "result.joltxmanifest")
                 self.consumer.add_on_job_completed_callback(self)
@@ -707,13 +697,25 @@ class AmqpExecutor(scheduler.NetworkExecutor):
 
         self.task.running(utils.duration() - float(manifest.duration))
 
-        if manifest.result != "SUCCESS":
+        # Transfer legacy logs
+        if not manifest.tasks:
             output = []
-            output.extend(manifest.stdout.split("\n"))
-            output.extend(manifest.stderr.split("\n"))
+            if manifest.stdout:
+                output.extend(manifest.stdout.rstrip("\n").split("\n"))
+            if manifest.stderr:
+                output.extend(manifest.stderr.rstrip("\n").split("\n"))
             for line in output:
                 log.transfer(line, self.task.identity[:8])
-            raise_error("[AMQP] remote build failed with status: {0}".format(manifest.result))
+
+        for task in manifest.tasks:
+            output = task.output or ""
+            for line in output.rstrip("\n").split("\n"):
+                log.transfer(line, task.identity[:8])
+
+        if manifest.result != "SUCCESS":
+            if manifest.exception:
+                raise manifest.exception
+            raise_error("[AMQP] Remote execution of task failed")
 
         raise_task_error_if(
             not env.cache.is_available_remotely(self.task), self.task,

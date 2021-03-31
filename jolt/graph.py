@@ -321,7 +321,7 @@ class TaskProxy(object):
                     available_locally = cache.download(self)
 
             if force_build or not available_locally:
-                with log.threadsink() as buildlog:
+                with log.threadsink() as self.buildlog:
                     if self.task.is_runnable():
                         log.verbose("Host: {0}", getenv("HOSTNAME", "localhost"))
 
@@ -346,7 +346,7 @@ class TaskProxy(object):
                                 self.task._verify_influence(context, artifact, self.tools)
                                 hooks.task_postpublish(self, artifact, self.tools)
                             with open(fs.path.join(artifact.path, ".build.log"), "w") as f:
-                                f.write(buildlog.getvalue())
+                                f.write(self.buildlog.getvalue())
                             artifact.commit()
 
             if force_build or force_upload or not available_remotely:

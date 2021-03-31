@@ -16,7 +16,7 @@ services:
     volumes:
       - cache:/usr/share/nginx/html
   worker:
-    image: robrt/jolt:latest
+    image: jolt:latest
     deploy:
       replicas: 2
     command: ["-c", "/opt/jolt/worker.conf", "amqp-worker"]

@@ -8,6 +8,7 @@ from jolt.scheduler import LocalExecutor
 from jolt.scheduler import LocalExecutorFactory
 from jolt.scheduler import NetworkExecutorExtension
 from jolt.scheduler import NetworkExecutorExtensionFactory
+from jolt.tools import Tools
 from jolt.loader import JoltLoader
 from jolt import config
 from jolt import filesystem as fs
@@ -64,6 +65,41 @@ class Jolt(Task):
                     artifact.collect(fs.path.basename(e))
 
 
+def download(identity, url=None):
+    # # Backwards compatibility. Use url to download tarball.
+    # if url and len(identity) < 40: # full sha1 digest
+    #     tools = Tools()
+    #     srcdir = "build/selfdeploy/{}/src".format(identity)
+    #     fs.makedirs(srcdir)
+    #     with tools.cwd(srcdir):
+    #         assert tools.download(url, "jolt.tgz"),\
+    #             "Failed to download Jolt from cache"
+    #         tools.extract("jolt.tgz", ".")
+    #         tools.unlink("jolt.tgz")
+    #     return srcdir
+
+    manifest = JoltManifest()
+    task = manifest.create_task()
+    task.name = "jolt"
+    task.identity = identity
+
+    registry = TaskRegistry()
+    registry.add_task_class(Jolt)
+
+    gb = GraphBuilder(registry, manifest)
+    dag = gb.build(["jolt"])
+    jolt = dag.select(lambda graph, task: True)
+    assert len(jolt) == 1, "too many selfdeploy tasks found"
+    jolt = jolt[0]
+
+    with ArtifactCache() as cache:
+        if not cache.is_available_locally(jolt):
+            assert cache.download(jolt), "failed to download jolt from cache"
+        path = cache.get_path(jolt)
+
+    return path
+
+
 class SelfDeployExtension(NetworkExecutorExtension):
     @utils.cached.instance
     def get_parameters(self, task):
@@ -84,7 +120,7 @@ class SelfDeployExtension(NetworkExecutorExtension):
         raise_error_if(not jolt_url, "failed to deploy jolt to a remote cache")
         return {
             "jolt_url":  jolt_url,
-            "jolt_identity": task.identity[:8],
+            "jolt_identity": task.identity,
             "jolt_requires": config.get("selfdeploy", "requires", "") }
 
 

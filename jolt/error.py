@@ -6,10 +6,11 @@ class JoltError(Exception):
 
 
 class JoltCommandError(JoltError):
-    def __init__(self, what, stdout, stderr, returncode, *args, **kwargs):
+    def __init__(self, what="", output=None, stdout=None, stderr=None, returncode=0, *args, **kwargs):
         super(JoltCommandError, self).__init__(what, *args, **kwargs)
-        self.stdout = stdout
-        self.stderr = stderr
+        self.output = output or []
+        self.stdout = stdout or []
+        self.stderr = stderr or []
         self.returncode = returncode
 
 

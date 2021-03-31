@@ -4,6 +4,7 @@ import codecs
 from xml.etree.ElementTree import Element
 from xml.etree.ElementTree import ElementTree
 from xml.etree import ElementTree as ET
+import pickle
 
 
 class SubElement(object):
@@ -52,18 +53,20 @@ class SubElement(object):
 
 
 class Attribute(object):
-    def __init__(self, attribute, varname=None, child=False, values=None, base64=False, zlib=False):
+    def __init__(self, attribute, varname=None, child=False, values=None, base64=False, zlib=False, pickle=False):
         self.attribute = attribute
         self.varname = varname if varname is not None else attribute.lower()
         self.child = child
         self.values = values
-        self.base64 = base64 or zlib
+        self.base64 = base64 or zlib or pickle
         self.zlib = zlib
+        self.pickle = pickle
 
     def __call__(self, cls):
         def decorate(cls, attribute, varname, child, values):
             base64 = self.base64
             zlib = self.zlib
+            do_pickle = self.pickle
 
             def _check_value(value, values):
                 if values and value not in values:
@@ -78,6 +81,8 @@ class Attribute(object):
                     if zlib:
                         value = codecs.decode(value, "zlib")
                     value = value.decode()
+                if do_pickle:
+                    value = pickle.loads(eval(value))
                 return value
 
             def attr_set(self, value):
@@ -89,6 +94,8 @@ class Attribute(object):
                     finally:
                         return
                 _check_value(value, values)
+                if do_pickle:
+                    value = str(pickle.dumps(value))
                 if base64:
                     value = value.encode()
                     if zlib:
@@ -99,6 +106,7 @@ class Attribute(object):
             def child_get(self):
                 if not hasattr(self, '_'+varname):
                     e = SubElement(attribute, elem=self._elem.find(attribute))
+                    self.append(e)
                     setattr(self, '_'+varname, e)
                 value = getattr(self, '_'+varname).text
                 if value is None:
@@ -107,18 +115,24 @@ class Attribute(object):
                     value = base64_decodebytes(value.encode())
                     if zlib:
                         value = codecs.decode(value, "zlib")
-                    value = value.decode()
+                    if not do_pickle:
+                        value = value.decode()
+                if do_pickle:
+                    return pickle.loads(value)
                 return str(value)
 
             def child_set(self, value):
                 _check_value(value, values)
-                if not value: return
+                if value is None: return
                 if not hasattr(self, '_'+varname):
                     e = SubElement(attribute)
                     self.append(e)
                     setattr(self, '_'+varname, e)
+                if do_pickle:
+                    value = pickle.dumps(value)
                 if base64:
-                    value = value.encode()
+                    if type(value) == str:
+                        value = value.encode()
                     if zlib:
                         value = codecs.encode(value, "zlib")
                     value = base64_encodebytes(value).decode()

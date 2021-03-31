@@ -43,6 +43,7 @@ def _run(cmd, cwd, env, *args, **kwargs):
     output_on_error = kwargs.get("output_on_error")
     output_rstrip = kwargs.get("output_rstrip", True)
     output_stdio = kwargs.get("output_stdio", False)
+    output_transfer = kwargs.get("output_transfer", False)
     output = output if output is not None else True
     output = False if output_on_error else output
     shell = kwargs.get("shell", True)
@@ -59,12 +60,12 @@ def _run(cmd, cwd, env, *args, **kwargs):
         env=env)
 
     class Reader(threading.Thread):
-        def __init__(self, parent, stream, output=None, logbuf=None):
+        def __init__(self, parent, stream, output=None, buffer=None):
             super(Reader, self).__init__()
             self.output = output
             self.parent = parent
             self.stream = stream
-            self.logbuf = logbuf if logbuf is not None else []
+            self.buffer = buffer if buffer is not None else []
             self.start()
 
         def run(self):
@@ -77,48 +78,55 @@ def _run(cmd, cwd, env, *args, **kwargs):
                         line = line.decode(errors='ignore')
                         if self.output:
                             self.output(line)
-                        self.logbuf.append((self,line))
+                        self.buffer.append((self,line))
             except Exception as e:
                 if self.output:
                     self.output("{0}", str(e))
                     self.output(line)
-                self.logbuf.append((self, line))
+                self.buffer.append((self, line))
 
-    stdout_func = log.stdout if not output_stdio else stdout_write
-    stderr_func = log.stderr if not output_stdio else stderr_write
+    log_stdout = log.stdout
+    log_stderr = log.stderr
+    if output_transfer:
+        log_stdout = lambda line: log.transfer(line)
+        log_stderr = lambda line: log.transfer(line)
 
-    logbuf = []
+    stdout_func = log_stdout if not output_stdio else stdout_write
+    stderr_func = log_stderr if not output_stdio else stderr_write
+
+    loglines = []
     stdout = Reader(
         threading.current_thread(), p.stdout,
-        output=stdout_func if output else None, logbuf=logbuf)
+        output=stdout_func if output else None, buffer=loglines)
     stderr = Reader(
         threading.current_thread(), p.stderr,
-        output=stderr_func if output else None, logbuf=logbuf)
+        output=stderr_func if output else None, buffer=loglines)
     p.wait()
     stdout.join()
     stderr.join()
 
-    if p.returncode != 0 and output_on_error:
-        for reader, line in logbuf:
-            if reader is stdout:
-                log.stdout(line)
-            else:
-                log.stderr(line)
-
+    stdiobuf = []
     stdoutbuf = []
     stderrbuf = []
-    for reader, line in logbuf:
+    for reader, line in loglines:
+        stdiobuf.append(line)
         if reader is stdout:
             stdoutbuf.append(line)
         else:
             stderrbuf.append(line)
 
     if p.returncode != 0:
-        stderrbuf = [line for reader, line in logbuf if reader is stderr]
+        if output_on_error:
+            for reader, line in loglines:
+                if reader is stdout:
+                    log.stdout(line)
+                else:
+                    log.stderr(line)
+
         raise JoltCommandError(
             "command failed: {0}".format(
                 " ".join(cmd) if type(cmd) == list else cmd.format(*args, **kwargs)),
-            stdoutbuf, stderrbuf, p.returncode)
+            stdiobuf, stdoutbuf, stderrbuf, p.returncode)
     return "\n".join(stdoutbuf) if output_rstrip else "".join(stdoutbuf)
 
 

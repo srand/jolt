@@ -913,6 +913,12 @@ class ArtifactCache(StorageProvider):
             fs.path.join(self.root),
             log.info, "Another instance of Jolt is already running, waiting for it to complete...")
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, type, value, tb):
+        self._lockfile.release()
+
     def get_path(self, node):
         return fs.path.join(self.root, node.canonical_name, node.identity)
 

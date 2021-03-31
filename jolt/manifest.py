@@ -57,6 +57,7 @@ class _JoltProject(SubElement):
 
 @Attribute('name')
 @Attribute('identity', child=True)
+@Attribute('output', child=True, zlib=True)
 @Composition(_JoltAttribute, "attribute")
 class _JoltTask(SubElement):
     def __init__(self, elem=None):
@@ -87,6 +88,7 @@ class _JoltNetworkParameter(SubElement):
 @Attribute("stdout", child=True, zlib=True)
 @Attribute("stderr", child=True, zlib=True)
 @Attribute("result", child=True)
+@Attribute("exception", child=True, pickle=True)
 @Attribute("duration", child=True)
 @Attribute("workspace")
 @Composition(_JoltRecipe, "recipe")

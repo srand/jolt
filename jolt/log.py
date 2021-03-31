@@ -1,6 +1,7 @@
 from __future__ import print_function
 import os
 import sys
+import time
 import tqdm
 if os.name == "nt":
     # FIXME: Workaround to make tqdm behave correctly on Windows
@@ -197,28 +198,45 @@ def exception(exc=None):
         line = line.replace("}", "}}")
         _logger.log(EXCEPTION, line)
 
-def transfer(line, context):
-    context = "[{}] ".format(context)
-    outline1 = context + line[10:]
-    outline2 = context + line
+def transfer(line, context=None):
+    if context:
+        context = "[{}] ".format(context)
+    try:
+        created = time.mktime(time.strptime(line[:19], "%Y-%m-%d %H:%M:%S"))
+        created += float(line[19:26])
+        line = line[27:]
+    except:
+        created = time.time()
+
     if line.startswith("[  ERROR]"):
-        error(outline1)
+        level = ERROR
     elif line.startswith("[VERBOSE]"):
-        verbose(outline1)
+        level = VERBOSE
     elif line.startswith("[  DEBUG]"):
-        debug(outline1)
+        level = DEBUG
     elif line.startswith("[   INFO]"):
-        info(outline1)
+        level = INFO
     elif line.startswith("[ EXCEPT]"):
-        outline1 = outline1.replace("{", "{{")
-        outline1 = outline1.replace("}", "}}")
-        _logger.log(EXCEPTION, outline1)
+        level = EXCEPTION
     elif line.startswith("[ STDERR]"):
-        stderr(outline1, prefix=True)
+        level = STDERR
     elif line.startswith("[ STDOUT]"):
-        stdout(outline1, prefix=True)
+        level = STDOUT
     else:
-        stdout(outline2, prefix=True)
+        level = None
+
+    if level:
+        line = line[10:]
+    else:
+        level = STDOUT
+
+    if context:
+        line = context + line
+
+    record = logging.LogRecord(created=created, msg=line, args=(), level=level, name=None, exc_info=None, lineno=0, pathname=None)
+    record.prefix = True
+
+    _logger.handle(record)
 
 
 class _Progress(object):
@@ -289,8 +307,23 @@ def threadsink():
     handler.addFilter(_thread_map)
     handler.addFilter(Filter(lambda record: record.thread == threadid))
     _logger.addHandler(handler)
-    yield stringbuf
-    _logger.removeHandler(handler)
+    try:
+        yield stringbuf
+    finally:
+        _logger.removeHandler(handler)
+
+
+@contextmanager
+def sink():
+    stringbuf = StringIO()
+    handler = logging.StreamHandler(stringbuf)
+    handler.setLevel(DEBUG)
+    handler.setFormatter(_file_formatter)
+    _logger.addHandler(handler)
+    try:
+        yield stringbuf
+    finally:
+        _logger.removeHandler(handler)
 
 
 @contextmanager
