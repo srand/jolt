@@ -8,6 +8,7 @@ import platform
 import subprocess
 import sys
 import unittest as ut
+import uuid
 
 from jolt import filesystem as fs
 from jolt import log
@@ -798,6 +799,9 @@ class TaskBase(object):
     executed using a heuristic scheduling algorithm where ready
     tasks along the critical path are favored.
     """
+
+    _instance = Export(lambda t: str(uuid.uuid4()))
+    # Instance identifier, global to cluster
 
     def __init__(self, parameters=None, **kwargs):
         self._identity = None

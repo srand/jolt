@@ -39,6 +39,8 @@ class TaskProxy(object):
         self._completed = False
         self._goal = False
         self._download = True
+        self._local = False
+        self._network = False
         hooks.task_created(self)
 
     def __hash__(self):
@@ -187,6 +189,12 @@ class TaskProxy(object):
 
         return self.graph.is_leaf(self)
 
+    def is_locally_executed(self):
+        return self._local
+
+    def is_remotely_executed(self):
+        return self._network
+
     def is_resource(self):
         return isinstance(self.task, Resource)
 
@@ -202,6 +210,12 @@ class TaskProxy(object):
 
     def set_in_progress(self):
         self._in_progress = True
+
+    def set_locally_executed(self):
+        self._local = True
+
+    def set_remotely_executed(self):
+        self._network = True
 
     def set_goal(self):
         self._goal = True
@@ -258,6 +272,9 @@ class TaskProxy(object):
                    self.duration_queued.diff(self.duration_running))
         self.graph.add_failed(self)
         hooks.task_failed(self)
+
+    def passed(self, what="Execution"):
+        hooks.task_passed(self)
 
     def finished(self, what="Execution"):
         raise_task_error_if(

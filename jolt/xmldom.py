@@ -112,7 +112,7 @@ class Attribute(object):
 
             def child_set(self, value):
                 _check_value(value, values)
-                if not value: return
+                if value is None: return
                 if not hasattr(self, '_'+varname):
                     e = SubElement(attribute)
                     self.append(e)

@@ -709,8 +709,10 @@ class AmqpExecutor(scheduler.NetworkExecutor):
 
         if manifest.result != "SUCCESS":
             output = []
-            output.extend(manifest.stdout.split("\n"))
-            output.extend(manifest.stderr.split("\n"))
+            if manifest.stdout:
+                output.extend(manifest.stdout.split("\n"))
+            if manifest.stderr:
+                output.extend(manifest.stderr.split("\n"))
             for line in output:
                 log.transfer(line, self.task.identity[:8])
             raise_error("[AMQP] remote build failed with status: {0}".format(manifest.result))

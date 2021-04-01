@@ -55,6 +55,7 @@ class TaskHookRegistry(object):
     def __init__(self, env=None):
         self.env = env
         self.hooks = [factory().create(env) for factory in TaskHookRegistry.factories]
+        self.hooks = list(filter(lambda n: n, self.hooks))
 
     def task_created(self, task):
         for ext in self.hooks:

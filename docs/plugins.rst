@@ -159,6 +159,20 @@ These configuration keys exist:
 * ``samples`` - Integer. The number of execution time samples to store per task in the database. Once the number is exceeded, samples are evicted in FIFO order.
 
 
+Dashboard
+---------
+
+The dashboard plugin automatically submits required telemetry to
+the Jolt Dashboard. It should be enabled on both clients and workers.
+
+The plugin is enabled by adding a ``[dashboard]`` section in
+the Jolt configuration.
+
+These configuration keys exist:
+
+* ``uri`` - Base URI of the Jolt Dashboard. Default: http://dashboard
+
+
 FTP
 -----------
 
@@ -303,3 +317,36 @@ These configuration keys exist:
 
 * ``path`` - Path, relative to the workspace root, where symlinks
   will be created. Defaults to ``artifacts``.
+
+
+Telemetry
+---------
+
+The telemtry plugin posts task telemetry to a configured HTTP
+endpoint. The payload is a JSON object with these fields:
+
+* ``name`` - The name of the task.
+* ``identity`` - The identity of the task artifact.
+* ``instance`` - A UUID representing the lifecycle of the task.
+  Tasks can be executed multiple times with the same identity,
+  for example if the first execution attempt failed and a subsequent
+  attempt succeeded. The instance ID may be used to distingush between
+  such attempts.
+* ``hostname`` - hostname of the machine from which the telemetry
+  record originated.
+* ``role`` - ``client`` or ``worker`` depending on where the record
+  originated.
+* ``event`` - ``queued``, ``started``, ``failed`` or ``finished``.
+
+The plugin is enabled by adding a ``[telemetry]`` section in
+the Jolt configuration.
+
+These configuration keys exist:
+
+* ``uri`` - Where telemetry records should be posted.
+* ``local`` - Submit telemetry for locally executed tasks. Default: ``true``.
+* ``network`` - Submit telemetry for tasks executed by a network worker. Default: ``true``.
+* ``queued`` - Enable queued event. Default: ``true``.
+* ``started`` - Enable started event. Default: ``true``.
+* ``failed`` - Enable failed event. Default: ``true``.
+* ``finished`` - Enable finished event. Default: ``true``.

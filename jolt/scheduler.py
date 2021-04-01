@@ -212,14 +212,16 @@ class ExecutorRegistry(object):
         return Uploader(self._concurrent_factory, task)
 
     def create_local(self, task, force=False):
+        task.set_locally_executed()
         return self._local_factory.create(task, force=force)
 
     def create_network(self, task):
         for factory in self._factories:
             executor = factory.create(task)
             if executor is not None:
+                task.set_remotely_executed()
                 return executor
-        return self._local_factory.create(task)
+        return self.create_local(task)
 
     def get_network_parameters(self, task):
         parameters = {}
