@@ -91,6 +91,10 @@ class TaskProxy(object):
         self.task.identity = value
 
     @property
+    def instance(self):
+        return self.task._instance.value
+
+    @property
     def weight(self):
         return self.task.weight
 

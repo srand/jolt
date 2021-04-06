@@ -27,6 +27,26 @@ Alternatively, edit the configuration manually:
 
 Aliases cannot be used to override the names of tasks loaded from recipes.
 
+
+Allure
+------
+This plugin generates an Allure test report on the outcome of executed
+tasks. The report includes:
+
+ - status of tasks, i.e. successful, failed or skipped
+ - duration of tasks
+ - hostname of executor
+ - logs
+
+The plugin is enabled by adding a ``[allure]`` section in
+the Jolt configuration.
+
+Available configuration keys:
+
+* ``loglevel`` - The level of detail to include in task logs:
+  ``INFO``, ``VERBOSE`` or ``DEBUG``
+
+
 AMQP
 ----
 

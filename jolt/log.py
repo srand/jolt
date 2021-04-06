@@ -280,11 +280,11 @@ _thread_map = _ThreadMapper()
 
 
 @contextmanager
-def threadsink():
+def threadsink(level=DEBUG):
     threadid = threading.get_ident()
     stringbuf = StringIO()
     handler = logging.StreamHandler(stringbuf)
-    handler.setLevel(DEBUG)
+    handler.setLevel(level)
     handler.setFormatter(_file_formatter)
     handler.addFilter(_thread_map)
     handler.addFilter(Filter(lambda record: record.thread == threadid))

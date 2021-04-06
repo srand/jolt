@@ -1,7 +1,11 @@
 import jolt
+from jolt import config
+from jolt.error import raise_error_if
 from jolt import filesystem as fs
 from jolt import log
 from jolt import utils
+from jolt.hooks import TaskHook, TaskHookFactory
+from jolt.loader import JoltLoader
 import time
 
 import allure
@@ -171,3 +175,71 @@ class Test(jolt.Test):
         assert self._curresult, "can't add step when no test is running"
         with self._curresult.step(name, description) as step:
             yield step
+
+
+
+class AllureHooks(TaskHook):
+    LOGLEVEL = {
+        "INFO": log.INFO,
+        "VERBOSE": log.VERBOSE,
+        "DEBUG": log.DEBUG,
+    }
+
+    def __init__(self):
+        loglevel = config.get("allure", "loglevel", "INFO")
+        self._loglevel = AllureHooks.LOGLEVEL.get(loglevel)
+        raise_error_if(not self._loglevel, "allure: illegal loglevel configured: {}", loglevel)
+        self._logpath = fs.path.join(JoltLoader.get().joltdir, "allure-results")
+        self._logger = AllureFileLogger(self._logpath)
+
+    def _task_started(self, task):
+        task.allure_lifecycle = AllureLifecycle()
+        with task.allure_lifecycle.schedule_test_case() as result:
+            result.name = task.short_qualified_name
+            result.start = time.time()*1000
+            result.fullName = task.qualified_name
+            result.description = task.task.__doc__
+            result.testCaseId = utils.sha1(result.fullName)
+            result.historyId = utils.sha1(task.identity + result.testCaseId)
+            result.labels.append(Label(name=LabelType.HOST, value=host_tag()))
+            result.labels.append(Label(name=LabelType.THREAD, value=thread_tag()))
+            result.labels.append(Label(name=LabelType.FRAMEWORK, value='jolt'))
+            result.labels.append(Label(name=LabelType.LANGUAGE, value=platform_label()))
+        task.logsink = log.threadsink(self._loglevel)
+        task.logsink_buffer = task.logsink.__enter__()
+
+    def _task_ended(self, task, status):
+        task.logsink.__exit__(None, None, None)
+        with task.allure_lifecycle.update_test_case() as result:
+            with task.tools.cwd(self._logpath):
+                content = task.logsink_buffer.getvalue()
+                if content:
+                    logpath = utils.sha1(content) + "-" + "log"
+                    task.tools.write_file(logpath, content, expand=False)
+                    result.attachments.append(
+                        Attachment(source=logpath, name="log", type="text/plain"))
+            result.status = status
+            result.stop = time.time()*1000
+            task.allure_lifecycle.write_test_case()
+            self._logger.report_result(result)
+
+    def task_started(self, task):
+        self._task_started(task)
+
+    def task_failed(self, task):
+        self._task_ended(task, Status.FAILED)
+
+    def task_finished(self, task):
+        self._task_ended(task, Status.PASSED)
+
+    def task_skipped(self, task):
+        self._task_started(task)
+        self._task_ended(task, Status.SKIPPED)
+
+
+@TaskHookFactory.register
+class AllureFactory(TaskHookFactory):
+    def create(self, env):
+        if "allure" in config.plugins():
+            return AllureHooks()
+        return None
