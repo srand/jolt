@@ -221,7 +221,11 @@ class AllureHooks(TaskHook):
                     result.attachments.append(
                         Attachment(source=logpath, name="log", type="text/plain"))
             result.status = status
-            result.stop = time.time()*1000
+            if status != Status.SKIPPED:
+                result.stop = time.time()*1000
+            else:
+                result.start = None
+                result.stop = None
             task.allure_lifecycle.write_test_case()
             self._logger.report_result(result)
 
