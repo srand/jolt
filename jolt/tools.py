@@ -1322,7 +1322,7 @@ class Tools(object):
         executable = self.expand(executable)
         return shutil.which(executable, path=self._env.get("PATH"))
 
-    def write_file(self, pathname, content=None):
+    def write_file(self, pathname, content=None, expand=True):
         """ Creates a file.
 
         Note:
@@ -1331,8 +1331,13 @@ class Tools(object):
         Args:
             pathname (str): Name/path of file to be created.
             content (str, optional): Data to be written to the file.
+            expand (boolean, optional): Expand macros in file content.
+               Default: True.
         """
         pathname = self.expand_path(pathname)
-        content = self.expand(content) if content is not None else ''
+        if content is None:
+            content = ''
+        if expand:
+            content = self.expand(content)
         with open(pathname, "wb") as f:
             f.write(content.encode())

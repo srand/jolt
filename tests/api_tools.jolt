@@ -390,3 +390,19 @@ class ToolsApi(JoltTest):
         ---
         """
         self.build("b")
+
+    def test_write_file(self):
+        """
+        --- tasks:
+        class A(Task):
+            value = 1
+
+            def run(self, d, t):
+                t.write_file("1.txt", "{{value}}")
+                t.write_file("value.txt", "{{value}}", expand=False)
+        ---
+        """
+        self.build("a")
+        with self.tools.cwd(self.ws):
+            self.assertEqual("1", self.tools.read_file("1.txt"))
+            self.assertEqual("{value}", self.tools.read_file("value.txt"))
