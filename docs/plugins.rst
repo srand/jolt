@@ -45,6 +45,8 @@ Available configuration keys:
 
 * ``loglevel`` - The level of detail to include in task logs:
   ``INFO``, ``VERBOSE`` or ``DEBUG``
+* ``path`` - Path to directory where result files are written.
+  Default: ``<workspace>/allure-results``.
 
 
 AMQP
