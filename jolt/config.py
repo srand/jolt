@@ -64,12 +64,7 @@ class Config(object):
         self._configs = []
 
     def configs(self, alias=None):
-        if alias:
-            for name, config in self._configs:
-                if name == alias:
-                    return [config]
-            return []
-        return [config for _, config in self._configs]
+        return [config for name, config in self._configs if not alias or name == alias]
 
     def add_file(self, alias, location):
         file = ConfigFile(location)
