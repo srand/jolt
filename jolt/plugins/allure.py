@@ -190,6 +190,7 @@ class AllureHooks(TaskHook):
         self._loglevel = AllureHooks.LOGLEVEL.get(loglevel)
         raise_error_if(not self._loglevel, "allure: illegal loglevel configured: {}", loglevel)
         self._logpath = fs.path.join(JoltLoader.get().joltdir, "allure-results")
+        fs.rmtree(self._logpath, ignore_errors=True)
         self._logger = AllureFileLogger(self._logpath)
 
     def _task_started(self, task):
