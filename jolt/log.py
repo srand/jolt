@@ -289,16 +289,20 @@ def threadsink(level=DEBUG):
     handler.addFilter(_thread_map)
     handler.addFilter(Filter(lambda record: record.thread == threadid))
     _logger.addHandler(handler)
-    yield stringbuf
-    _logger.removeHandler(handler)
+    try:
+        yield stringbuf
+    finally:
+        _logger.removeHandler(handler)
 
 
 @contextmanager
 def map_thread(thread_from, thread_to):
     tid = thread_from.ident
     _thread_map.map(tid, thread_to.ident)
-    yield
-    _thread_map.unmap(tid)
+    try:
+        yield
+    finally:
+        _thread_map.unmap(tid)
 
 
 class _LogStream(object):

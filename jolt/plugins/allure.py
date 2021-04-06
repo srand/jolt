@@ -207,14 +207,14 @@ class AllureHooks(TaskHook):
             result.labels.append(Label(name=LabelType.THREAD, value=thread_tag()))
             result.labels.append(Label(name=LabelType.FRAMEWORK, value='jolt'))
             result.labels.append(Label(name=LabelType.LANGUAGE, value=platform_label()))
-        task.logsink = log.threadsink(self._loglevel)
-        task.logsink_buffer = task.logsink.__enter__()
+        task.allure_logsink = log.threadsink(self._loglevel)
+        task.allure_logsink_buffer = task.allure_logsink.__enter__()
 
     def _task_ended(self, task, status):
-        task.logsink.__exit__(None, None, None)
+        task.allure_logsink.__exit__(None, None, None)
         with task.allure_lifecycle.update_test_case() as result:
             with task.tools.cwd(self._logpath):
-                content = task.logsink_buffer.getvalue()
+                content = task.allure_logsink_buffer.getvalue()
                 if content:
                     logpath = utils.sha1(content) + "-" + "log"
                     task.tools.write_file(logpath, content, expand=False)
