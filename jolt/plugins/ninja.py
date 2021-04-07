@@ -670,12 +670,14 @@ class GNUDepImporter(Rule):
     def _build_archives(self, project, writer, deps):
         archives = []
         for name, artifact in deps.items():
-             for lib in artifact.cxxinfo.libraries.items():
-                 name = "{0}{1}{2}".format(self.prefix, lib, self.suffix)
-                 for path in artifact.cxxinfo.libpaths.items():
-                     archive = fs.path.join(artifact.path, path, name)
-                     if fs.path.exists(archive):
-                         archives.append(archive)
+            if artifact.cxxinfo.libpaths.items():
+                sandbox = project.tools.sandbox(artifact, project.incremental)
+            for lib in artifact.cxxinfo.libraries.items():
+                name = "{0}{1}{2}".format(self.prefix, lib, self.suffix)
+                for path in artifact.cxxinfo.libpaths.items():
+                    archive = fs.path.join(sandbox, path, name)
+                    if fs.path.exists(archive):
+                        archives.append(archive)
         return archives
 
     def build(self, project, writer, deps):
@@ -781,7 +783,7 @@ class IncludePaths(Variable):
 
         incpaths = ["."] + [expand(path) for path in project.incpaths]
         for _, artifact in deps.items():
-            incs = [path for path in artifact.cxxinfo.incpaths.items()]
+            incs = artifact.cxxinfo.incpaths.items()
             if incs:
                 sandbox = tools.sandbox(artifact, project.incremental)
                 incpaths += [expand_artifact(sandbox, path) for path in incs]
@@ -803,8 +805,10 @@ class LibraryPaths(Variable):
             return
         libpaths = [tools.expand_relpath(path, project.outdir) for path in project.libpaths]
         for _, artifact in deps.items():
-            libpaths += [fs.path.join(artifact.path, path)
-                         for path in artifact.cxxinfo.libpaths.items()]
+            libs = artifact.cxxinfo.libpaths.items()
+            if libs:
+                sandbox = tools.sandbox(artifact, project.incremental)
+                libpaths += [fs.path.join(sandbox, path) for path in libs]
         libpaths = ["{0}{1}".format(self.prefix, path) for path in libpaths]
         writer.variable(self.name, " ".join(libpaths))
 
