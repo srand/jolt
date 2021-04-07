@@ -372,10 +372,12 @@ There are a number of other useful influence decorators as well:
     @influence.files("path/to/e2fsprogs/*.c")
     @influence.environ("CFLAGS")
     @influence.weekly
-    @influence.source("report")
+    @influence.attribute("webstatus")
     class E2fsprogs(Task):
-        def report(self):
-            # TODO: Report something
+        @property
+        def webstatus(self):
+            r = requests.get("http://statusindicator/")
+            return r.text
 
         def run(self, deps, tools):
             ac = tools.autotools()
@@ -404,9 +406,10 @@ are still available. Other time-based decorators include:
 - ``influence.daily``
 - ``influence.hourly``
 
-The ``influence.source`` decorator adds the source code of a task function as
-hash influence. Above, the ``report`` method is registered. Similarly, there is
-also a ``influence.attribute`` decorator for task attributes and properties.
+The ``influence.attribute`` decorator adds the value of an attribute or property as
+hash influence. Above, the ``webstatus`` property is registered to influence the task
+with data obtained from a web service. The source code of the property itself is
+monitored automatically.
 
 
 Ninja

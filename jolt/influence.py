@@ -1,5 +1,6 @@
 import datetime
 import hashlib
+import inspect
 import os
 import uuid
 from pathlib import Path, PurePath
@@ -79,7 +80,7 @@ def attribute(name, sort=False):
 
         from jolt import influence
 
-        @influence.source("attribute")
+        @influence.attribute("attribute")
         class Example(Task):
             attribute = False
     """
@@ -161,6 +162,26 @@ def source(name, obj=None):
         cls._influence = _influence
         return cls
     return _decorate
+
+
+class TaskClassSourceInfluence(HashInfluenceProvider):
+    name = "Source"
+
+    def get_influence(self, task):
+        # Calculate sha1 sum for classes in hierarchy
+        result = ""
+        for cls in reversed(task.__class__.mro()):
+            try:
+                cls.__dict__["_TaskClassSourceInfluence__influence"]
+            except KeyError:
+                try:
+                    src, _ = inspect.getsourcelines(cls)
+                    cls.__influence = utils.sha1(str(src))
+                except TypeError:
+                    continue
+            result += cls.__dict__["_TaskClassSourceInfluence__influence"] + \
+                ": " + cls.__name__ + "\n"
+        return result
 
 
 class TaskRequirementInfluence(HashInfluenceProvider):

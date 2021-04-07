@@ -17,6 +17,7 @@ from jolt.cache import ArtifactAttributeSetProvider
 from jolt.error import raise_task_error, raise_task_error_if
 from jolt.expires import Immediately
 from jolt.influence import FileInfluence, TaskSourceInfluence, TaintInfluenceProvider
+from jolt.influence import TaskClassSourceInfluence
 from jolt.influence import source as source_influence, attribute as attribute_influence
 from jolt.tools import Tools
 
@@ -817,9 +818,7 @@ class TaskBase(object):
             "multiple tasks extended, only one allowed")
         self.extends = self.extends[0]
         self.influence = utils.call_or_return_list(self, self.__class__._influence)
-        self.influence.append(TaskSourceInfluence("publish"))
-        self.influence.append(TaskSourceInfluence("run"))
-        self.influence.append(TaskSourceInfluence("unpack"))
+        self.influence.append(TaskClassSourceInfluence())
         self.influence.append(TaintInfluenceProvider())
         self.requires = self.expand(utils.unique_list(utils.call_or_return_list(self, self.__class__._requires)))
         self.selfsustained = utils.call_or_return(self, self.__class__._selfsustained)
@@ -1351,10 +1350,6 @@ class Test(Task):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.influence.append(TaskSourceInfluence("setup", self))
-        self.influence.append(TaskSourceInfluence("cleanup", self))
-        for name in self._get_test_names():
-            self.influence.append(TaskSourceInfluence(name, self))
 
     def setup(self, deps, tools):
         """ Implement this method to make preparations before a test """
