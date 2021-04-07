@@ -421,10 +421,10 @@ class FileInfluence(HashInfluenceProvider):
             if value:
                 result.append(value)
             elif f.exists():
-                _fi_files[f] = value = f.name + ":" + self.get_file_influence(f)
+                _fi_files[f] = value = self.get_file_influence(f) + ": " + f.name
                 result.append(value)
             elif fs.path.lexists(str(f)):
-                _fi_files[f] = value = f.name + ": Symlink (broken)"
+                _fi_files[f] = value = "Symlink (broken): " + f.name
                 result.append(value)
         return "\n".join(result)
 
