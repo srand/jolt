@@ -315,9 +315,9 @@ class TaskProxy(object):
             self.task.clean(self.tools)
             discarded = cache.discard(self, expired)
             if discarded:
-                log.verbose("Discarded: {} ({})", self.short_qualified_name, self.identity[:8])
+                log.debug("Discarded: {} ({})", self.short_qualified_name, self.identity[:8])
             else:
-                log.verbose(" Retained: {} ({})", self.short_qualified_name, self.identity[:8])
+                log.debug(" Retained: {} ({})", self.short_qualified_name, self.identity[:8])
 
     def run(self, cache, force_upload=False, force_build=False):
         with self.tools:
@@ -424,25 +424,15 @@ class Graph(nx.DiGraph):
         with self._mutex:
             return self._nodes_by_name.get(qualified_name)
 
-    def prune(self, func):
-        with self._mutex:
-            for node in nx.topological_sort(self):
-                if func(self, node):
-                    log.debug("[GRAPH] Pruned {0}", node.short_qualified_name)
-                    self.remove_node(node)
-
-            for node in self.nodes:
-                log.debug("[GRAPH] Keeping {0} ({1})", node.qualified_name, node.identity)
-
     def select(self, func):
         with self._mutex:
             return [n for n in self.nodes if func(self, n)]
 
     def debug(self):
         with self._mutex:
-            log.verbose("[GRAPH] Listing all nodes")
+            log.debug("[GRAPH] Listing all nodes")
             for node in nx.topological_sort(self):
-                log.verbose("[GRAPH]   " + node.qualified_name + " ({})", self.out_degree(node))
+                log.debug("[GRAPH]   " + node.qualified_name + " ({})", self.out_degree(node))
 
     def is_leaf(self, node):
         with self._mutex:
@@ -597,11 +587,11 @@ class GraphPruner(object):
             if node not in self.retained:
                 pruned.append(node)
             else:
-                log.verbose("Retained: {}", node.log_name)
+                log.debug("Retained: {}", node.log_name)
                 node.children = [c for c in node.children if c in self.retained]
 
         for node in pruned:
-            log.verbose("Excluded: {}", node.log_name)
+            log.debug("Excluded: {}", node.log_name)
             node.pruned()
 
         return graph
