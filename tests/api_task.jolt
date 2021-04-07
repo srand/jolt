@@ -492,6 +492,19 @@ class TaskApi(JoltTest):
         with self.assertRaises(Exception, msg="no such dependency"):
             self.build("fail1")
 
+    def test_always_influence(self):
+        """
+        --- tasks:
+        @influence.always
+        class A(Task):
+            pass
+        ---
+        """
+        r = self.build("a")
+        self.assertBuild(r, "a")
+        r = self.build("a")
+        self.assertBuild(r, "a")
+
     def test_source_influence(self):
         """
         --- tasks:

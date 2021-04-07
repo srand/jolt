@@ -213,6 +213,35 @@ class TaskParameterInfluence(HashInfluenceProvider):
 
 
 
+class InstanceInfluence(HashInfluenceProvider):
+    name = "Instance"
+
+    def get_influence(self, task):
+        return task._instance.value
+
+
+def always(cls):
+    """ Always execute the task.
+
+    Example:
+
+      .. code-block:: python
+
+        from jolt import influence
+
+        @influence.always
+        class Example(Task):
+
+    """
+    _old_influence = cls._influence
+    def _influence(self, *args, **kwargs):
+        influence = _old_influence(self, *args, **kwargs)
+        influence.append(InstanceInfluence())
+        return influence
+    cls._influence = _influence
+    return cls
+
+
 class TaskDateInfluence(HashInfluenceProvider):
     name = "Date"
 
@@ -315,7 +344,6 @@ Example:
         class Example(Task):
 
 """
-
 
 
 class TaskEnvironmentInfluence(HashInfluenceProvider):
