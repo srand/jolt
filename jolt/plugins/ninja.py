@@ -12,7 +12,8 @@ from jolt.influence import HashInfluenceProvider, TaskAttributeInfluence
 from jolt import log
 from jolt import utils
 from jolt import filesystem as fs
-from jolt.error import raise_task_error_if, JoltCommandError
+from jolt.error import raise_task_error_if, raise_error_on_exception
+from jolt.error import JoltCommandError
 
 
 class attributes:
@@ -1500,7 +1501,9 @@ if __name__ == "__main__":
         threads = config.get("jolt", "threads", tools.getenv("JOLT_THREADS", None))
         threads = " -j" + threads if threads else ""
         depsfile = self._get_keepdepfile(tools)
-        tools.run("ninja{3}{2} -C {0} {1}", self.outdir, verbose, threads, depsfile)
+        with raise_error_on_exception("Compilation failed"):
+            tools.run("ninja{3}{2} -C {0} {1}", self.outdir, verbose, threads, depsfile)
+
 
     def shell(self, deps, tools):
         """
