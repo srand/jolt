@@ -1,3 +1,4 @@
+import contextlib
 import fnmatch
 import re
 import time
@@ -290,6 +291,8 @@ class retried:
             return _f
         return _decorate
 
+def ignore_exception(exc=Exception):
+    return contextlib.suppress(exc)
 
 def Singleton(cls):
     cls._instance = None

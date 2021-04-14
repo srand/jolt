@@ -1,5 +1,6 @@
 from __future__ import print_function
 import os
+import re
 import sys
 import tqdm
 if os.name == "nt":
@@ -219,6 +220,14 @@ def transfer(line, context):
         stdout(outline1, prefix=True)
     else:
         stdout(outline2, prefix=True)
+
+
+def decompose(line):
+    match = re.match(r"(?P<timestamp>[0-9]{4}-[0-9]{1,2}-[0-9]{1,2} [0-9]{1,2}:[0-9]{1,2}:[0-9]{1,2}.[0-9]{6}) \[(?P<loglevel>.*?)\]( \[(?P<context>.*?)\])? (?P<message>.*)", line)
+    if not match:
+        return line
+    match = match.groupdict()
+    return match["timestamp"], match["loglevel"].strip(), match.get("context"), match["message"]
 
 
 class _Progress(object):

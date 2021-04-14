@@ -1,3 +1,6 @@
+from contextlib import contextmanager, ExitStack
+import functools
+
 from jolt import utils
 
 
@@ -37,6 +40,10 @@ class TaskHook(object):
 
     def task_postunpack(self, task, artifact, tools):
         pass
+
+    @contextmanager
+    def task_run(self, task):
+        yield
 
 
 class TaskHookFactory(object):
@@ -127,6 +134,49 @@ class TaskHookRegistry(object):
         for ext in self.hooks:
             utils.call_and_catch_and_log(ext.task_postunpack, task, artifact, tools)
 
+    @contextmanager
+    def task_run(self, task):
+        tasks = [task] if type(task) != list else task
+        with ExitStack() as stack:
+            for task in tasks:
+                if task.is_resource():
+                    continue
+                for ext in self.hooks:
+                    stack.enter_context(ext.task_run(task))
+            yield
+
+
+class CliHook(object):
+    @contextmanager
+    def cli_build(self, *args, **kwargs):
+        yield
+
+
+class CliHookFactory(object):
+    @staticmethod
+    def register(cls):
+        CliHookRegistry.factories.append(cls)
+
+    def create(self, env):
+        raise NotImplementedError()
+
+
+@utils.Singleton
+class CliHookRegistry(object):
+    factories = []
+
+    def __init__(self, env=None):
+        self.env = env
+        self.hooks = [factory().create(env) for factory in CliHookRegistry.factories]
+        self.hooks = list(filter(lambda n: n, self.hooks))
+
+    @contextmanager
+    def cli_build(self, *args, **kwargs):
+        with ExitStack() as stack:
+            for ext in self.hooks:
+                stack.enter_context(ext.cli_build(*args, **kwargs))
+            yield
+
 
 def task_created(task):
     TaskHookRegistry.get().task_created(task)
@@ -163,3 +213,13 @@ def task_postpublish(task, artifact, tools):
 
 def task_postunpack(task, artifact, tools):
     TaskHookRegistry.get().task_postunpack(task, artifact, tools)
+
+def task_run(task):
+    return TaskHookRegistry.get().task_run(task)
+
+def cli_build(cmd):
+    @functools.wraps(cmd)
+    def decorator(*args, **kwargs):
+        with CliHookRegistry.get().cli_build():
+            return cmd(*args, **kwargs)
+    return decorator

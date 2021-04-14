@@ -1,8 +1,9 @@
 import copy
 from itertools import zip_longest
 import ninja_syntax as ninja
-import platform
 import os
+import platform
+import re
 import sys
 
 from jolt.tasks import Task, attributes as task_attributes
@@ -14,6 +15,11 @@ from jolt import utils
 from jolt import filesystem as fs
 from jolt.error import raise_task_error_if, raise_error_on_exception
 from jolt.error import JoltCommandError
+
+
+class CompileError(Exception):
+    def __init__(self):
+        super().__init__("Compilation failed")
 
 
 class attributes:
@@ -1292,7 +1298,7 @@ class CXXProject(Task):
             l = self.tools.glob(source)
             raise_task_error_if(
                 not l and not ('*' in source or '?' in source), self,
-                "source file '{0}' not found", fs.path.basename(source))
+                "listed source file '{0}' not found in workspace", fs.path.basename(source))
             sources += l
         self.sources = sources
 
@@ -1501,8 +1507,12 @@ if __name__ == "__main__":
         threads = config.get("jolt", "threads", tools.getenv("JOLT_THREADS", None))
         threads = " -j" + threads if threads else ""
         depsfile = self._get_keepdepfile(tools)
-        with raise_error_on_exception("Compilation failed"):
+        try:
             tools.run("ninja{3}{2} -C {0} {1}", self.outdir, verbose, threads, depsfile)
+        except JoltCommandError as e:
+            with self.report() as report:
+                self._report_errors(report, "\n".join(e.stdout))
+            raise CompileError()
 
 
     def shell(self, deps, tools):
@@ -1529,6 +1539,36 @@ if __name__ == "__main__":
             print()
             print("Use the 'compile' command to build individual compilation targets")
             super(CXXProject, self).shell(deps, tools)
+
+    def _report_errors(self, report, logbuffer):
+        messages = {}
+
+        # GCC style errors
+        matches = re.finditer(r"(?P<filename>.*?):(?P<linecol>[0-9]+:[0-9]+): (?P<message>.*)", logbuffer)
+        for error in matches:
+            error = error.groupdict()
+            if error["message"].startswith("note:"):
+                continue
+            filename = error["filename"]
+            with self.tools.cwd(self.outdir):
+                filename = self.tools.expand_relpath(filename, self.joltdir)
+            location = filename + ":" + error["linecol"]
+            if location in messages:
+                messages[location] += "\n" + error["message"]
+            else:
+                messages[location] = error["message"]
+
+        def snippet(path, line):
+            with self.tools.cwd(self.joltdir):
+                content = self.tools.read_file(path)
+                content = content.splitlines()
+                #return "\n".join(content[line-2:line+2])
+                return str(line) + ": " + content[line-1]
+
+        for location, message in messages.items():
+            file_line_col = location.rsplit(":", 2)
+            details = snippet(file_line_col[0], int(file_line_col[1]))
+            report.add_error("Compiler Error", location, message, details)
 
 
 class CXXLibrary(CXXProject):

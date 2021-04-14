@@ -1,3 +1,4 @@
+import inspect
 
 
 class JoltError(Exception):
@@ -19,6 +20,16 @@ def raise_error(msg, *args, **kwargs):
 
 def raise_task_error(task, msg, *args, **kwargs):
     if task:
+        with task.report() as report:
+            report.add_error("Error", inspect.getsourcefile(task.__class__),
+                             msg.format(*args, **kwargs))
+        raise_error(msg + " (" + str(task) + ")", *args, **kwargs)
+    else:
+        raise_error(msg, *args, **kwargs)
+
+
+def raise_unreported_task_error(task, msg, *args, **kwargs):
+    if task:
         raise_error(msg + " (" + str(task) + ")", *args, **kwargs)
     else:
         raise_error(msg, *args, **kwargs)
@@ -32,6 +43,11 @@ def raise_error_if(condition, *args, **kwargs):
 def raise_task_error_if(condition, task, *args, **kwargs):
     if condition:
         raise_task_error(task, *args, **kwargs)
+
+
+def raise_unreported_task_error_if(condition, task, *args, **kwargs):
+    if condition:
+        raise_unreported_task_error(task, *args, **kwargs)
 
 
 class raise_error_on_exception(object):

@@ -378,7 +378,8 @@ class TaskProxy(object):
             for extension in self.extensions:
                 try:
                     extension.started()
-                    extension.run(cache, force_upload, force_build)
+                    with hooks.task_run(extension):
+                        extension.run(cache, force_upload, force_build)
                 except Exception as e:
                     extension.failed()
                     raise e

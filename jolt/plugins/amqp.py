@@ -13,6 +13,7 @@ import uuid
 from jolt.cli import cli
 from jolt import config
 from jolt import filesystem as fs
+from jolt import hooks
 from jolt import log
 from jolt import scheduler
 from jolt import utils
@@ -654,8 +655,8 @@ class AmqpExecutor(scheduler.NetworkExecutor):
         manifest = JoltManifest.export(self.task)
         build = manifest.create_build()
 
-        tasks = [self.task.qualified_name]
-        tasks += [t.qualified_name for t in self.task.extensions]
+        tasks = [self.task.short_qualified_name]
+        tasks += [t.short_qualified_name for t in self.task.extensions]
 
         for task in tasks:
             mt = build.create_task()
@@ -715,6 +716,12 @@ class AmqpExecutor(scheduler.NetworkExecutor):
                 output.extend(manifest.stderr.split("\n"))
             for line in output:
                 log.transfer(line, self.task.identity[:8])
+            for task in [self.task] + self.task.extensions:
+                with task.task.report() as report:
+                    remote_report = manifest.find_task(task.short_qualified_name)
+                    if remote_report:
+                        for error in remote_report.errors:
+                            report.manifest.append(error)
             raise_error("[AMQP] remote build failed with status: {0}".format(manifest.result))
 
         raise_task_error_if(
@@ -780,7 +787,8 @@ class AmqpExecutor(scheduler.NetworkExecutor):
             self.task.started(TYPE)
             for extension in self.task.extensions:
                 extension.started(TYPE)
-            self._run(env)
+            with hooks.task_run([self.task] + self.task.extensions):
+                self._run(env)
             for extension in self.task.extensions:
                 extension.finished(TYPE)
             self.task.finished(TYPE)

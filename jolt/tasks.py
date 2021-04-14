@@ -1,4 +1,5 @@
 import base64
+from contextlib import contextmanager
 import copy
 import fnmatch
 import functools
@@ -9,16 +10,21 @@ import subprocess
 import sys
 import unittest as ut
 import uuid
+import re
+import traceback
 
 from jolt import filesystem as fs
 from jolt import log
 from jolt import utils
 from jolt.cache import ArtifactAttributeSetProvider
 from jolt.error import raise_task_error, raise_task_error_if
+from jolt.error import raise_unreported_task_error_if
+from jolt.error import JoltCommandError
 from jolt.expires import Immediately
 from jolt.influence import FileInfluence, TaskSourceInfluence, TaintInfluenceProvider
 from jolt.influence import TaskClassSourceInfluence
 from jolt.influence import source as source_influence, attribute as attribute_influence
+from jolt import manifest
 from jolt.tools import Tools
 
 
@@ -806,6 +812,7 @@ class TaskBase(object):
 
     def __init__(self, parameters=None, **kwargs):
         self._identity = None
+        self._report = manifest._JoltTask()
         self.name = self.__class__.name
 
         self._create_exports_and_parameters()
@@ -1107,6 +1114,59 @@ class Task(TaskBase):
         with tools.environ(PS1="jolt$ ") as env:
             from jolt import config
             subprocess.call(config.get_shell().split(), env=env, cwd=tools._cwd)
+
+    @contextmanager
+    def report(self):
+        """
+        Provide error analysis for task.
+
+        Intentionally undocumented. Use at own risk.
+        """
+        class ErrorProxy(object):
+            def __init__(self, error):
+                self._error = error
+
+        class ReportProxy(object):
+            def __init__(self, report):
+                self._report = report
+
+            def add_error(self, type, location, message, details=""):
+                error = self._report.create_error()
+                error.type = type
+                error.location = location
+                error.message = message
+                error.details = details
+                return error
+
+            def add_exception(self, exc):
+                tb = traceback.format_exception(etype=type(exc), value=exc, tb=exc.__traceback__)
+                installdir = fs.path.dirname(__file__)
+                if any(map(lambda frame: installdir not in frame, tb[1:-1])):
+                    while len(tb) > 2 and installdir in tb[1]:
+                        del tb[1]
+                loc = re.findall("\"(.*?\", line [0-9]+, in .*?)\n", tb[1])
+                location = loc[0] if loc and len(loc) > 0 else ""
+                message = str(exc)
+                if isinstance(exc, JoltCommandError):
+                    details = "\n".join(exc.stderr)
+                else:
+                    details = "".join(tb)
+
+                self.add_error(
+                    type="Exception",
+                    location=location,
+                    message=message,
+                    details=details)
+
+            @property
+            def errors(self):
+                return [ErrorProxy(error) for error in self._report.errors]
+
+            @property
+            def manifest(self):
+                return self._report
+
+        yield ReportProxy(self._report)
 
 
 class Resource(Task):
@@ -1466,8 +1526,10 @@ class Test(Task):
                     _TestCase(self, deps, tools, testfunc))
         with log.stream() as logstream:
             self.testresult = ut.TextTestRunner(resultclass=_TestResult, stream=logstream, verbosity=2).run(testsuite)
-
-        raise_task_error_if(
+        with self.report() as report:
+            for tc, tb in self.testresult.failures:
+                report.add_error("Test Failed", tc.name, tb.splitlines()[-1], tb)
+        raise_unreported_task_error_if(
             not self.testresult.wasSuccessful(), self,
             "{} tests out of {} were successful".format(
                 len(self.testresult.successes),

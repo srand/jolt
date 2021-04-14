@@ -55,9 +55,23 @@ class _JoltProject(SubElement):
     def __init__(self, elem=None):
         super(_JoltProject, self).__init__('project', elem=elem)
 
+
+@Attribute('type', child=True)
+@Attribute('location', child=True)
+@Attribute('message', child=True)
+@Attribute('details', child=True)
+class _JoltTaskError(SubElement):
+    def __init__(self, elem=None):
+        super(_JoltTaskError, self).__init__('error', elem=elem)
+
+
 @Attribute('name')
+@Attribute('duration', child=True)
+@Attribute('goal', child=True)
 @Attribute('identity', child=True)
+@Attribute('result', child=True)
 @Composition(_JoltAttribute, "attribute")
+@Composition(_JoltTaskError, "error")
 class _JoltTask(SubElement):
     def __init__(self, elem=None):
         super(_JoltTask, self).__init__('task', elem=elem)
@@ -157,6 +171,14 @@ class JoltManifest(ElementTree):
 
     def format(self):
         return minidom.parseString(ET.tostring(self.getroot())).toprettyxml(indent="  ")
+
+    def transform(self, xsltfile):
+        from lxml import etree as lxmlET
+        manifest = lxmlET.fromstring(self.format())
+        xslt = lxmlET.parse(xsltfile)
+        transform = lxmlET.XSLT(xslt)
+        document = transform(manifest)
+        return minidom.parseString(lxmlET.tostring(document)).toprettyxml(indent="  ")
 
     def write(self, filename):
         with open(filename, 'w') as f:

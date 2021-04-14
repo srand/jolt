@@ -19,13 +19,13 @@ from jolt import tools
 from jolt import utils
 from jolt.influence import HashInfluenceRegistry
 from jolt.options import JoltOptions
-from jolt.hooks import TaskHookRegistry
+from jolt import hooks
 from jolt.manifest import JoltManifest
 from jolt.error import JoltError
 from jolt.error import raise_error
 from jolt.error import raise_error_if
 from jolt.error import raise_task_error_if
-
+from jolt.plugins import report
 
 debug_enabled = False
 workdir = getcwd()
@@ -171,6 +171,7 @@ def _autocomplete_tasks(ctx, args, incomplete):
 @click.option("--result", type=click.Path(), hidden=True,
               help="Write result manifest to this file.")
 @click.pass_context
+@hooks.cli_build
 def build(ctx, task, network, keep_going, identity, default, local,
           no_download, no_upload, download, upload, worker, force,
           salt, copy, debug, result, jobs):
@@ -240,7 +241,7 @@ def build(ctx, task, network, keep_going, identity, default, local,
         log.verbose("Local build as a user")
         strategy = scheduler.LocalStrategy(executors, acache)
 
-    TaskHookRegistry.get(options)
+    hooks.TaskHookRegistry.get(options)
     registry = TaskRegistry.get(options)
 
     for params in default:
@@ -341,14 +342,9 @@ def build(ctx, task, network, keep_going, identity, default, local,
                  str(duration),
                  str(queue.duration_acc) if network else '')
         if result:
-            manifest = JoltManifest()
-            manifest.duration = str(goal_task_duration)
-            for goal in goal_tasks:
-                mftask = manifest.create_task()
-                mftask.name = goal.qualified_name
-                mftask.identity = goal.identity
-            manifest.write(result)
-
+            with report.update() as manifest:
+                manifest.duration = str(goal_task_duration)
+                manifest.write(result)
 
 
 @cli.command()

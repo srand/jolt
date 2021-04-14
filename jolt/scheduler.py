@@ -4,6 +4,7 @@ import os
 import queue
 
 from jolt import config
+from jolt import hooks
 from jolt import log
 from jolt import utils
 from jolt import tools
@@ -100,10 +101,11 @@ class LocalExecutor(Executor):
             return
         try:
             self.task.started()
-            self.task.run(
-                env.cache,
-                force_build=self.force_build,
-                force_upload=self.force_upload)
+            with hooks.task_run(self.task):
+                self.task.run(
+                    env.cache,
+                    force_build=self.force_build,
+                    force_upload=self.force_upload)
         except Exception as e:
             log.exception()
             self.task.failed()

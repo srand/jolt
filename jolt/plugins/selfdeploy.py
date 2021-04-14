@@ -25,6 +25,7 @@ _path = fs.path.dirname(_path)
 
 
 @influence.files(fs.path.join(_path, "**", "*.py"))
+@influence.files(fs.path.join(_path, "**", "*.xslt"))
 class Jolt(Task):
     name = "jolt"
 
@@ -59,6 +60,7 @@ class Jolt(Task):
             artifact.collect('jolt/*.job')
             artifact.collect('jolt/*/*.py')
             artifact.collect('jolt/*/*/*.py')
+            artifact.collect('jolt/*/*.xslt')
             for e in self.extras:
                 with tools.cwd(fs.path.dirname(e)):
                     artifact.collect(fs.path.basename(e))
