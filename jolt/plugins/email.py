@@ -42,10 +42,12 @@ class EmailHooks(CliHook):
             with open(self._artifact, "w") as f:
                 f.write(report.transform(self._stylesheet))
 
-        if report.result == "SUCCESS" and not self._success:
-            return
-        if report.result == "FAILED" and not self._failure:
-            return
+        if report.has_failure():
+            if not self._failure:
+                return
+        else:
+            if not self._success:
+                return
 
         msg = EmailMessage()
         msg['Subject'] = self._subject

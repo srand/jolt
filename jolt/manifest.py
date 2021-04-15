@@ -187,6 +187,11 @@ class JoltManifest(ElementTree):
     def has_task(self, task):
         return self.find("./task[@identity='{}']".format(task.identity)) is not None
 
+    def has_failure(self):
+        if self.result and self.result == "FAILED":
+            return True
+        return self.find("./task[result='FAILED']") is not None
+
     def find_task(self, task):
         match = self.find("./task[@name='{0}']".format(task))
         if match is None:
