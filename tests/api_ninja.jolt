@@ -633,3 +633,33 @@ class NinjaApi(JoltTest):
 
         self.jolt("build exe:arg=*")
         self.assertCompiled(r, "main.cpp")
+
+    def test_relink_on_change(self):
+        """
+        --- file: lib.cpp
+        int func() {{return 0;}}
+
+        --- file: main.cpp
+        int func();
+        int main() {{return func();}}
+
+        --- tasks:
+        class Lib(CXXLibrary):
+            sources = ["lib.cpp"]
+
+        class Exe(CXXExecutable):
+            requires = "lib"
+            sources = ["main.cpp"]
+
+        class Run(Task):
+            requires = ["exe"]
+
+            def run(self, deps, tools):
+                tools.run("exe")
+        ---
+        """
+        self.build("run")
+        with self.tools.cwd(self.ws):
+            self.tools.write_file("lib.cpp", "int func() {{return 1;}}")
+        with self.assertRaises(Exception):
+            self.build("run")

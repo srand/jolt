@@ -645,7 +645,7 @@ class GNULinker(Rule):
         project._binaries, _ = self._out(project, project.binary)
         file_list = FileListWriter("objects", posix=True)
         file_list.build(project, writer, infiles)
-        return super().build(project, writer, infiles)
+        return super().build(project, writer, infiles, implicit=writer.depimports)
 
     @utils.cached.instance
     def get_influence(self, task):
@@ -661,7 +661,7 @@ class GNUArchiver(Rule):
         project._binaries, _ = self._out(project, project.binary)
         file_list = GNUMRIWriter("objects", project._binaries)
         file_list.build(project, writer, infiles)
-        super().build(project, writer, infiles)
+        super().build(project, writer, infiles, implicit=writer.depimports)
 
     def get_influence(self, task):
         return "GA" + super().get_influence(task)
@@ -1006,7 +1006,7 @@ class MSVCArchiver(Rule):
         project._binaries, _ = self._out(project, project.binary)
         file_list = FileListWriter("objects", project._binaries)
         file_list.build(project, writer, infiles)
-        super().build(project, writer, infiles)
+        super().build(project, writer, infiles, implicit=writer.depimports)
 
     def get_influence(self, task):
         return "MSVCArchiver" + super().get_influence(task)
