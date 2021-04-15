@@ -386,6 +386,9 @@ class TaskProxy(object):
                 else:
                     extension.finished()
 
+    def report(self):
+        return self.task.report()
+
 
 class Graph(nx.DiGraph):
     def __init__(self):
