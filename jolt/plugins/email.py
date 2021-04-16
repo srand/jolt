@@ -52,7 +52,7 @@ class EmailHooks(CliHook):
         msg = EmailMessage()
         msg['Subject'] = self._subject
         msg['From'] = self._from
-        msg['To'] = ", ".join(self._to.split())
+        msg['To'] = ", ".join(utils.unique_list(self._to.split()))
         msg.set_content("Your e-mail client cannot display HTML formatted e-mails.")
         msg.add_alternative(report.transform(self._stylesheet), subtype='html')
 
