@@ -1510,7 +1510,7 @@ if __name__ == "__main__":
         try:
             tools.run("ninja{3}{2} -C {0} {1}", self.outdir, verbose, threads, depsfile)
         except JoltCommandError as e:
-            with self.report() as report:
+            with utils.ignore_exception(), self.report() as report:
                 self._report_errors(report, "\n".join(e.stdout))
             raise CompileError()
 
@@ -1553,10 +1553,10 @@ if __name__ == "__main__":
             with self.tools.cwd(self.outdir):
                 filename = self.tools.expand_relpath(filename, self.joltdir)
             location = filename + ":" + error["linecol"]
-            if location in messages:
-                messages[location] += "\n" + error["message"]
-            else:
-                messages[location] = error["message"]
+            if location not in messages:
+                messages[location] = []
+            if error["message"] not in messages[location]:
+                messages[location].append(error["message"])
 
         def snippet(path, line):
             with self.tools.cwd(self.joltdir):
@@ -1565,10 +1565,10 @@ if __name__ == "__main__":
                 #return "\n".join(content[line-2:line+2])
                 return str(line) + ": " + content[line-1]
 
-        for location, message in messages.items():
+        for location, messages in messages.items():
             file_line_col = location.rsplit(":", 2)
             details = snippet(file_line_col[0], int(file_line_col[1]))
-            report.add_error("Compiler Error", location, message, details)
+            report.add_error("Compiler Error", location, "\n".join(messages), details)
 
 
 class CXXLibrary(CXXProject):
