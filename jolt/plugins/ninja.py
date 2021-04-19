@@ -14,10 +14,10 @@ from jolt import log
 from jolt import utils
 from jolt import filesystem as fs
 from jolt.error import raise_task_error_if, raise_error_on_exception
-from jolt.error import JoltCommandError
+from jolt.error import JoltError, JoltCommandError
 
 
-class CompileError(Exception):
+class CompileError(JoltError):
     def __init__(self):
         super().__init__("Compilation failed")
 

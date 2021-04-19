@@ -19,7 +19,7 @@ from jolt import utils
 from jolt.cache import ArtifactAttributeSetProvider
 from jolt.error import raise_task_error, raise_task_error_if
 from jolt.error import raise_unreported_task_error_if
-from jolt.error import JoltCommandError
+from jolt.error import JoltError, JoltCommandError
 from jolt.expires import Immediately
 from jolt.influence import FileInfluence, TaskSourceInfluence, TaintInfluenceProvider
 from jolt.influence import TaskClassSourceInfluence
@@ -1149,6 +1149,8 @@ class Task(TaskBase):
                 message = str(exc)
                 if isinstance(exc, JoltCommandError):
                     details = "\n".join(exc.stderr)
+                elif isinstance(exc, JoltError):
+                    details = ""
                 else:
                     details = "".join(tb)
 
