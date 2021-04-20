@@ -21,6 +21,8 @@ class ReportHooks(TaskHook):
         report.goal = str(task.is_goal()).lower()
         report.identity = task.identity
         report.result = result
+        if hasattr(task, "logstash"):
+            report.logstash = task.logstash
         self.manifest.append(report)
 
     @contextmanager
@@ -53,7 +55,7 @@ def write(filename):
     return _report_hooks.write(filename)
 
 
-@TaskHookFactory.register
+@TaskHookFactory.register_with_prio(-10)
 class ReportFactory(TaskHookFactory):
     def create(self, env):
         return _report_hooks

@@ -69,6 +69,7 @@ class _JoltTaskError(SubElement):
 @Attribute('duration', child=True)
 @Attribute('goal', child=True)
 @Attribute('identity', child=True)
+@Attribute('logstash', child=True)
 @Attribute('result', child=True)
 @Composition(_JoltAttribute, "attribute")
 @Composition(_JoltTaskError, "error")

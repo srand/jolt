@@ -95,8 +95,27 @@
 
         <xsl:for-each select="$Failures">
           <table width="100%" cellspacing="0" cellpadding="0" bgcolor="#f1f1f1">
-            <tr bgcolor="#f44336" style="font-size: 16pt; color: white;">
-              <td style="padding: 10px"><xsl:value-of select="@name"/></td>
+            <tr bgcolor="#f44336">
+              <td style="padding: 10px">
+                <table cellpadding="0" cellspacing="0">
+                  <tr>
+                    <td width="100%" style="font-size: 16pt; color: white;">
+                      <xsl:value-of select="@name"/>
+                    </td>
+                    <td>
+                      <style>a{color:white;} a:visited{color:white}</style>
+                      <xsl:if test="logstash != ''">
+                        <xsl:element name="a">
+                          <xsl:attribute name="href">
+                            <xsl:value-of select="logstash"/>
+                          </xsl:attribute>
+                          Log
+                        </xsl:element>
+                      </xsl:if>
+                    </td>
+                  </tr>
+                </table>
+              </td>
             </tr>
             <xsl:for-each select="error">
               <tr>

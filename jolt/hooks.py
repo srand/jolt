@@ -49,7 +49,15 @@ class TaskHook(object):
 class TaskHookFactory(object):
     @staticmethod
     def register(cls):
-        TaskHookRegistry.factories.append(cls)
+        TaskHookRegistry.factories.append((cls, 0))
+        TaskHookRegistry.factories.sort(key=lambda x: x[1])
+
+    @staticmethod
+    def register_with_prio(prio):
+        def decorator(cls):
+            TaskHookRegistry.factories.append((cls, prio))
+            TaskHookRegistry.factories.sort(key=lambda x: x[1])
+        return decorator
 
     def create(self, env):
         raise NotImplementedError()
@@ -61,7 +69,7 @@ class TaskHookRegistry(object):
 
     def __init__(self, env=None):
         self.env = env
-        self.hooks = [factory().create(env) for factory in TaskHookRegistry.factories]
+        self.hooks = [factory().create(env) for factory, _ in TaskHookRegistry.factories]
         self.hooks = list(filter(lambda n: n, self.hooks))
 
     def task_created(self, task):

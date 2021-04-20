@@ -1,3 +1,4 @@
+from contextlib import contextmanager
 from datetime import datetime
 
 from jolt import *
@@ -25,29 +26,31 @@ class LogStashHooks(TaskHook):
             datetime.now().strftime("%Y-%m-%d_%H%M%S.%f"),
             task.canonical_name)
 
-    def _stash_log(self, task):
+    def _stash_log(self, task, logbuffer):
         with task.tools.tmpdir("logstash") as t:
             filepath = fs.path.join(t.path, "log")
             with open(filepath, "w") as f:
-                f.write(task.logsink_buffer.getvalue())
-            task.tools.upload(filepath, self._get_uri(task))
+                f.write(logbuffer)
+            task.logstash = self._get_uri(task)
+            task.tools.upload(filepath, task.logstash)
 
-    def task_started(self, task):
-        task.logsink = log.threadsink()
-        task.logsink_buffer = task.logsink.__enter__()
+    @contextmanager
+    def task_run(self, task):
+        with log.threadsink() as logsink:
+            try:
+                yield
+            except Exception as e:
+                if self._failed_enabled:
+                    self._stash_log(task, logsink.getvalue())
+                raise e
+            else:
+                if self._finished_enabled:
+                    self._stash_log(task, logsink.getvalue())
 
-    def task_failed(self, task):
-        task.logsink.__exit__(None, None, None)
-        if self._failed_enabled:
-            self._stash_log(task)
 
-    def task_finished(self, task):
-        task.logsink.__exit__(None, None, None)
-        if self._finished_enabled:
-            self._stash_log(task)
-
-
-@TaskHookFactory.register
+# Must run before other plugins which depend on the
+# logstash_uri TaskProxy attribute.
+@TaskHookFactory.register_with_prio(10)
 class LogStashFactory(TaskHookFactory):
     def create(self, env):
         return LogStashHooks()
