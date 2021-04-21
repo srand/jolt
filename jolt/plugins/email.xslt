@@ -13,7 +13,7 @@
     <html>
       <head>
         <link rel="stylesheet" href="https://www.w3schools.com/w3css/4/w3.css" />
-        <style>
+        <style type="text/css">
           pre {
             margin-bottom: 0px;
             margin-top: 0px;
@@ -23,6 +23,12 @@
             white-space: -pre-wrap;
             white-space: -o-pre-wrap;
             word-wrap: break-word;
+          }
+          a {
+            color: #f44336;
+          }
+          a.log {
+            color: white;
           }
         </style>
       </head>
@@ -103,9 +109,9 @@
                       <xsl:value-of select="@name"/>
                     </td>
                     <td>
-                      <style>a{color:white;} a:visited{color:white}</style>
                       <xsl:if test="logstash != ''">
                         <xsl:element name="a">
+                          <xsl:attribute name="class">log</xsl:attribute>
                           <xsl:attribute name="href">
                             <xsl:value-of select="logstash"/>
                           </xsl:attribute>
