@@ -378,7 +378,6 @@ class Artifact(object):
         self._cache = cache
         self._node = node
         self._path = cache.get_path(node)
-        self._stable_path = cache.get_stable_path(node)
         self._temp = cache.create_path(node) \
                      if not fs.path.exists(cache.get_path(node)) \
                      else None
@@ -491,12 +490,10 @@ class Artifact(object):
         return size
 
     def apply(self):
-        fs.unlink(self._stable_path, ignore_errors=True)
-        if fs.path.exists(self._path):
-            fs.symlink(self._path, self._stable_path)
+        pass
 
     def unapply(self):
-        fs.unlink(self._stable_path, ignore_errors=True)
+        pass
 
     def commit(self, uploadable=True):
         if not self._node.task.is_cacheable():
@@ -537,8 +534,8 @@ class Artifact(object):
 
     @property
     def stable_path(self):
-        """ str: A stable location of the artifact in the local cache. """
-        return self._stable_path
+        """ Deprecated. Use final_path. """
+        return self._path
 
     @property
     def tools(self):
@@ -915,11 +912,6 @@ class ArtifactCache(StorageProvider):
 
     def get_path(self, node):
         return fs.path.join(self.root, node.canonical_name, node.identity)
-
-    def get_stable_path(self, node):
-        identity = utils.sha1(node.qualified_name)
-        return fs.path.join(self.root, node.canonical_name, identity)
-
 
     def evict(self):
         while self.stats.get_size() > self.max_size:
