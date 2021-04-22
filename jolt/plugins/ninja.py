@@ -1541,34 +1541,26 @@ if __name__ == "__main__":
             super(CXXProject, self).shell(deps, tools)
 
     def _report_errors(self, report, logbuffer):
-        messages = {}
-
         # GCC style errors
-        matches = re.finditer(r"(?P<filename>.*?):(?P<linecol>[0-9]+:[0-9]+): (?P<message>.*)", logbuffer)
-        for error in matches:
-            error = error.groupdict()
-            if error["message"].startswith("note:"):
-                continue
-            filename = error["filename"]
-            with self.tools.cwd(self.outdir):
-                filename = self.tools.expand_relpath(filename, self.joltdir)
-            location = filename + ":" + error["linecol"]
-            if location not in messages:
-                messages[location] = []
-            if error["message"] not in messages[location]:
-                messages[location].append(error["message"])
+        report.add_regex_errors_with_file(
+            "Compiler Error",
+            r"(?P<location>(?P<file>.*?):(?P<line>[0-9]+):(?P<col>[0-9]+)): (?P<message>.*)",
+            logbuffer,
+            self.outdir,
+            lambda err: not err["message"].startswith("note:"))
 
-        def snippet(path, line):
-            with self.tools.cwd(self.joltdir):
-                content = self.tools.read_file(path)
-                content = content.splitlines()
-                #return "\n".join(content[line-2:line+2])
-                return str(line) + ": " + content[line-1]
+        # other compiler errors
+        report.add_regex_errors_with_file(
+            "Compiler Error",
+            r"(?P<location>(?P<file>.*?)\((?P<line>[0-9]+)\)): (?P<message>error: .*)",
+            logbuffer,
+            self.outdir)
 
-        for location, messages in messages.items():
-            file_line_col = location.rsplit(":", 2)
-            details = snippet(file_line_col[0], int(file_line_col[1]))
-            report.add_error("Compiler Error", location, "\n".join(messages), details)
+        # Linker errors
+        report.add_regex_errors(
+            "Linker Error",
+            r"(?P<location>(?P<file>.*?):\(.*?\)): (?P<message>undefined reference to.*)",
+            logbuffer)
 
 
 class CXXLibrary(CXXProject):

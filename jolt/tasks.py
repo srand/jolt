@@ -1,4 +1,5 @@
 import base64
+from collections import OrderedDict
 from contextlib import contextmanager
 import copy
 import fnmatch
@@ -1122,53 +1123,120 @@ class Task(TaskBase):
 
         Intentionally undocumented. Use at own risk.
         """
-        class ErrorProxy(object):
-            def __init__(self, error):
-                self._error = error
+        yield ReportProxy(self, self._report)
 
-        class ReportProxy(object):
-            def __init__(self, report):
-                self._report = report
 
-            def add_error(self, type, location, message, details=""):
-                error = self._report.create_error()
-                error.type = type
-                error.location = location
-                error.message = message
-                error.details = details
-                return error
+class ErrorProxy(object):
+    def __init__(self, error):
+        self._error = error
 
-            def add_exception(self, exc):
-                tb = traceback.format_exception(etype=type(exc), value=exc, tb=exc.__traceback__)
-                installdir = fs.path.dirname(__file__)
-                if any(map(lambda frame: installdir not in frame, tb[1:-1])):
-                    while len(tb) > 2 and installdir in tb[1]:
-                        del tb[1]
-                loc = re.findall("\"(.*?\", line [0-9]+, in .*?)\n", tb[1])
-                location = loc[0] if loc and len(loc) > 0 else ""
-                message = str(exc)
-                if isinstance(exc, JoltCommandError):
-                    details = "\n".join(exc.stderr)
-                elif isinstance(exc, JoltError):
+
+class ReportProxy(object):
+    def __init__(self, task, report):
+        self._task = task
+        self._report = report
+
+    def add_error(self, type, location, message, details=""):
+        """ Add an error to the build report. """
+        error = self._report.create_error()
+        error.type = type
+        error.location = location
+        error.message = message
+        error.details = details
+        return error
+
+    def add_regex_errors(self, type, regex, logbuf):
+        """
+        Find errors in log using regex and add them to build report.
+
+        The regex should contain these named match groups:
+
+         - location - origin of the error
+         - message  - a brief description of the error
+         - details  - futher error details
+
+        """
+        for match in re.finditer(regex, logbuf):
+            error = match.groupdict()
+            self.add_error(
+                type,
+                error.get("location", ""),
+                error.get("message", ""),
+                error.get("details", ""))
+
+    def add_regex_errors_with_file(self, type, regex, logbuf, reldir, filterfn=lambda n: True):
+        """
+        Find errors in log using regex and add them to build report.
+
+        Instead of using error details from the regex match,
+        file content is used. For this to work the regex match
+        must contain these named groups:
+
+         - file - path to file
+         - line - line number of error
+
+        In case file is a relative path, reldir is the working directory.
+        """
+        errors_by_location = OrderedDict()
+        for match in re.finditer(regex, logbuf):
+            error = match.groupdict()
+            if not filterfn(error):
+                continue
+            if error["location"] not in errors_by_location:
+                errors_by_location[error["location"]] = (error, [error["message"]])
+            else:
+                errors_by_location[error["location"]][1].append(error["message"])
+
+        for error, msgs in errors_by_location.values():
+            message = "\n".join(utils.unique_list(msgs))
+            with self._task.tools.cwd(reldir):
+                try:
+                    details = self._task.tools.read_file(error["file"])
+                    details = details.splitlines()
+                    details = str(error["line"]) + ": " + details[int(error["line"])-1]
+                except:
                     details = ""
-                else:
-                    details = "".join(tb)
+            self.add_error(type, error.get("location", ""), message, details)
 
-                self.add_error(
-                    type="Exception",
-                    location=location,
-                    message=message,
-                    details=details)
+    def add_exception(self, exc):
+        """
+        Add an exception to the build report.
 
-            @property
-            def errors(self):
-                return [ErrorProxy(error) for error in self._report.errors]
+        The exception traceback is included in the error details, but
+        frames inside Jolt may be filtered out if the exception
+        originated in a task recipe.
 
-            @property
-            def manifest(self):
-                return self._report
+        No traceback is included if the exception is derived from JoltError.
 
-        yield ReportProxy(self._report)
+        """
+        tb = traceback.format_exception(etype=type(exc), value=exc, tb=exc.__traceback__)
+        installdir = fs.path.dirname(__file__)
+        if any(map(lambda frame: installdir not in frame, tb[1:-1])):
+            while len(tb) > 2 and installdir in tb[1]:
+                del tb[1]
+        loc = re.findall("\"(.*?\", line [0-9]+, in .*?)\n", tb[1])
+        location = loc[0] if loc and len(loc) > 0 else ""
+        message = str(exc)
+        if isinstance(exc, JoltCommandError):
+            details = "\n".join(exc.stderr)
+        elif isinstance(exc, JoltError):
+            details = ""
+        else:
+            details = "".join(tb)
+
+        self.add_error(
+            type="Exception" if not isinstance(exc, JoltError) else "Error",
+            location=location,
+            message=message,
+            details=details)
+
+    @property
+    def errors(self):
+        return [ErrorProxy(error) for error in self._report.errors]
+
+    @property
+    def manifest(self):
+        return self._report
 
 
 class Resource(Task):
