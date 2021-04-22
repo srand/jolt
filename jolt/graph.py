@@ -581,12 +581,10 @@ class GraphPruner(object):
         for root in graph.roots:
             self._check_node(root)
 
+        for node in graph.goals:
+            self.retained.add(node)
+
         pruned = []
-
-        for node in graph:
-            if node.is_goal():
-                self.retained.add(node)
-
         for node in graph:
             if node not in self.retained:
                 pruned.append(node)

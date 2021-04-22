@@ -385,3 +385,39 @@ class BuildCli(testsupport.JoltTest):
         r = self.build("pass")
         a = self.artifacts(r)
         self.tools.run("cat {}/.build.log", a[0])
+
+    def test_force_requirement(self):
+        """
+        --- tasks:
+        class Dep(Task):
+            def run(self, deps, tools):
+                pass
+
+        class A(Task):
+            requires = "dep"
+            def run(self, deps, tools):
+                deps["dep"]
+
+        class B(Task):
+            requires = "a"
+            def run(self, deps, tools):
+                deps["a"]
+
+        class C(Task):
+            requires = "b"
+            def run(self, deps, tools):
+                deps["b"]
+        ---
+        """
+        r = self.build("c")
+        self.assertBuild(r, "a")
+        self.assertBuild(r, "b")
+        self.assertBuild(r, "c")
+
+        r = self.build("c")
+        self.assertNoBuild(r, "c")
+
+        r = self.build("c -f a")
+        self.assertBuild(r, "a")
+        self.assertBuild(r, "b")
+        self.assertBuild(r, "c")

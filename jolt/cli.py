@@ -2,6 +2,7 @@ import click
 import imp
 import subprocess
 import sys
+import uuid
 import webbrowser
 from os import _exit, environ, getcwd
 
@@ -255,12 +256,12 @@ def build(ctx, task, network, keep_going, identity, default, local,
         for mt in mb.defaults:
             registry.set_default_parameters(mt.name)
 
+    if force:
+        for goal in task:
+            registry.get_task(goal, manifest=manifest).taint = uuid.uuid4()
+
     gb = graph.GraphBuilder(registry, manifest, options, progress=True)
     dag = gb.build(task)
-
-    if force:
-        for goal in dag.goals:
-            goal.taint()
 
     # Inform cache about what task artifacts we will need.
     acache.advise(dag.tasks)
