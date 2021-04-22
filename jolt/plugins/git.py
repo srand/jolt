@@ -195,7 +195,7 @@ class GitRepository(object):
                 self.tools.run("git fetch {url} {refspec}",
                                url=self.url,
                                refspec=refspec or '',
-                               output=False)
+                               output_on_error=True)
 
     def checkout(self, rev):
         log.info("Checking out {0} in {1}", rev, self.path)
