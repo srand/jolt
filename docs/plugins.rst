@@ -195,6 +195,31 @@ These configuration keys exist:
 * ``uri`` - Base URI of the Jolt Dashboard. Default: http://dashboard
 
 
+Email
+-----
+
+The email plugin sends an HTML email report to configured recipients
+when builds have completed. The email includes a list of interpreted
+errors in case of failure.
+
+.. image:: img/email.png
+
+The plugin is enabled by adding a ``[email]`` section in
+the Jolt configuration.
+
+These configuration keys exist:
+
+* ``server`` - SMTP server used to send emails.
+* ``from`` - Sender email address.
+* ``to`` - Receiver email address. May also be read from environment, e.g.
+  ``{ENV|GERRIT_PATCHSET_UPLOADER_EMAIL}``. Multiple addresses should be
+  separated by a single space.
+* ``stylesheet`` - An optional custom XSLT stylesheet used to transform the
+  Jolt result manifest into an HTML email.
+* ``on_success`` - Send emails when builds are successful. Default: ``true``
+* ``on_failure`` - Send emails when builds failed. Default: ``true``
+
+
 FTP
 -----------
 
