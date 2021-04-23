@@ -1,16 +1,34 @@
 from setuptools import setup, find_packages
+from setuptools.command.build_py import build_py
 from codecs import open
-from os import path
+from os import makedirs, path
+from shutil import copyfile
 
 here = path.abspath(path.dirname(__file__))
+name = "jolt"
+version = "0.9.12"
+
 
 # Get the long description from the README file
 with open(path.join(here, 'README.rst'), encoding='utf-8') as f:
     long_description = f.read()
 
+
+class BuildCommand(build_py):
+    def run(self):
+        build_py.run(self)
+
+        # Install additional files required by selfdeploy plugin
+        if not self.dry_run:
+            target_dir = path.join(self.build_lib, name, "plugins", "selfdeploy")
+            makedirs(target_dir)
+            for fn in ["setup.py", "README.rst"]:
+                copyfile(path.join(here, fn), path.join(target_dir,fn))
+
 setup(
-    name='jolt',
-    version='0.9.12',
+    name=name,
+    cmdclass={"build_py": BuildCommand},
+    version=version,
     description='A task executor',
     long_description=long_description,
     url='https://bitbucket.org/rand_r/jolt',

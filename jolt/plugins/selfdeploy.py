@@ -61,6 +61,8 @@ class Jolt(Task):
             artifact.collect('jolt/*/*.py')
             artifact.collect('jolt/*/*/*.py')
             artifact.collect('jolt/*/*.xslt')
+            artifact.collect('jolt/plugins/selfdeploy/README.rst', flatten=True)
+            artifact.collect('jolt/plugins/selfdeploy/setup.py', flatten=True)
             for e in self.extras:
                 with tools.cwd(fs.path.dirname(e)):
                     artifact.collect(fs.path.basename(e))
