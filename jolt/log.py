@@ -20,6 +20,7 @@ except:
     from io import StringIO
 
 from jolt import config
+from jolt.error import JoltError
 from jolt import filesystem as fs
 from jolt import colors
 
@@ -191,12 +192,34 @@ def stderr(line, **kwargs):
 
 def exception(exc=None):
     if exc:
-        _logger.error(str(exc))
-    backtrace = traceback.format_exc()
-    for line in backtrace.splitlines():
+        te = traceback.TracebackException.from_exception(exc)
+        if isinstance(exc, JoltError):
+            _logger.error("{}", str(exc))
+        elif isinstance(exc, SyntaxError):
+            filename = fs.path.relpath(
+                te.filename,
+                fs.path.commonprefix([os.getcwd(), te.filename]))
+            _logger.error("SyntaxError: {} ({}, line {})",
+                          te.text.strip(),
+                          filename,
+                          te.lineno)
+        else:
+            filename = fs.path.relpath(
+                te.stack[-1].filename,
+                fs.path.commonprefix([os.getcwd(), te.stack[-1].filename]))
+            _logger.error("{}: {} ({}, line {}, in {})",
+                          type(exc).__name__,
+                          str(exc) or te.stack[-1].line,
+                          filename,
+                          te.stack[-1].lineno,
+                          te.stack[-1].name)
+        backtrace = traceback.format_exc().splitlines()
+    else:
+        backtrace = traceback.format_exc().splitlines()
+    for line in backtrace:
         line = line.replace("{", "{{")
         line = line.replace("}", "}}")
-        _logger.log(EXCEPTION, line)
+        _logger.log(EXCEPTION, line.strip())
 
 def transfer(line, context):
     context = "[{}] ".format(context)

@@ -370,6 +370,60 @@ class BuildCli(testsupport.JoltTest):
         l1 = self.tasks(r1, local=True)
         self.assertEqual(l1, [])
 
+    def test_error_messages(self):
+        """
+        --- tasks:
+        class Assert(Task):
+            def run(self, deps, tools):
+                assert False
+
+        class AssertMsg(Task):
+            def run(self, deps, tools):
+                assert False, "always fails"
+
+        class Command(Task):
+            def run(self, deps, tools):
+                tools.run("false")
+
+        class Error(Task):
+            def run(self, deps, tools):
+                from jolt import error
+                error.raise_task_error(self, "this is an error")
+        ---
+        """
+        with self.assertRaises(Exception):
+            self.build("assert")
+        r1 = self.lastLog()
+        self.assertIn("AssertionError: assert False (test.jolt, line 8, in run)", r1)
+
+        with self.assertRaises(Exception):
+            self.build("assertmsg")
+        r1 = self.lastLog()
+        self.assertIn("AssertionError: always fails (test.jolt, line 12, in run)", r1)
+
+        with self.assertRaises(Exception):
+            self.build("command")
+        r1 = self.lastLog()
+        self.assertIn("command failed: false", r1)
+
+        with self.assertRaises(Exception):
+            self.build("error")
+        r1 = self.lastLog()
+        self.assertIn("this is an error", r1)
+
+    def test_error_message_syntax_error(self):
+        """
+        --- tasks:
+        class Syntax(Task):
+            def run(self, deps, tools):
+                x*
+        ---
+        """
+        with self.assertRaises(Exception):
+            self.build("syntax")
+        r1 = self.lastLog()
+        self.assertIn("SyntaxError: x* (test.jolt, line 8)", r1)
+
     def test_export(self):
         """
         --- tasks:
