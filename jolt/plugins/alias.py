@@ -9,9 +9,7 @@ log.verbose("[Alias] Loaded")
 _registry = tasks.TaskRegistry.get()
 
 for key, value in config.options("alias"):
-    _registry.add_task_class(
-        type("Alias", (tasks.Alias,), {
-            "name": key,
-            "requires": value.split(),
-        })
-    )
+    class ConfigAlias(tasks.Alias):
+        name = key
+        requires = value.split()
+    _registry.add_task_class(ConfigAlias)
