@@ -12,6 +12,8 @@ from jolt.plugins.allure import Test
 
 
 def enable_network_testing(cls, storage_providers=None):
+    if os.getenv("JOLT_NO_NETWORK_TESTS"):
+        return cls
     class Gen(TaskGenerator):
         def generate(self):
             classes = []
@@ -85,6 +87,7 @@ class JoltTest(Test):
         self.deps = deps
         self.ws = tools.builddir(self._testMethodName)
         with tools.cwd(self.ws):
+            tools.setenv("JOLT_CONFIG_PATH", self.ws)
             tools.write_file("test.jolt", """
 from jolt import *
 from jolt.error import raise_error_if

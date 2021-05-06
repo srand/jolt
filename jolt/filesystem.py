@@ -62,10 +62,13 @@ def rmtree(path, ignore_errors=False):
 
 def unlink(path, ignore_errors=False):
     try:
-        os.unlink(path)
-    except:
+        if os.path.isdir(path) and not os.path.islink(path):
+            os.rmdir(path)
+        else:
+            os.unlink(path)
+    except Exception as e:
         if not ignore_errors:
-            raise
+            raise e
 
 _symlinks = None
 def has_symlinks():

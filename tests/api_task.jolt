@@ -167,8 +167,16 @@ class TaskApi(JoltTest):
         self.assertBuild(r, "base")
         self.assertBuild(r, "extended:i=2")
         self.assertNoBuild(r, "extendedextension:i=3")
+        self.assertIn("Publication skipped, already in local cache (base", r)
+        r = self.jolt("build extendedextension:i=2")
+        self.assertBuild(r, "base")
+        self.assertIn("Publication skipped, already in local cache (base", r)
+        self.assertBuild(r, "extended:i=2")
+        self.assertIn("Publication skipped, already in local cache (extended", r)
+        self.assertBuild(r, "extendedextension:i=2")
         r = self.jolt("build extendedextension:i=3")
         self.assertBuild(r, "base")
+        self.assertIn("Publication skipped, already in local cache (base", r)
         self.assertBuild(r, "extended:i=3")
         self.assertBuild(r, "extendedextension:i=3")
 
@@ -539,3 +547,85 @@ class TaskApi(JoltTest):
             a = self.artifacts(r)
             self.assertNotIn(a[0], artifacts)
             artifacts.add(a[0])
+
+    def test_unpack(self):
+        """
+        --- tasks:
+        class UnpackMe(Task):
+            def unpack(self, a, t):
+                t.run("sleep 1")
+                with t.cwd(a.path):
+                    t.write_file("unpacked", "yes")
+
+        class Unpacker1(Task):
+            requires = "unpackme"
+
+            def run(self, d, t):
+                with t.cwd(d["unpackme"].path):
+                    assert t.read_file("unpacked") == "yes"
+
+        class Unpacker2(Task):
+            requires = "unpackme"
+        ---
+        """
+        self.build("unpacker1")
+        self.jolt("clean")
+        r = self.build("-j2 unpacker1 unpacker2")
+        self.assertBuild(r, "unpacker1")
+        self.assertBuild(r, "unpacker2")
+        self.assertArtifact(r)
+
+    def test_unpack_fail(self):
+        """
+        --- tasks:
+        once = 0
+
+        class UnpackMe(Task):
+            def unpack(self, a, t):
+                # Fail once
+                global once
+                once += 1
+                assert once > 1
+                t.run("sleep 1")
+                with t.cwd(a.path):
+                    try:
+                        t.read_file("unpacked")
+                        assert False, "unpacked exists"
+                    except:
+                        pass
+                    t.write_file("unpacked", "yes")
+
+        class Unpacker1(Task):
+            requires = "unpackme"
+
+            def run(self, d, t):
+                with t.cwd(d["unpackme"].path):
+                    assert t.read_file("unpacked") == "yes"
+
+        class Unpacker2(Task):
+            requires = "unpackme"
+
+            def run(self, d, t):
+                with t.cwd(d["unpackme"].path):
+                    assert t.read_file("unpacked") == "yes"
+        ---
+        """
+        r = self.build("unpackme")
+        a = self.artifacts(r)
+        self.assertExists(a[0])
+        with self.assertRaises(Exception):
+            self.build("unpacker1")
+        self.assertExists(a[0])
+
+        # Unpackme should not have been discarded due to the error
+        r = self.build("unpackme")
+        a = self.artifacts(r)
+        self.assertNoBuild(r, "unpackme")
+        self.assertExists(a[0])
+
+        with self.assertRaises(Exception):
+            self.build("-j2 -k unpacker1 unpacker2")
+        r = self.lastLog()
+        self.assertIn("Execution finished", r)
+        self.assertNoArtifact(r)
+

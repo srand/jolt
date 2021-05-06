@@ -108,6 +108,9 @@ class TaskProxy(object):
     def info(self, fmt, *args, **kwargs):
         self.task.info(fmt + " " + self.log_name, *args, **kwargs)
 
+    def verbose(self, fmt, *args, **kwargs):
+        log.verbose(fmt + " " + self.log_name, *args, **kwargs)
+
     def warning(self, fmt, *args, **kwargs):
         self.task.warning(fmt + " " + self.log_name, *args, **kwargs)
 
@@ -129,8 +132,7 @@ class TaskProxy(object):
     def add_extension(self, task):
         if self.is_extension():
             self.get_extended_task().add_extension(task)
-        else:
-            self.extensions.append(task)
+        self.extensions.append(task)
 
     def set_extended_task(self, task):
         self._extended_task = task
@@ -346,29 +348,31 @@ class TaskProxy(object):
                     if self.task.is_runnable():
                         log.verbose("Host: {0}", getenv("HOSTNAME", "localhost"))
 
-                    with cache.get_context(self) as context:
-                        self.running()
-                        with self.tools.cwd(self.task.joltdir):
-                            hooks.task_prerun(self, context, self.tools)
-                            if self.is_goal() and self.options.debug:
-                                log.info("Entering debug shell")
-                                self.task.shell(context, self.tools)
-                            self.task.run(context, self.tools)
-                            hooks.task_postrun(self, context, self.tools)
+                    with cache.get_locked_artifact(self) as artifact:
+                        if not cache.is_available_locally(self) or self.has_extensions():
+                            with cache.get_context(self) as context:
+                                self.running()
+                                with self.tools.cwd(self.task.joltdir):
+                                    hooks.task_prerun(self, context, self.tools)
+                                    if self.is_goal() and self.options.debug:
+                                        log.info("Entering debug shell")
+                                        self.task.shell(context, self.tools)
+                                    self.task.run(context, self.tools)
+                                    hooks.task_postrun(self, context, self.tools)
 
-                        if cache.is_available_locally(self):
-                            with cache.get_artifact(self) as artifact:
-                                artifact.discard()
-
-                        with cache.get_artifact(self) as artifact:
-                            with self.tools.cwd(self.task.joltdir):
-                                hooks.task_prepublish(self, artifact, self.tools)
-                                self.task.publish(artifact, self.tools)
-                                self.task._verify_influence(context, artifact, self.tools)
-                                hooks.task_postpublish(self, artifact, self.tools)
-                            with open(fs.path.join(artifact.path, ".build.log"), "w") as f:
-                                f.write(buildlog.getvalue())
-                            artifact.commit()
+                                if not cache.is_available_locally(self):
+                                    with self.tools.cwd(self.task.joltdir):
+                                        hooks.task_prepublish(self, artifact, self.tools)
+                                        self.task.publish(artifact, self.tools)
+                                        self.task._verify_influence(context, artifact, self.tools)
+                                        hooks.task_postpublish(self, artifact, self.tools)
+                                    with open(fs.path.join(artifact.path, ".build.log"), "w") as f:
+                                        f.write(buildlog.getvalue())
+                                    cache.commit(artifact)
+                                else:
+                                    self.info("Publication skipped, already in local cache")
+                        else:
+                            self.info("Execution skipped, already in local cache")
 
             if force_build or force_upload or not available_remotely:
                 raise_task_error_if(

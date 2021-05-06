@@ -34,6 +34,14 @@ class AmqpWorker(Resource):
                 tools.run("docker stack deploy -c jolt.yaml jolt_test", output_on_error=True)
                 tools.run("docker service scale jolt_test_worker=1", output_on_error=True)
                 artifact.strings.config = tools.read_file("client.conf")
+            for i in range(0, 20):
+                try:
+                    assert "Queue bound" in tools.run("docker service logs jolt_test_worker", output=False)
+                    break
+                except:
+                    time.sleep(1)
+                    continue
+            assert "Queue bound" in tools.run("docker service logs jolt_test_worker", output=False)
             artifact.active = True
         except Exception as e:
             if os.getenv("CI"):
@@ -44,9 +52,9 @@ class AmqpWorker(Resource):
     def release(self, artifact, deps, tools):
         if artifact.active:
             tools.run("docker stack rm jolt_test")
-            for i in range(0, 10):
+            for i in range(0, 20):
                 try:
-                    tools.run("docker volume rm jolt_test_cache", output=False)
+                    tools.run("docker volume rm jolt_test_cache-http jolt_test_cache-node", output=False)
                     break
                 except:
                     time.sleep(1)

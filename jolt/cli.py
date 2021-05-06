@@ -126,6 +126,11 @@ def cli(ctx, verbose, extra_verbose, config_file, debug_exception, profile,
     for cls in tasks:
         TaskRegistry.get().add_task_class(cls)
 
+    if ctx.invoked_subcommand in ["build", "clean"]:
+        ctx.obj["workspace_lock"] = utils.LockFile(
+            fs.path.join(loader.joltdir, "build"),
+            log.info, "Workspace is locked by another process, please wait...")
+
     # If no command is given, we default to building the default task.
     # If the default task doesn't exist, help is printed inside build().
     if ctx.invoked_subcommand is None:
@@ -262,13 +267,6 @@ def build(ctx, task, network, keep_going, identity, default, local,
 
     gb = graph.GraphBuilder(registry, manifest, options, progress=True)
     dag = gb.build(task)
-
-    # Inform cache about what task artifacts we will need.
-    acache.advise(dag.tasks)
-
-    if identity:
-        root = dag.select(lambda graph, task: task.identity.startswith(identity))
-        raise_error_if(len(root) < 1, "unknown hash identity, no such task '{0}'", identity)
 
     gp = graph.GraphPruner(strategy)
     dag = gp.prune(dag)
@@ -469,7 +467,7 @@ def _config(ctx, list, delete, global_, user, key, value):
 
     def _print_key(section, opt):
         value = config.get(section, opt, alias=alias)
-        assert value is not None, "no such key: {}".format(key)
+        raise_error_if(value is None, "no such key: {}".format(key))
         print("{} = {}".format(key, value))
 
     if list:

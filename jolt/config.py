@@ -12,14 +12,16 @@ from jolt.error import raise_error_if
 from jolt.manifest import ManifestExtension, ManifestExtensionRegistry
 
 
-if os.name == "nt":
+if os.getenv("JOLT_CONFIG_PATH"):
+    location = fs.path.join(os.getenv("JOLT_CONFIG_PATH"), "config")
+    location_user = fs.path.join(os.getenv("JOLT_CONFIG_PATH"), "user")
+elif os.name == "nt":
     appdata = os.getenv("APPDATA", fs.path.join(fs.userhome(), "AppData", "Roaming"))
     location = fs.path.join(appdata, "Jolt", "config")
     location_user = fs.path.join(appdata, "Jolt", "user")
 else:
     location = fs.path.join(fs.userhome(), ".config", "jolt", "config")
     location_user = fs.path.join(fs.userhome(), ".config", "jolt", "user")
-
 
 class ConfigFile(SafeConfigParser):
     def __init__(self, location, *args, **kwargs):
@@ -68,7 +70,10 @@ class Config(object):
 
     def add_file(self, alias, location):
         file = ConfigFile(location)
-        self._configs.append((alias, file))
+        if alias == "cli":
+            self._configs.insert(-1, (alias, file))
+        else:
+            self._configs.append((alias, file))
         return file
 
     def get(self, section, key, default, alias=None):
@@ -126,8 +131,11 @@ class Config(object):
 _config = Config()
 _config.add_file("global", location)
 _config.add_file("user", location_user)
-_config.add_file("cli", None)
 _manifest = _config.add_file("manifest", None)
+# Note: cli configs are added next to last in the chain,
+# before manifest, and can therefore not override the
+# imported manifest config.
+_config.add_file("cli", None)
 _config.load()
 
 

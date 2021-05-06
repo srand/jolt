@@ -14,7 +14,7 @@ services:
     ports:
       - "8080:80"
     volumes:
-      - cache:/usr/share/nginx/html
+      - cache-http:/usr/share/nginx/html
   dashboard:
     image: robrt/jolt-dashboard:latest
     ports:
@@ -27,10 +27,13 @@ services:
     configs:
       - source: worker.conf
         target: /opt/jolt/worker.conf
+    volumes:
+      - cache-node:/root/.cache/jolt
 configs:
   worker.conf:
     file: ./worker.conf
   nginx.conf:
     file: ./nginx.conf
 volumes:
-  cache:
+  cache-node:
+  cache-http:
