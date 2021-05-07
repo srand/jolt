@@ -938,11 +938,9 @@ class TaskBase(object):
             log.warning("Missing influence: {} ({})", source, self.name)
         raise_task_error_if(sources, self, "task is missing source influence")
 
-    @utils.cached.instance
     def _get_export_objects(self):
         return self._exports
 
-    @utils.cached.instance
     def _get_parameter_objects(self, unset=False):
         return self._parameters
 
