@@ -13,10 +13,24 @@ def start_pdb(sig, frame):
     pdb.Pdb().set_trace(frame)
 
 
+def dump_threads(sig, frame):
+    import traceback
+    print("\n===============================================================================")
+    code = []
+    for threadId, stack in sys._current_frames().items():
+        print("\n--- ThreadID:", threadId)
+        for filename, lineno, name, line in traceback.extract_stack(stack):
+            print('File: "{}", line {}, in {}'.format(filename, lineno, name))
+            if line:
+                print("  " + line.strip())
+    print("\n===============================================================================\n")
+
+
 def main():
     if os.name == "posix":
         import signal
         signal.signal(signal.SIGUSR1, start_pdb)
+        signal.signal(signal.SIGUSR2, dump_threads)
 
     try:
         cli.cli(obj=dict())
