@@ -520,7 +520,7 @@ class Artifact(object):
     def tools(self):
         return self._node.tools
 
-    def collect(self, files, dest=None, flatten=False, symlinks=False):
+    def collect(self, files, dest=None, flatten=False, symlinks=False, cwd=None):
         """ Collect files to be included in the artifact.
 
         Args:
@@ -540,8 +540,13 @@ class Artifact(object):
                 relative to the current working directory.
             symlinks (boolean, optional): If True, symlinks are copied.
                 The default is False, i.e. the symlink target is copied.
+            cwd (str, optional): Change current working directory before
+                starting collection.
 
         """
+        if cwd:
+            with self.tools.cwd(cwd):
+                return self.collect(files, dest, flatten, symlinks)
 
         raise_task_error_if(
             not self.is_temporary(),

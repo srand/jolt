@@ -1,3 +1,4 @@
+import os
 import sys
 import time
 sys.path.append(".")
@@ -628,4 +629,40 @@ class TaskApi(JoltTest):
         r = self.lastLog()
         self.assertIn("Execution finished", r)
         self.assertNoArtifact(r)
+
+    def test_download(self):
+        """
+        --- tasks:
+        class Zlib(Download):
+            version = Parameter("1.2.11")
+            url = "https://zlib.net/zlib-{{version}}.tar.gz"
+            collect = [
+                ("zlib-{{version}}", "zlib1"),
+                dict(files="zlib-{{version}}", dest="zlib2"),
+                dict(files="*", dest="zlib3", cwd="zlib-{{version}}")
+            ]
+        class ZlibArchive(Download):
+            extract = False
+            version = Parameter("1.2.11")
+            url = "https://zlib.net/zlib-{{version}}.tar.gz"
+
+        class PlainText(Download):
+            version = Parameter("1.2.11")
+            url = "https://nodejs.org/dist/latest/SHASUMS256.txt"
+
+        ---
+        """
+        r = self.build("zlib")
+        a = self.artifacts(r)
+        self.assertExists(os.path.join(a[0], "zlib1", "gzlib.c"))
+        self.assertExists(os.path.join(a[0], "zlib2", "gzlib.c"))
+        self.assertExists(os.path.join(a[0], "zlib3", "gzlib.c"))
+
+        r = self.build("zlibarchive")
+        a = self.artifacts(r)
+        self.assertExists(os.path.join(a[0], "zlib-1.2.11.tar.gz"))
+
+        r = self.build("plaintext")
+        a = self.artifacts(r)
+        self.assertExists(os.path.join(a[0], "SHASUMS256.txt"))
 

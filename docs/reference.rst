@@ -50,6 +50,18 @@ Decorators
 .. reference-decorators-end
 
 
+Download
+--------
+
+.. reference-download-start
+
+.. autoclass:: jolt.tasks.Download
+   :undoc-members:
+   :members: collect, extract, url
+
+.. reference-download-end
+
+
 Influence
 ---------
 

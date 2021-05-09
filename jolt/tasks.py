@@ -1370,9 +1370,89 @@ class Alias(Task):
         pass
 
 
-class TaskException(Exception):
-    def __init__(self, *args, **kwargs):
-        super(TaskException, self).__init__(*args, **kwargs)
+class Download(Task):
+    """
+    Downloads a file over HTTP(S).
+
+    Once downloaded, archives are extracted and all of their files are published.
+    If the file is not an archive it is published as is. Recognized archive extensions are:
+
+        - .tar
+        - .tar.bz2
+        - .tar.gz
+        - .tar.xz
+        - .zip
+
+    Example:
+
+      .. code-block:: python
+
+        class NodeJS(Download):
+            \"\"\" Downloads and publishes Node.js. Adds binaries to PATH. \"\"\"
+
+            version = Parameter("14.16.1")
+            url = "https://nodejs.org/dist/v{version}/node-v{version}-win-x64.zip"
+
+            def publish(self, artifact, tools):
+                super(publish).publish(artifact, tools)
+                artifact.environ.PATH.append("node-v{version}-win-x64")
+    """
+
+    abstract = True
+
+    collect = ["*"]
+    """
+    A list of file publication instructions.
+
+    Items in the list are passed directly to :func:`Artifact.collect() <jolt.Artifact.collect>`
+    and can be either strings, tuples or dictionaries.
+
+    Example:
+
+      .. code-block:: python
+
+            collect = [
+                "*",                           # Collect all files
+                ("*", "src/"),                 # Collect all files into the artifact's src/ directory
+                {"files": "*", cwd="subdir"},  # Collect all files from the archive's subdir/ directory
+            ]
+
+    """
+
+    extract = True
+    """ Automatically extract archives. """
+
+    url = None
+    """ URL of file to download. """
+
+    def _filename_from_url(self, tools):
+        from urllib.parse import urlparse
+        url = urlparse(tools.expand(self.url))
+        return fs.posixpath.basename(url.path) or "file"
+
+    def run(self, deps, tools):
+        self._builddir = tools.builddir()
+        filename = self._filename_from_url(tools)
+        with tools.cwd(self._builddir):
+            raise_task_error_if(
+                not tools.download(self.url, filename), self,
+                "download failed: {}", tools.expand(self.url))
+        if self.extract and any(map(lambda n: filename.endswith(n), [".tar", ".tar.bz2", ".tar.gz", ".tar.xz", ".zip"])):
+            self._srcdir = self._builddir
+            self._builddir = tools.builddir("extracted")
+            with tools.cwd(self._builddir):
+                self.info("Extracting {}", filename)
+                tools.extract(fs.path.join(self._srcdir, filename), ".")
+
+    def publish(self, artifact, tools):
+        with tools.cwd(self._builddir):
+            for files in self.collect:
+                if type(files) == tuple:
+                    artifact.collect(*files)
+                elif type(files) == dict:
+                    artifact.collect(**files)
+                else:
+                    artifact.collect(files)
 
 
 
