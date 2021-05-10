@@ -3,7 +3,6 @@ import copy
 import smtplib
 from email.message import EmailMessage
 import os
-
 from jolt import config
 from jolt import filesystem as fs
 from jolt import log
@@ -11,6 +10,7 @@ from jolt import utils
 from jolt.error import raise_error_if
 from jolt.plugins import report
 from jolt.hooks import CliHook, CliHookFactory
+from jolt.tasks import TaskRegistry
 
 
 class EmailHooks(CliHook):
@@ -35,8 +35,17 @@ class EmailHooks(CliHook):
             param.key = key
             param.value = value
 
+    def shorten_task_names(self, report):
+        # Use the short qualified task names in the report
+        for mtask in report.tasks:
+            with utils.ignore_exception():
+                # mtask.name is a fully qualified name
+                task = TaskRegistry.get().get_task(mtask.name)
+                mtask.name = task.short_qualified_name
+
     def send_report(self, report):
         self.annotate_report(report)
+        self.shorten_task_names(report)
 
         if self._artifact:
             with open(self._artifact, "w") as f:

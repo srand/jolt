@@ -16,7 +16,7 @@ class ReportHooks(TaskHook):
         self.manifest = JoltManifest()
 
     def finalize_report(self, report, task, result):
-        report.name = task.short_qualified_name
+        report.name = task.qualified_name
         report.duration = str(task.duration_running.seconds)
         report.goal = str(task.is_goal()).lower()
         report.identity = task.identity

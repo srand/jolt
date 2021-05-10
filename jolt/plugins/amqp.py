@@ -655,8 +655,8 @@ class AmqpExecutor(scheduler.NetworkExecutor):
         manifest = JoltManifest.export(self.task)
         build = manifest.create_build()
 
-        tasks = [self.task.short_qualified_name]
-        tasks += [t.short_qualified_name for t in self.task.extensions]
+        tasks = [self.task.qualified_name]
+        tasks += [t.qualified_name for t in self.task.extensions]
 
         for task in tasks:
             mt = build.create_task()
@@ -718,7 +718,7 @@ class AmqpExecutor(scheduler.NetworkExecutor):
                 log.transfer(line, self.task.identity[:8])
             for task in [self.task] + self.task.extensions:
                 with task.task.report() as report:
-                    remote_report = manifest.find_task(task.short_qualified_name)
+                    remote_report = manifest.find_task(task.qualified_name)
                     if remote_report:
                         for error in remote_report.errors:
                             report.manifest.append(error)
