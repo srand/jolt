@@ -547,10 +547,11 @@ class WorkerStrategy(ExecutionStrategy, PruneStrategy):
     def should_prune_requirements(self, task):
         if task.is_alias() or not task.is_cacheable():
             return False
-        if task.is_available_locally(self.cache) and task.is_uploadable(self.cache):
-            return True
-        if task.is_available_remotely(self.cache):
-            return True
+        if task.is_available_locally(self.cache):
+            if task.is_uploadable(self.cache):
+                return True
+            if not task.is_goal() and task.task.selfsustained:
+                return True
         return False
 
 
