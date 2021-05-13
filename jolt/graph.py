@@ -578,8 +578,7 @@ class GraphPruner(object):
 
         prune = self.strategy.should_prune_requirements(node)
         if not node.task.selfsustained or not prune or node.is_extension():
-            for child in node.neighbors:
-                self._check_node(child)
+            utils.map_concurrent(self._check_node, node.neighbors)
 
     def prune(self, graph):
         for root in graph.roots:
