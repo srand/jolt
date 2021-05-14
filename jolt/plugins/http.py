@@ -1,4 +1,3 @@
-import requests
 from requests.auth import HTTPBasicAuth
 from requests.exceptions import ConnectTimeout, RequestException
 import keyring
@@ -48,6 +47,7 @@ class Http(cache.StorageProvider):
             password = getpass.getpass(NAME + " password: ")
             raise_error_if(not password, "no password in keyring for " + NAME)
             keyring.set_password(service, username, password)
+
         return HTTPBasicAuth(username, password)
 
     def _get_url(self, node, artifact):
@@ -92,9 +92,11 @@ class Http(cache.StorageProvider):
         if self._disabled:
             return False
         with self._cache.get_artifact(node) as artifact:
+            from requests.api import head
+
             url = self._get_url(node, artifact)
             try:
-                response = requests.head(url, stream=True, timeout=TIMEOUT_HEAD)
+                response = head(url, stream=True, timeout=TIMEOUT_HEAD)
             except ConnectTimeout:
                 self._disabled = True
                 log.warning("[HTTP] failed to establish server connection, disabled")

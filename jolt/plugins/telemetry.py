@@ -1,5 +1,4 @@
 from socket import gethostname
-import requests
 from requests.exceptions import RequestException
 
 from jolt import config
@@ -42,7 +41,8 @@ class TelemetryHooks(TaskHook):
             "role": "client" if client else "worker",
             "event": event,
         }
-        r = requests.post(self._uri, json=data)
+        from requests.api import post
+        r = post(self._uri, json=data)
         r.raise_for_status()
 
     def task_started(self, task):
