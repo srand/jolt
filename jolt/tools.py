@@ -11,7 +11,6 @@ if os.name != "nt":
 import glob
 import multiprocessing
 import shutil
-import requests
 import tarfile
 import zipfile
 import bz2file
@@ -637,6 +636,7 @@ class Tools(object):
         url = self.expand(url)
         pathname = self.expand_path(pathname)
         try:
+            import requests
             response = requests.get(url, stream=True, **kwargs)
             name = fs.path.basename(pathname)
             size = int(response.headers.get('content-length', 0))
@@ -1292,6 +1292,7 @@ class Tools(object):
                     data = fileobj.read(4096)
                     pbar.update(len(data))
                     return data
+                import requests
                 response = requests.put(url, data=iter(read, b''), auth=auth, **kwargs)
                 if response.status_code not in [201, 204]:
                     log.verbose("Server response {} for {}", response.status_code, url)

@@ -1,12 +1,12 @@
 from contextlib import contextmanager
 import copy
 import hashlib
-import networkx as nx
 from os import getenv
 from threading import RLock
+from collections import OrderedDict
 import uuid
 
-from jolt.tasks import Alias, Export, Resource, WorkspaceResource
+from jolt.tasks import Alias, Resource, WorkspaceResource
 #from jolt.utils import *
 from jolt.influence import HashInfluenceRegistry, TaskRequirementInfluence
 from jolt import log
@@ -289,7 +289,7 @@ class TaskProxy(object):
         self._completed = True
         try:
             self.graph.remove_node(self)
-        except nx.exception.NetworkXError:
+        except KeyError:
             self.warning("Pruned task was executed")
         self.task.info(colors.green(what + " finished after {0} {1}" + self.log_name),
                        self.duration_running,
@@ -300,7 +300,7 @@ class TaskProxy(object):
         self._completed = True
         try:
             self.graph.remove_node(self)
-        except nx.exception.NetworkXError:
+        except KeyError:
             pass
         hooks.task_skipped(self)
 
@@ -308,7 +308,7 @@ class TaskProxy(object):
         self._completed = True
         try:
             self.graph.remove_node(self)
-        except nx.exception.NetworkXError:
+        except KeyError:
             self.warning("Pruned task was already pruned")
         hooks.task_pruned(self)
 
@@ -394,15 +394,60 @@ class TaskProxy(object):
         return self.task.report()
 
 
-class Graph(nx.DiGraph):
+class Graph(object):
     def __init__(self):
-        super(Graph, self).__init__()
         self._mutex = RLock()
         self._failed = []
+        self._children = OrderedDict()
+        self._parents = OrderedDict()
+
+    def add_node(self, node):
+        with self._mutex:
+            self._children[node] = OrderedDict()
+            self._parents[node] = OrderedDict()
 
     def remove_node(self, node):
         with self._mutex:
-            super(Graph, self).remove_node(node)
+            parents = self._parents[node].keys()
+            for child in self._children[node]:
+                del self._parents[child][node]
+            for parent in parents:
+                del self._children[parent][node]
+            del self._children[node]
+            del self._parents[node]
+
+    def add_edges_from(self, edges):
+        with self._mutex:
+            for src, dst in edges:
+                self._children[src][dst] = None
+                self._parents[dst][src] = None
+
+    @property
+    def topological_nodes(self):
+        with self._mutex:
+            G = Graph()
+            G._children = OrderedDict()
+            G._parents = OrderedDict()
+            for k, v in self._children.items():
+                G._children[k] = copy.copy(v)
+            for k, v in self._parents.items():
+                G._parents[k] = copy.copy(v)
+            S = G.roots
+            L = []
+            while S:
+                for n in S:
+                    L.append(n)
+                    G.remove_node(n)
+                S = G.roots
+            raise_error_if(len(G.nodes) > 0, "graph has cycles")
+            print([n.name for n in L])
+            return L
+
+
+    @property
+    def nodes(self):
+        with self._mutex:
+            return self._children.keys()
 
     def number_of_tasks(self, filterfn=None):
         return len(list(filter(filterfn, self.nodes)) if filterfn else self.nodes)
@@ -439,16 +484,16 @@ class Graph(nx.DiGraph):
     def debug(self):
         with self._mutex:
             log.debug("[GRAPH] Listing all nodes")
-            for node in nx.topological_sort(self):
-                log.debug("[GRAPH]   " + node.qualified_name + " ({})", self.out_degree(node))
+            for node in self.topological_nodes:
+                log.debug("[GRAPH]   " + node.qualified_name + " ({})", len(self._children[node].keys()))
 
     def is_leaf(self, node):
         with self._mutex:
-            return self.out_degree(node) == 0
+            return len(self._children[node].keys()) == 0
 
     def is_root(self, node):
         with self._mutex:
-            return self.in_degree(node) == 0
+            return len(self._parents[node].keys()) == 0
 
     def is_orphan(self, node):
         with self._mutex:
@@ -456,7 +501,7 @@ class Graph(nx.DiGraph):
 
     def are_neighbors(self, n1, n2):
         with self._mutex:
-            return n2 in self[n1]
+            return n2 in self._children[n1]
 
 
 class GraphBuilder(object):
@@ -524,12 +569,10 @@ class GraphBuilder(object):
     def build(self, task_list, influence=True):
         with self._progress("Building graph", len(self.graph.tasks), "tasks") as progress:
             goals = [self._get_node(progress, task) for task in task_list]
-            raise_error_if(not nx.is_directed_acyclic_graph(self.graph),
-                           "there are cyclic task dependencies")
             self.graph._nodes_by_name = self.nodes
 
         if influence:
-            topological_nodes = list(nx.topological_sort(self.graph))
+            topological_nodes = self.graph.topological_nodes
             with self._progress("Collecting task influence", len(self.graph.tasks), "tasks") as p:
                 for node in reversed(topological_nodes):
                     node.finalize(self.graph, self.manifest)
@@ -588,7 +631,7 @@ class GraphPruner(object):
             self.retained.add(node)
 
         pruned = []
-        for node in graph:
+        for node in graph.nodes:
             if node not in self.retained:
                 pruned.append(node)
             else:

@@ -8,7 +8,6 @@ from os import _exit, environ, getcwd
 
 from jolt.tasks import TaskRegistry, Parameter
 from jolt import scheduler
-from jolt import graph
 from jolt import cache
 from jolt import colors
 from jolt import filesystem as fs
@@ -126,7 +125,7 @@ def cli(ctx, verbose, extra_verbose, config_file, debug_exception, profile,
     for cls in tasks:
         TaskRegistry.get().add_task_class(cls)
 
-    if ctx.invoked_subcommand in ["build", "clean"]:
+    if ctx.invoked_subcommand in ["build", "clean"] and loader.joltdir:
         ctx.obj["workspace_lock"] = utils.LockFile(
             fs.path.join(loader.joltdir, "build"),
             log.info, "Workspace is locked by another process, please wait...")
@@ -265,6 +264,8 @@ def build(ctx, task, network, keep_going, identity, default, local,
         for goal in task:
             registry.get_task(goal, manifest=manifest).taint = uuid.uuid4()
 
+    from jolt import graph
+
     gb = graph.GraphBuilder(registry, manifest, options, progress=True)
     dag = gb.build(task)
 
@@ -369,6 +370,8 @@ def clean(ctx, task, deps, expired):
     use the --expired parameter. Artifacts typically expire immediately after
     creation unless explicitly configured not to.
     """
+    from jolt import graph
+
     acache = cache.ArtifactCache.get()
     if task:
         task = [utils.stable_task_name(t) for t in task]
@@ -507,6 +510,8 @@ def display(ctx, task, reverse=None, show_cache=False):
     Display a task and its dependencies visually.
 
     """
+    from jolt import graph
+
     registry = TaskRegistry.get()
     gb = graph.GraphBuilder(registry, ctx.obj["manifest"])
     dag = gb.build(task, influence=show_cache)
@@ -587,6 +592,8 @@ def freeze(ctx, task, default, output, remove):
     for params in default:
         registry.set_default_parameters(params)
 
+    from jolt import graph
+
     gb = graph.GraphBuilder(registry, manifest)
     dag = gb.build(task)
 
@@ -643,6 +650,7 @@ def _list(ctx, task=None, reverse=None):
     reverse = [utils.stable_task_name(t) for t in utils.as_list(reverse or [])]
 
     try:
+        from jolt import graph
         dag = graph.GraphBuilder(registry, ctx.obj["manifest"]).build(task, influence=False)
     except JoltError as e:
         raise e
@@ -745,6 +753,7 @@ def info(ctx, task, influence=False, artifacts=False, salt=None):
         task.taint = salt
 
     if artifacts:
+        from jolt import graph
         acache = cache.ArtifactCache.get()
         builder = graph.GraphBuilder(task_registry, manifest)
         dag = builder.build([task.qualified_name])
