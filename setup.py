@@ -43,7 +43,7 @@ setup(
     ],
     keywords='build msbuild xcode make pam bazel jolt conan',
     packages=find_packages(exclude=['contrib', 'docs', 'tests']),
-    install_requires=["requests", "click>=7.0", "networkx", "keyring", "keyrings.alt",
+    install_requires=["requests", "click>=7.0", "keyring", "keyrings.alt",
                       "jinja2", "python-jenkins", "multi_key_dict",
                       "tqdm<=4.29.1", "bz2file", "colorama", "ninja-syntax",
                       "pyyaml", "fasteners", "ntfsutils", "pygit2", "lxml"],

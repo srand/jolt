@@ -126,7 +126,7 @@ def cli(ctx, verbose, extra_verbose, config_file, debug_exception, profile,
     for cls in tasks:
         TaskRegistry.get().add_task_class(cls)
 
-    if ctx.invoked_subcommand in ["build", "clean"]:
+    if ctx.invoked_subcommand in ["build", "clean"] and loader.joltdir:
         ctx.obj["workspace_lock"] = utils.LockFile(
             fs.path.join(loader.joltdir, "build"),
             log.info, "Workspace is locked by another process, please wait...")
