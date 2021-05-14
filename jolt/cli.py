@@ -150,6 +150,10 @@ def cli(ctx, verbose, extra_verbose, config_file, debug_exception, profile,
 
 
 def _autocomplete_tasks(ctx, args, incomplete):
+    manifest = JoltManifest()
+    utils.call_and_catch(manifest.parse)
+    manifest.process_import()
+
     tasks = JoltLoader.get().load()
     tasks = [task.name for task in tasks if task.name.startswith(incomplete or '')]
     return sorted(tasks)
