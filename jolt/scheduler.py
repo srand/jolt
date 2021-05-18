@@ -139,6 +139,8 @@ class Downloader(Executor):
     def _download(self, env, task):
         if self.is_aborted():
             return
+        if not task.is_downloadable():
+            return
         try:
             task.started("Download")
             raise_task_error_if(
@@ -481,6 +483,12 @@ class DistributedStrategy(ExecutionStrategy, PruneStrategy):
         if not self.cache.upload_enabled():
             return self.executors.create_network(task)
 
+        if not task.is_goal(with_extensions=False):
+            task.disable_download()
+        for extension in task.extensions:
+            if not extension.is_goal(with_extensions=False):
+                extension.disable_download()
+
         remote = task.is_available_remotely(self.cache)
         if remote:
             if task.is_goal() and self.cache.download_enabled() and \
@@ -492,12 +500,6 @@ class DistributedStrategy(ExecutionStrategy, PruneStrategy):
                 return self.executors.create_uploader(task)
             if task.is_fast() and task.deps_available_locally(self.cache):
                 return self.executors.create_local(task)
-
-        if not task.is_goal():
-            task.disable_download()
-        for extension in task.extensions:
-            if not extension.is_goal():
-                extension.disable_download()
 
         return self.executors.create_network(task)
 

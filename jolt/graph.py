@@ -180,8 +180,8 @@ class TaskProxy(object):
     def is_identified(self):
         return self.task.identity is not None
 
-    def is_goal(self):
-        return self._goal or any([e.is_goal() for e in self.extensions])
+    def is_goal(self, with_extensions=True):
+        return self._goal or (with_extensions and any([e.is_goal() for e in self.extensions]))
 
     def in_progress(self):
         return self._in_progress
