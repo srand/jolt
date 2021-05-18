@@ -860,8 +860,10 @@ class ArtifactCache(StorageProvider):
             size = self._db_select_sum_artifact_size(db)
             count = self._db_select_artifact_count(db)
             in_use = self._db_select_artifact_count_in_use(db)
-            log.verbose("Cache size is {} ({} artifacts, {} in use)",
-                        utils.as_human_size(size), count, in_use)
+            cur_size = utils.as_human_size(size)
+            max_size = utils.as_human_size(self._max_size)
+            log.verbose("Cache size is {} (max {}, {} artifacts, {} in use)",
+                        cur_size, max_size, count, in_use)
         atexit.register(self.close)
 
 
