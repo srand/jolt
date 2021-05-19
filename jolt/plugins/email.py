@@ -48,6 +48,9 @@ class EmailHooks(CliHook):
         self.shorten_task_names(report)
 
         if self._artifact:
+            dirname = fs.path.dirname(self._artifact)
+            if dirname:
+                fs.makedirs(dirname)
             with open(self._artifact, "w") as f:
                 f.write(report.transform(self._stylesheet))
 
