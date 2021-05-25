@@ -205,6 +205,7 @@ def compdb(ctx, task, default):
     for goal in dag.goals:
         artifact, deps = get_task_artifacts(goal)
         db = CompDB("all_compile_commands.json", artifact)
+        db.read()
         db.relocate(goal)
         outdir = goal.tools.builddir("compdb", incremental=True)
         dbpath = fs.path.join(outdir, "all_compile_commands.json")
