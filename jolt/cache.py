@@ -1102,7 +1102,7 @@ class ArtifactCache(StorageProvider):
         artifact._read_manifest()
 
     def _fs_delete_artifact(self, identity, name):
-        fs.rmtree(self._fs_get_artifact_path(identity, name))
+        fs.rmtree(self._fs_get_artifact_path(identity, name), ignore_errors=True)
         fs.rmtree(self._fs_get_artifact_tmppath(identity, name), ignore_errors=True)
         fs.unlink(fs.path.join(self.root, name), ignore_errors=True)
 
@@ -1333,7 +1333,7 @@ class ArtifactCache(StorageProvider):
                     self.commit(artifact)
                 except Exception as e:
                     # Restore the temporary copy
-                    fs.rmtree(artifact.path)
+                    fs.rmtree(artifact.path, ignore_errors=True)
                     fs.rename(artifact.temporary_path, artifact.path)
                     raise e
         return True
