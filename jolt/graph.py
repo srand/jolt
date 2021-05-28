@@ -348,7 +348,7 @@ class TaskProxy(object):
                     if self.task.is_runnable():
                         log.verbose("Host: {0}", getenv("HOSTNAME", "localhost"))
 
-                    with cache.get_locked_artifact(self) as artifact:
+                    with cache.get_locked_artifact(self, discard=force_build) as artifact:
                         if not cache.is_available_locally(self) or self.has_extensions():
                             with cache.get_context(self) as context:
                                 self.running()

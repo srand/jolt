@@ -910,9 +910,10 @@ class ArtifactCache(StorageProvider):
         cur.execute("UPDATE artifacts SET size = ? WHERE identity = ?", (size, identity))
         db.commit()
 
-    def _db_delete_artifact(self, db, identity):
+    def _db_delete_artifact(self, db, identity, and_refs=True):
         cur = db.cursor()
-        cur.execute("DELETE FROM artifact_refs WHERE identity = ?", (identity,))
+        if and_refs:
+            cur.execute("DELETE FROM artifact_refs WHERE identity = ?", (identity,))
         cur.execute("DELETE FROM artifacts WHERE identity = ?", (identity,))
         db.commit()
 
@@ -926,6 +927,10 @@ class ArtifactCache(StorageProvider):
         cur = db.cursor()
         cur.execute("DELETE FROM artifact_refs WHERE identity = ? AND pid = ?", (identity, self._pid))
         db.commit()
+
+    def _db_select_reference(self, db, identity):
+        cur = db.cursor()
+        return list(cur.execute("SELECT * FROM artifact_refs WHERE identity = ? AND pid = ?", (identity, self._pid)))
 
     def _db_insert_lock(self, db, identity):
         cur = db.cursor()
@@ -969,9 +974,17 @@ class ArtifactCache(StorageProvider):
         cur = db.cursor()
         return [n[0] for n in cur.execute("SELECT DISTINCT pid FROM artifact_lockrefs")]
 
+    def _db_select_artifact_lock_pids(self, db, identity):
+        cur = db.cursor()
+        return [n[0] for n in cur.execute("SELECT DISTINCT pid FROM artifact_lockrefs WHERE identity = ?", (identity,))]
+
     def _db_select_reference_pids(self, db):
         cur = db.cursor()
         return [n[0] for n in cur.execute("SELECT DISTINCT pid FROM artifact_refs")]
+
+    def _db_select_artifact_reference_pids(self, db, identity):
+        cur = db.cursor()
+        return [n[0] for n in cur.execute("SELECT DISTINCT pid FROM artifact_refs WHERE identity = ?", (identity,))]
 
     def _db_select_artifact_not_in_use(self, db, identity):
         cur = db.cursor()
@@ -1072,11 +1085,12 @@ class ArtifactCache(StorageProvider):
     @contextlib.contextmanager
     def _fs_compress_artifact(self, artifact):
         task = artifact.get_task()
+        archive = artifact.get_archive_path()
+
         raise_task_error_if(
             artifact.is_temporary(), task,
             "can't compress an unpublished task artifact")
 
-        archive = artifact.get_archive_path()
         try:
             task.tools.archive(artifact.path, archive)
         except KeyboardInterrupt as e:
@@ -1160,17 +1174,18 @@ class ArtifactCache(StorageProvider):
                 self._lock_file.release()
 
     @contextlib.contextmanager
-    def _pid_lock(self, pid):
+    def _pid_lock(self, pid, wait=False, timeout=None):
         """
         Process specific lock.
 
         Indicator of process liveness. Throws exception if process is alive.
         """
-        self._assert_cache_locked()
+        if not wait:
+            self._assert_cache_locked()
         with self._thread_lock:
             lock_file = self._fs_get_pid_file(pid)
             lock = fasteners.InterProcessLock(lock_file)
-            if not lock.acquire(blocking=False):
+            if not lock.acquire(blocking=wait, timeout=timeout):
                 raise RuntimeError()
             try:
                 yield
@@ -1205,7 +1220,7 @@ class ArtifactCache(StorageProvider):
         if not node.task.is_cacheable():
             return False
         with self._cache_lock(), self._db() as db:
-            if self._db_select_artifact(db, node.identity):
+            if self._db_select_artifact(db, node.identity) or self._db_select_reference(db, node.identity):
                 with self._fs_get_artifact(node) as a:
                     if a.is_temporary():
                         self._db_delete_artifact(db, node.identity)
@@ -1376,6 +1391,48 @@ class ArtifactCache(StorageProvider):
             self._fs_invalidate_pids(db)
             return self._discard(db, self._db_select_artifact_not_in_use(db, node.identity), if_expired)
 
+    def _discard_wait(self, node):
+        """
+        Discards an artifact without expiration consideration.
+
+        The artifact must be locked prior to calling this function.
+
+        If the artifact is in use, the function waits for all references to be dropped.
+        The artifact is also unregistered from the database to prevent new references,
+        but it remains available in the filesystem.
+        """
+        with self._cache_lock(), self._db() as db:
+            self._db_invalidate_locks(db)
+            self._db_invalidate_references(db)
+            self._fs_invalidate_pids(db)
+            artifacts = self._db_select_artifact(db, node.identity)
+            self._db_delete_artifact(db, node.identity, and_refs=False)
+            refpids = self._db_select_artifact_reference_pids(db, node.identity)
+            lockpids = self._db_select_artifact_lock_pids(db, node.identity)
+
+        if len(refpids) > 1:
+            node.info("Artifact is temporarily in use, forced discard on hold")
+            for pid in refpids:
+                # Loop waiting for other processes to surrender the artifact
+                while True:
+                    try:
+                        # No need to wait for self, nor for processes waiting
+                        # for the artifact lock we are already holding.
+                        if pid == self._pid or pid in lockpids:
+                            break
+                        # Throws exception after 1s if lock is not acquired.
+                        # We then we check if there are any new lock references,
+                        # which allows us to a break deadlock condition.
+                        with self._pid_lock(pid, wait=True, timeout=1):
+                            break
+                    except RuntimeError as e:
+                        with self._cache_lock(), self._db() as db:
+                            lockpids = self._db_select_artifact_lock_pids(db, node.identity)
+
+        with self._cache_lock(), self._db() as db:
+            assert self._discard(db, artifacts, False), "Failed to discard artifact"
+        return self._fs_get_artifact(node)
+
     def discard_all(self, if_expired=False):
         with self._cache_lock(), self._db() as db:
             self._db_invalidate_locks(db)
@@ -1390,7 +1447,7 @@ class ArtifactCache(StorageProvider):
         return self._fs_get_artifact(node)
 
     @contextlib.contextmanager
-    def get_locked_artifact(self, node):
+    def get_locked_artifact(self, node, discard=False):
         """
         Locks the task artifact.
 
@@ -1409,7 +1466,9 @@ class ArtifactCache(StorageProvider):
             lock.acquire()
 
         try:
-            artifact = self._fs_get_artifact(node)
+            artifact = self.get_artifact(node)
+            if discard:
+                artifact = self._discard_wait(node)
             if artifact.is_temporary():
                 fs.rmtree(artifact.temporary_path, ignore_errors=True)
                 fs.makedirs(artifact.temporary_path)
