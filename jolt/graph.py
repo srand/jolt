@@ -439,7 +439,11 @@ class Graph(object):
                     L.append(n)
                     G.remove_node(n)
                 S = G.roots
-            raise_error_if(len(G.nodes) > 0, "graph has cycles")
+            if len(G.nodes) > 0:
+                log.debug("[GRAPH] Graph has cycles between these nodes:")
+                for node in G.nodes:
+                    log.debug("[GRAPH]   " + node.short_qualified_name)
+                raise_error_if(len(G.nodes) > 0, "graph has cycles")
             return L
 
     def clone(self):
