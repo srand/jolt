@@ -204,6 +204,10 @@ class TaskProxy(object):
     def is_resource(self):
         return isinstance(self.task, Resource)
 
+    def is_unpacked(self, cache):
+        tasks = [self] + self.extensions
+        return any(map(cache.is_unpacked, tasks))
+
     def is_uploadable(self, cache):
         tasks = [self] + self.extensions
         return all(map(cache.is_uploadable, tasks))
@@ -374,7 +378,13 @@ class TaskProxy(object):
                         else:
                             self.info("Execution skipped, already in local cache")
 
-            if force_build or force_upload or not available_remotely:
+                        # Must upload the artifact while still holding its lock, otherwise the
+                        # artifact may become unpack():ed before we have a chance to.
+                        if force_upload or force_build or not available_remotely:
+                            raise_task_error_if(
+                                not cache.upload(self, force=force_upload, locked=False) and cache.upload_enabled(),
+                                self, "failed to upload task artifact")
+            elif force_upload or not available_remotely:
                 raise_task_error_if(
                     not cache.upload(self, force=force_upload) and cache.upload_enabled(),
                     self, "failed to upload task artifact")

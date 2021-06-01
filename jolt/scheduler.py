@@ -403,65 +403,6 @@ class DownloadStrategy(ExecutionStrategy, PruneStrategy):
         return False
 
 
-class CollaborativeDistributedStrategy(ExecutionStrategy, PruneStrategy):
-    def __init__(self, executors, cache):
-        self.executors = executors
-        self.cache = cache
-
-    def create_executor(self, task):
-        if task.is_resource():
-            return self.executors.create_local(task)
-
-        if task.is_alias():
-            return self.executors.create_skipper(task)
-
-        if not task.is_cacheable():
-            return self.executors.create_network(task)
-
-        # Check remote availability first so that the availability of
-        # remote storage providers is made known when checking if
-        # artifacts can be downloaded or not.
-        remote = task.is_available_remotely(self.cache)
-
-        if not self.cache.download_enabled():
-            if not task.is_available_locally(self.cache):
-                return self.executors.create_local(task)
-            else:
-                return self.executors.create_skipper(task)
-
-        if remote:
-            if not task.is_available_locally(self.cache):
-                return self.executors.create_downloader(task)
-            else:
-                return self.executors.create_skipper(task)
-
-        if task.is_available_locally(self.cache):
-            if self.cache.upload_enabled():
-                if task.is_uploadable(self.cache):
-                    return self.executors.create_uploader(task)
-                else:
-                    return self.executors.create_network(task)
-            else:
-                return self.executors.create_skipper(task)
-
-        if task.is_fast():
-            if not self.cache.upload_enabled():
-                return self.executors.create_network(task)
-            else:
-                return self.executors.create_local(task)
-
-        return self.executors.create_network(task)
-
-    def should_prune_requirements(self, task):
-        if task.is_alias() or not task.is_cacheable():
-            return False
-        if self.cache.upload_enabled() and task.is_available_locally(self.cache):
-            return True
-        if self.cache.download_enabled() and task.is_available_remotely(self.cache):
-            return True
-        return False
-
-
 class DistributedStrategy(ExecutionStrategy, PruneStrategy):
     def __init__(self, executors, cache):
         self.executors = executors
@@ -532,7 +473,10 @@ class WorkerStrategy(ExecutionStrategy, PruneStrategy):
 
         if task.is_available_locally(self.cache):
             if task.is_goal() and not task.is_available_remotely(self.cache):
-                if task.is_uploadable(self.cache):
+                # Unpacked artifacts may become unpacked before we manage to upload.
+                # To keep the implementation simple we take the easy road and rebuild
+                # all artifacts that have not been unpacked, even if they are uploadable.
+                if task.is_unpacked(self.cache) and task.is_uploadable(self.cache):
                     return self.executors.create_uploader(task)
                 else:
                     return self.executors.create_local(task, force=True)
@@ -550,7 +494,10 @@ class WorkerStrategy(ExecutionStrategy, PruneStrategy):
         if task.is_alias() or not task.is_cacheable():
             return False
         if task.is_available_locally(self.cache):
-            if task.is_uploadable(self.cache):
+            # Unpacked artifacts may become unpacked before we manage to upload.
+            # To keep the implementation simple we take the easy road and rebuild
+            # all artifacts that have not been unpacked, even if they are uploadable.
+            if task.is_unpacked(self.cache) and task.is_uploadable(self.cache):
                 return True
             if not task.is_goal() and task.task.selfsustained:
                 return True

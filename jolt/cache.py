@@ -1247,6 +1247,10 @@ class ArtifactCache(StorageProvider):
         """ Check presence of task artifact in any cache, local or remote """
         return self.is_available_locally(node) or self.is_available_remotely(node)
 
+    def is_unpacked(self, node):
+        with self.get_artifact(node) as artifact:
+            return artifact.is_unpacked()
+
     def is_uploadable(self, node):
         with self.get_artifact(node) as artifact:
             return artifact.is_uploadable()
@@ -1282,7 +1286,7 @@ class ArtifactCache(StorageProvider):
                     return True
         return len(self._storage_providers) == 0
 
-    def upload(self, node, force=False):
+    def upload(self, node, force=False, locked=True):
         """
         Uploads an artifact from the local cache to all configured remote caches.
 
@@ -1295,7 +1299,10 @@ class ArtifactCache(StorageProvider):
         raise_task_error_if(
             not self.is_available_locally(node), node,
             "can't upload task artifact, no artifact present in the local cache")
-        with self.get_locked_artifact(node) as artifact:
+        with self.get_locked_artifact(node) if locked else self.get_artifact(node) as artifact:
+            raise_task_error_if(
+                not artifact.is_uploadable(), node,
+                "artifact was modified locally by another process and can no longer be uploaded, try again")
             if self._storage_providers:
                 with self._fs_compress_artifact(artifact):
                     return all([provider.upload(node, force) for provider in self._storage_providers])
