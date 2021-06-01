@@ -1632,12 +1632,14 @@ class CXXLibrary(CXXProject):
         """
 
         with tools.cwd(self.outdir):
-            artifact.collect("*{binary}.a", self.publishlib)
-            artifact.collect("*{binary}.dll", self.publishlib)
-            artifact.collect("*{binary}.lib", self.publishlib)
-            artifact.collect("*{binary}.so", self.publishlib)
+            if not self.shared:
+                artifact.collect("*{binary}.a", self.publishlib)
+                artifact.collect("*{binary}.lib", self.publishlib)
+            else:
+                artifact.collect("*{binary}.dll", self.publishlib)
+                artifact.collect("*{binary}.so", self.publishlib)
             if self.shared and not self.strip:
-                artifact.collect(".debug", self.publishdir)
+                artifact.collect(".debug/*{binary}.so", self.publishdir)
 
         if self.headers:
             for header in self.headers:
