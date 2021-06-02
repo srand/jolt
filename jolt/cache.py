@@ -1150,11 +1150,16 @@ class ArtifactCache(StorageProvider):
         return fs.path.join(self.root, "pids", pid)
 
     def _fs_is_artifact_expired(self, identity, name, last_used):
-        manifest = self._fs_get_artifact_manifest(identity, name)
-        manifest["used"] = last_used
-        strategy = ArtifactEvictionStrategyRegister.get().find(
-            manifest.get("expires", "immediately"))
-        return strategy.is_evictable(manifest)
+        try:
+            manifest = self._fs_get_artifact_manifest(identity, name)
+            manifest["used"] = last_used
+            strategy = ArtifactEvictionStrategyRegister.get().find(
+                manifest.get("expires", "immediately"))
+            return strategy.is_evictable(manifest)
+        except KeyboardInterrupt as e:
+            raise e
+        except:
+            return True
 
     def close(self):
         with self._cache_lock(), self._db() as db:
