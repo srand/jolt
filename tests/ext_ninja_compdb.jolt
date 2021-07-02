@@ -73,6 +73,7 @@ class CompDBExtension(JoltTest):
         self.assertIn("lib.cpp", files)
         self.assertIn("test.cpp", files)
 
+        self.tools.run("mkdir {}", files["test.cpp"]["directory"])
         with self.tools.cwd(files["test.cpp"]["directory"]):
             self.tools.run("mkdir test")
             self.tools.run(files["test.cpp"]["command"])

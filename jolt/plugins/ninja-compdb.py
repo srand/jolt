@@ -11,6 +11,7 @@ from jolt import graph
 from jolt import log
 from jolt import scheduler
 from jolt import utils
+from jolt import loader
 from jolt.error import raise_task_error_if
 from jolt.hooks import TaskHook, TaskHookFactory, TaskHookRegistry
 from jolt.influence import StringInfluence
@@ -22,29 +23,35 @@ from jolt.tools import Tools
 log.verbose("[NinjaCompDB] Loaded")
 
 
+def joltdir():
+    return loader.JoltLoader.get().joltdir
+
+
 def patch(command, attrib, search, replace):
     command[attrib] = command[attrib].replace(search, replace)
-
-def patchattrib(command, attrib, searchattrib, replace):
-    command[attrib] = command[attrib].replace(
-        command[searchattrib], replace)
-
-def delattrib(command, attrib):
-    del command[attrib]
 
 
 class CompDB(object):
     def __init__(self, path="compile_commands.json", artifact=None):
         self.commands = []
+        self.attribs = {}
         if artifact:
             self.path = fs.path.join(artifact.path, path)
         else:
             self.path = path
 
+    def metapath(self, path):
+        return fs.path.join(fs.path.dirname(path), ".meta.compile_commands.json")
+
     def read(self, path=None):
         try:
             with open(path or self.path) as f:
                 self.commands = json.load(f)
+            try:
+                with open(self.metapath(path or self.path)) as f:
+                    self.attribs = json.load(f)
+            except:
+                self.attribs = {}
         except OSError:
             pass
 
@@ -53,20 +60,20 @@ class CompDB(object):
             return
         with open(path or self.path, "w") as f:
             json.dump(self.commands, f, indent=2)
+        with open(self.metapath(path or self.path), "w") as f:
+            json.dump(self.attribs, f, indent=2)
 
     def annotate(self, task):
-        for command in self.commands:
-            command["joltdir"] = task.task.joltdir
-            command["cachedir"] = config.get_cachedir()
+        self.attribs["joltdir"] = joltdir()
+        self.attribs["cachedir"] = config.get_cachedir()
 
-    def relocate(self, task):
+    def relocate(self, task, sandboxes=False):
         for command in self.commands:
-            utils.call_and_catch(patchattrib, command, "command", "joltdir", task.task.joltdir)
-            utils.call_and_catch(patchattrib, command, "command", "cachedir", config.get_cachedir())
-            utils.call_and_catch(patchattrib, command, "directory", "joltdir", task.task.joltdir)
-            utils.call_and_catch(patch, command, "directory", "sandbox-", "sandbox-reflect-")
-            utils.call_and_catch(delattrib, command, "joltdir")
-            utils.call_and_catch(delattrib, command, "cachedir")
+            utils.call_and_catch(patch, command, "command", self.attribs.get("joltdir", joltdir()), joltdir())
+            utils.call_and_catch(patch, command, "command", self.attribs.get("cachedir", config.get_cachedir()), config.get_cachedir())
+            if sandboxes:
+                utils.call_and_catch(patch, command, "command", "sandbox-", "sandbox-reflect-")
+            utils.call_and_catch(patch, command, "directory", self.attribs.get("joltdir", joltdir()), joltdir())
 
     def merge(self, db):
         self.commands.extend(db.commands)
@@ -86,7 +93,7 @@ def get_task_artifacts(task, artifact=None):
 
 class CompDBHooks(TaskHook):
     def task_created(self, task):
-        task.task.influence.append(StringInfluence("NinjaCompDB: v2"))
+        task.task.influence.append(StringInfluence("NinjaCompDB: v3"))
 
     def task_postrun(self, task, deps, tools):
         if not isinstance(task.task, ninja.CXXProject):
@@ -112,6 +119,7 @@ class CompDBHooks(TaskHook):
             for dep in [artifact] + deps:
                 depdb = CompDB(artifact=dep)
                 depdb.read()
+                depdb.relocate(task)
                 db.merge(depdb)
             db.write()
             artifact.collect(dbpath, flatten=True)
@@ -206,7 +214,7 @@ def compdb(ctx, task, default):
         artifact, deps = get_task_artifacts(goal)
         db = CompDB("all_compile_commands.json", artifact)
         db.read()
-        db.relocate(goal)
+        db.relocate(goal, sandboxes=True)
         outdir = goal.tools.builddir("compdb", incremental=True)
         dbpath = fs.path.join(outdir, "all_compile_commands.json")
         db.write(dbpath, force=True)
