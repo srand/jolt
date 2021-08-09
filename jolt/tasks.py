@@ -1270,7 +1270,9 @@ class Resource(Task):
 
         An implementor overrides this method in a subclass. The acquired
         resource must be released manually if an exception occurs before the
-        method has returned.
+        method has returned. If this method returns successfully, the :func:`~release`
+        method is guaranteed to be called in the future upon completion of the
+        consuming task (unless the process is forcibly interrupted or killed).
 
         Args:
             artifact (:class:`~jolt.Artifact`): The artifact associated with the resource.

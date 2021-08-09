@@ -666,3 +666,36 @@ class TaskApi(JoltTest):
         a = self.artifacts(r)
         self.assertExists(os.path.join(a[0], "SHASUMS256.txt"))
 
+    def test_resource(self):
+        """
+        --- tasks:
+        class R1(Resource):
+            def acquire(self, artifact, deps, tools):
+                print("Acquire R1")
+                tools.write_file("r1.lock", "locked")
+                assert False, "Acquisition Error"
+            def release(self, artifact, deps, tools):
+                print("Release R1")
+                tools.write_file("r1.lock", "unlocked")
+                assert False, "Unexpected Release"
+
+        class R2(Resource):
+            def acquire(self, artifact, deps, tools):
+                print("Acquire R2")
+                tools.write_file("r2.lock", "locked")
+            def release(self, artifact, deps, tools):
+                print("Release R2")
+                tools.write_file("r2.lock", "unlocked")
+
+        class A(Task):
+            requires = ["r1", "r2"]
+
+            def run(self, deps, tools):
+                deps["r1"]
+        ---
+        """
+        with self.assertRaises(Exception, msg="Acquisition Error"):
+            self.build("a")
+        with self.tools.cwd(self.ws):
+            self.assertEqual("locked", self.tools.read_file("r1.lock"))
+            self.assertEqual("unlocked", self.tools.read_file("r2.lock"))

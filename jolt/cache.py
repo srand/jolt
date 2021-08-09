@@ -699,14 +699,22 @@ class Context(object):
         self._artifacts_index = OrderedDict()
 
     def __enter__(self):
-        for dep in reversed(self._node.children):
-            self._cache.unpack(dep)
-            with self._cache.get_artifact(dep) as artifact:
-                self._artifacts[dep.qualified_name] = artifact
-                self._artifacts_index[dep.qualified_name] = artifact
-                self._artifacts_index[dep.short_qualified_name] = artifact
-                artifact.apply()
-                ArtifactAttributeSetRegistry.apply_all(self._node.task, artifact)
+        try:
+            for dep in reversed(self._node.children):
+                self._cache.unpack(dep)
+                with self._cache.get_artifact(dep) as artifact:
+                    self._artifacts[dep.qualified_name] = artifact
+                    self._artifacts_index[dep.qualified_name] = artifact
+                    self._artifacts_index[dep.short_qualified_name] = artifact
+                    artifact.apply()
+                    ArtifactAttributeSetRegistry.apply_all(self._node.task, artifact)
+        except Exception as e:
+            # Rollback all attributes/resources except the last failing one
+            for name, artifact in reversed(list(self._artifacts.items())[:-1]):
+                with utils.ignore_exception():
+                    ArtifactAttributeSetRegistry.unapply_all(self._node.task, artifact)
+                    artifact.unapply()
+            raise e
         return self
 
     def __exit__(self, type, value, tb):
