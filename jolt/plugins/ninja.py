@@ -1559,7 +1559,7 @@ if __name__ == "__main__":
         # Linker errors
         report.add_regex_errors(
             "Linker Error",
-            r"(?P<location>(?P<file>.*?):\(.*?\)): (?P<message>undefined reference to.*)",
+            r"(?P<location>(?P<file>.*?):(.*?)): (?P<message>(undefined reference|multiple definition).*)",
             logbuffer)
         report.add_regex_errors(
             "Linker Error",
