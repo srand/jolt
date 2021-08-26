@@ -380,9 +380,10 @@ class Artifact(object):
                 artifact.strings.version = "1.2"
     """
 
-    def __init__(self, cache, node):
+    def __init__(self, cache, node, tools=None):
         self._cache = cache
         self._node = node
+        self._tools = tools or self._node.tools
         self._path = cache._fs_get_artifact_path(node.identity, node.canonical_name)
         self._temp = cache._fs_get_artifact_tmppath(node.identity, node.canonical_name)
         self._archive = cache._fs_get_artifact_archivepath(node.identity, node.canonical_name)
@@ -518,13 +519,13 @@ class Artifact(object):
 
     @property
     def tools(self):
-        return self._node.tools
+        return self._tools
 
     def collect(self, files, dest=None, flatten=False, symlinks=False, cwd=None):
         """ Collect files to be included in the artifact.
 
         Args:
-            files (str): A filename pattern matching the files to be include
+            files (str): A filename pattern matching the files to be included
                 in the artifact. The pattern may contain simple shell-style
                 wildcards such as '*' and '?'. Note: files starting with a
                 dot are not matched by these wildcards.
@@ -559,7 +560,7 @@ class Artifact(object):
 
         # Special case for renaming files
         safe_dest = dest or fs.sep
-        if len(files) == 1 and safe_dest[-1] != fs.sep:
+        if len(files) == 1 and safe_dest[-1] != fs.sep and safe_dest[-1] != '.':
             src = files[0]
             self.files.append(self.tools.expand_relpath(src), dest)
             self.tools.copy(src, fs.path.join(self._temp, dest), symlinks=symlinks)
@@ -590,50 +591,73 @@ class Artifact(object):
                 log.verbose("Collected {0} -> {1}", relsrcpath, reldstpath)
 
 
-    def copy(self, pathname, dest, flatten=False, symlinks=False):
+    def copy(self, files, dest, flatten=False, symlinks=False, cwd=None):
         """ Copy files from the artifact.
 
         Args:
-            pathname (str): A pathname pattern, relative to the root, matching
-                the files to be copied from the artifact.
-                The pattern may contain simple shell-style
-                wildcards such as '*' and '?'. Note: files starting with a
-                dot are not matched by these wildcards.
-            dest (str, optional): Destination path. If the string ends with a
-                path separator a new directory will
-                be created and all matched source files will be copied into
-                the new directory. A destination without trailing path
-                separator can be used to rename single files, one at a time.
+            files (str): A filename pattern matching the files to be copied
+                from the artifact. The filepath is relative to the artifact
+                root and may contain simple shell-style wildcards such as
+                '*' and '?'. Note: files starting with a dot are not matched
+                by these wildcards.
+            dest (str, optional): Destination path, relative to the current
+                working directory. If the string ends with a path separator
+                a new directory will be created and all matched source files
+                will be copied into the new directory. A destination without
+                trailing path separator can be used to rename single files,
+                one at a time.
             flatten (boolean, optional): If True, the directory tree structure
                 of matched source files will flattened, i.e. all files will
                 be copied into the root of the destination path. The default
                 is False, which retains the directory tree structure.
             symlinks (boolean, optional): If True, symlinks are copied.
                 The default is False, i.e. the symlink target is copied.
+            cwd (str, optional): Change destination working directory before
+                starting copy.
 
         """
+        if cwd:
+            with self.tools.cwd(cwd):
+                return self.copy(files, dest, flatten, symlinks)
 
         raise_task_error_if(
             self.is_temporary(),
             self._node,
             "can't copy files from an unpublished task artifact")
 
-        pathname = self._node.task.expand(pathname)
-        dest = self._node.task.expand(dest)
+        files = fs.path.join(self._path, files)
+        files = self.tools.expand_path(files)
+        files = self.tools.glob(files)
+        dest = self.tools.expand_relpath(dest, self.tools.getcwd()) if dest is not None else ""
 
-        files = []
-        with self.tools.cwd(self._path):
-            files = self.tools.glob(pathname)
-        for src in files:
-            with self.tools.cwd(self._path):
-                srcs = self.tools.glob(src) \
-                    if fs.path.isdir(fs.path.join(self._path, src)) and flatten else [src]
-            for src in srcs:
-                destfile = fs.path.join(dest, src) \
-                           if not flatten else \
-                              fs.path.join(dest, fs.path.basename(src))
-                self.tools.copy(fs.path.join(self._path, src), destfile, symlinks=symlinks)
-                log.verbose("Copied {0} -> {1}", src, destfile)
+        # Special case for renaming files
+        safe_dest = dest or fs.sep
+        if len(files) == 1 and safe_dest[-1] != fs.sep and safe_dest[-1] != '.':
+            src = files[0]
+            self.tools.copy(src, dest, symlinks=symlinks)
+            log.verbose("Copied {0} -> {1}",
+                        self.tools.expand_relpath(src, self._path), dest)
+            return
+
+        # Expand directories into full file list if flatting a tree
+        # Determine relative artifact destination paths
+        if flatten:
+            files = [q
+                for f in files
+                for q in ([p for p in fs.scandir(f)] if fs.path.isdir(f) else [f])]
+            reldestfiles = [fs.path.join(dest, fs.path.basename(f)) for f in files]
+        else:
+            reldestfiles = [fs.path.join(dest, self.tools.expand_relpath(f, self._path))
+                            for f in files]
+
+        # General case
+        for srcpath, reldstpath in zip(files, reldestfiles):
+            relsrcpath = self.tools.expand_relpath(srcpath, self._path)
+            dstpath = fs.path.join(self.tools.getcwd(), reldstpath)
+
+            if symlinks or fs.path.exists(srcpath):
+                self.tools.copy(srcpath, dstpath, symlinks=symlinks)
+                log.verbose("Copied {0} -> {1}", relsrcpath, reldstpath)
 
     def _set_uploadable(self, uploadable):
         self._uploadable = uploadable
@@ -702,7 +726,7 @@ class Context(object):
         try:
             for dep in reversed(self._node.children):
                 self._cache.unpack(dep)
-                with self._cache.get_artifact(dep) as artifact:
+                with self._cache.get_artifact(dep, self._node.tools) as artifact:
                     self._artifacts[dep.qualified_name] = artifact
                     self._artifacts_index[dep.qualified_name] = artifact
                     self._artifacts_index[dep.short_qualified_name] = artifact
@@ -1080,8 +1104,8 @@ class ArtifactCache(StorageProvider):
         except:
             raise_error("failed to create cache directory '{0}'", self.root)
 
-    def _fs_get_artifact(self, node):
-        return Artifact(self, node)
+    def _fs_get_artifact(self, node, tools=None):
+        return Artifact(self, node, tools)
 
     def _fs_commit_artifact(self, artifact, uploadable):
         artifact._set_uploadable(uploadable)
@@ -1463,8 +1487,8 @@ class ArtifactCache(StorageProvider):
     def get_context(self, node):
         return Context(self, node)
 
-    def get_artifact(self, node):
-        return self._fs_get_artifact(node)
+    def get_artifact(self, node, tools=None):
+        return self._fs_get_artifact(node, tools)
 
     @contextlib.contextmanager
     def get_locked_artifact(self, node, discard=False):

@@ -172,6 +172,8 @@ class BuildCli(testsupport.JoltTest):
 
     def test_copy(self):
         """
+        --- file: dir/temp
+        --- file: dir2/temp
         --- tasks:
         @influence.files("test.jolt")
         class A(Task):
@@ -183,9 +185,18 @@ class BuildCli(testsupport.JoltTest):
                 a.collect("test.jolt", "directory/test.py")
         ---
         """
-        r1 = self.build("a -c artifact/copy")
+        self.build("a -c artifact/copy")
         self.assertExists(self.ws+"/artifact/copy/test.py")
         self.assertExists(self.ws+"/artifact/copy/directory/test.py")
+
+        self.build("a -c dir2")
+        self.assertExists(self.ws+"/dir2/test.py")
+        self.assertExists(self.ws+"/dir2/directory/test.py")
+
+        with self.tools.cwd(self.ws + "/dir"):
+            self.tools.run("jolt -c ../test.conf -c ../net.conf build -f a -c .")
+        self.assertExists(self.ws+"/dir/test.py")
+        self.assertExists(self.ws+"/dir/directory/test.py")
 
 
     def test_result(self):

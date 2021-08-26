@@ -1,0 +1,137 @@
+#!/usr/bin/python
+
+import sys
+import time
+sys.path.append(".")
+
+from testsupport import JoltTest
+from jolt import utils
+from os.path import join
+
+class ArtifactApi(JoltTest):
+    name = "api/artifact"
+
+    def test_collect(self):
+        """
+        --- file: dir1/file1.txt
+        --- file: file2.txt
+        --- tasks:
+
+        @influence.files("**/*.txt")
+        class File(Task):
+            def publish(self, a, t):
+                a.collect("file2.txt")
+                a.collect("file2.txt", "file2_renamed.txt")
+                a.collect("file2.txt", "dir2/")
+                a.collect("file2.txt", "dir2/file2_renamed_2.txt")
+
+        @influence.files("**/*.txt")
+        class Dir(Task):
+            def publish(self, a, t):
+                a.collect("dir1")
+                a.collect("dir1", "dir1_renamed")
+                a.collect("dir1", "dir2/")
+                a.collect("dir1", "dir2/dir1_renamed_2")
+
+        @influence.files("**/*.txt")
+        class Flattened(Task):
+            def publish(self, a, t):
+                a.collect("dir1", flatten=True)
+
+        ---
+        """
+        r = self.build("file")
+        a = self.artifacts(r)
+        self.assertExists(join(a[0], "file2.txt"))
+        self.assertExists(join(a[0], "file2_renamed.txt"))
+        self.assertExists(join(a[0], "dir2", "file2.txt"))
+        self.assertExists(join(a[0], "dir2", "file2_renamed_2.txt"))
+
+        r = self.build("dir")
+        a = self.artifacts(r)
+        self.assertIsDir(join(a[0], "dir1"))
+        self.assertIsDir(join(a[0], "dir1_renamed"))
+        self.assertIsDir(join(a[0], "dir2", "dir1"))
+        self.assertIsDir(join(a[0], "dir2", "dir1_renamed_2"))
+
+        r = self.build("flattened")
+        a = self.artifacts(r)
+        self.assertExists(join(a[0], "file1.txt"))
+
+    def test_copy(self):
+        """
+        --- file: dir1/file1.txt
+        --- file: file2.txt
+        --- tasks:
+
+        @influence.files("**/*.txt")
+        class Source(Task):
+            def publish(self, a, t):
+                a.collect("**/*.txt")
+
+        @influence.files("**/*.txt")
+        class File(Task):
+            requires = "source"
+
+            def run(self, d, t):
+                self.builddir = t.builddir()
+                with t.cwd(self.builddir):
+                    d["source"].copy("file2.txt", ".")
+                    d["source"].copy("file2.txt", "file2_renamed.txt")
+                    d["source"].copy("file2.txt", "dir2/")
+                    d["source"].copy("file2.txt", "dir2/file2_renamed_2.txt")
+
+            def publish(self, a, t):
+                with t.cwd(self.builddir):
+                    a.collect("*")
+
+        @influence.files("**/*.txt")
+        class Dir(Task):
+            requires = "source"
+
+            def run(self, d, t):
+                self.builddir = t.builddir()
+                with t.cwd(self.builddir):
+                    d["source"].copy("dir1", ".")
+                    d["source"].copy("dir1", "dir1_renamed")
+                    d["source"].copy("dir1", "dir2/")
+                    d["source"].copy("dir1", "dir2/dir1_renamed_2")
+
+            def publish(self, a, t):
+                with t.cwd(self.builddir):
+                    a.collect("*")
+
+        @influence.files("**/*.txt")
+        class Flattened(Task):
+            requires = "source"
+
+            def run(self, d, t):
+                self.builddir = t.builddir()
+                with t.cwd(self.builddir):
+                    d["source"].copy("dir1", ".", flatten=True)
+
+            def publish(self, a, t):
+                with t.cwd(self.builddir):
+                    a.collect("*")
+
+        ---
+        """
+        r = self.build("file")
+        a = self.artifacts(r)
+        self.assertExists(join(a[0], "file2.txt"))
+        self.assertExists(join(a[0], "file2_renamed.txt"))
+        self.assertExists(join(a[0], "dir2", "file2.txt"))
+        self.assertExists(join(a[0], "dir2", "file2_renamed_2.txt"))
+
+        r = self.build("dir")
+        a = self.artifacts(r)
+        self.assertIsDir(join(a[0], "dir1"))
+        self.assertIsDir(join(a[0], "dir1_renamed"))
+        self.assertIsDir(join(a[0], "dir2", "dir1"))
+        self.assertIsDir(join(a[0], "dir2", "dir1_renamed_2"))
+
+        r = self.build("flattened")
+        a = self.artifacts(r)
+        self.assertExists(join(a[0], "file1.txt"))
+
+

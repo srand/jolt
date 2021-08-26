@@ -180,3 +180,6 @@ global_string("{test}")
 
     def assertNotExists(self, *args):
         self.assertFalse(os.path.exists(fs.path.join(self.ws, *args)))
+
+    def assertIsDir(self, *args):
+        self.assertTrue(os.path.isdir(fs.path.join(self.ws, *args)))

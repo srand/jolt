@@ -1703,11 +1703,11 @@ class ResourceAttributeSetProvider(ArtifactAttributeSetProvider):
         if isinstance(task, Resource):
             deps = task._run_env
             deps.__enter__()
-            task.acquire(artifact, deps, artifact.tools)
+            task.acquire(artifact, deps, task.tools)
 
     def unapply(self, task, artifact):
         task = artifact.get_task()
         if isinstance(task, Resource):
             env = task._run_env
-            task.release(artifact, env, artifact.tools)
+            task.release(artifact, env, task.tools)
             env.__exit__(None, None, None)
