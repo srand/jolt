@@ -18,6 +18,9 @@ pathsep = os.pathsep
 def as_posix(path):
     return pathlib.Path(path).as_posix()
 
+def as_dirpath(path):
+    return path if path[-1] == sep else path + sep
+
 def is_relative_to(pathname, rootdir):
     try:
         pathlib.Path(pathname).relative_to(pathlib.Path(rootdir))
@@ -107,67 +110,24 @@ def symlink(src, dest, *args, **kwargs):
     else:
         os.symlink(src, dest, *args, **kwargs)
 
-def copytree(src, dst, symlinks=False, ignore=None, metadata=True):
-    names = os.listdir(src)
-    if ignore is not None:
-        ignored_names = ignore(src, names)
-    else:
-        ignored_names = set()
-
-    makedirs(dst)
-    errors = []
-    for name in names:
-        if name in ignored_names:
-            continue
-        srcname = os.path.join(src, name)
-        dstname = os.path.join(dst, name)
-        try:
-            if symlinks and os.path.islink(srcname):
-                unlink(dstname, ignore_errors=True)
-                linkto = os.readlink(srcname)
-                os.symlink(linkto, dstname)
-            elif os.path.isdir(srcname):
-                copytree(srcname, dstname, symlinks, ignore)
-            elif metadata:
-                shutil.copy2(srcname, dstname)
-            else:
-                shutil.copy(srcname, dstname)
-        except (IOError, os.error) as why:
-            errors.append((srcname, dstname, str(why)))
-        except Exception as err:
-            errors.extend(err.args[0])
-    try:
-        if metadata:
-            shutil.copystat(src, dst)
-    except WindowsError:
-        pass
-    except OSError as why:
-        errors.extend((src, dst, str(why)))
-    if errors:
-        raise Exception([errors[0]])
-
-def copy(src, dest, symlinks=False, metadata=True):
-    if not path.exists(dest):
-        if dest[-1] == os.sep:
-            makedirs(dest)
-            dest = path.join(dest, path.basename(src))
-        else:
-            makedirs(path.dirname(dest))
-    else:
-        if dest[-1] == os.sep:
-            dest = path.join(dest, path.basename(src))
+def copy(src, dst, symlinks=False, ignore=None, metadata=True):
+    dstdir = os.path.dirname(dst)
+    if not os.path.isdir(dstdir):
+        unlink(dstdir, ignore_errors=True)
+        makedirs(dstdir)
 
     if symlinks and os.path.islink(src):
-        unlink(dest, ignore_errors=True)
         linkto = os.readlink(src)
-        os.symlink(linkto, dest)
-    elif path.isdir(src):
-        copytree(src, dest, symlinks=symlinks, metadata=metadata)
-    elif metadata:
-        shutil.copy2(src, dest)
-    else:
-        shutil.copy(src, dest)
-
+        unlink(dst, ignore_errors=True)
+        return symlink(linkto, dst)
+    elif not os.path.isdir(src):
+        if metadata:
+            return shutil.copy2(src, dst)
+        else:
+            return shutil.copy(src, dst)
+    if os.path.exists(dst):
+        rmtree(dst)
+    return shutil.copytree(src, dst, symlinks)
 
 def scandir(scanpath, filterfn=lambda path: path[0] != ".", relative=False):
     def relresult(path, fp):

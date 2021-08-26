@@ -1377,7 +1377,7 @@ class ArtifactCache(StorageProvider):
             # Keep a temporary copy of the artifact if the task
             # unpack() method fails. The copy is removed in
             # get_locked_artifact() if left unused.
-            fs.copytree(artifact.path, artifact.temporary_path, symlinks=True)
+            fs.copy(artifact.path, artifact.temporary_path, symlinks=True)
 
             task = artifact.get_task()
             with tools.Tools(task) as t:
