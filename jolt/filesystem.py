@@ -125,9 +125,13 @@ def copy(src, dst, symlinks=False, ignore=None, metadata=True):
             return shutil.copy2(src, dst)
         else:
             return shutil.copy(src, dst)
-    if os.path.exists(dst):
-        rmtree(dst)
-    return shutil.copytree(src, dst, symlinks)
+
+    return shutil.copytree(
+        src, dst,
+        symlinks,
+        dirs_exist_ok=True,
+        copy_function=shutil.copy2 if metadata else shutil.copy
+    )
 
 def scandir(scanpath, filterfn=lambda path: path[0] != ".", relative=False):
     def relresult(path, fp):
