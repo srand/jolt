@@ -3,6 +3,7 @@ from jolt import *
 
 class All(Alias):
     requires = [
+        "api/artifact",
         "api/artifact/environ",
         "api/git",
         "api/ninja",
