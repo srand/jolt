@@ -123,6 +123,7 @@ def copytree(src, dst, symlinks=False, ignore=None, metadata=True):
         dstname = os.path.join(dst, name)
         try:
             if symlinks and os.path.islink(srcname):
+                unlink(dstname, ignore_errors=True)
                 linkto = os.readlink(srcname)
                 os.symlink(linkto, dstname)
             elif os.path.isdir(srcname):
@@ -143,7 +144,7 @@ def copytree(src, dst, symlinks=False, ignore=None, metadata=True):
     except OSError as why:
         errors.extend((src, dst, str(why)))
     if errors:
-        raise Exception(errors)
+        raise Exception([errors[0]])
 
 def copy(src, dest, symlinks=False, metadata=True):
     if not path.exists(dest):
@@ -156,7 +157,11 @@ def copy(src, dest, symlinks=False, metadata=True):
         if dest[-1] == os.sep:
             dest = path.join(dest, path.basename(src))
 
-    if path.isdir(src):
+    if symlinks and os.path.islink(src):
+        unlink(dest, ignore_errors=True)
+        linkto = os.readlink(src)
+        os.symlink(linkto, dest)
+    elif path.isdir(src):
         copytree(src, dest, symlinks=symlinks, metadata=metadata)
     elif metadata:
         shutil.copy2(src, dest)

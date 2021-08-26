@@ -334,7 +334,7 @@ def build(ctx, task, network, keep_going, identity, default, local,
                 with acache.get_artifact(goal) as artifact:
                     log.info("Location: {0}", artifact.path)
                     if copy:
-                        artifact.copy("*", click.format_filename(copy), cwd=workdir)
+                        artifact.copy("*", click.format_filename(copy), symlinks=True, cwd=workdir)
     except KeyboardInterrupt:
         print()
         log.warning("Interrupted by user")
