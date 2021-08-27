@@ -110,28 +110,46 @@ def symlink(src, dest, *args, **kwargs):
     else:
         os.symlink(src, dest, *args, **kwargs)
 
+
+def _copy_symlink(src, dst):
+    if os.path.lexists(dst):
+        unlink(dst, ignore_errors=True)
+    if os.path.islink(src):
+        return symlink(os.readlink(src), dst)
+    return shutil.copy(src, dst)
+
+
+def _copy2_symlink(src, dst):
+    if os.path.lexists(dst):
+        unlink(dst, ignore_errors=True)
+    if os.path.islink(src):
+        symlink(os.readlink(src), dst)
+        shutil.copystat(src, dst, follow_symlinks=False)
+        return
+    return shutil.copy2(src, dst)
+
+
 def copy(src, dst, symlinks=False, ignore=None, metadata=True):
     dstdir = os.path.dirname(dst)
     if not os.path.isdir(dstdir):
         unlink(dstdir, ignore_errors=True)
         makedirs(dstdir)
 
-    if symlinks and os.path.islink(src):
-        linkto = os.readlink(src)
-        unlink(dst, ignore_errors=True)
-        return symlink(linkto, dst)
-    elif not os.path.isdir(src):
-        if metadata:
-            return shutil.copy2(src, dst)
-        else:
-            return shutil.copy(src, dst)
+    if symlinks:
+        copyfn = _copy2_symlink if metadata else _copy_symlink
+    else:
+        copyfn = shutil.copy2 if metadata else shutil.copy
+
+    if os.path.islink(src) or not os.path.isdir(src):
+        return copyfn(src, dst)
 
     return shutil.copytree(
         src, dst,
-        symlinks,
+        False,
         dirs_exist_ok=True,
-        copy_function=shutil.copy2 if metadata else shutil.copy
+        copy_function=copyfn
     )
+
 
 def scandir(scanpath, filterfn=lambda path: path[0] != ".", relative=False):
     def relresult(path, fp):
