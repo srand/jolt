@@ -462,7 +462,7 @@ class Rule(HashInfluenceProvider):
                 outfile = outfile[len(project.joltdir)+1:]
                 outfile = fs.path.join(project.outdir, outfile)
 
-            result_files.append(outfile)
+            result_files.append(outfile.replace("..", "__"))
 
         result_vars = {}
         for key, val in self.variables.items():
