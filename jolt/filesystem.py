@@ -140,7 +140,9 @@ def copy(src, dst, symlinks=False, ignore=None, metadata=True):
     else:
         copyfn = shutil.copy2 if metadata else shutil.copy
 
-    if os.path.islink(src) or not os.path.isdir(src):
+    if symlinks and os.path.islink(src):
+        return copyfn(src, dst)
+    elif not os.path.isdir(src):
         return copyfn(src, dst)
 
     return shutil.copytree(
