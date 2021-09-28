@@ -917,7 +917,7 @@ class GNUToolchain(Toolchain):
         deps="gcc",
         depfile="$out.d",
         infiles=[".c"],
-        outfiles=["{outdir}/{in_path}/{in_base}{in_ext}.o"],
+        outfiles=["{outdir}/{binary}.dir/{in_path}/{in_base}{in_ext}.o"],
         variables={"desc": "[C] {in_base}{in_ext}"},
         implicit=["$cc_path"])
 
@@ -926,7 +926,7 @@ class GNUToolchain(Toolchain):
         deps="gcc",
         depfile="$out.d",
         infiles=[".cc", ".cpp", ".cxx"],
-        outfiles=["{outdir}/{in_path}/{in_base}{in_ext}.o"],
+        outfiles=["{outdir}/{binary}.dir/{in_path}/{in_base}{in_ext}.o"],
         variables={"desc": "[CXX] {in_base}{in_ext}"},
         implicit=["$cxx_path"])
 
@@ -935,7 +935,7 @@ class GNUToolchain(Toolchain):
         deps="gcc",
         depfile="$out.d",
         infiles=[".s", ".asm"],
-        outfiles=["{outdir}/{in_path}/{in_base}{in_ext}.o"],
+        outfiles=["{outdir}/{binary}.dir/{in_path}/{in_base}{in_ext}.o"],
         variables={"desc": "[ASM] {in_base}{in_ext}"},
         implicit=["$cc_path"])
 
@@ -944,7 +944,7 @@ class GNUToolchain(Toolchain):
         deps="gcc",
         depfile="$out.d",
         infiles=[".S"],
-        outfiles=["{outdir}/{in_path}/{in_base}{in_ext}.o"],
+        outfiles=["{outdir}/{binary}.dir/{in_path}/{in_base}{in_ext}.o"],
         variables={"desc": "[ASM] {in_base}{in_ext}"},
         implicit=["$cc_path"])
 
@@ -1047,7 +1047,7 @@ class MSVCToolchain(Toolchain):
         command="$cl /nologo /showIncludes $asflags $extra_asflags $macros $incpaths /c /Tc$in /Fo$out",
         deps="msvc",
         infiles=[".asm", ".s", ".S"],
-        outfiles=["{outdir}/{in_path}/{in_base}.obj"],
+        outfiles=["{outdir}/{binary}.dir/{in_path}/{in_base}.obj"],
         variables={"desc": "[ASM] {in_base}{in_ext}"},
         implicit=["$cl_path"])
 
@@ -1055,7 +1055,7 @@ class MSVCToolchain(Toolchain):
         command="$cl /nologo /showIncludes $cxxflags $extra_cxxflags $macros $incpaths /c /Tc$in /Fo$out",
         deps="msvc",
         infiles=[".c"],
-        outfiles=["{outdir}/{in_path}/{in_base}.obj"],
+        outfiles=["{outdir}/{binary}.dir/{in_path}/{in_base}.obj"],
         variables={"desc": "[C] {in_base}{in_ext}"},
         implicit=["$cl_path"])
 
@@ -1063,7 +1063,7 @@ class MSVCToolchain(Toolchain):
         command="$cl /nologo /showIncludes $cxxflags $extra_cxxflags $macros $incpaths /c /Tp$in /Fo$out",
         deps="msvc",
         infiles=[".cc", ".cpp", ".cxx"],
-        outfiles=["{outdir}/{in_path}/{in_base}.obj"],
+        outfiles=["{outdir}/{binary}.dir/{in_path}/{in_base}.obj"],
         variables={"desc": "[CXX] {in_base}{in_ext}"},
         implicit=["$cl_path"])
 
