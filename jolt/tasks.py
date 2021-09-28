@@ -1427,6 +1427,9 @@ class Download(Task):
     url = None
     """ URL of file to download. """
 
+    symlinks = True
+    """ Publish symlinks (True) """
+
     def _filename_from_url(self, tools):
         from urllib.parse import urlparse
         url = urlparse(tools.expand(self.url))
@@ -1450,11 +1453,11 @@ class Download(Task):
         with tools.cwd(self._builddir):
             for files in self.collect:
                 if type(files) == tuple:
-                    artifact.collect(*files)
+                    artifact.collect(*files, symlinks=self.symlinks)
                 elif type(files) == dict:
-                    artifact.collect(**files)
+                    artifact.collect(**files, symlinks=self.symlinks)
                 else:
-                    artifact.collect(files)
+                    artifact.collect(files, symlinks=self.symlinks)
 
 
 
