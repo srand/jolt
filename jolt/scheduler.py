@@ -499,8 +499,8 @@ class WorkerStrategy(ExecutionStrategy, PruneStrategy):
             # all artifacts that have not been unpacked, even if they are uploadable.
             if task.is_unpacked(self.cache) and task.is_uploadable(self.cache):
                 return True
-            if not task.is_goal() and task.task.selfsustained:
-                return True
+        if not task.is_goal() and task.task.selfsustained:
+            return True
         return False
 
 
