@@ -44,6 +44,9 @@ class DockerImage(Task):
     imagefile = None
     """ Name of the image tarball. Defaults to the task's canonical name. """
 
+    push = False
+    """ Optionally push image to registry. Default: False """
+
     tag = None
     """ Optional image tag. """
 
@@ -66,6 +69,10 @@ class DockerImage(Task):
             image = tools.run("docker build . -f {} --quiet {}", dockerfile, tag)
 
         try:
+            if self.tag and self.push:
+                self.info("Push image")
+                tools.run("docker push {}", self.tag)
+
             self.info("Saving image to file")
             with tools.cwd(tools.builddir()):
                 if self.tag:
