@@ -8,6 +8,7 @@ import inspect
 from pathlib import Path
 import platform
 import subprocess
+from os import environ
 import sys
 import unittest as ut
 import uuid
@@ -24,7 +25,9 @@ from jolt.error import JoltError, JoltCommandError
 from jolt.expires import Immediately
 from jolt.influence import FileInfluence, TaskSourceInfluence, TaintInfluenceProvider
 from jolt.influence import TaskClassSourceInfluence
-from jolt.influence import source as source_influence, attribute as attribute_influence
+from jolt.influence import attribute as attribute_influence
+from jolt.influence import environ as environ_influence
+from jolt.influence import source as source_influence
 from jolt import manifest
 from jolt.tools import Tools
 
@@ -61,6 +64,16 @@ class Export(object):
     def set_task(self, task):
         self._task = task
 
+
+
+class EnvironExport(Export):
+    def __init__(self, envname):
+        super().__init__(value=lambda self: environ.get(envname))
+        self._envname = envname
+
+    def assign(self, value):
+        super().assign(value)
+        self._task.tools.setenv(self._envname, value)
 
 
 class Parameter(object):
@@ -652,6 +665,26 @@ class attributes:
             return cls
         return _decorate
 
+    @staticmethod
+    def environ(envname, influence=True):
+        """
+        Decorator marking the task as dependent on an environment variable.
+
+        The value of the environment variable will be automatically
+        transferred to workers in distributed network builds.
+
+        Args:
+            envname (str): Name of the environment variable.
+            influence (boolean): Add value of environment
+                variable as influence of the task. Default: True.
+
+        """
+        def _decorate(cls):
+            if influence:
+                environ_influence(envname)(cls)
+            setattr(cls, "_environ_" + utils.canonical(envname.lower()), EnvironExport(envname))
+            return cls
+        return _decorate
 
     @staticmethod
     def method(alias, target, influence=True):
