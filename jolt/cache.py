@@ -701,6 +701,10 @@ class Artifact(object):
     def is_uploadable(self):
         return self._uploadable
 
+    @property
+    def identity(self):
+        return self._node.identity
+
 
 class Context(object):
     """
