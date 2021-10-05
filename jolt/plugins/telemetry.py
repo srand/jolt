@@ -56,16 +56,24 @@ class TelemetryHooks(TaskHook):
                 if self._started:
                     self.post(task, "started", client=True)
             if self._network and task.options.worker:
-                self.post(task, "started", client=False)
+                if self._started:
+                    self.post(task, "started", client=False)
 
     def task_failed(self, task):
+        if not self._failed:
+            return
         if task.is_locally_executed():
             if self._local and not task.options.worker:
                 self.post(task, "failed", client=True)
             if self._network and task.options.worker:
                 self.post(task, "failed", client=False)
+        if task.is_remotely_executed():
+            if self._network and self._failed:
+                self.post(task, "failed", client=True)
 
     def task_finished(self, task):
+        if not self._finished:
+            return
         if task.is_locally_executed():
             if self._local and not task.options.worker:
                 self.post(task, "finished", client=True)
