@@ -104,10 +104,13 @@ class Attribute(object):
                 if value is None:
                     return None
                 if base64:
-                    value = base64_decodebytes(value.encode())
-                    if zlib:
-                        value = codecs.decode(value, "zlib")
-                    value = value.decode()
+                    try:
+                        value = base64_decodebytes(value.encode())
+                        if zlib:
+                            value = codecs.decode(value, "zlib")
+                        value = value.decode()
+                    except:
+                        value = getattr(self, '_'+varname).text
                 return str(value)
 
             def child_set(self, value):
