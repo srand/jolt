@@ -518,6 +518,7 @@ ManifestExtensionRegistry.add(TaskIdentityExtension())
 
 class TaskExportExtension(ManifestExtension):
     def export_manifest(self, manifest, task):
+        short_task_names = set()
         for child in [task] + task.extensions + task.descendants:
             manifest_task = manifest.find_task(child.qualified_name)
             if manifest_task is None:
@@ -527,5 +528,19 @@ class TaskExportExtension(ManifestExtension):
                 attrib = manifest_task.create_attribute()
                 attrib.name = key
                 attrib.value = export.export(child.task)
+            short_task_names.add(child.name)
+
+        # Figure out if any task with an overridden default parameter
+        # value was included in the manifest. If so, add info about it.
+        default_task_names = set()
+        for task in task.options.default:
+            short_name, _ = utils.parse_task_name(task)
+            if short_name in short_task_names:
+                default_task_names.add(task)
+        if default_task_names:
+            build = manifest.create_build()
+            for task in default_task_names:
+                default = build.create_default()
+                default.name = task
 
 ManifestExtensionRegistry.add(TaskExportExtension())

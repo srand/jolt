@@ -662,10 +662,6 @@ class AmqpExecutor(scheduler.NetworkExecutor):
             mt = build.create_task()
             mt.name = task
 
-        for task in self.factory.options.default:
-            default = build.create_default()
-            default.name = task
-
         registry = scheduler.ExecutorRegistry.get()
         for key, value in registry.get_network_parameters(self.task).items():
             param = manifest.create_parameter()
