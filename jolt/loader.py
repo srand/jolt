@@ -237,7 +237,7 @@ class RecipeExtension(ManifestExtension):
             manifest_recipe.path = recipe.basepath
             manifest_recipe.source = recipe.source
 
-        projects = set([task.task.joltproject for task in [task] + task.children])
+        projects = set([task.task.joltproject for task in [task] + task.extensions + task.descendants])
         for project in filter(lambda x: x is not None, projects):
             manifest_project = manifest.create_project()
             manifest_project.name = project
