@@ -256,6 +256,24 @@ Tools
 .. reference-tools-end
 
 
+CMake
+-----
+
+.. reference-cmake-start
+
+CMake
+^^^^^^
+
+.. reference-cmake-cmake-start
+
+.. autoclass:: jolt.plugins.cmake.CMake
+   :members: cmakelists, options
+
+.. reference-cmake-cmake-end
+
+.. reference-cmake-end
+
+
 Conan
 -----
 

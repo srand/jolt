@@ -197,8 +197,11 @@ class _CMake(object):
         extra_args = " ".join(extra_args)
 
         with self.tools.cwd(self.builddir):
-            self.tools.run("cmake {0} -DCMAKE_INSTALL_PREFIX={1} {2}",
-                           sourcedir, self.installdir, extra_args,
+            self.tools.run("cmake {0} -B {1} -DCMAKE_INSTALL_PREFIX={2} {3}",
+                           sourcedir, 
+                           self.builddir, 
+                           self.installdir, 
+                           extra_args,
                            output=True)
 
     def build(self, release=True, *args, **kwargs):
