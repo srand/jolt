@@ -12,3 +12,12 @@ class Fail(Task):
 
     def run(self, d, t):
         assert False, "always fails"
+
+
+class Pass1(Task):
+    pass
+
+class Pass2(Task):
+    requires = "pass1"
+
+

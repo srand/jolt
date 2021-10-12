@@ -89,9 +89,9 @@ def has_symlinks():
 def symlink(src, dest, *args, **kwargs):
     if os.name == "nt":
         # Try to use junctions first.
-        import ntfsutils.junction
         try:
-            ntfsutils.junction.create(src, dest)
+            import _winapi
+            _winapi.CreateJunction(src, dest)
             return
         except KeyboardInterrupt as e:
             raise e
