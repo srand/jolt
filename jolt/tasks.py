@@ -1416,6 +1416,7 @@ class Download(Task):
         - .tar.bz2
         - .tar.gz
         - .tar.xz
+        - .tgz
         - .zip
 
     Example:
@@ -1475,7 +1476,7 @@ class Download(Task):
             raise_task_error_if(
                 not tools.download(self.url, filename), self,
                 "download failed: {}", tools.expand(self.url))
-        if self.extract and any(map(lambda n: filename.endswith(n), [".tar", ".tar.bz2", ".tar.gz", ".tar.xz", ".zip"])):
+        if self.extract and any(map(lambda n: filename.endswith(n), [".tar", ".tar.bz2", ".tar.gz", ".tar.xz", ".tgz", ".zip"])):
             self._srcdir = self._builddir
             self._builddir = tools.builddir("extracted")
             with tools.cwd(self._builddir):
