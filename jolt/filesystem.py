@@ -145,12 +145,19 @@ def copy(src, dst, symlinks=False, ignore=None, metadata=True):
     elif not os.path.isdir(src):
         return copyfn(src, dst)
 
-    return shutil.copytree(
-        src, dst,
-        False,
-        dirs_exist_ok=True,
-        copy_function=copyfn
-    )
+    try:
+        return shutil.copytree(
+            src, dst,
+            False,
+            dirs_exist_ok=True,
+            copy_function=copyfn
+        )
+    except TypeError:
+        return shutil.copytree(
+            src, dst,
+            False,
+            copy_function=copyfn
+        )
 
 
 def scandir(scanpath, filterfn=lambda path: path[0] != ".", relative=False):
