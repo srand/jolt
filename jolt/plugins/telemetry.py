@@ -79,6 +79,9 @@ class TelemetryHooks(TaskHook):
                 self.post(task, "finished", client=True)
             if self._network and task.options.worker:
                 self.post(task, "finished", client=False)
+        if task.is_remotely_executed():
+            if self._network and self._finished:
+                self.post(task, "finished", client=True)
 
 
 @TaskHookFactory.register
