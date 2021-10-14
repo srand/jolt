@@ -1506,6 +1506,7 @@ class ArtifactCache(StorageProvider):
         with self._cache_lock():
             with self._db() as db:
                 self._db_insert_lock(db, node.identity)
+                self._db_insert_reference(db, node.identity)
             lock_path = self._fs_get_artifact_lockpath(node.identity)
             lock = fasteners.InterProcessLock(lock_path)
             is_locked = lock.acquire(blocking=False)
