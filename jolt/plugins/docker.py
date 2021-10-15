@@ -1,7 +1,21 @@
 from jolt import *
+from jolt.tasks import TaskRegistry
 from jolt import utils
 
 from os import path
+
+
+class DockerCLI(Download):
+    name = "docker/cli"
+    version = Parameter("20.10.9")
+    url = "https://download.docker.com/linux/static/stable/x86_64/docker-{version}.tgz"
+
+    def publish(self, artifact, tools):
+        with tools.cwd(tools.builddir()):
+            artifact.collect("bin/docker")
+        artifact.environ.PATH.append("bin")
+
+TaskRegistry.get().add_task_class(DockerCLI)
 
 
 @influence.attribute("compression")
