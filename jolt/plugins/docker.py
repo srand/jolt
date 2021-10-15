@@ -3,17 +3,20 @@ from jolt.tasks import TaskRegistry
 from jolt import utils
 
 from os import path
+from platform import system
 
 
 class DockerCLI(Download):
     name = "docker/cli"
     version = Parameter("20.10.9")
-    url = "https://download.docker.com/linux/static/stable/x86_64/docker-{version}.tgz"
+    host = Parameter(system().lower())
+    arch = Parameter("x86_64")
+    url = "https://download.docker.com/{host}/static/stable/{arch}/docker-{version}.tgz"
 
     def publish(self, artifact, tools):
-        with tools.cwd(tools.builddir()):
-            artifact.collect("bin/docker")
-        artifact.environ.PATH.append("bin")
+        with tools.cwd(self._builddir):
+            artifact.collect("docker/docker")
+        artifact.environ.PATH.append("docker")
 
 TaskRegistry.get().add_task_class(DockerCLI)
 
