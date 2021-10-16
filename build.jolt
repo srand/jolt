@@ -1,9 +1,18 @@
-from jolt import Alias, BooleanParameter, Parameter, Task, Tools
+from jolt import Alias, BooleanParameter, Parameter, Task, TaskGenerator, Tools
 from jolt import attributes, influence
-from jolt.plugins import docker, git
+from jolt.plugins import docker, git, selfdeploy
 
 from os import getenv
-_version = Tools().run("python3 setup.py --version", output_on_error=True)
+_version = getenv("JOLT_VERSION")
+
+
+class Jolt(selfdeploy.Jolt):
+    version = Parameter(_version)
+
+    def publish(self, artifact, tools):
+          super().publish(artifact, tools)
+          with tools.cwd(artifact.path):
+               tools.replace_in_file("setup.py", "0.9.13", "{version}")
 
 
 @influence.files("{dockerfile}")
@@ -13,10 +22,15 @@ class JoltImage(docker.DockerImage):
     name = "jolt/image"
     dockerfile = "docker/Dockerfile"
     push = BooleanParameter(False)
-    requires = ["docker/cli"]
+    requires = ["jolt:version={version}", "docker/cli"]
     requires_push_true = ["docker/login"]
     tags = ["robrt/jolt:latest", "robrt/jolt:{version}"]
     version = Parameter(_version)
+
+    def run(self, deps, tools):
+         self.context = tools.sandbox(deps["jolt:version={version}"])
+         tools.copy("{dockerfile}", "{context}/docker/")
+         super().run(deps, tools)
 
 
 @influence.files("{dockerfile}")
@@ -53,18 +67,21 @@ class JoltWheel(Task):
     name = "jolt/pypi"
 
     release = BooleanParameter(False)
+    requires = ["jolt:version={version}"]
+    version = Parameter(_version)
 
     def run(self, deps, tools):
         tools.run("python3 -m pip install --upgrade setuptools wheel")
         tools.run("python3 -m pip install --upgrade twine")
-        tools.rmtree("build/lib", ignore_errors=True)
-        tools.rmtree("dist", ignore_errors=True)
-        tools.run("python3 {joltdir}/setup.py sdist bdist_wheel")
-        if self.release:
-            tools.run("python3 -m twine upload dist/*")
+        self.builddir = tools.sandbox(deps["jolt:version={version}"])
+        with tools.cwd(self.builddir):
+             tools.run("python3 setup.py sdist bdist_wheel")
+             if self.release:
+                  tools.run("python3 -m twine upload dist/*")
 
     def publish(self, artifact, tools):
-        artifact.collect("dist")
+        with tools.cwd(self.builddir):
+             artifact.collect("dist")
 
 
 class Default(Alias):
