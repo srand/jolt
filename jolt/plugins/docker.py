@@ -1,16 +1,20 @@
 from jolt import *
+from jolt.error import raise_task_error_if
 from jolt.tasks import TaskRegistry
 from jolt import utils
 
+from functools import partial
 from os import path
 from platform import system
 
 
 class DockerCLI(Download):
+    """ Downloads and publishes the Docker command line client """
     name = "docker/cli"
-    version = Parameter("20.10.9")
-    host = Parameter(system().lower())
-    arch = Parameter("x86_64")
+
+    version = Parameter("20.10.9", help="Docker version")
+    host = Parameter(system().lower(), help="Host operating system")
+    arch = Parameter("x86_64", help="Host architecture")
     url = "https://download.docker.com/{host}/static/stable/{arch}/docker-{version}.tgz"
 
     def publish(self, artifact, tools):
@@ -18,7 +22,45 @@ class DockerCLI(Download):
             artifact.collect("docker/docker")
         artifact.environ.PATH.append("docker")
 
+
+class DockerLogin(Resource):
+    """
+    Resource which logs in and out of a Docker Registry.
+
+    If the user and password parameters are unset, credentials
+    are fetched from the environment variables:
+
+        - DOCKER_USER
+        - DOCKER_PASSWD
+
+    """
+    name = "docker/login"
+
+    requires = ["docker/cli"]
+
+    user = Parameter("", help="Docker Registry username")
+    passwd = Parameter("", help="Docker Registry password")
+
+    def _user(self, tools):
+        return str(self.user) or tools.getenv("DOCKER_USER")
+
+    def _password(self, tools):
+        return str(self.passwd) or tools.getenv("DOCKER_PASSWD")
+
+    def acquire(self, artifact, deps, tools):
+        raise_task_error_if(not self._user(tools), self, "Username has not been configured")
+        raise_task_error_if(not self._password(tools), self, "Password has not been configured")
+
+        with tools.cwd(tools.builddir()):
+            tools.write_file("docker-credential", self._password(tools))
+            tools.run("cat docker-credential | docker login -u {user} --password-stdin", user=self._user(tools))
+
+    def release(self, artifact, deps, tools):
+        tools.run("docker logout")
+
+
 TaskRegistry.get().add_task_class(DockerCLI)
+TaskRegistry.get().add_task_class(DockerLogin)
 
 
 @influence.attribute("compression")
@@ -63,7 +105,12 @@ class DockerImage(Task):
     """ Name of the image tarball. Defaults to the task's canonical name. """
 
     push = False
-    """ Optionally push image to registry. Default: False """
+    """
+    Optionally push image to registry. Default: False
+
+    To be able to push images, the current user must login to the Docker Registry.
+    The ``docker/login`` Jolt resource can be used for that purpose.
+    """
 
     tag = "{canonical_name}:{identity}"
     """ Optional image tag. Defaults to task's canonical name. """
