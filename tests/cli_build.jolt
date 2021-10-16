@@ -441,13 +441,14 @@ class BuildCli(testsupport.JoltTest):
         import os
 
         class Pass(Task):
-            export = Export(lambda x: os.getenv("USER"))
+            export = Export(lambda x: os.getenv("ENVVAR"))
 
             def run(self, deps, tools):
-                assert self.export.value is not None and self.export.value != "root"
+                assert self.export.value is not None and self.export.value == "value"
         ---
         """
-        r = self.build("pass")
+        with self.tools.environ(ENVVAR="value"):
+            r = self.build("pass")
         a = self.artifacts(r)
         self.tools.run("cat {}/.build.log", a[0])
 
