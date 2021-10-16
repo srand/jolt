@@ -92,6 +92,9 @@ class DockerImage(Task):
     """
     abstract = True
 
+    cleanup = True
+    """ Remove image from Docker daemon upon completion. Default: True """
+
     compression = None
     """ Optional image compression "bz2", "gz", or "xz". """
 
@@ -101,8 +104,14 @@ class DockerImage(Task):
     dockerfile = "Dockerfile"
     """ Path to the Dockerfile to build, or the full source code of such a file. """
 
-    imagefile = None
-    """ Name of the image tarball. Defaults to the task's canonical name. """
+    imagefile = "{canonical_name}.tar"
+    """
+    Name of the image tarball published by the task.
+
+    If set to None, no image file will be saved and published.
+
+    Defaults to the task's canonical name.
+    """
 
     push = False
     """
@@ -112,17 +121,17 @@ class DockerImage(Task):
     The ``docker/login`` Jolt resource can be used for that purpose.
     """
 
-    tag = "{canonical_name}:{identity}"
-    """ Optional image tag. Defaults to task's canonical name. """
+    tags = ["{canonical_name}:{identity}"]
+    """ Optional list of image tags. Defaults to task's canonical name. """
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.imagefile = self.imagefile or utils.canonical(self.name) + ".tar"
 
     def run(self, deps, tools):
         context = tools.expand_relpath(self.context, self.joltdir)
         dockerfile = tools.expand(self.dockerfile)
-        tag = tools.expand(self.tag)
+        self._imagefile = tools.expand(self.imagefile) if self.imagefile else None
+        tags = [tools.expand(tag) for tag in self.tags]
 
         if not path.exists(dockerfile):
             with tools.cwd(tools.builddir()):
@@ -134,26 +143,33 @@ class DockerImage(Task):
 
         self.info("Building image from {} in {}", dockerfile, context)
         with tools.cwd(context):
-            image = tools.run("docker build . -f {} -t {}", dockerfile, tag)
+            image = tools.run("docker build . -f {} -t {}", dockerfile, tags[0])
+            for tag in tags[1:]:
+                tools.run("docker tag {} {}", tags[0], tag)
 
         try:
             if self.push:
                 self.info("Pushing image")
-                tools.run("docker push {}", tag)
+                for tag in tags:
+                    tools.run("docker push {}", tag)
 
             self.info("Saving image to file")
             with tools.cwd(tools.builddir()):
-                tools.run("docker image save {} -o {imagefile}", tag)
-                if self.compression is not None:
-                    tools.compress("{imagefile}", "{imagefile}.{compression}")
+                if self._imagefile:
+                    tools.run("docker image save {} -o {_imagefile}", tags[0])
+                    if self.compression is not None:
+                        tools.compress("{_imagefile}", "{_imagefile}.{compression}")
         finally:
-            self.info("Removing image from Docker daemon")
-            utils.call_and_catch(tools.run("docker image rm {}", tag))
+            if self.cleanup:
+                self.info("Removing image from Docker daemon")
+                for tag in tags:
+                    utils.call_and_catch(tools.run("docker image rm {}", tag))
 
     def publish(self, artifact, tools):
-        artifact.strings.tag = tools.expand(self.tag)
+        artifact.strings.tag = tools.expand(self.tags[0])
         with tools.cwd(tools.builddir()):
-            if self.compression is not None:
-                artifact.collect("{imagefile}.{compression}")
-            else:
-                artifact.collect("{imagefile}")
+            if self._imagefile:
+                if self.compression is not None:
+                    artifact.collect("{_imagefile}.{compression}")
+                else:
+                    artifact.collect("{_imagefile}")

@@ -141,7 +141,7 @@ class DockerExt(JoltTest):
         from jolt.plugins.docker import *
 
         class Busybox(DockerImage):
-            tag = "busybox:jolt"
+            tags = ["busybox:jolt", "busybox:latest-jolt"]
 
         ---
 	"""
@@ -151,6 +151,60 @@ class DockerExt(JoltTest):
         f = path.join(a[0], "busybox.tar")
         self.assertExists(f)
         try:
-            self.assertIn("busybox:jolt", self.tools.run("docker image load -i {}", f))
+            loaded = self.tools.run("docker image load -i {}", f)
+            self.assertIn("busybox:jolt", loaded)
         finally:
             utils.call_and_catch(self.tools.run, "docker image rm busybox:jolt")
+
+
+    def test_cleanup(self):
+        """
+        --- file: Dockerfile
+        FROM busybox:latest
+
+        --- tasks:
+        from jolt.plugins.docker import *
+
+        class Busybox(DockerImage):
+            tags = ["busybox:jolt"]
+            cleanup = BooleanParameter()
+        ---
+	"""
+
+        try:
+            b = self.build("busybox:cleanup=true")
+            self.assertBuild(b, "busybox:cleanup=true")
+            self.assertNotIn("busybox:jolt", self.tools.run("docker images"))
+
+            b = self.build("busybox:cleanup=false")
+            self.assertBuild(b, "busybox:cleanup=false")
+            self.assertNotIn("busybox:jolt", self.tools.run("docker images"))
+
+        finally:
+            self.tools.run("docker image rm -f busybox:jolt")
+
+
+    def test_imagefile(self):
+        """
+        --- file: Dockerfile
+        FROM busybox:latest
+
+        --- tasks:
+        from jolt.plugins.docker import *
+
+        class Busybox(DockerImage):
+            tags = ["busybox:jolt"]
+            imagefile = Parameter()
+        ---
+	"""
+        b = self.build("busybox:imagefile=image.tar")
+        a = self.artifacts(b)
+        f = path.join(a[0], "image.tar")
+        self.assertExists(f)
+        f = self.tools.glob(path.join(a[0], "*"))
+        self.assertEqual(1, len(f))
+
+        b = self.build("busybox:imagefile=")
+        a = self.artifacts(b)
+        f = self.tools.glob(path.join(a[0], "*"))
+        self.assertEqual(0, len(f))
