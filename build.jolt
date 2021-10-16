@@ -1,6 +1,9 @@
-from jolt import Alias, BooleanParameter, Task
+from jolt import Alias, BooleanParameter, Parameter, Task, Tools
 from jolt import attributes, influence
 from jolt.plugins import docker, git
+
+from os import getenv
+_version = Tools().run("python3 setup.py --version", output_on_error=True)
 
 
 @influence.files("{dockerfile}")
@@ -12,7 +15,8 @@ class JoltImage(docker.DockerImage):
     push = BooleanParameter(False)
     requires = ["docker/cli"]
     requires_push_true = ["docker/login"]
-    tag = "robrt/jolt:latest"
+    tags = ["robrt/jolt:latest", "robrt/jolt:{version}"]
+    version = Parameter(_version)
 
 
 @influence.files("{dockerfile}")
@@ -23,7 +27,8 @@ class RabbitImage(docker.DockerImage):
     push = BooleanParameter(False)
     requires = ["docker/cli"]
     requires_push_true = ["docker/login"]
-    tag = "robrt/rabbitmq:latest"
+    tags = ["robrt/rabbitmq:latest", "robrt/rabbitmq:{version}"]
+    version = Parameter("3.8")
 
 
 @influence.files("**/*.py")
@@ -62,8 +67,12 @@ class JoltWheel(Task):
 
 
 class Default(Alias):
+    @property
+    def push(self):
+        return "true" if getenv("BUILD_VERSION") else "false"
+
     requires = [
-        "jolt/image:push=true",
-        "jolt/pypi:release=true",
-        "jolt/rabbitmq:push=true",
+        "jolt/image:push={push}",
+        "jolt/pypi:release={push}",
+        "jolt/rabbitmq:push={push}",
     ]
