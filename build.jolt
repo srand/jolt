@@ -69,7 +69,7 @@ class JoltWheel(Task):
 class Default(Alias):
     @property
     def push(self):
-        return "true" if getenv("BUILD_VERSION") else "false"
+        return "true" if getenv("JOLT_VERSION") else "false"
 
     requires = [
         "jolt/image:push={push}",

@@ -6,7 +6,7 @@ from shutil import copyfile
 
 here = path.abspath(path.dirname(__file__))
 name = "jolt"
-version = getenv("BUILD_VERSION", "0.9.13")
+version = getenv("JOLT_VERSION", "0.9.13")
 
 
 # Get the long description from the README file
