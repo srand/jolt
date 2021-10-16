@@ -1,0 +1,69 @@
+from jolt import Alias, BooleanParameter, Task
+from jolt import attributes, influence
+from jolt.plugins import docker, git
+
+
+@influence.files("{dockerfile}")
+@influence.files("**/*.py")
+@attributes.requires("requires_push_{push}")
+class JoltImage(docker.DockerImage):
+    name = "jolt/image"
+    dockerfile = "docker/Dockerfile"
+    push = BooleanParameter(False)
+    requires = ["docker/cli"]
+    requires_push_true = ["docker/login"]
+    tag = "robrt/jolt:latest"
+
+
+@influence.files("{dockerfile}")
+@attributes.requires("requires_push_{push}")
+class RabbitImage(docker.DockerImage):
+    name = "jolt/rabbitmq"
+    dockerfile = "docker/Dockerfile.rabbitmq"
+    push = BooleanParameter(False)
+    requires = ["docker/cli"]
+    requires_push_true = ["docker/login"]
+    tag = "robrt/rabbitmq:latest"
+
+
+@influence.files("**/*.py")
+@git.influence("docs")
+class JoltDocs(Task):
+    name = "jolt/docs"
+
+    def run(self, deps, tools):
+        with tools.cwd("docs"):
+            tools.run("make clean html")
+
+    def publish(self, artifact, tools):
+        with tools.cwd("docs/_build/html"):
+            artifact.collect("*")
+
+
+@attributes.environ("TWINE_USERNAME")
+@attributes.environ("TWINE_PASSWORD")
+@influence.whitelist("dist/**")
+class JoltWheel(Task):
+    name = "jolt/pypi"
+
+    release = BooleanParameter(False)
+
+    def run(self, deps, tools):
+        tools.run("python3 -m pip install --upgrade setuptools wheel")
+        tools.run("python3 -m pip install --upgrade twine")
+        tools.rmtree("build/lib", ignore_errors=True)
+        tools.rmtree("dist", ignore_errors=True)
+        tools.run("python3 {joltdir}/setup.py sdist bdist_wheel")
+        if self.release:
+            tools.run("python3 -m twine upload dist/*")
+
+    def publish(self, artifact, tools):
+        artifact.collect("dist")
+
+
+class Default(Alias):
+    requires = [
+        "jolt/image:push=true",
+        "jolt/pypi:release=true",
+        "jolt/rabbitmq:push=true",
+    ]
