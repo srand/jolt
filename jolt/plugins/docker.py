@@ -92,6 +92,13 @@ class DockerImage(Task):
     """
     abstract = True
 
+    buildargs = []
+    """
+    List of build arguments and their values ("ARG=VALUE").
+
+    The arguments are passed to Docker using --build-arg.
+    """
+
     cleanup = True
     """ Remove image from Docker daemon upon completion. Default: True """
 
@@ -128,6 +135,7 @@ class DockerImage(Task):
         super().__init__(*args, **kwargs)
 
     def run(self, deps, tools):
+        buildargs = " ".join(["--build-arg " + tools.expand(arg) for arg in self.buildargs])
         context = tools.expand_relpath(self.context, self.joltdir)
         dockerfile = tools.expand(self.dockerfile)
         self._imagefile = tools.expand(self.imagefile) if self.imagefile else None
@@ -143,7 +151,7 @@ class DockerImage(Task):
 
         self.info("Building image from {} in {}", dockerfile, context)
         with tools.cwd(context):
-            image = tools.run("docker build . -f {} -t {}", dockerfile, tags[0])
+            image = tools.run("docker build . -f {} -t {} {}", dockerfile, tags[0], buildargs)
             for tag in tags[1:]:
                 tools.run("docker tag {} {}", tags[0], tag)
 
