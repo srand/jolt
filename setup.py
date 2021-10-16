@@ -46,7 +46,7 @@ setup(
     install_requires=["requests", "click>=7.0", "keyring", "keyrings.alt",
                       "jinja2", "python-jenkins", "multi_key_dict",
                       "tqdm", "bz2file", "colorama", "ninja-syntax",
-                      "pyyaml", "fasteners", "pygit2<1.6.0", "lxml"],
+                      "pyyaml", "fasteners", "pygit2", "lxml"],
     dependency_links=[],
     extras_require={
         'allure': ['allure-python-commons'],
