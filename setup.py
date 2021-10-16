@@ -1,12 +1,12 @@
 from setuptools import setup, find_packages
 from setuptools.command.build_py import build_py
 from codecs import open
-from os import makedirs, path
+from os import makedirs, path, getenv
 from shutil import copyfile
 
 here = path.abspath(path.dirname(__file__))
 name = "jolt"
-version = "0.9.13"
+version = getenv("BUILD_VERSION", "0.9.13")
 
 
 # Get the long description from the README file
