@@ -1240,7 +1240,7 @@ class ReportProxy(object):
         No traceback is included if the exception is derived from JoltError.
 
         """
-        tb = traceback.format_exception(etype=type(exc), value=exc, tb=exc.__traceback__)
+        tb = traceback.format_exception(type(exc), value=exc, tb=exc.__traceback__)
         installdir = fs.path.dirname(__file__)
         if any(map(lambda frame: installdir not in frame, tb[1:-1])):
             while len(tb) > 2 and installdir in tb[1]:
