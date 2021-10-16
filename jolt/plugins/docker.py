@@ -120,6 +120,13 @@ class DockerImage(Task):
     Defaults to the task's canonical name.
     """
 
+    pull = True
+    """
+    Always pull images when building.
+
+    Passes --pull to the Docker client.
+    """
+
     push = False
     """
     Optionally push image to registry. Default: False
@@ -139,6 +146,7 @@ class DockerImage(Task):
         context = tools.expand_relpath(self.context, self.joltdir)
         dockerfile = tools.expand(self.dockerfile)
         self._imagefile = tools.expand(self.imagefile) if self.imagefile else None
+        pull = " --pull" if self.pull else ""
         tags = [tools.expand(tag) for tag in self.tags]
 
         if not path.exists(dockerfile):
@@ -151,7 +159,7 @@ class DockerImage(Task):
 
         self.info("Building image from {} in {}", dockerfile, context)
         with tools.cwd(context):
-            image = tools.run("docker build . -f {} -t {} {}", dockerfile, tags[0], buildargs)
+            image = tools.run("docker build . -f {} -t {} {}{}", dockerfile, tags[0], buildargs, pull)
             for tag in tags[1:]:
                 tools.run("docker tag {} {}", tags[0], tag)
 
