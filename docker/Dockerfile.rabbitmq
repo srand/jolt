@@ -1,8 +1,14 @@
-FROM docker.io/rabbitmq:3.8
+ARG VERSION=3.9
 
-RUN mkdir -p $RABBITMQ_HOME/plugins && \
-    cd $RABBITMQ_HOME/plugins && \
-    apt-get update && apt-get install -y wget && \
-    wget https://github.com/noxdafox/rabbitmq-message-deduplication/releases/download/0.4.3/rabbitmq_message_deduplication-v3.8.x-0.4.3.ez && \
-    wget https://github.com/noxdafox/rabbitmq-message-deduplication/releases/download/0.4.3/elixir-1.8.2.ez && \
+FROM docker.io/rabbitmq:${VERSION}
+
+ARG VERSION_DEDUPLICATION=0.5.0
+ARG VERSION_ELIXIR=1.10.4
+
+RUN apt-get update && apt-get install -y wget && apt-get clean
+
+RUN mkdir -p $RABBITMQ_HOME/plugins
+RUN cd $RABBITMQ_HOME/plugins && \
+    wget https://github.com/noxdafox/rabbitmq-message-deduplication/releases/download/${VERSION_DEDUPLICATION}/rabbitmq_message_deduplication-${VERSION_DEDUPLICATION}.ez && \
+    wget https://github.com/noxdafox/rabbitmq-message-deduplication/releases/download/${VERSION_DEDUPLICATION}/elixir-${VERSION_ELIXIR}.ez && \
     rabbitmq-plugins enable rabbitmq_message_deduplication

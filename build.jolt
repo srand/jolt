@@ -23,12 +23,13 @@ class JoltImage(docker.DockerImage):
 @attributes.requires("requires_push_{push}")
 class RabbitImage(docker.DockerImage):
     name = "jolt/rabbitmq"
+    buildargs = ["VERSION={version}"]
     dockerfile = "docker/Dockerfile.rabbitmq"
     push = BooleanParameter(False)
     requires = ["docker/cli"]
     requires_push_true = ["docker/login"]
     tags = ["robrt/rabbitmq:latest", "robrt/rabbitmq:{version}"]
-    version = Parameter("3.8")
+    version = Parameter("3.9")
 
 
 @influence.files("**/*.py")
