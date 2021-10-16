@@ -4,6 +4,7 @@ import os
 import time
 
 from jolt import *
+from jolt.plugins import docker
 
 
 @influence.files("../README.rst")
@@ -15,6 +16,8 @@ from jolt import *
 class JoltAmqp(Task):
     name = "jolt/image"
 
+    requires = ["docker/cli"]
+    
     def run(self, deps, tools):
         with tools.cwd(".."):
             tools.run("docker build -t robrt/jolt:{identity} -f docker/Dockerfile.test .")
