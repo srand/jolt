@@ -42,7 +42,9 @@ class AmqpWorker(Resource):
                                       tools.expand("rabbitmq:{deps[jolt/image].identity}", deps=deps))
                 tools.run("docker stack deploy -c jolt.yaml jolt_test", output_on_error=True)
                 tools.run("docker service scale jolt_test_worker=1", output_on_error=True)
-                artifact.strings.config = tools.read_file("client.conf")
+                config = tools.read_file("client.conf")
+                config = config.replace("localhost", os.getenv("DOCKER_PUBLIC_IP", "localhost"))
+                artifact.strings.config = config
             for i in range(0, 20):
                 try:
                     assert "Queue bound" in tools.run("docker service logs jolt_test_worker", output=False)
