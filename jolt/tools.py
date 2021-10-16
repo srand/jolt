@@ -1326,7 +1326,7 @@ class Tools(object):
         executable = self.expand(executable)
         return shutil.which(executable, path=self._env.get("PATH"))
 
-    def write_file(self, pathname, content=None, expand=True):
+    def write_file(self, pathname, content=None, expand=True, **kwargs):
         """ Creates a file.
 
         Note:
@@ -1337,11 +1337,13 @@ class Tools(object):
             content (str, optional): Data to be written to the file.
             expand (boolean, optional): Expand macros in file content.
                Default: True.
+            **kwargs (dict, optional): Additional key value dictionary 
+                used in macro expansion.
         """
         pathname = self.expand_path(pathname)
         if content is None:
             content = ''
         if expand:
-            content = self.expand(content)
+            content = self.expand(content, **kwargs)
         with open(pathname, "wb") as f:
             f.write(content.encode())
