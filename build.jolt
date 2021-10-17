@@ -16,7 +16,6 @@ class Jolt(selfdeploy.Jolt):
 
 
 @influence.files("{dockerfile}")
-@influence.files("**/*.py")
 @attributes.requires("requires_push_{push}")
 class JoltImage(docker.DockerImage):
     name = "jolt/image"
@@ -62,7 +61,6 @@ class JoltDocs(Task):
 
 @attributes.environ("TWINE_USERNAME")
 @attributes.environ("TWINE_PASSWORD")
-@influence.whitelist("dist/**")
 class JoltWheel(Task):
     name = "jolt/pypi"
 
@@ -84,6 +82,34 @@ class JoltWheel(Task):
              artifact.collect("dist")
 
 
+
+@attributes.environ("TWINE_USERNAME")
+@attributes.environ("TWINE_PASSWORD")
+@git.influence("docker/wrapper")
+class JoltWrapperWheel(Task):
+    name = "jolt/docker/pypi"
+
+    release = BooleanParameter(False)
+    version = Parameter(_version)
+
+    def run(self, deps, tools):
+        tools.run("python3 -m pip install --upgrade setuptools wheel")
+        tools.run("python3 -m pip install --upgrade twine")
+        with tools.cwd(tools.builddir()):
+            tools.copy("{joltdir}/README.rst", "README.rst")
+            tools.copy("{joltdir}/docker/wrapper/__init__.py", "jolt_docker/")
+            tools.copy("{joltdir}/docker/wrapper/__main__.py", "jolt_docker/")
+            tools.copy("{joltdir}/docker/wrapper/setup.py", "setup.py")
+            tools.replace_in_file("setup.py", "0.9.13", "{version}")
+            tools.run("python3 setup.py sdist bdist_wheel")
+            if self.release:
+                tools.run("python3 -m twine upload dist/*")
+
+    def publish(self, artifact, tools):
+        with tools.cwd(tools.builddir()):
+             artifact.collect("dist")
+
+
 class Default(Alias):
     @property
     def push(self):
@@ -92,5 +118,6 @@ class Default(Alias):
     requires = [
         "jolt/image:push={push}",
         "jolt/pypi:release={push}",
+        "jolt/docker/pypi:release={push}",
         "jolt/rabbitmq:push={push}",
     ]

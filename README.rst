@@ -82,13 +82,22 @@ Installing
 Jolt is available in the Python Package Index:
 
 .. code:: bash
- 
+
   $ pip install jolt
   $ jolt
 
 And as a Docker image:
 
 .. code:: bash
- 
+
   $ docker run robrt/jolt
 
+A thin Python wrapper is available for the Docker images. By using it, multiple versions
+of Jolt can coexist on the host since the version used is selected during runtime rather
+than install time. To use a specific version in a project, add a version attribute in the
+Jolt manifest. By always using a specific version cache hits become more likely.
+
+.. code:: bash
+
+  $ pip install jolt_docker
+  $ jolt
