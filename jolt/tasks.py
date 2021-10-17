@@ -233,7 +233,21 @@ class Parameter(object):
 
 
 class BooleanParameter(Parameter):
-    """ Boolean task parameter type. """
+    """
+    Boolean task parameter.
+
+    Accepted values are:
+
+      - False
+      - True
+      - "false"
+      - "true"
+      - "no"
+      - "yes"
+      - "0"
+      - "1"
+
+    """
 
     def __init__(self, default=None, required=True, const=False, influence=True, help=None):
         """
@@ -291,6 +305,7 @@ class BooleanParameter(Parameter):
         return not self.is_true
 
     def __bool__(self):
+        """ Returns the boolean parameter value """
         return self.is_true
 
     def __getitem__(self, key):
@@ -387,8 +402,7 @@ class ListParameter(Parameter):
         """ Set the parameter value.
 
         Args:
-            value (boolean): The new parameter value. Accepted values are:
-                False, True, "false, and "true", 0 and 1, "no" and "yes".
+            value (str): A list of accepted values, separated by '+'.
 
         Raises:
             ValueError: If the parameter is assigned an illegal value.
@@ -424,13 +438,13 @@ class ListParameter(Parameter):
 
         Args:
             key (int, slice, str): Element index or slice. A key string can
-            be used to check for the existence of that value in the list.
-            If the key is present the same value is returned, otherwise None.
+                be used to check for the existence of that value in the list.
+                If the key is present the same value is returned, otherwise None.
 
-            A special key syntax is also available to request an alternate return
-            value depending on the presence of the key. Instead of a list value
-            you pass ``value,present,absent`` and either ``present`` or ``absent``
-            will be returned. See the example below.
+                A special key syntax is also available to request an alternate return
+                value depending on the presence of the key. Instead of a list value
+                you pass ``value,present,absent`` and either ``present`` or ``absent``
+                will be returned. See the example below.
 
         Returns:
             Element value, or substitution.

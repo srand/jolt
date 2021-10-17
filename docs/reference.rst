@@ -85,23 +85,23 @@ Parameter
 
 
 BooleanParameter
-----------------
+^^^^^^^^^^^^^^^^
 
 .. reference-booleanparameter-start
 
 .. autoclass:: jolt.BooleanParameter
-   :members: __bool__, __getitem__, __init__, __str__, is_default, get_default, get_value, set_value, is_set, is_unset, is_true, is_false
+   :members: __bool__, __getitem__, __init__, __str__, is_default, get_default, get_value, is_set, is_unset, is_true, is_false
 
 .. reference-booleanparameter-end
 
 
 ListParameter
--------------
+^^^^^^^^^^^^^
 
 .. reference-listparameter-start
 
-.. autoclass:: jolt.Parameter
-   :members: __getitem__, __init__, __iter__, __len__, __str__, is_default, get_default, get_value, set_value, is_set, is_unset
+.. autoclass:: jolt.ListParameter
+   :members: __getitem__, __init__, __iter__, __len__, __str__, is_default, get_default, get_value, is_set, is_unset
 
 .. reference-listparameter-end
 
@@ -296,15 +296,37 @@ Docker
 
 .. reference--start
 
+DockerClient
+^^^^^^^^^^^^
+
+.. reference-docker-dockerclient-start
+
+.. autoclass:: jolt.plugins.docker.DockerClient
+   :members: name, version, host, arch, url
+
+.. reference-docker-dockerclient-end
+
+.. reference-docker-end
+
 DockerImage
 ^^^^^^^^^^^
 
-.. reference-docker-docker-start
+.. reference-docker-dockerimage-start
 
 .. autoclass:: jolt.plugins.docker.DockerImage
-   :members: compression, context, dockerfile, imagefile, tag
+   :members: buildargs, cleanup, compression, context, dockerfile, imagefile, pull, push, tags
 
-.. reference-docker-docker-end
+.. reference-docker-dockerimage-end
+
+DockerLogin
+^^^^^^^^^^^
+
+.. reference-docker-dockerlogin-start
+
+.. autoclass:: jolt.plugins.docker.DockerLogin
+   :members: name, user, passwd
+
+.. reference-docker-dockerlogin-end
 
 .. reference-docker-end
 

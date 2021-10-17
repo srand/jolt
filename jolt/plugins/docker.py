@@ -8,14 +8,27 @@ from os import path
 from platform import system
 
 
-class DockerCLI(Download):
-    """ Downloads and publishes the Docker command line client """
+class DockerClient(Download):
+    """ Task: Downloads and publishes the Docker command line client.
+
+    The task will be automatically made available after importing
+    ``jolt.plugins.docker``.
+    """
+
     name = "docker/cli"
+    """ Name of the task """
 
     version = Parameter("20.10.9", help="Docker version")
+    """ Docker version [20.10.9] """
+
     host = Parameter(system().lower(), help="Host operating system")
+    """ Host operating system [autodetected] """
+
     arch = Parameter("x86_64", help="Host architecture")
+    """ Host architecture [x86_64] """
+
     url = "https://download.docker.com/{host}/static/stable/{arch}/docker-{version}.tgz"
+    """ URL of binaries """
 
     def publish(self, artifact, tools):
         with tools.cwd(self._builddir):
@@ -25,7 +38,7 @@ class DockerCLI(Download):
 
 class DockerLogin(Resource):
     """
-    Resource which logs in and out of a Docker Registry.
+    Resource: Logs in and out of a Docker Registry.
 
     If the user and password parameters are unset, credentials
     are fetched from the environment variables:
@@ -33,13 +46,27 @@ class DockerLogin(Resource):
         - DOCKER_USER
         - DOCKER_PASSWD
 
+    The resource will be automatically made available after importing
+    ``jolt.plugins.docker``.
     """
     name = "docker/login"
+    """ Name of the resource """
 
     requires = ["docker/cli"]
 
     user = Parameter("", help="Docker Registry username")
+    """
+    Docker Registry username.
+
+    If not set, the environment variable ``DOCKER_USER`` is read instead.
+    """
+
     passwd = Parameter("", help="Docker Registry password")
+    """
+    Docker Registry password.
+
+    If not set, the environment variable ``DOCKER_PASSWD`` is read instead.
+    """
 
     def _user(self, tools):
         return str(self.user) or tools.getenv("DOCKER_USER")
@@ -59,35 +86,54 @@ class DockerLogin(Resource):
         tools.run("docker logout")
 
 
-TaskRegistry.get().add_task_class(DockerCLI)
+TaskRegistry.get().add_task_class(DockerClient)
 TaskRegistry.get().add_task_class(DockerLogin)
 
 
-@influence.attribute("compression")
-@influence.attribute("context")
-@influence.attribute("dockerfile")
-@influence.attribute("imagename")
-@influence.attribute("tag")
 class DockerImage(Task):
     """
-    Builds a Docker image and publishes the resulting tarfile.
+    Abstract Task: Builds and publishes a Docker image.
 
-    The image may optionally be compressed using bzip2, gzip or lzma compression.
+    Builds the selected ``Dockerfile`` and optionally tags and pushes the
+    image to a registry. The image can also be saved to file and published
+    in the task artifact. Compression formats supported are bzip2, gzip and
+    lzma.
+
+    By default, base images referenced in the ``Dockerfile`` will be pulled
+    during the build. Note that Jolt has no way of knowing beforehand if
+    images have been updated in the registry. Use time-based influence to
+    trigger rebuilds if it's important that base images are kept up-to-date.
+
+    No automatic influence for ``Dockerfile`` or context is collected. Make
+    sure to use an appropriate influence decorator.
+
+    Optionally add requirements to:
+
+      - ``docker/cli`` to provision the Docker client, if none is available on the host.
+      - ``docker/login`` to automatically login to the Docker registry.
+
+    This class must be subclassed.
 
     Example:
 
+    .. code-block:: docker
+
+        # Dockerfile
+
+        FROM busybox:latest
+        CMD ["busybox"]
 
     .. code-block:: python
+
+        # build.jolt
 
         from jolt.plugins.docker import DockerImage
 
         class Busybox(DockerImage):
+            \"\"\" Publishes Busybox image as gzip-compressed tarball \"\"\"
             compression = "gz"
-            dockerfile = \"\"\"
-            FROM busybox:latest
-            CMD ["busybox"]
-            \"\"\"
-            tag = "busybox:latest"
+            requires = ["docker/cli"]
+            tags = ["busybox:{identity}"]
 
     """
     abstract = True
@@ -96,11 +142,11 @@ class DockerImage(Task):
     """
     List of build arguments and their values ("ARG=VALUE").
 
-    The arguments are passed to Docker using --build-arg.
+    The arguments are passed to Docker using ``--build-arg``.
     """
 
     cleanup = True
-    """ Remove image from Docker daemon upon completion. Default: True """
+    """ Remove image from Docker daemon upon completion [True] """
 
     compression = None
     """ Optional image compression "bz2", "gz", or "xz". """
@@ -129,7 +175,7 @@ class DockerImage(Task):
 
     push = False
     """
-    Optionally push image to registry. Default: False
+    Optionally push image to registry [False]
 
     To be able to push images, the current user must login to the Docker Registry.
     The ``docker/login`` Jolt resource can be used for that purpose.

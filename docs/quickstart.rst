@@ -76,13 +76,11 @@ its name to ``hello``.
         name = "hello"
 
         def run(self, deps, tools):
-            b = tools.builddir()
-            with tools.cwd(b):
+            with tools.cwd(tools.builddir()):
                 tools.write_file("message.txt", "Hello world!")
 
         def publish(self, artifact, tools):
-            b = tools.builddir()
-            with tools.cwd(b):
+            with tools.cwd(tools.builddir()):
                 artifact.collect("*.txt")
 
 The implementation of the task is now split into two methods,
@@ -145,13 +143,11 @@ use the new parameter's value when writing the ``message.txt`` file.
         recipient = Parameter(default="world", help="Name of greeting recipient.")
 
         def run(self, deps, tools):
-            b = tools.builddir()
-            with tools.cwd(b):
+            with tools.cwd(tools.builddir()):
                 tools.write_file("message.txt", "Hello {recipient}!")
 
         def publish(self, artifact, tools):
-            b = tools.builddir()
-            with tools.cwd(b):
+            with tools.cwd(tools.builddir()):
                 artifact.collect("*.txt")
 
 
@@ -177,13 +173,13 @@ file to the console. ``Print`` will declare a dependency on ``Hello``.
         """ Prints a cheerful message """
 
         recipient = Parameter(default="world", help="Name of greeting recipient.")
-        requires = "hello:recipient={recipient}"
+        requires = ["hello:recipient={recipient}"]
         cacheable = False
 
         def run(self, deps, tools):
             hello = deps["hello:recipient={recipient}"]
-            with open(os.path.join(hello.path, "message.txt")) as f:
-                print(f.read())
+            with tools.cwd(hello.path):
+                print(tools.read_file("message.txt"))
 
 The output from this task is not ``cacheable``, forcing the task to be
 executed every time. It's dependency ``hello`` however, will only be
@@ -221,7 +217,7 @@ generic support for running any third-party build tool.
     class E2fsprogs(Task):
         """ Ext 2/3/4 filesystem utilities """
 
-        requires = "git:url=git://git.kernel.org/pub/scm/fs/ext2/e2fsprogs.git"
+        requires = ["git:url=git://git.kernel.org/pub/scm/fs/ext2/e2fsprogs.git"]
 
         def run(self, deps, tools):
             ac = tools.autotools()
@@ -286,7 +282,7 @@ Below is a skeleton example providing mutual exclusion:
 	""" Reboots the specified test device """
 
 	device = Parameter(help="Name of device to reboot")
-        requires = "exclusivity:to={device}"
+        requires = ["exclusivity:to={device}"]
 	cacheable = False
 
 	def run(self, deps, tools):
@@ -311,7 +307,7 @@ Below is an example:
     from jolt import *
 
     class E2fsTest(Test):
-        requires = "e2fsprogs"
+        requires = ["e2fsprogs"]
 
         def setup(self, deps, tools):
             self.tools = tools
@@ -469,8 +465,8 @@ To build the library and the program we use this Jolt recipe:
 
 
     class HelloWorld(CXXExecutable):
-        requires = "message"
-        sources = "program/main.cpp"
+        requires = ["message"]
+        sources = ["program/main.cpp"]
 
 
 Metadata
@@ -694,8 +690,8 @@ Secondly, declare the toolchain as a dependency of all your compilation tasks:
 .. code-block:: python
 
     class HelloWorld(CXXExecutable):
-        requires = "toolchain"
-        sources = "src/main.cpp"
+        requires = ["toolchain"]
+        sources = ["src/main.cpp"]
 
 
 Default toolchain parameter values can be overridden from the command line when you
@@ -742,12 +738,12 @@ used in our example application. All build metadata is automatically configured.
     from jolt.plugins.conan import Conan
 
     class Boost(Conan):
-        requires = "toolchain"
+        requires = ["toolchain"]
         packages = ["boost/1.74.0"]
 
     class HelloWorld(CXXExecutable):
         requires = ["toolchain", "boost"]
-        sources = "src/main.cpp"
+        sources = ["src/main.cpp"]
 
 With the toolchain as a dependency also for Boost, Conan will be able to fetch
 the appropriate binaries that match your toolchain. If no such binaries are

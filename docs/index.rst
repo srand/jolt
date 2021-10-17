@@ -17,6 +17,5 @@ plugins.
    quickstart
    guides
    configuration
-   plugins
    reference
-   changelog
+

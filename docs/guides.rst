@@ -20,10 +20,12 @@ Docker's Swarm mode is an easy to use container orchestration tool which can be 
   .. literalinclude:: ../docker/swarm/jolt.yaml
     :language: yaml
 
-The Jolt workers are configured through the worker.conf file. It enables the AMQP and HTTP plugins. The hidden ``amqp-worker`` command provided by the plugin will connect to the configured AMQP message broker and start processing execution requests. The HTTP plugin will store the resulting artifacts on the configured HTTP server. Jolt clients can then download these artifacts to the local host. In the example, a simple local Docker volume is used as server storage for the artifacts. In a real deployment, you probably want to use something else.
+The two Jolt workers are configured through the ``worker.conf`` file:
 
   .. literalinclude:: ../docker/swarm/worker.conf
     :language: yaml
+
+This configuration enables the AMQP and HTTP plugins. The hidden Jolt ``amqp-worker`` command enabled by the AMQP plugin will connect to the configured message broker and start processing execution requests. The HTTP plugin will store the resulting artifacts on the configured HTTP server. Jolt clients can then download these artifacts to the local host. In the example, a simple local Docker volume is used as server storage for the artifacts. In a real deployment, you probably want to use something else.
 
 To deploy the system into a swarm, run:
 
@@ -65,3 +67,16 @@ Alternatively, if you are using a separate configuration file:
   .. code:: bash
 
     $ jolt -c client.conf build --network <task>
+
+
+Adapting Task Definitions
+-------------------------
+
+Task classes may have to be adapted to work in a distributed execution environment.
+For example, Jolt will by default not transfer any workspace files to a worker.
+Such dependencies, typically source repositories, must be listed as task requirements.
+
+Another common issue is that workers don't have the required tools installed. Those tools
+have to be packaged by Jolt tasks and listed as requirements in order to be
+automatically provisioned on the workers.
+
