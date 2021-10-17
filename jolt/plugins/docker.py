@@ -68,6 +68,13 @@ class DockerLogin(Resource):
     If not set, the environment variable ``DOCKER_PASSWD`` is read instead.
     """
 
+    server = Parameter("", help="Docker Registry server")
+    """
+    Docker Registry server.
+
+    If no server is specified, the default is defined by the daemon.
+    """
+
     def _user(self, tools):
         return str(self.user) or tools.getenv("DOCKER_USER")
 
@@ -80,10 +87,10 @@ class DockerLogin(Resource):
 
         with tools.cwd(tools.builddir()):
             tools.write_file("docker-credential", self._password(tools))
-            tools.run("cat docker-credential | docker login -u {user} --password-stdin", user=self._user(tools))
+            tools.run("cat docker-credential | docker login -u {user} --password-stdin {server}", user=self._user(tools))
 
     def release(self, artifact, deps, tools):
-        tools.run("docker logout")
+        tools.run("docker logout {server}")
 
 
 TaskRegistry.get().add_task_class(DockerClient)
