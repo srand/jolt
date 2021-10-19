@@ -118,6 +118,18 @@ Resource
 .. reference-resource-end
 
 
+Script
+------
+
+.. reference-script-start
+
+.. autoclass:: jolt.tasks.Script
+   :members: collect
+   :show-inheritance:
+
+.. reference-script-end
+
+
 Task
 ----
 
@@ -280,7 +292,7 @@ Conan
 .. reference-conan-start
 
 Conan
-^^^^^^
+^^^^^
 
 .. reference-conan-conan-start
 

@@ -2,6 +2,7 @@ name = "jolt"
 
 from .tasks import Alias
 from .tasks import Download
+from .tasks import Script
 from .tasks import Task
 from .tasks import TaskGenerator
 from .tasks import Test

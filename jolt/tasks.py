@@ -1524,6 +1524,92 @@ class Download(Task):
                     artifact.collect(files, symlinks=self.symlinks)
 
 
+class Script(Task):
+    """
+    A simple shell script task.
+
+    The script source is extracted directly from the task class documentation.
+    All text following a ``---`` separator will be executed.
+
+    A temporary build directory is automatically created and can be accessed
+    with ``{builddir}``. All other task attributes are also expanded as usual.
+    Dependency artifacts are accessible through the ``deps`` dictionary.
+
+      .. code-block:: python
+
+        echo {deps[task].path}
+
+    By default, all files in the build directory are published in the task artifact.
+    The :attr:`collect` attribute can be used to customize file collection.
+    Alternatively, the publish method may be overridden.
+
+    Keep in mind that shell scripts are not necessarily portable between
+    host operating systems. Implement your tasks in Python code if portability
+    is a concern.
+
+    Example:
+
+      .. code-block:: python
+
+        class Hello(Script):
+            \"\"\"
+            Classic Hello World!
+            ---
+            # Script source
+
+            echo "Hello world!" > {builddir}/hello.txt
+            \"\"\"
+    """
+    abstract = True
+
+    collect = [{"files": "*", "cwd": "{builddir}"}]
+    """
+    A list of file publication instructions.
+
+    Items in the list are passed directly to :func:`Artifact.collect() <jolt.Artifact.collect>`
+    and can be either strings, tuples or dictionaries.
+
+    By default, all files in the build directory are published.
+
+    Example:
+
+      .. code-block:: python
+
+        collect = [
+            "*",                              # Collect all files
+            ("*", "src/"),                    # Collect all files into the artifact's src/ directory
+            {"files": "*", "cwd": "subdir"},  # Collect all files from the archive's subdir/ directory
+        ]
+
+    """
+
+    source = None
+
+    @property
+    def _source(self):
+        if self.source is not None:
+            return self.source
+        doc = self.__doc__.split("---", 1)
+        return doc[1] if len(doc) > 1 else doc[0]
+
+    def run(self, deps, tools):
+        self.builddir = tools.builddir()
+        self.deps = deps
+        self._scriptdir = tools.builddir("script")
+
+        tools.write_file("{_scriptdir}/script.sh", self._source)
+        tools.run("$SHELL {_scriptdir}/script.sh")
+
+    def publish(self, artifact, tools):
+        with tools.cwd(self.builddir):
+            for files in self.collect:
+                if type(files) == tuple:
+                    artifact.collect(*files)
+                elif type(files) == dict:
+                    artifact.collect(**files)
+                else:
+                    artifact.collect(files)
+
 
 __unittest = True
 

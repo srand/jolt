@@ -1,3 +1,5 @@
+#!/usr/bin/python
+
 import os
 import sys
 import time
@@ -707,3 +709,24 @@ class TaskApi(JoltTest):
         with self.tools.cwd(self.ws):
             self.assertEqual("locked", self.tools.read_file("r1.lock"))
             self.assertEqual("unlocked", self.tools.read_file("r2.lock"))
+
+    def test_script(self):
+        """
+        --- tasks:
+        class A(Script):
+            \"\"\"
+            #\-\-\-
+            echo -n {{arg}} > {{builddir}}/file.txt
+            \"\"\"
+            arg = Parameter()
+
+        class B(Script):
+            \"\"\"
+            #\-\-\-
+            set -e
+            [ "$(cat {{deps[a:arg=hello].path}}/file.txt)" != "hello" ] && exit 1 || exit 0
+            \"\"\"
+            requires = ["a:arg=hello"]
+        ---
+        """
+        self.build("b")
