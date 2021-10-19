@@ -7,7 +7,7 @@ import subprocess
 import xml.etree.ElementTree as ET
 
 
-def find_joltdir(searchdir):
+def find_manifestdir(searchdir):
     manifest = os.path.join(searchdir, "default.joltxmanifest")
     if os.path.exists(manifest):
         try:
@@ -17,13 +17,29 @@ def find_joltdir(searchdir):
         except FileNotFoundError:
             return searchdir
 
+    parentdir = os.path.dirname(searchdir)
+    if searchdir == parentdir:
+        return None
+    return find_manifestdir(parentdir)
+
+
+def find_joltfiledir(searchdir):
     if glob.glob(os.path.join(searchdir, "*.jolt")):
         return searchdir
 
     parentdir = os.path.dirname(searchdir)
     if searchdir == parentdir:
         return None
+
     return find_joltdir(parentdir)
+
+
+# Aka workspace directory
+def find_joltdir(searchdir):
+    manifestdir = find_manifestdir(searchdir)
+    if manifestdir:
+        return manifestdir
+    return find_joltfiledir(searchdir)
 
 
 def find_version(joltdir):

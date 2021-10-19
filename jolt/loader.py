@@ -81,24 +81,15 @@ class LoaderFactory(object):
 
 
 class NativeLoader(Loader):
-    def __init__(self):
+    def __init__(self, searchpath):
         self._recipes = []
-        self._find_files()
+        self._find_files(searchpath)
 
-    def _find_files(self):
-        files = []
-        oldpath = None
-        curpath = os.getcwd()
-        while not self._recipes and oldpath != curpath:
-            files = glob.glob(fs.path.join(curpath, "*.jolt"))
-
-            for filepath in files:
-                recipe = NativeRecipe(filepath)
-                self._recipes.append(recipe)
-
-            oldpath = curpath
-            curpath = os.path.dirname(oldpath)
-        self.path = oldpath if self._recipes else None
+    def _find_files(self, searchpath):
+        files = glob.glob(fs.path.join(searchpath, "*.jolt"))
+        for filepath in files:
+            recipe = NativeRecipe(filepath)
+            self._recipes.append(recipe)
 
     @property
     def recipes(self):
@@ -115,8 +106,8 @@ def register(factory):
 
 @register
 class NativeLoaderFactory(LoaderFactory):
-    def create(self):
-        return NativeLoader()
+    def create(self, searchpath):
+        return NativeLoader(searchpath)
 
 
 @utils.Singleton
@@ -171,15 +162,45 @@ class JoltLoader(object):
                     attributes.requires("_resources")(task)
                 self._tasks += recipe.tasks
 
-    def load(self, manifest=None):
+    def _find_joltdir(self, searchdir):
         for factory in _loaders:
-            loader = factory().create()
-            for recipe in loader.recipes:
-                recipe.load()
-                self._recipes.append(recipe)
-                self._tasks += recipe.tasks
-            if len(loader.recipes) > 0:
-                self.set_joltdir(loader.path)
+            loader = factory().create(searchdir)
+            if loader.recipes:
+                return searchdir
+
+        parentdir = os.path.dirname(searchdir)
+        if searchdir == parentdir:
+            return None
+
+        return self._find_joltdir(parentdir)
+
+    def _get_searchpaths(self):
+        searchpaths = [self.joltdir]
+        # Only allow recipes to be loaded from the same directory as the
+        # the manifest if it exists. Otherwise stop at the first
+        # directory with a .jolt file.
+        #
+        #path = os.path.relpath(os.getcwd(), self.joltdir)
+        #while path and path != '.':
+        #    searchpath = os.path.join(self.joltdir, path)
+        #    searchpaths.append(searchpath)
+        #    path = os.path.dirname(path)
+        return searchpaths
+
+    def load(self, manifest=None):
+        if not self.joltdir:
+            self.set_joltdir(self._find_joltdir(os.getcwd()))
+
+        if not self.joltdir:
+            return []
+
+        for searchpath in self._get_searchpaths():
+            for factory in _loaders:
+                loader = factory().create(searchpath)
+                for recipe in loader.recipes:
+                    recipe.load()
+                    self._recipes.append(recipe)
+                    self._tasks += recipe.tasks
 
         self._load_project_recipes()
         return self._tasks
