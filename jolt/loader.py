@@ -1,10 +1,10 @@
 import base64
 import glob
 import imp
-import inspect
 import os
 import sys
 
+from jolt import inspect
 from jolt.tasks import attributes
 from jolt.tasks import Alias, Task, TaskGenerator, TaskRegistry, WorkspaceResource
 from jolt.error import raise_error_if, raise_task_error_if
@@ -44,14 +44,8 @@ class NativeRecipe(Recipe):
         return cls.__dict__.get("abstract", False) or cls.__name__.startswith("_")
 
     @staticmethod
-    def _is_generator(cls):
-        return inspect.isclass(cls) and \
-            issubclass(cls, TaskGenerator) and \
-            not NativeRecipe._is_abstract(cls)
-
-    @staticmethod
     def _is_task(cls):
-        return inspect.isclass(cls) and \
+        return isinstance(cls, type) and \
             issubclass(cls, Task) and \
             not NativeRecipe._is_abstract(cls)
 
@@ -60,16 +54,14 @@ class NativeRecipe(Recipe):
 
         name = utils.canonical(self.path)
         module = imp.load_source("joltfile_{0}".format(name), self.path)
+        classes = inspect.getmoduleclasses(module, [Task, TaskGenerator], NativeRecipe._is_abstract)
 
-        tasks = inspect.getmembers(module, self._is_task)
-        generators = inspect.getmembers(module, self._is_generator)
-
-        for _, cls in generators:
+        for cls in classes[TaskGenerator]:
             cls.joltdir = self.joltdir or os.path.dirname(self.path)
-            classes = utils.as_list(cls().generate())
-            tasks += [(c.__name__, c) for c in classes if self._is_task(c)]
+            generated_tasks = utils.as_list(cls().generate())
+            classes[Task] += filter(NativeRecipe._is_task, generated_tasks)
 
-        for name, task in tasks:
+        for task in classes[Task]:
             task.name = task.name or task.__name__.lower()
             task.joltdir = self.joltdir or os.path.dirname(self.path)
             task.joltproject = self.project

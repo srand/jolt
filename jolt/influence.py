@@ -1,10 +1,10 @@
 import datetime
 import hashlib
-import inspect
 import os
 import uuid
 from pathlib import Path, PurePath
 
+from jolt import inspect
 from jolt import utils
 from jolt import log
 from jolt import filesystem as fs
@@ -128,7 +128,7 @@ class TaskSourceInfluence(HashInfluenceProvider):
             try:
                 func.__influence
             except AttributeError:
-                func.__influence = utils.sha1(task._get_source(func))
+                func.__influence = utils.sha1(inspect.getfuncsource(func))
             finally:
                 shasum.update(func.__influence.encode())
 
@@ -171,12 +171,13 @@ class TaskClassSourceInfluence(HashInfluenceProvider):
         # Calculate sha1 sum for classes in hierarchy
         result = ""
         for cls in reversed(task.__class__.mro()):
+            if cls is object:
+                continue
             try:
                 cls.__dict__["_TaskClassSourceInfluence__influence"]
             except KeyError:
                 try:
-                    src, _ = inspect.getsourcelines(cls)
-                    cls.__influence = utils.sha1(str(src))
+                    cls.__influence = utils.sha1(inspect.getclasssource(cls))
                 except TypeError:
                     continue
             result += cls.__dict__["_TaskClassSourceInfluence__influence"] + \

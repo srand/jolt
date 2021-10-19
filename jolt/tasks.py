@@ -4,7 +4,6 @@ from contextlib import contextmanager
 import copy
 import fnmatch
 import functools
-import inspect
 from pathlib import Path
 import platform
 import subprocess
@@ -888,10 +887,6 @@ class TaskBase(object):
     def _selfsustained(self):
         return utils.call_or_return(self, self.__class__.selfsustained)
 
-    def _get_source(self, func):
-        source, _ = inspect.getsourcelines(func)
-        return "\n".join(source)
-
     def _create_exports_and_parameters(self):
         self._exports = {}
         self._parameters = {}
@@ -1303,8 +1298,6 @@ class Resource(Task):
 
     def __init__(self, *args, **kwargs):
         super(Resource, self).__init__(*args, **kwargs)
-        self.influence.append(TaskSourceInfluence("acquire"))
-        self.influence.append(TaskSourceInfluence("release"))
 
     def is_runnable(self):
         return False
