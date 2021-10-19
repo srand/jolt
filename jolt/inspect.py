@@ -63,6 +63,14 @@ def getfile(cls_or_func):
         return module.__file__
     raise TypeError('{!r} is a built-in object'.format(cls_or_func))
 
+def getlineno(cls_or_func):
+    """ Returns the name of the file in which a class or function is defined """
+    if isinstance(cls_or_func, type):
+        ast = getclassast(cls_or_func)
+    else:
+        ast = getfuncast(cls_or_func)
+    return ast.lineno
+
 def getclassast(cls):
     """ Returns the Abstract Syntax Tree of a class """
     global _modules

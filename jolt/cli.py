@@ -714,8 +714,15 @@ def info(ctx, task, influence=False, artifacts=False, salt=None):
            task_registry.get_test_class(task_cls_name)
     raise_task_error_if(not task, task_name, "no such task")
 
+    from jolt import inspect
+
     click.echo()
     click.echo("  {0}".format(task.name))
+    click.echo()
+    click.echo("  Definition")
+    click.echo("    {0}:{1}".format(
+        fs.path.relpath(inspect.getfile(task), JoltLoader.get().joltdir),
+        inspect.getlineno(task)))
     click.echo()
     if task.__doc__:
         click.echo("  {0}".format(task.__doc__.strip()))
