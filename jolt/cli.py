@@ -719,21 +719,21 @@ def info(ctx, task, influence=False, artifacts=False, salt=None):
     click.echo()
     click.echo("  {0}".format(task.name))
     click.echo()
+    if task.__doc__:
+        click.echo("  {0}".format(task.__doc__.strip()))
+        click.echo()
     click.echo("  Definition")
     click.echo("    {0}:{1}".format(
         fs.path.relpath(inspect.getfile(task), JoltLoader.get().joltdir),
         inspect.getlineno(task)))
     click.echo()
-    if task.__doc__:
-        click.echo("  {0}".format(task.__doc__.strip()))
-        click.echo()
     click.echo("  Parameters")
     has_param = False
     params = { key: getattr(task, key) for key in dir(task)
                if isinstance(utils.getattr_safe(task, key), Parameter) }
     for item, param in params.items():
         has_param = True
-        click.echo("    {0:<15}   {1}".format(item, param.__doc__ or ""))
+        click.echo("    {0:<15}   {1}".format(item, param.help or ""))
     if not has_param:
         click.echo("    None")
 

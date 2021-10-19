@@ -23,3 +23,6 @@ def blue(s):
 
 def bright(s):
     return Style.BRIGHT + s + Style.RESET_ALL if enabled() else s
+
+def dim(s):
+    return Style.DIM + s + Style.RESET_ALL if enabled() else s

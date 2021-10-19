@@ -29,6 +29,7 @@ from jolt.influence import environ as environ_influence
 from jolt.influence import source as source_influence
 from jolt import manifest
 from jolt.tools import Tools
+from jolt import colors
 
 
 class Export(object):
@@ -111,9 +112,22 @@ class Parameter(object):
         self._required = required
         self._const = const
         self._influence = influence
-        self.__doc__ = help
+        self._help = help
         if default:
             self._validate(default)
+
+    @property
+    def help(self):
+        values = self._help_values()
+        if values:
+            return "{} {}".format(self._help, values) if self._help else values
+        return self._help or ""
+
+    def _help_values(self, accepted=None):
+        accepted = accepted or self._accepted_values or []
+        def highlight(value):
+            return colors.bright(value) if self._is_default(value) else colors.dim(value)
+        return "[{}]".format(", ".join([highlight(value) for value in accepted])) if accepted else ""
 
     def __str__(self):
         """ Returns the parameter value as a string """
@@ -174,6 +188,9 @@ class Parameter(object):
             True if the assigned value is the default value.
         """
         return self._default == self._value
+
+    def _is_default(self, value):
+        return self._default and value == self._default
 
     def is_unset(self):
         """ Check if the parameter is unset.
@@ -279,6 +296,9 @@ class BooleanParameter(Parameter):
             const=const,
             influence=influence,
             help=help)
+
+    def _help_values(self, accepted=None):
+        return super()._help_values(["true", "false"])
 
     def set_value(self, value):
         """ Set the parameter value.
@@ -418,6 +438,9 @@ class ListParameter(Parameter):
 
     def get_value(self):
         return "+".join(self._value)
+
+    def _is_default(self, value):
+        return self._default and value in self._default
 
     def __bool__(self):
         """ Returns True if the list is non-empty. """
