@@ -794,19 +794,12 @@ def info(ctx, task, influence=False, artifacts=False, salt=None):
 @click.argument("task", type=str, nargs=-1, autocompletion=_autocomplete_tasks)
 @click.pass_context
 def export(ctx, task):
-    try:
-        _export(ctx, task)
-    finally:
-        log.set_level(log.INFO)
-
-
-def _export(ctx, task):
     """
     Export artifact metadata into environment.
 
     The export command parses task artifact metadata and creates
-    a virtual environment in which the user can the applications
-    published in an artifact. The staged environment is identical
+    a virtual environment in which the user run can the applications
+    included in an artifact. The staged environment is identical
     to the environment that would be setup for a task consuming
     the same artifact.
 
@@ -824,7 +817,13 @@ def _export(ctx, task):
     environment variables will be restored to their original
     values.
     """
+    try:
+        _export(ctx, task)
+    finally:
+        log.set_level(log.INFO)
 
+
+def _export(ctx, task):
     acache = cache.ArtifactCache.get()
     task = [utils.stable_task_name(t) for t in task]
     registry = TaskRegistry.get()
