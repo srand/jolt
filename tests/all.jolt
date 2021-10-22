@@ -12,6 +12,7 @@ class All(Alias):
         "cli/build",
         "cli/config",
         "cli/display",
+        "cli/export",
         "cli/info",
         "cli/list",
         "ext/alias",

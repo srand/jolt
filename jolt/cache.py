@@ -92,6 +92,10 @@ class ArtifactAttributeSet(object):
         for _, value in self.items():
             value.unapply(task, artifact)
 
+    def visit(self, task, artifact, visitor):
+        for _, value in self.items():
+            value.visit(task, artifact, visitor)
+
 
 class ArtifactAttributeSetRegistry(object):
     providers = []
@@ -121,6 +125,15 @@ class ArtifactAttributeSetRegistry(object):
         for provider in ArtifactAttributeSetRegistry.providers:
             provider().unapply(task, artifact)
 
+    @staticmethod
+    def visit_all(task, artifact, visitor):
+        for provider in ArtifactAttributeSetRegistry.providers:
+            provider().visit(task, artifact, visitor)
+
+
+def visit_artifact(task, artifact, visitor):
+    ArtifactAttributeSetRegistry.visit_all(task, artifact, visitor)
+
 
 class ArtifactAttributeSetProvider(object):
     @staticmethod
@@ -141,6 +154,9 @@ class ArtifactAttributeSetProvider(object):
 
     def unapply(self, task, artifact):
         raise NotImplemented()
+
+    def visit(self, task, artifact, visitor):
+        pass
 
 
 class ArtifactAttribute(object):
@@ -267,6 +283,9 @@ class ArtifactFileAttributeProvider(ArtifactAttributeSetProvider):
         pass
 
     def unapply(self, task, artifact):
+        pass
+
+    def visit(self, task, artifact, visitor):
         pass
 
 

@@ -21,6 +21,9 @@ class EnvironmentVariable(ArtifactStringAttribute):
             task.tools.setenv(self.get_name())
         self._old_value = None
 
+    def visit(self, task, artifact, visitor):
+        visitor.setenv(self.get_name(), self.get_value())
+
 
 class PathEnvironmentVariable(EnvironmentVariable):
     def __init__(self, artifact, name="PATH"):
@@ -44,6 +47,11 @@ class PathEnvironmentVariable(EnvironmentVariable):
         if self._old_value:
             new_val = new_val + fs.pathsep + task.tools.getenv(self.get_name())
         task.tools.setenv(self.get_name(), new_val)
+
+    def visit(self, task, artifact, visitor):
+        paths = self.get_value().split(fs.pathsep)
+        paths = [fs.path.join(artifact.path, path) for path in paths]
+        visitor.setenv(self.get_name(), paths)
 
 
 class EnvironmentVariableSet(ArtifactAttributeSet):
@@ -87,3 +95,6 @@ class EnvironmentVariableSetProvider(ArtifactAttributeSetProvider):
 
     def unapply(self, task, artifact):
         artifact.environ.unapply(task, artifact)
+
+    def visit(self, task, artifact, visitor):
+        artifact.environ.visit(task, artifact, visitor)

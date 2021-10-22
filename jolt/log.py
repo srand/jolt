@@ -46,6 +46,7 @@ DEBUG = logging.DEBUG
 EXCEPTION = logging.DEBUG + 1
 STDOUT = logging.INFO + 1
 STDERR = logging.ERROR + 1
+SILENCE = STDERR + 1
 logging.addLevelName(VERBOSE, "VERBOSE")
 logging.addLevelName(STDOUT, "STDOUT")
 logging.addLevelName(STDERR, "STDERR")

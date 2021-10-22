@@ -385,3 +385,14 @@ def concat_attributes(attrib, postfix, prepend=False):
         setattr(cls, "_" + attrib, _get)
         return cls
     return _decorate
+
+
+def render(template, **kwargs):
+    from jinja2 import Environment, PackageLoader, select_autoescape
+    env = Environment(
+        loader=PackageLoader("jolt"),
+        autoescape=select_autoescape(),
+        trim_blocks=True,
+        lstrip_blocks=True)
+    template = env.get_template(template)
+    return template.render(**kwargs)

@@ -88,6 +88,10 @@ class JoltTest(Test):
         self.ws = tools.builddir(self._testMethodName)
         with tools.cwd(self.ws):
             tools.setenv("JOLT_CONFIG_PATH", self.ws)
+            tools.write_file("default.joltxmanifest", """
+<?xml version="1.0" ?>
+<jolt-manifest workspace="." />
+""")
             tools.write_file("test.jolt", """
 from jolt import *
 from jolt.error import raise_error_if

@@ -55,7 +55,7 @@ setup(
         'test': ['coverage'],
     },
     package_data={
-        'jolt': ['**/*.xslt'],
+        'jolt': ['**/*.xslt', '**/*.template'],
     },
     entry_points={
         'console_scripts': [

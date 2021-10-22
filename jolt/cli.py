@@ -48,11 +48,13 @@ class ArgRequiredUnless(click.Argument):
 
 class PluginGroup(click.Group):
     def get_command(self, ctx, cmd_name):
-
-        if ctx.params.get("verbose", False):
+        if cmd_name == "export":
+            log.set_level(log.SILENCE)
+        elif ctx.params.get("verbose", False):
             log.set_level(log.VERBOSE)
-        if ctx.params.get("extra_verbose", False):
+        elif ctx.params.get("extra_verbose", False):
             log.set_level(log.DEBUG)
+
         config_files = ctx.params.get("config_file") or []
         for config_file in config_files:
             log.verbose("Config: {0}", config_file)
@@ -786,3 +788,88 @@ def info(ctx, task, influence=False, artifacts=False, salt=None):
         for string in HashInfluenceRegistry.get().get_strings(task):
             string = string.split(":", 1)
             click.echo("    {:<18}{}".format(string[0][10:], string[1].strip()))
+
+
+@cli.command()
+@click.argument("task", type=str, nargs=-1, autocompletion=_autocomplete_tasks)
+@click.pass_context
+def export(ctx, task):
+    try:
+        _export(ctx, task)
+    finally:
+        log.set_level(log.INFO)
+
+
+def _export(ctx, task):
+    """
+    Export artifact metadata into environment.
+
+    The export command parses task artifact metadata and creates
+    a virtual environment in which the user can the applications
+    published in an artifact. The staged environment is identical
+    to the environment that would be setup for a task consuming
+    the same artifact.
+
+    When running the command, a shell script is printed to stdout.
+    It can be written to file and executed separately, or sourced
+    directly in the shell by running:
+
+      source <(jolt export <task>)
+
+    The command will fail if the task artifact or any dependency
+    artifact is missing in the local cache. Build it to populate
+    the cache and then try again.
+
+    Run ``deactivate-jolt`` to leave the virtual environment. All
+    environment variables will be restored to their original
+    values.
+    """
+
+    acache = cache.ArtifactCache.get()
+    task = [utils.stable_task_name(t) for t in task]
+    registry = TaskRegistry.get()
+    executors = scheduler.ExecutorRegistry.get()
+    strategy = scheduler.LocalStrategy(executors, acache)
+
+    dag = graph.GraphBuilder(registry, ctx.obj["manifest"])
+    dag = dag.build(task)
+
+    gp = graph.GraphPruner(strategy)
+    dag = gp.prune(dag)
+
+    class Export(object):
+        def __init__(self):
+            self.environ = {}
+            self.prepend_environ = {}
+
+        def setenv(self, name, value):
+            self.environ[name] = value
+
+    class Context(object):
+        def __init__(self, tasks):
+            self.tasks = tasks
+            self.environ = set()
+            self.exports = {}
+
+        def add_export(self, task, visitor):
+            self.exports[task] = visitor
+            self.environ.update(set(visitor.environ.keys()))
+
+    tasks = list(filter(lambda t: t.is_cacheable(), reversed(dag.topological_nodes)))
+    context = Context(tasks)
+
+    for task in context.tasks:
+        artifact = acache.get_artifact(task)
+        raise_task_error_if(
+            artifact.is_temporary(), task,
+            "Task artifact not found in local cache, build first")
+
+        visitor = Export()
+        cache.visit_artifact(task, artifact, visitor)
+        context.add_export(task, visitor)
+
+    script = utils.render(
+        "export.sh.template",
+        ctx=context)
+
+    print(script)

@@ -1,0 +1,115 @@
+
+#!/usr/bin/env python
+
+import re
+import sys
+import time
+sys.path.append(".")
+
+import testsupport
+
+
+class ExportCli(testsupport.JoltTest):
+    name = "cli/export"
+
+    def test_export_missing_artifact(self):
+        """
+        --- tasks:
+        class A(Task):
+            pass
+        ---
+        """
+        with self.assertRaises(Exception, msg="artifact not found in local cache"):
+            self.jolt("export a")
+
+    def test_export_order(self):
+        """
+        --- tasks:
+        class A(Task):
+            def publish(self, artifact, tools):
+                artifact.environ.VARIABLE = "a"
+
+        class B(Task):
+            requires = ["a"]
+
+            def publish(self, artifact, tools):
+                artifact.environ.VARIABLE = "b"
+        ---
+        """
+        with self.tools.cwd(self.ws):
+            self.build("b")
+            self.assertEqual("b", self.tools.run(
+                "bash -c 'source <(jolt -c test.conf export b) && echo $VARIABLE'"))
+
+    def test_export_inherited(self):
+        """
+        --- tasks:
+        class A(Task):
+            def publish(self, artifact, tools):
+                artifact.environ.VARIABLEA = "a"
+
+        class B(Task):
+            requires = ["a"]
+
+            def publish(self, artifact, tools):
+                artifact.environ.VARIABLEB = "b"
+        ---
+        """
+        with self.tools.cwd(self.ws):
+            self.build("b")
+            self.assertEqual("a", self.tools.run(
+                "bash -c 'source <(jolt -c test.conf export b) && echo $VARIABLEA'"))
+            self.assertEqual("b", self.tools.run(
+                "bash -c 'source <(jolt -c test.conf export b) && echo $VARIABLEB'"))
+
+    def test_export_path(self):
+        """
+        --- tasks:
+        class A(Task):
+            def publish(self, artifact, tools):
+                artifact.environ.PATH.append(".")
+                with tools.cwd(artifact.path):
+                    tools.write_file("a.sh", "#!/bin/sh\\necho A")
+                    tools.chmod("a.sh", 0o777)
+
+        class B(Task):
+            requires = ["a"]
+
+            def publish(self, artifact, tools):
+                artifact.environ.PATH.append(".")
+                with tools.cwd(artifact.path):
+                    tools.write_file("b.sh", "#!/bin/sh\\necho B")
+                    tools.chmod("b.sh", 0o777)
+        ---
+        """
+        with self.tools.cwd(self.ws):
+            self.build("b")
+            self.assertEqual("A", self.tools.run(
+                "bash -c 'source <(jolt -c test.conf export b) && a.sh'"))
+            self.assertEqual("B", self.tools.run(
+                "bash -c 'source <(jolt -c test.conf export b) && b.sh'"))
+
+    def test_export_path_override(self):
+        """
+        --- tasks:
+        class A(Task):
+            def publish(self, artifact, tools):
+                artifact.environ.PATH.append(".")
+                with tools.cwd(artifact.path):
+                    tools.write_file("a.sh", "#!/bin/sh\\necho A")
+                    tools.chmod("a.sh", 0o777)
+
+        class B(Task):
+            requires = ["a"]
+
+            def publish(self, artifact, tools):
+                artifact.environ.PATH.append(".")
+                with tools.cwd(artifact.path):
+                    tools.write_file("a.sh", "#!/bin/sh\\necho B")
+                    tools.chmod("a.sh", 0o777)
+        ---
+        """
+        with self.tools.cwd(self.ws):
+            self.build("b")
+            self.assertEqual("B", self.tools.run(
+                "bash -c 'source <(jolt -c test.conf export b) && a.sh'"))
