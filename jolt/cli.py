@@ -791,7 +791,7 @@ def info(ctx, task, influence=False, artifacts=False, salt=None):
 
 
 @cli.command()
-@click.argument("task", type=str, nargs=-1, autocompletion=_autocomplete_tasks)
+@click.argument("task", type=str, nargs=-1, required=True, autocompletion=_autocomplete_tasks)
 @click.pass_context
 def export(ctx, task):
     """
