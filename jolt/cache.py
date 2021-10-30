@@ -714,6 +714,9 @@ class Artifact(object):
     def is_temporary(self):
         return self._temporary
 
+    def is_unpackable(self):
+        return self._node.is_unpackable()
+
     def is_unpacked(self):
         return self._unpacked
 
@@ -1132,6 +1135,8 @@ class ArtifactCache(StorageProvider):
 
     def _fs_commit_artifact(self, artifact, uploadable):
         artifact._set_uploadable(uploadable)
+        if not artifact.is_unpackable():
+            artifact._set_unpacked()
         artifact._write_manifest()
         if artifact.is_temporary():
             fs.rmtree(artifact.final_path, ignore_errors=True)
@@ -1391,6 +1396,8 @@ class ArtifactCache(StorageProvider):
         """
         if not node.task.is_cacheable():
             return False
+        if not node.is_unpackable():
+            return True
         with self._thread_lock, self.get_locked_artifact(node) as artifact:
             if not self.is_available_locally(node):
                 raise_task_error(node, "locked artifact is missing in cache (forcibly removed?)")

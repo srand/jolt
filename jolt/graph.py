@@ -6,7 +6,7 @@ from threading import RLock
 from collections import OrderedDict
 import uuid
 
-from jolt.tasks import Alias, Resource, WorkspaceResource
+from jolt.tasks import Alias, Resource, WorkspaceResource, Task
 #from jolt.utils import *
 from jolt.influence import HashInfluenceRegistry, TaskRequirementInfluence
 from jolt import log
@@ -203,6 +203,9 @@ class TaskProxy(object):
 
     def is_resource(self):
         return isinstance(self.task, Resource)
+
+    def is_unpackable(self):
+        return self.task.unpack.__func__ is not Task.unpack
 
     def is_unpacked(self, cache):
         tasks = [self] + self.extensions
