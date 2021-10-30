@@ -642,6 +642,7 @@ class GraphPruner(object):
     def _check_node(self, node):
         if node in self.visited:
             return
+        self._progress.update(1)
         self.visited.add(node)
         self.retained.add(node)
 
@@ -650,8 +651,10 @@ class GraphPruner(object):
             utils.map_concurrent(self._check_node, node.neighbors)
 
     def prune(self, graph):
-        for root in graph.roots:
-            self._check_node(root)
+        with log.progress("Checking availability", 0, " tasks") as p:
+            self._progress = p
+            for root in graph.roots:
+                self._check_node(root)
 
         for node in graph.goals:
             self.retained.add(node)
