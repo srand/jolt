@@ -936,6 +936,7 @@ class ArtifactCache(StorageProvider):
     def _db(self):
         db = sqlite3.connect(self._db_path, detect_types=sqlite3.PARSE_DECLTYPES)
         try:
+            db.execute("PRAGMA journal_mode=OFF")
             yield db
         finally:
             db.close()
