@@ -1284,6 +1284,13 @@ class ArtifactCache(StorageProvider):
         """
         if not node.task.is_cacheable():
             return False
+
+        # Cache availability in node
+        try:
+            return node.__available
+        except AttributeError:
+            pass
+
         with self._cache_lock(), self._db() as db:
             if self._db_select_artifact(db, node.identity) or self._db_select_reference(db, node.identity):
                 with self._fs_get_artifact(node) as a:
@@ -1291,6 +1298,7 @@ class ArtifactCache(StorageProvider):
                         self._db_delete_artifact(db, node.identity)
                         return False
                     self._db_insert_reference(db, node.identity)
+                node.__available = True
                 return True
         return False
 
