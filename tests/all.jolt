@@ -22,4 +22,5 @@ class All(Alias):
         "ext/ninja-compdb",
         "ext/symlinks",
         "int/utils",
+	"nfr",
     ]

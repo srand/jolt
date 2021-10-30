@@ -1,0 +1,39 @@
+#!/usr/bin/env python3
+
+import re
+import sys
+import time
+sys.path.append(".")
+
+from testsupport import JoltTest
+from jolt import utils
+
+class NonFunctionalRequirements(JoltTest):
+    name = "nfr"
+
+    def test_many_deps(self):
+        """
+        --- tasks:
+        class Generator(TaskGenerator):
+            def generate(self):
+                tasks = []
+                names = ["t"+str(i) for i in range(0, 1000)]
+
+                for task_name in names:
+                    class T(Task):
+                        name = task_name
+                    tasks.append(T)
+
+                class T(Task):
+                    requires = names
+
+                return tasks + [T]
+        ---
+        """
+        d = utils.duration()
+        self.build("t")
+        self.assertLess(d.seconds, 21)
+
+        d = utils.duration()
+        self.build("-f t")
+        self.assertLess(d.seconds, 7)
