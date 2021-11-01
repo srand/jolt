@@ -38,7 +38,7 @@ class InfoCli(JoltTest):
         self.assertIn("docstring", output)
         self.assertIn("Parameters\n    None", output)
         self.assertIn("Requirements\n    None", output)
-        self.assertIn("Definition\n    test.jolt:6", output)
+        self.assertIn("Definition\n    File              test.jolt (6)", output)
 
     def test_info_parameterized(self):
         """
