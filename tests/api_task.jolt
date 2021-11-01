@@ -727,6 +727,14 @@ class TaskApi(JoltTest):
             [ "$(cat {{deps[a:arg=hello].path}}/file.txt)" != "hello" ] && exit 1 || exit 0
             \"\"\"
             requires = ["a:arg=hello"]
+
+        class C(Script):
+            \"\"\"
+            #!/usr/bin/env python
+
+            print("Hello world")
+            \"\"\"
+            requires = ["b"]
         ---
         """
-        self.build("b")
+        self.build("c")

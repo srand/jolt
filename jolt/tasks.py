@@ -1585,20 +1585,27 @@ class Script(Task):
 
     source = None
 
-    @property
-    def _source(self):
+    def _source(self, tools):
         if self.source is not None:
             return self.source
         doc = self.__doc__.split("---", 1)
-        return doc[1] if len(doc) > 1 else doc[0]
+        script = doc[1] if len(doc) > 1 else doc[0]
+        script = script.splitlines()
+        script = [line[4:] for line in script]
+        script = "\n".join(script)
+        script = script.lstrip()
+        if not script.startswith("#!"):
+            script = "#!" + tools.getenv("SHELL", "/bin/sh") + "\n" + script
+        return script
 
     def run(self, deps, tools):
         self.builddir = tools.builddir()
         self.deps = deps
         self._scriptdir = tools.builddir("script")
 
-        tools.write_file("{_scriptdir}/script.sh", self._source)
-        tools.run("$SHELL {_scriptdir}/script.sh")
+        tools.write_file("{_scriptdir}/script", self._source(tools))
+        tools.chmod("{_scriptdir}/script", 0o555)
+        tools.run("{_scriptdir}/script")
 
     def publish(self, artifact, tools):
         with tools.cwd(self.builddir):
