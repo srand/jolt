@@ -55,7 +55,6 @@ class CompDBExtension(JoltTest):
 
         ---
         """
-        breakpoint()
         self.build("exe")
 
         with self.tools.cwd(self.ws):
