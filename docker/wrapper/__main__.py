@@ -100,7 +100,7 @@ if os.name == "posix":
 
 # Build command line
 
-cmd = ["docker", "run", "-it", "--rm", "-u", f"{uid}:{gid}", "-w", cwd]
+cmd = ["docker", "run", "-i", "--rm", "-u", f"{uid}:{gid}", "-w", cwd]
 for volume in volumes:
     cmd += ["-v", volume]
 for group in groups:
