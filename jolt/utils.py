@@ -396,3 +396,9 @@ def render(template, **kwargs):
         lstrip_blocks=True)
     template = env.get_template(template)
     return template.render(**kwargs)
+
+
+def callstack():
+    import traceback
+    for line in traceback.format_stack():
+        print(line.strip())

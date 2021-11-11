@@ -575,8 +575,7 @@ class GraphBuilder(object):
                 for child_child in child.children:
                     self.graph.add_edges_from([(parent, child_child)])
                     node.children.append(child_child)
-            else:
-                self.graph.add_edges_from([(parent, child)])
+            self.graph.add_edges_from([(parent, child)])
             node.children.append(child)
 
         node.children = utils.unique_list(node.children)
