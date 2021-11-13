@@ -261,24 +261,25 @@ class _AutoTools(object):
 
     def configure(self, sourcedir, *args, **kwargs):
         sourcedir = self.tools.expand_path(sourcedir)
+        prefix = kwargs.get("prefix", "/usr")
 
         if not fs.path.exists(fs.path.join(sourcedir, "configure")):
             with self.tools.cwd(sourcedir):
                 self.tools.run("autoreconf -visf", output=True)
 
-        with self.tools.cwd(self.builddir):
+        with self.tools.cwd(self.builddir), self.tools.environ(DESTDIR=self.installdir):
             self.tools.run("{0}/configure --prefix={1} {2}",
-                           sourcedir, self.installdir,
+                           sourcedir, prefix,
                            self.tools.getenv("CONFIGURE_FLAGS"),
                            output=True)
 
     def build(self, *args, **kwargs):
-        with self.tools.cwd(self.builddir):
+        with self.tools.cwd(self.builddir), self.tools.environ(DESTDIR=self.installdir):
             self.tools.run("make VERBOSE=yes Q= V=1 -j{0}",
                            self.tools.cpu_count(), output=True)
 
     def install(self, target="install", **kwargs):
-        with self.tools.cwd(self.builddir):
+        with self.tools.cwd(self.builddir), self.tools.environ(DESTDIR=self.installdir):
             self.tools.run("make {}", target, output=True)
 
     def publish(self, artifact, files='*', *args, **kwargs):
