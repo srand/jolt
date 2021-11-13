@@ -316,7 +316,7 @@ class Tools(object):
             fs.rmtree(dir, ignore_errors=True)
         return False
 
-    def append_file(self, pathname, content):
+    def append_file(self, pathname, content, expand=True):
         """ Appends data at the end of a file.
 
         Args:
@@ -325,7 +325,8 @@ class Tools(object):
         """
 
         pathname = self.expand_path(pathname)
-        content = self.expand(content)
+        if expand:
+            content = self.expand(content)
         with open(pathname, "ab") as f:
             f.write(content.encode())
 
