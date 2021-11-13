@@ -148,15 +148,15 @@ def copy(src, dst, symlinks=False, ignore=None, metadata=True):
     try:
         return shutil.copytree(
             src, dst,
-            False,
+            symlinks,
             dirs_exist_ok=True,
-            copy_function=copyfn
+            copy_function=copyfn,
         )
     except TypeError:
         return shutil.copytree(
             src, dst,
-            False,
-            copy_function=copyfn
+            symlinks,
+            copy_function=copyfn,
         )
 
 
