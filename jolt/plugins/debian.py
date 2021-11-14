@@ -1,6 +1,10 @@
 from jolt import BooleanParameter, Download, Task, TaskGenerator, Tools, Parameter, Resource
-from jolt import attributes, config, filesystem as fs, utils
+from jolt import attributes, config, filesystem as fs, utils, loader
 from jolt.tasks import TaskRegistry
+
+from jolt.cache import ArtifactListAttribute
+from jolt.cache import ArtifactAttributeSet
+from jolt.cache import ArtifactAttributeSetProvider
 
 import contextlib
 import os
@@ -8,10 +12,70 @@ import platform
 import subprocess
 
 
+class DebianListVariable(ArtifactListAttribute):
+    pass
+
+
+class DebianAttributeSet(ArtifactAttributeSet):
+    def __init__(self, artifact):
+        super(DebianAttributeSet, self).__init__()
+        super(ArtifactAttributeSet, self).__setattr__("_artifact", artifact)
+
+    def create(self, name):
+        if name == "chroot":
+            return DebianListVariable(self._artifact, "chroot")
+        assert False, "no such debian attribute: {0}".format(name)
+
+
+@ArtifactAttributeSetProvider.Register
+class DebianAttributeProvider(ArtifactAttributeSetProvider):
+    def create(self, artifact):
+        setattr(artifact, "debian", DebianAttributeSet(artifact))
+
+    def parse(self, artifact, content):
+        if "debian" not in content:
+            return
+        for key, value in content["debian"].items():
+            getattr(artifact.debian, key).set_value(value, expand=False)
+
+    def format(self, artifact, content):
+        if "debian" not in content:
+            content["debian"] = {}
+        for key, attrib in artifact.debian.items():
+            content["debian"][key] = attrib.get_value()
+
+    def apply_deps(self, task, deps):
+        lowerdirs = []
+        for _, artifact in deps.items():
+            lowerdirs += [
+                fs.path.join(artifact.path, item)
+                for item in artifact.debian.chroot.items()
+            ]
+        if lowerdirs:
+            task.__chroot = task.tools.builddir("chroot")
+            with task.tools.cwd(task.__chroot):
+                task.tools.mkdir("work")
+                task.tools.mkdir("uppr")
+                task.tools.mkdir("root")
+                task.tools.run("fuse-overlayfs -o lowerdir={},upperdir=uppr,workdir=work root",
+                               ":".join(lowerdirs))
+            task.__unshare = contextlib.ExitStack()
+            task.__unshare.enter_context(
+                task.tools.chroot(chroot=fs.path.join(task.__chroot, "root")))
+
+    def unapply_deps(self, task, deps):
+        try:
+            task.__unshare.close()
+            with task.tools.cwd(task.__chroot):
+                task.tools.run("fusermount -u root")
+        except:
+            pass
+
+
 class Debian(Task):
     abstract = False
 
-    include = []
+    packages = []
     """ List of packages to install, in addition to those included by variant. """
 
     mode = "unshare"
@@ -60,7 +124,7 @@ class Debian(Task):
       - debootstrap
       - standard
 
-    The default variant is extract where only packages listed in ``include``
+    The default variant is extract where only packages listed in ``packages``
     are downloaded and extracted, but not installed.
 
     See mmdebstrab documentation for details.
@@ -68,9 +132,10 @@ class Debian(Task):
 
     def run(self, deps, tools):
         with tools.cwd(tools.builddir()):
+            packages = "--include={}".format(",".join(self.packages)) if self.packages else ""
             tools.run(
-                "mmdebstrap --include={} --mode={mode} --variant={variant} {suite} {target}",
-                ",".join(self.include),
+                "mmdebstrap {} --mode={mode} --variant={variant} {suite} {target}",
+                packages,
             )
 
 
@@ -82,10 +147,15 @@ class Debian(Task):
 class DebianPkgBase(Debian):
     abstract = True
 
+    include = ["."]
+    exclude = []
+
     def run(self, deps, tools):
         super().run(deps, tools)
         with tools.cwd(tools.builddir()):
-            tools.run("tar --exclude=./dev -xf {target}")
+            include = " ".join(self.include)
+            exclude = " ".join(["--exclude=" + i for i in self.exclude])
+            tools.run("tar --exclude=./dev {} -xf {target} {}", exclude, include)
             tools.unlink(self.target)
 
     def publish(self, artifact, tools):
@@ -98,11 +168,11 @@ class DebianPkgBase(Debian):
 
             for incdir in ["usr/include"]:
                 if os.path.exists(tools.expand_path(incdir)):
-                    artifact.cxxinfo.incpaths.append(incdir)
+                    pass #artifact.cxxinfo.incpaths.append(incdir)
 
             for libdir in ["lib", "usr/lib"]:
                 if os.path.exists(tools.expand_path(libdir)):
-                    artifact.cxxinfo.libpaths.append(libdir)
+                    pass #artifact.cxxinfo.libpaths.append(libdir)
                     artifact.environ.LD_LIBRARY_PATH.append(libdir)
 
             for pkgdir in ["usr/share/pkgconfig"]:
@@ -118,13 +188,14 @@ class MMDebstrap(DebianPkgBase):
     """
 
     name = "debian/mmdebstrap"
-    include = [
+    packages = [
         "bash",
         "bubblewrap",
         "coreutils",
         "dash",
         "fakechroot",
         "fakeroot",
+        "fuse-overlayfs",
         "mmdebstrap",
         "proot",
         "qemu-user",
@@ -137,6 +208,10 @@ class MMDebstrap(DebianPkgBase):
     download = BooleanParameter(True, help="Download files from Github, or build from scratch.")
     url = "https://github.com/srand/jolt/releases/download/v0.9.35/mmdebstrap.tgz"
 
+    @property
+    def joltdir(self):
+        return loader.JoltLoader.get().joltdir
+
     def run_build(self, deps, tools):
         super().run(deps, tools)
 
@@ -146,7 +221,6 @@ class MMDebstrap(DebianPkgBase):
             tools.extract("debstrap.tgz", ".")
             tools.unlink("debstrap.tgz")
 
-
 TaskRegistry.get().add_task_class(MMDebstrap)
 
 
@@ -154,10 +228,20 @@ class DebianPkg(DebianPkgBase):
     abstract = True
     requires = ["debian/mmdebstrap"]
 
+    def publish(self, artifact, tools):
+        super().publish(artifact, tools)
+        artifact.debian.chroot.append(".")
 
-class GCC(DebianPkg):
-    name = "debian/gcc"
-    include = ["gcc", "g++"]
+
+class DebianEssential(DebianPkg):
+    name = "debian/essential"
+    variant = "essential"
+
+    @property
+    def joltdir(self):
+        return loader.JoltLoader.get().joltdir
+
+TaskRegistry.get().add_task_class(DebianEssential)
 
 
 def _host():
@@ -167,7 +251,7 @@ def _host():
     return m
 
 
-@attributes.attribute("include", "include_{host}_{arch}")
+@attributes.attribute("packages", "packages_{host}_{arch}")
 @attributes.method("publish", "publish_{host}_{arch}")
 class GCC(DebianPkg):
     name = "debian/gcc"
@@ -175,10 +259,14 @@ class GCC(DebianPkg):
     host = Parameter(_host(), values=["amd64"], const=True)
     arch = Parameter(_host(), values=["amd64", "armel", "armhf", "arm64"], help="Target architecture.")
 
-    include_amd64_amd64 = ["gcc", "g++"]
-    include_amd64_armhf = ["crossbuild-essential-armhf"]
-    include_amd64_armel = ["crossbuild-essential-armel"]
-    include_amd64_arm64 = ["crossbuild-essential-arm64"]
+    packages_amd64_amd64 = ["gcc", "g++"]
+    packages_amd64_armhf = ["crossbuild-essential-armhf"]
+    packages_amd64_armel = ["crossbuild-essential-armel"]
+    packages_amd64_arm64 = ["crossbuild-essential-arm64"]
+
+    @property
+    def joltdir(self):
+        return loader.JoltLoader.get().joltdir
 
     def publish_amd64_amd64(self, artifact, tools):
         super().publish(artifact, tools)

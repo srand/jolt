@@ -1177,7 +1177,7 @@ class Task(TaskBase):
         """
         with tools.environ(PS1="jolt$ ") as env:
             from jolt import config
-            subprocess.call(config.get_shell().split(), env=env, cwd=tools._cwd)
+            subprocess.call(tools._cmd_prefix.strip().split() + config.get_shell().split(), env=env, cwd=tools._cwd)
 
     @contextmanager
     def report(self):

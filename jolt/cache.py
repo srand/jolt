@@ -88,9 +88,15 @@ class ArtifactAttributeSet(object):
         for _, value in self.items():
             value.apply(task, artifact)
 
+    def apply_deps(self, task, deps):
+        pass
+
     def unapply(self, task, artifact):
         for _, value in self.items():
             value.unapply(task, artifact)
+
+    def unapply_deps(self, task, deps):
+        pass
 
     def visit(self, task, artifact, visitor):
         for _, value in self.items():
@@ -121,9 +127,19 @@ class ArtifactAttributeSetRegistry(object):
             provider().apply(task, artifact)
 
     @staticmethod
+    def apply_all_deps(task, deps):
+        for provider in ArtifactAttributeSetRegistry.providers:
+            provider().apply_deps(task, deps)
+
+    @staticmethod
     def unapply_all(task, artifact):
         for provider in ArtifactAttributeSetRegistry.providers:
             provider().unapply(task, artifact)
+
+    @staticmethod
+    def unapply_all_deps(task, deps):
+        for provider in ArtifactAttributeSetRegistry.providers:
+            provider().unapply_deps(task, deps)
 
     @staticmethod
     def visit_all(task, artifact, visitor):
@@ -150,10 +166,16 @@ class ArtifactAttributeSetProvider(object):
         raise NotImplemented()
 
     def apply(self, task, artifact):
-        raise NotImplemented()
+        pass
+
+    def apply_deps(self, task, deps):
+        pass
 
     def unapply(self, task, artifact):
-        raise NotImplemented()
+        pass
+
+    def unapply_deps(self, task, deps):
+        pass
 
     def visit(self, task, artifact, visitor):
         pass
@@ -758,8 +780,10 @@ class Context(object):
                     self._artifacts_index[dep.short_qualified_name] = artifact
                     artifact.apply()
                     ArtifactAttributeSetRegistry.apply_all(self._node.task, artifact)
+            ArtifactAttributeSetRegistry.apply_all_deps(self._node.task, self)
         except Exception as e:
             # Rollback all attributes/resources except the last failing one
+            ArtifactAttributeSetRegistry.unapply_all_deps(self._node.task, self)
             for name, artifact in reversed(list(self._artifacts.items())[:-1]):
                 with utils.ignore_exception():
                     ArtifactAttributeSetRegistry.unapply_all(self._node.task, artifact)
@@ -768,6 +792,7 @@ class Context(object):
         return self
 
     def __exit__(self, type, value, tb):
+        ArtifactAttributeSetRegistry.unapply_all_deps(self._node.task, self)
         for name, artifact in reversed(self._artifacts.items()):
             ArtifactAttributeSetRegistry.unapply_all(self._node.task, artifact)
             artifact.unapply()

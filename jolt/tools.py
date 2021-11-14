@@ -4,6 +4,7 @@ import gzip
 import lzma
 import subprocess
 import os
+import platform
 import sys
 import threading
 if os.name != "nt":
@@ -303,6 +304,8 @@ class Tools(object):
 
 
     def __init__(self, task=None, cwd=None, env=None):
+        self._chroot = None
+        self._cmd_prefix = ""
         self._cwd = fs.path.normpath(fs.path.join(os.getcwd(), cwd or os.getcwd()))
         self._env = copy.deepcopy(env or os.environ)
         self._task = task
@@ -915,6 +918,15 @@ class Tools(object):
             files = [self.expand_relpath(file, self.getcwd()) for file in files]
         return files
 
+    def mkdir(self, pathname, recursively=True):
+        """ Create directory. """
+
+        pathname = self.expand_path(pathname)
+        if recursively:
+            fs.makedirs(pathname)
+        else:
+            fs.mkdir(pathname)
+
     def map_consecutive(self, callable, iterable):
         """ Same as ``map()``. """
         return utils.map_consecutive(callable, iterable)
@@ -1111,7 +1123,7 @@ class Tools(object):
                 raise e
             except:
                 pass
-            return _run(cmd, self._cwd, self._env, *args, **kwargs)
+            return _run(self._cmd_prefix + cmd, self._cwd, self._env, *args, **kwargs)
         finally:
             if stdi:
                 termios.tcsetattr(sys.stdin.fileno(), termios.TCSANOW, stdi)
@@ -1273,6 +1285,51 @@ class Tools(object):
         pathname = self.expand_path(pathname, *args, **kwargs)
         return fs.unlink(pathname)
 
+    @contextmanager
+    def chroot(self, chroot):
+        """
+        Experimental: Use chroot as root filesystem when running commands.
+
+        Mounts the specified chroot as the root filesystem in a new mount namespace,
+        which is used in calls to Tools.run().
+
+        Requires Bubblewrap and Linux host.
+
+        Example:
+
+            .. code-block:: python
+
+              with tools.choot("path/to/rootfs"):
+                  tools.run("ls")
+
+        """
+        raise_error_if(not self.which("bwrap"), "Tools.chroot() requires Bubblewrap to be installed")
+        raise_error_if(platform.system() != "Linux", "Tools.chroot() is only supported on Linux")
+        old_chroot = self._chroot
+        old_prefix = self._cmd_prefix
+        cmd = [
+            "bwrap",
+            "--bind", chroot, "/",
+            "--bind", config.get_cachedir(), config.get_cachedir(),
+            "--bind", "/etc/resolv.conf", "/etc/resolv.conf",
+            "--proc", "/proc",
+            "--dev", "/dev",
+            "--tmpfs", "/tmp",
+            "--unshare-user",
+            "--cap-add", "ALL",
+            "--uid", "0",
+            "--gid", "0",
+        ]
+        if self._task and self._task.joltdir != ".":
+            cmd += ["--bind", self._task.joltdir, self._task.joltdir]
+        self._chroot = chroot
+        self._cmd_prefix = " ".join(cmd) + " "
+
+        yield self._cmd_prefix
+
+        self._chroot = old_chroot
+        self._cmd_prefix = old_prefix
+
     def upload(self, pathname, url, exceptions=False, auth=None, **kwargs):
         """ Uploads a file using HTTP (PUT).
 
@@ -1326,7 +1383,10 @@ class Tools(object):
             str: Full path to the executable.
         """
         executable = self.expand(executable)
-        return shutil.which(executable, path=self._env.get("PATH"))
+        path = self._env.get("PATH")
+        if self._chroot:
+            path = self._chroot + fs.pathsep + path
+        return shutil.which(executable, path=path)
 
     def write_file(self, pathname, content=None, expand=True, **kwargs):
         """ Creates a file.

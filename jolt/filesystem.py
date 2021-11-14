@@ -38,6 +38,13 @@ def makedirs(path):
         if e.errno != errno.EEXIST:
             raise
 
+def mkdir(path):
+    try:
+        os.mkdir(path)
+    except OSError as e:
+        if e.errno != errno.EEXIST:
+            raise
+
 mkdtemp = tempfile.mkdtemp
 
 def exists(path):
