@@ -208,3 +208,102 @@ class DockerExt(JoltTest):
         a = self.artifacts(b)
         f = self.tools.glob(path.join(a[0], "*"))
         self.assertEqual(0, len(f))
+
+
+    def test_autoload_used(self):
+        """
+        --- file: Dockerfile
+        FROM busybox:latest
+
+        --- tasks:
+        from jolt.plugins.docker import *
+
+        class Busybox(DockerImage):
+            pass
+
+        class Consumer(Task):
+            requires = ["busybox"]
+
+            def run(self, deps, tools):
+                images = tools.run("docker image ls --format '{{{{{{{{.Repository}}}}}}}}:{{{{{{{{.Tag}}}}}}}}'")
+                assert deps["busybox"].strings.tag.get_value() in images, "image not properly loaded"
+        ---
+	"""
+        self.build("consumer")
+
+
+    def test_autoload_not_used_when_imagefile_is_none(self):
+        """
+        --- file: Dockerfile
+        FROM busybox:latest
+
+        --- tasks:
+        from jolt.plugins.docker import *
+
+        class Busybox(DockerImage):
+            imagefile = None
+
+            def run(self, d, t):
+                super().run(d, t)
+                t.run("docker rmi busybox:latest")
+
+        class Consumer(Task):
+            requires = ["busybox"]
+
+            def run(self, deps, tools):
+                images = tools.run("docker image ls --format '{{{{{{{{.Repository}}}}}}}}:{{{{{{{{.Tag}}}}}}}}'")
+                assert deps["busybox"].strings.tag.get_value() not in images, "image not properly loaded"
+        ---
+	"""
+        self.build("consumer")
+        self.assertNotIn("busybox:latest", self.tools.run("docker image ls --format '{{{{.Repository}}}}:{{{{.Tag}}}}'"))
+
+    def test_autoload_not_used_when_autoload_is_false(self):
+        """
+        --- file: Dockerfile
+        FROM busybox:latest
+
+        --- tasks:
+        from jolt.plugins.docker import *
+
+        class Busybox(DockerImage):
+            autoload = False
+
+            def run(self, d, t):
+                super().run(d, t)
+                t.run("docker rmi busybox:latest")
+
+        class Consumer(Task):
+            requires = ["busybox"]
+
+            def run(self, deps, tools):
+                images = tools.run("docker image ls --format '{{{{{{{{.Repository}}}}}}}}:{{{{{{{{.Tag}}}}}}}}'")
+                assert deps["busybox"].strings.tag.get_value() not in images, "image not properly loaded"
+        ---
+	"""
+        self.build("consumer")
+        self.assertNotIn("busybox:latest", self.tools.run("docker image ls --format '{{{{.Repository}}}}:{{{{.Tag}}}}'"))
+
+    def test_artifact_pull_rmi(self):
+        """
+        --- file: Dockerfile
+        FROM busybox:latest
+
+        --- tasks:
+        from jolt.plugins.docker import *
+
+        class Busybox(Task):
+            def publish(self, a, t):
+                a.docker.pull.append("busybox:latest")
+                a.docker.rmi.append("busybox:latest")
+
+        class Consumer(Task):
+            requires = ["busybox"]
+
+            def run(self, deps, tools):
+                images = tools.run("docker image ls --format '{{{{{{{{.Repository}}}}}}}}:{{{{{{{{.Tag}}}}}}}}'")
+                assert "busybox:latest" in images, "image not properly loaded"
+        ---
+	"""
+        self.build("consumer")
+        self.assertNotIn("busybox:latest", self.tools.run("docker image ls --format '{{{{.Repository}}}}:{{{{.Tag}}}}'"))

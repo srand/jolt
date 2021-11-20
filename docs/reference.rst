@@ -326,7 +326,7 @@ DockerImage
 .. reference-docker-dockerimage-start
 
 .. autoclass:: jolt.plugins.docker.DockerImage
-   :members: buildargs, cleanup, compression, context, dockerfile, imagefile, pull, push, tags
+   :members: autoload, buildargs, cleanup, compression, context, dockerfile, imagefile, pull, push, tags
 
 .. reference-docker-dockerimage-end
 
@@ -339,6 +339,48 @@ DockerLogin
    :members: name, user, passwd
 
 .. reference-docker-dockerlogin-end
+
+.. reference-docker-end
+
+Metadata
+^^^^^^^^
+
+.. reference-docker-artifact-start
+
+The Docker module registers and makes available these artifact metadata attributes:
+
+  - ``artifact.docker.load`` - List of image files to be loaded from the artifact
+    into the local Docker registry when the artifact is consumed.
+
+    Example:
+
+    .. code-block:: python
+
+      def publish(self, artifact, tools):
+          artifact.docker.load.append("image.tar")
+
+  - ``artifact.docker.pull`` - List of image tags to be pulled from a remote registry
+    to the local Docker registry when the artifact is consumed.
+
+    Example:
+
+    .. code-block:: python
+
+      def publish(self, artifact, tools):
+          artifact.docker.pull.append("busybox:latest")
+
+  - ``artifact.docker.rmi`` - List of image tags to remove from the local Docker
+    registry when a consuming task has finished.
+
+    Example:
+
+    .. code-block:: python
+
+      def publish(self, artifact, tools):
+          artifact.docker.rmi.append("busybox:latest")
+
+
+.. reference-docker-artifact-end
 
 .. reference-docker-end
 

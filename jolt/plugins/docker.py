@@ -1,11 +1,79 @@
 from jolt import *
 from jolt.error import raise_task_error_if
 from jolt.tasks import TaskRegistry
+from jolt import filesystem as fs
 from jolt import utils
+
+from jolt.cache import ArtifactListAttribute
+from jolt.cache import ArtifactAttributeSet
+from jolt.cache import ArtifactAttributeSetProvider
 
 from functools import partial
 from os import path
 from platform import system
+
+
+
+class DockerListVariable(ArtifactListAttribute):
+    pass
+
+
+class DockerLoadListVariable(DockerListVariable):
+    def apply(self, task, artifact):
+        for image in self.items():
+            task.tools.run("docker load -i {}", fs.path.join(artifact.path, image))
+
+
+class DockerPullListVariable(DockerListVariable):
+    def apply(self, task, artifact):
+        for image in self.items():
+            task.tools.run("docker pull {}", image)
+
+
+class DockerRmiListVariable(DockerListVariable):
+    def unapply(self, task, artifact):
+        for image in self.items():
+            task.tools.run("docker rmi -f {}", image)
+
+
+
+class DockerAttributeSet(ArtifactAttributeSet):
+    def __init__(self, artifact):
+        super(DockerAttributeSet, self).__init__()
+        super(ArtifactAttributeSet, self).__setattr__("_artifact", artifact)
+
+    def create(self, name):
+        if name == "pull":
+            return DockerPullListVariable(self._artifact, "pull")
+        if name == "load":
+            return DockerLoadListVariable(self._artifact, "load")
+        if name == "rmi":
+            return DockerRmiListVariable(self._artifact, "rmi")
+        assert False, "no such docker attribute: {0}".format(name)
+
+
+@ArtifactAttributeSetProvider.Register
+class DockerAttributeProvider(ArtifactAttributeSetProvider):
+    def create(self, artifact):
+        setattr(artifact, "docker", DockerAttributeSet(artifact))
+
+    def parse(self, artifact, content):
+        if "docker" not in content:
+            return
+        for key, value in content["docker"].items():
+            getattr(artifact.docker, key).set_value(value, expand=False)
+
+    def format(self, artifact, content):
+        if "docker" not in content:
+            content["docker"] = {}
+        for key, attrib in artifact.docker.items():
+            content["docker"][key] = attrib.get_value()
+
+    def apply(self, task, artifact):
+        artifact.docker.apply(task, artifact)
+
+    def unapply(self, task, artifact):
+        artifact.docker.unapply(task, artifact)
 
 
 class DockerClient(Download):
@@ -145,6 +213,19 @@ class DockerImage(Task):
     """
     abstract = True
 
+    autoload = True
+    """
+    Automatically load image file into local registry when the artifact is
+    consumed by another task.
+
+    If the built image is saved to a file (i.e. ``imagefile`` is set), the image
+    file is automatically loaded into the local Docker registry when the task
+    artifact is consumed by another task. The image is also automatically
+    removed from the registry upon completion of the consumer task.
+
+    Default: ``True``.
+    """
+
     buildargs = []
     """
     List of build arguments and their values ("ARG=VALUE").
@@ -199,6 +280,7 @@ class DockerImage(Task):
         context = tools.expand_relpath(self.context, self.joltdir)
         dockerfile = tools.expand_path(self.dockerfile)
         self._imagefile = tools.expand(self.imagefile) if self.imagefile else None
+        self._autoload = self._imagefile and self.autoload
         pull = " --pull" if self.pull else ""
         tags = [tools.expand(tag) for tag in self.tags]
 
@@ -245,5 +327,12 @@ class DockerImage(Task):
             if self._imagefile:
                 if self.compression is not None:
                     artifact.collect("{_imagefile}.{compression}")
+                    if self._autoload:
+                        artifact.docker.load.append("{_imagefile}.{compression}")
                 else:
                     artifact.collect("{_imagefile}")
+                    if self._autoload:
+                        artifact.docker.load.append("{_imagefile}")
+        if self._autoload:
+            artifact.docker.rmi.append(artifact.strings.tag.get_value())
+
