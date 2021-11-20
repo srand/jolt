@@ -197,20 +197,25 @@ class DockerImage(Task):
     def run(self, deps, tools):
         buildargs = " ".join(["--build-arg " + tools.expand(arg) for arg in self.buildargs])
         context = tools.expand_relpath(self.context, self.joltdir)
-        dockerfile = tools.expand(self.dockerfile)
+        dockerfile = tools.expand_path(self.dockerfile)
         self._imagefile = tools.expand(self.imagefile) if self.imagefile else None
         pull = " --pull" if self.pull else ""
         tags = [tools.expand(tag) for tag in self.tags]
 
+        # If dockerfile is not relative to joltdir, look for it in context
+        if not path.exists(dockerfile):
+            with tools.cwd(context):
+                dockerfile = tools.expand_path(self.dockerfile)
+
         if not path.exists(dockerfile):
             with tools.cwd(tools.builddir()):
                 tools.write_file("Dockerfile", self.dockerfile)
-                dockerfile = tools.expand_relpath("Dockerfile", self.joltdir)
-        else:
-            dockerfile = tools.expand_path(self.dockerfile)
-            dockerfile = tools.expand_relpath(dockerfile, context)
+                dockerfile = tools.expand_path("Dockerfile")
 
-        self.info("Building image from {} in {}", dockerfile, context)
+        self.info("Building image from {} in {}",
+                  tools.expand_relpath(dockerfile),
+                  tools.expand_relpath(context))
+
         with tools.cwd(context):
             image = tools.run("docker build . -f {} -t {} {}{}", dockerfile, tags[0], buildargs, pull)
             for tag in tags[1:]:
