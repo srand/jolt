@@ -29,6 +29,17 @@ class TestApi(JoltTest):
         """
         self.jolt("build inferred")
 
+    def test_skip(self):
+        """
+        --- tasks:
+        class Skipped(Test):
+            def test_skipped(self):
+                self.skip("skipping test")
+        ---
+        """
+        r = self.build("skipped")
+        self.assertIn("OK (skipped=1)", r)
+
     def test_parameterized(self):
         """
         --- tasks:
