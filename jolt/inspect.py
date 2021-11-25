@@ -101,11 +101,7 @@ def getclasssource(cls):
 def getfuncsource(func):
     """ Returns the source code of a function """
     tree = getfuncast(func)
-    try:
-        return ast.unparse(tree)
-    except AttributeError:
-        # For Python <3.9
-        return ast.dump(tree, annotate_fields=False)
+    return ast.dump(tree, annotate_fields=False)
 
 def getmoduleclasses(module, searchtypes, predicate=None):
     """
