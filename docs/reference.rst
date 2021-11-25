@@ -250,7 +250,7 @@ Test
 .. reference-test-start
 
 .. autoclass:: jolt.tasks.Test
-   :members: setup, cleanup
+   :members: setup, cleanup, parameterized
    :undoc-members:
 
 .. reference-test-end

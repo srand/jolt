@@ -1721,6 +1721,49 @@ class Test(Task):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
+    @staticmethod
+    def parameterized(args):
+        """
+        Parameterizes a test method.
+
+        The test method is instantiated and called once with each argument tuple in the list.
+
+        Example:
+
+          .. code-block:: python
+
+            class Example(Test):
+               @Test.parameterized([
+                   (1, 1, 1),  # 1*1 == 1
+                   (1, 2, 2),  # 1*2 == 2
+                   (2, 1, 2),  # 2*1 == 2
+                   (2, 2, 4),  # 2*2 == 4
+               ])
+               def test_multiply(self, factor1, factor2, product):
+                   self.assertEqual(factor1*factor2, product)
+
+        """
+
+        class partialmethod(functools.partialmethod):
+            def __init__(self, index, func, *args):
+                super().__init__(func, *args)
+                self.__index = index
+
+            def __get__(self, obj, cls=None):
+                retval = super().__get__(obj, cls)
+                retval.__name__ = f"{self.func.__name__}[{self.__index}]"
+                retval.__doc__ = self.func.__doc__
+                return retval
+
+        def decorate(method):
+            frame = sys._getframe().f_back.f_locals
+            for index, arg in enumerate(args):
+                testmethod = partialmethod(index, method, *arg)
+                name = f"{method.__name__}[{index}]"
+                frame[name] = testmethod
+            return None
+        return decorate
+
     def setup(self, deps, tools):
         """ Implement this method to make preparations before a test """
 

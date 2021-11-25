@@ -1,0 +1,46 @@
+#!/usr/bin/python
+
+import os
+import sys
+import time
+sys.path.append(".")
+
+from testsupport import JoltTest
+
+
+class TestApi(JoltTest):
+    name = "api/test"
+
+    def test_name(self):
+        """
+        --- tasks:
+        class Explicit(Test):
+            name = "explicit1"
+        ---
+        """
+        self.jolt("build explicit1")
+
+    def test_name_inferred(self):
+        """
+        --- tasks:
+        class Inferred(Test):
+            pass
+        ---
+        """
+        self.jolt("build inferred")
+
+    def test_parameterized(self):
+        """
+        --- tasks:
+        class A(Test):
+            @Test.parameterized([
+                (0, False,),
+                (1, True,),
+            ])
+            def test_parameterized(self, index, boolean):
+                print(index, boolean)
+                self.assertTrue((index == 0 and not boolean) or (index == 1 and boolean))
+        ---
+        """
+        r = self.build("a")
+        self.assertIn("Ran 2 tests", r)

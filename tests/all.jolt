@@ -8,6 +8,7 @@ class All(Alias):
         "api/git",
         "api/ninja",
         "api/task",
+        "api/test",
         "api/tools",
         "cli/build",
         "cli/config",
