@@ -1832,6 +1832,8 @@ class Test(Task):
         for test in self._get_test_names():
             if self.pattern.is_unset() or fnmatch.fnmatch(test, str(self.pattern)):
                 testfunc = getattr(self, test)
+                if not testfunc:
+                    continue
                 testsuite.addTest(
                     _TestCase(self, deps, tools, testfunc))
         with log.stream() as logstream:
