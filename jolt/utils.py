@@ -55,7 +55,15 @@ def decorate_prepend(func, extra_func):
     return _f
 
 def as_list(t):
-    return [t] if type(t) == str else list(t)
+    return [t] if type(t) == str or not is_iterable(t) else list(t)
+
+def is_iterable(x):
+    try:
+        iter(x)
+    except TypeError:
+        return False
+    else:
+        return True
 
 def as_stable_string_list(o):
     if type(o) == list or type(o) == tuple:

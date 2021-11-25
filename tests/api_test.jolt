@@ -55,3 +55,26 @@ class TestApi(JoltTest):
         """
         r = self.build("a")
         self.assertIn("Ran 2 tests", r)
+
+    def test_parameterized_invalid_arg(self):
+        """
+        --- tasks:
+        class A(Test):
+            @Test.parameterized(True)
+            def test_parameterized(self, arg):
+                pass
+        ---
+        """
+        with self.assertRaises(Exception, msg="expects a list as argument"):
+            self.build("a")
+
+    def test_parameterized_simple_list(self):
+        """
+        --- tasks:
+        class A(Test):
+            @Test.parameterized([True, False])
+            def test_parameterized(self, arg):
+                pass
+        ---
+        """
+        self.build("a")

@@ -18,7 +18,7 @@ from jolt import filesystem as fs
 from jolt import log
 from jolt import utils
 from jolt.cache import ArtifactAttributeSetProvider
-from jolt.error import raise_task_error, raise_task_error_if
+from jolt.error import raise_error_if, raise_task_error, raise_task_error_if
 from jolt.error import raise_unreported_task_error_if
 from jolt.error import JoltError, JoltCommandError
 from jolt.expires import Immediately
@@ -1743,6 +1743,7 @@ class Test(Task):
                    self.assertEqual(factor1*factor2, product)
 
         """
+        raise_error_if(type(args) != list, "Test.parameterized() expects a list as argument")
 
         class partialmethod(functools.partialmethod):
             def __init__(self, index, func, *args):
@@ -1758,7 +1759,7 @@ class Test(Task):
         def decorate(method):
             frame = sys._getframe().f_back.f_locals
             for index, arg in enumerate(args):
-                testmethod = partialmethod(index, method, *arg)
+                testmethod = partialmethod(index, method, *utils.as_list(arg))
                 name = f"{method.__name__}[{index}]"
                 frame[name] = testmethod
             return None
