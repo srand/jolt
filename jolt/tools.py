@@ -1123,7 +1123,12 @@ class Tools(object):
                 raise e
             except:
                 pass
-            return _run(self._cmd_prefix + cmd, self._cwd, self._env, *args, **kwargs)
+            if self._cmd_prefix:
+                if type(cmd) == list:
+                    cmd = self._cmd_prefix.split() + cmd
+                else:
+                    cmd = self._cmd_prefix.split() + cmd
+            return _run(cmd, self._cwd, self._env, *args, **kwargs)
         finally:
             if stdi:
                 termios.tcsetattr(sys.stdin.fileno(), termios.TCSANOW, stdi)
