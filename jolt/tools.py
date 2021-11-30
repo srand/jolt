@@ -262,7 +262,7 @@ class _AutoTools(object):
 
     def configure(self, sourcedir, *args, **kwargs):
         sourcedir = self.tools.expand_path(sourcedir)
-        prefix = kwargs.get("prefix", "/usr")
+        prefix = kwargs.get("prefix", "/")
 
         if not fs.path.exists(fs.path.join(sourcedir, "configure")):
             with self.tools.cwd(sourcedir):
