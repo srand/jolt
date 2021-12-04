@@ -2,4 +2,6 @@ bz2file
 colorama
 fasteners
 ninja-syntax
+sphinx-click
+sphinx-rtd-theme
 tqdm
