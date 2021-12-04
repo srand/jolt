@@ -796,27 +796,25 @@ def info(ctx, task, influence=False, artifacts=False, salt=None):
 @click.pass_context
 def export(ctx, task):
     """
-    Export artifact metadata into environment.
-
-    The export command parses task artifact metadata and creates
-    a virtual environment in which the user run can the applications
-    included in an artifact. The staged environment is identical
-    to the environment that would be setup for a task consuming
-    the same artifact.
+    Export task artifact metadata into shell environment.
 
     When running the command, a shell script is printed to stdout.
-    It can be written to file and executed separately, or sourced
+    It can be redirected to a file and executed separately, or sourced
     directly in the shell by running:
 
       source <(jolt export <task>)
 
+    The script creates a virtual environment that is identical
+    to the environment that would be setup when the specified task
+    artifact is consumed by another task. This enables packaged
+    applications, such as compilers, to be run directly from the shell.
+
     The command will fail if the task artifact or any dependency
-    artifact is missing in the local cache. Build it to populate
-    the cache and then try again.
+    artifact is missing in the local cache. Build the task to
+    populate the cache and then try again.
 
     Run ``deactivate-jolt`` to leave the virtual environment. All
-    environment variables will be restored to their original
-    values.
+    environment variables will be restored to their original values.
     """
     try:
         _export(ctx, task)
