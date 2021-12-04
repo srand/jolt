@@ -6,7 +6,7 @@ from shutil import copyfile
 
 here = path.abspath(path.dirname(__file__))
 name = "jolt"
-version = "0.9.13"
+exec(open('jolt/version.py').read())
 
 
 # Get the long description from the README file
@@ -28,7 +28,7 @@ class BuildCommand(build_py):
 setup(
     name=name,
     cmdclass={"build_py": BuildCommand},
-    version=version,
+    version=__version__,
     description='A task executor',
     long_description=long_description,
     url='https://bitbucket.org/rand_r/jolt',

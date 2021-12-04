@@ -1,18 +1,13 @@
 from jolt import Alias, BooleanParameter, Parameter, Task, TaskGenerator, Tools
 from jolt import attributes, influence
+from jolt import __version__
 from jolt.plugins import docker, git, selfdeploy
 
 from os import getenv
-_version = getenv("JOLT_VERSION")
 
 
 class Jolt(selfdeploy.Jolt):
-    version = Parameter(_version, influence=False)
-
-    def publish(self, artifact, tools):
-          super().publish(artifact, tools)
-          with tools.cwd(artifact.path):
-               tools.replace_in_file("setup.py", "0.9.13", "{version}")
+    version = Parameter(__version__, influence=False)
 
 
 @influence.files("{dockerfile}")
@@ -24,7 +19,7 @@ class JoltImage(docker.DockerImage):
     requires = ["jolt:version={version}", "docker/cli"]
     requires_push_true = ["docker/login"]
     tags = ["robrt/jolt:latest", "robrt/jolt:{version}"]
-    version = Parameter(_version, influence=False)
+    version = Parameter(__version__, influence=False)
 
     def run(self, deps, tools):
          self.context = tools.sandbox(deps["jolt:version={version}"])
@@ -66,7 +61,7 @@ class JoltWheel(Task):
 
     release = BooleanParameter(False)
     requires = ["jolt:version={version}"]
-    version = Parameter(_version, influence=False)
+    version = Parameter(__version__, influence=False)
 
     def run(self, deps, tools):
         tools.run("python3 -m pip install --upgrade setuptools wheel")
@@ -90,7 +85,7 @@ class JoltWrapperWheel(Task):
     name = "jolt/docker/pypi"
 
     release = BooleanParameter(False)
-    version = Parameter(_version, influence=False)
+    version = Parameter(__version__, influence=False)
 
     def run(self, deps, tools):
         tools.run("python3 -m pip install --upgrade setuptools wheel")
@@ -111,9 +106,7 @@ class JoltWrapperWheel(Task):
 
 
 class Default(Alias):
-    @property
-    def push(self):
-        return "true" if getenv("JOLT_VERSION") else "false"
+    push = BooleanParameter(False)
 
     requires = [
         "jolt/image:push={push}",

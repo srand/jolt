@@ -12,6 +12,7 @@ from jolt import cache
 from jolt import colors
 from jolt import filesystem as fs
 from jolt import log
+from jolt import __version__
 from jolt.log import logfile
 from jolt import config
 from jolt.loader import JoltLoader
@@ -69,6 +70,7 @@ class PluginGroup(click.Group):
 
 
 @click.group(cls=PluginGroup, invoke_without_command=True)
+@click.version_option(__version__)
 @click.option("-v", "--verbose", is_flag=True, help="Verbose output.")
 @click.option("-vv", "--extra-verbose", is_flag=True, help="Extra verbose output.")
 @click.option("-c", "--config", "config_file", multiple=True, type=str,
