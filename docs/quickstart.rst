@@ -105,10 +105,10 @@ the task in order to know what artifact to look for. Run:
 
 .. code-block:: bash
 
-    $ jolt info -a hello
+    $ jolt inspect -a hello
 
-The ``info`` command shows information about the task, including the
-documentation written in its Python implementation. We're looking for the
+The ``inspect`` command displays information about the task, including the
+documentation written in its Python class implementation. We're looking for the
 identity:
 
 .. code-block:: bash

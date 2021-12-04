@@ -1,5 +1,4 @@
 import click
-import imp
 import subprocess
 import sys
 import uuid
@@ -48,7 +47,10 @@ class ArgRequiredUnless(click.Argument):
 
 class PluginGroup(click.Group):
     def get_command(self, ctx, cmd_name):
-        if cmd_name == "export":
+        if cmd_name == "info":
+            cmd_name = "inspect"
+
+        if cmd_name in ["export", "inspect"]:
             log.set_level(log.SILENCE)
         elif ctx.params.get("verbose", False):
             log.set_level(log.VERBOSE)
@@ -481,6 +483,9 @@ def _config(ctx, list, delete, global_, user, key, value):
         raise_error_if(value is None, "no such key: {}".format(key))
         print("{} = {}".format(key, value))
 
+    def _print_section(section):
+        print("{}".format(section))
+
     if list:
         for section, option, value in config.items(alias):
             if option:
@@ -525,17 +530,17 @@ def display(ctx, task, reverse=None, show_cache=False):
     options = JoltOptions()
     acache = cache.ArtifactCache.get(options)
 
-
     if reverse:
-        iterator = lambda task: list(dag.predecessors(task))
+        def iterator(task):
+            return list(dag.predecessors(task))
         reverse = utils.as_list(reverse)
-        tasklist = dag.select(lambda graph, node: \
-                             node.short_qualified_name in reverse or \
-                             node.qualified_name in reverse)
+        tasklist = dag.select(lambda graph, node:
+                              node.short_qualified_name in reverse or
+                              node.qualified_name in reverse)
     else:
+        def iterator(task):
+            return task.children
         tasklist = dag.requested_goals
-        iterator = lambda task: task.children
-
 
     if dag.has_tasks():
         def _display(task, indent=0, last=None):
@@ -561,7 +566,7 @@ def display(ctx, task, reverse=None, show_cache=False):
             print(header + colorize(task.short_qualified_name))
             children = iterator(task)
             for i in range(0, len(children)):
-                _display(children[i], indent+1, last=(last or []) +[i+1!=len(children)])
+                _display(children[i], indent + 1, last=(last or []) + [i + 1 != len(children)])
         for task in tasklist:
             _display(task)
     else:
@@ -657,12 +662,12 @@ def _list(ctx, task=None, reverse=None):
         dag = graph.GraphBuilder(registry, ctx.obj["manifest"]).build(task, influence=False)
     except JoltError as e:
         raise e
-    except:
+    except Exception:
         raise_error("an exception occurred during task dependency evaluation, see log for details")
 
     task = reverse or task
-    nodes = dag.select(lambda graph, node: \
-                       node.short_qualified_name in task or \
+    nodes = dag.select(lambda graph, node:
+                       node.short_qualified_name in task or
                        node.qualified_name in task)
 
     tasklist = set()
@@ -697,23 +702,28 @@ def _log(follow, delete):
                 return subprocess.call("{1} {0}".format(logfile, pager), shell=True)
         print(t.read_file(logfile))
 
+
 @cli.command()
 @click.argument("task", autocompletion=_autocomplete_tasks)
-@click.option("-i", "--influence", is_flag=True, help="Print task influence.")
-@click.option("-a", "--artifacts", is_flag=True, help="Print task artifact status.")
+@click.option("-i", "--influence", is_flag=True, help="Print influence attributes and values.")
+@click.option("-a", "--artifact", is_flag=True, help="Print artifact cache status.")
 @click.option("-s", "--salt", type=str, help="Add salt as task influence.")
 @click.pass_context
-def info(ctx, task, influence=False, artifacts=False, salt=None):
+def inspect(ctx, task, influence=False, artifact=False, salt=None):
     """
-    View information about a task, including its documentation.
+    View information about a task.
 
-    <WIP>
+    This command displays information about a task, such as its class
+    documentation, parameters and their accepted values, requirements,
+    task class origin (file/line), influence attributes, artifact identity,
+    cache status, and more. Default parameter values, if any, are highlighted.
+
     """
     task_name = task
     task_cls_name, task_params = utils.parse_task_name(task_name)
     task_registry = TaskRegistry.get()
     task = task_registry.get_task_class(task_cls_name) or \
-           task_registry.get_test_class(task_cls_name)
+        task_registry.get_test_class(task_cls_name)
     raise_task_error_if(not task, task_name, "no such task")
 
     from jolt import inspect
@@ -726,8 +736,8 @@ def info(ctx, task, influence=False, artifacts=False, salt=None):
         click.echo()
     click.echo("  Parameters")
     has_param = False
-    params = { key: getattr(task, key) for key in dir(task)
-               if isinstance(utils.getattr_safe(task, key), Parameter) }
+    params = {key: getattr(task, key) for key in dir(task)
+              if isinstance(utils.getattr_safe(task, key), Parameter)}
     for item, param in params.items():
         has_param = True
         click.echo("    {0:<15}   {1}".format(item, param.help or ""))
@@ -763,7 +773,7 @@ def info(ctx, task, influence=False, artifacts=False, salt=None):
     if salt:
         task.taint = salt
 
-    if artifacts:
+    if artifact:
         acache = cache.ArtifactCache.get()
         builder = graph.GraphBuilder(task_registry, manifest)
         dag = builder.build([task.qualified_name])

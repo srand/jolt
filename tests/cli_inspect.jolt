@@ -8,8 +8,8 @@ sys.path.append(".")
 from testsupport import JoltTest
 
 
-class InfoCli(JoltTest):
-    name = "cli/info"
+class InspectCli(JoltTest):
+    name = "cli/inspect"
 
     def test_name(self):
         """
@@ -20,12 +20,12 @@ class InfoCli(JoltTest):
         """
         self.jolt("build explicit1")
 
-    def test_info_invalid(self):
+    def test_inspect_invalid(self):
         """ """
         with self.assertRaises(Exception):
-            self.jolt("info non-existing-task")
+            self.jolt("inspect non-existing-task")
 
-    def test_info(self):
+    def test_inspect(self):
         """
         --- tasks:
         class TaskName(Task):
@@ -33,25 +33,25 @@ class InfoCli(JoltTest):
             pass
         ---
         """
-        output = self.jolt("info taskname")
+        output = self.jolt("inspect taskname")
         self.assertIn("taskname", output)
         self.assertIn("docstring", output)
         self.assertIn("Parameters\n    None", output)
         self.assertIn("Requirements\n    None", output)
         self.assertIn("Definition\n    File              test.jolt (6)", output)
 
-    def test_info_parameterized(self):
+    def test_inspect_parameterized(self):
         """
         --- tasks:
         class A(Task):
             arg1 = Parameter(help="docstring")
         ---
         """
-        output = self.jolt("info a")
+        output = self.jolt("inspect a")
         self.assertIn("Parameters\n    arg1", output)
         self.assertIn("docstring", output)
 
-    def test_info_requirements_ok(self):
+    def test_inspect_requirements_ok(self):
         """
         --- tasks:
         class A(Task):
@@ -65,12 +65,12 @@ class InfoCli(JoltTest):
                 return ["a"]
         ---
         """
-        output = self.jolt("info b")
+        output = self.jolt("inspect b")
         self.assertIn("Requirements\n    a", output)
-        output = self.jolt("info c")
+        output = self.jolt("inspect c")
         self.assertIn("Requirements\n    a", output)
 
-    def test_info_requirements_param(self):
+    def test_inspect_requirements_param(self):
         """
         --- tasks:
         class A(Task):
@@ -86,17 +86,17 @@ class InfoCli(JoltTest):
                 return ["a:arg={{arg}}"]
         ---
         """
-        output = self.jolt("info b")
+        output = self.jolt("inspect b")
         self.assertIn("Requirements\n    Unavailable", output)
-        output = self.jolt("info c")
+        output = self.jolt("inspect c")
         self.assertIn("Requirements\n    Unavailable", output)
 
-        output = self.jolt("info b:arg=value")
+        output = self.jolt("inspect b:arg=value")
         self.assertIn("Requirements\n    a:arg=value", output)
-        output = self.jolt("info c:arg=value")
+        output = self.jolt("inspect c:arg=value")
         self.assertIn("Requirements\n    a:arg=value", output)
 
-    def test_info_requirements_exception(self):
+    def test_inspect_requirements_exception(self):
         """
         --- tasks:
         class A(Task):
@@ -104,11 +104,11 @@ class InfoCli(JoltTest):
                 raise "broken"
         ---
         """
-        output = self.jolt("info a")
+        output = self.jolt("inspect a")
         self.assertIn("Parameters\n    None", output)
         self.assertIn("Unavailable", output)
 
-    def test_info_identity(self):
+    def test_inspect_identity(self):
         """
         --- tasks:
         class A1(Task):
@@ -147,13 +147,13 @@ class InfoCli(JoltTest):
 
         ---
         """
-        i1 = self.jolt("info -a k")
+        i1 = self.jolt("inspect -a k")
         id1 = re.search("Identity[ ]*([^ ]*)", i1).group(1).strip()
         b1 = self.build("k")
         a1 = self.artifacts(b1)
         print(id1, a1[0])
         self.assertIn(id1, a1[0])
-        i2 = self.jolt("info -a k")
+        i2 = self.jolt("inspect -a k")
         self.assertIn(id1, i2)
         self.assertIn("Location          "+a1[0], i2)
         self.assertIn("Local             True", i2)

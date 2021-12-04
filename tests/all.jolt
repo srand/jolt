@@ -14,7 +14,7 @@ class All(Alias):
         "cli/config",
         "cli/display",
         "cli/export",
-        "cli/info",
+        "cli/inspect",
         "cli/list",
         "ext/alias",
         "ext/autoweight",
