@@ -18,8 +18,9 @@ from .cache import Context
 
 from .tools import Tools
 
-from . import expires
+from .version import __version__
 
+from . import expires
 
 def include(joltfile):
     """ Include another Python file """
