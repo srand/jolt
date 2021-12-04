@@ -63,6 +63,7 @@ setup(
         'allure': ['allure-python-commons'],
         'amqp': ['pika'],
         'dev': ['check-manifest'],
+        'doc': ['sphinx-click', 'sphinx-rtd-theme'],
         'test': ['coverage'],
     },
     package_data={
