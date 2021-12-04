@@ -3,7 +3,7 @@ import fnmatch
 import re
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from functools import partial
+from functools import partial, wraps
 from threading import RLock
 from string import Formatter
 import os
@@ -410,3 +410,12 @@ def callstack():
     import traceback
     for line in traceback.format_stack():
         print(line.strip())
+
+
+def deprecated(func):
+    @wraps(func)
+    def deprecation_warning(*args, **kwargs):
+        from jolt import log
+        log.warning("Called method is deprecated: {}", func.__name__)
+        return func(*args, **kwargs)
+    return deprecation_warning

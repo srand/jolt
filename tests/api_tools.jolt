@@ -406,3 +406,20 @@ class ToolsApi(JoltTest):
         with self.tools.cwd(self.ws):
             self.assertEqual("1", self.tools.read_file("1.txt"))
             self.assertEqual("{value}", self.tools.read_file("value.txt"))
+
+    def test_deprecated(self):
+        """
+        --- tasks:
+        from jolt.utils import deprecated
+
+        class A(Task):
+            @deprecated
+            def obsolete(self):
+                pass
+
+            def run(self, d, t):
+                self.obsolete()
+        ---
+        """
+        r = self.build("a")
+        self.assertIn("method is deprecated: obsolete", r)
