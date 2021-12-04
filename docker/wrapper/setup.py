@@ -4,7 +4,7 @@ from os import path
 
 here = path.abspath(path.dirname(__file__))
 name = "jolt_docker"
-version = "0.9.13"
+exec(open('jolt_docker/version.py').read())
 
 
 # Get the long description from the README file
@@ -13,7 +13,7 @@ with open(path.join(here, 'README.rst'), encoding='utf-8') as f:
 
 setup(
     name=name,
-    version=version,
+    version=__version__,
     description='A task executor',
     long_description=long_description,
     url='https://bitbucket.org/rand_r/jolt',

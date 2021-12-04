@@ -91,11 +91,7 @@ class JoltWrapperWheel(Task):
         tools.run("python3 -m pip install --upgrade setuptools wheel")
         tools.run("python3 -m pip install --upgrade twine")
         with tools.cwd(tools.builddir()):
-            tools.copy("{joltdir}/README.rst", "README.rst")
-            tools.copy("{joltdir}/docker/wrapper/__init__.py", "jolt_docker/")
-            tools.copy("{joltdir}/docker/wrapper/__main__.py", "jolt_docker/")
-            tools.copy("{joltdir}/docker/wrapper/setup.py", "setup.py")
-            tools.replace_in_file("setup.py", "0.9.13", "{version}")
+            tools.copy("{joltdir}/docker/wrapper", ".")
             tools.run("python3 setup.py sdist bdist_wheel")
             if self.release:
                 tools.run("python3 -m twine upload dist/*")

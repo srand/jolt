@@ -6,6 +6,8 @@ import sys
 import subprocess
 import xml.etree.ElementTree as ET
 
+from .version import __version__
+
 
 def find_manifestdir(searchdir):
     manifest = os.path.join(searchdir, "default.joltxmanifest")
@@ -101,6 +103,8 @@ if os.name == "posix":
 # Build command line
 
 cmd = ["docker", "run", "-i", "--rm", "-u", f"{uid}:{gid}", "-w", cwd]
+if sys.stdin.isatty() and sys.stdout.isatty():
+    cmd += ["-t"]
 for volume in volumes:
     cmd += ["-v", volume]
 for group in groups:
@@ -110,6 +114,9 @@ cmd += sys.argv[1:]
 
 
 def main():
+    if "--version" in sys.argv:
+        print(f"jolt, version {__version__}")
+        sys.exit(0)
     verbose("Running: {} (CWD: {})", " ".join(cmd), cwd)
     sys.exit(subprocess.call(cmd))
 
