@@ -18,8 +18,14 @@ class JoltImage(docker.DockerImage):
     push = BooleanParameter(False)
     requires = ["jolt:version={version}", "docker/cli"]
     requires_push_true = ["docker/login"]
-    tags = ["robrt/jolt:latest", "robrt/jolt:{version}"]
+    tags = ["robrt/jolt:latest", "robrt/jolt:{version}", "robrt/jolt:{minor_version}"]
     version = Parameter(__version__, influence=False)
+
+    @property
+    def minor_version(self):
+        from jolt.version_utils import version
+        v = version(str(self.version))
+        return f"{v.major}.{v.minor}"
 
     def run(self, deps, tools):
          self.context = tools.sandbox(deps["jolt:version={version}"])
