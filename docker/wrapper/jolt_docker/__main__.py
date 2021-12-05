@@ -6,7 +6,8 @@ import sys
 import subprocess
 import xml.etree.ElementTree as ET
 
-from .version import __version__
+from jolt_docker.version import __version__
+from jolt_docker.version_utils import requirement
 
 
 def find_manifestdir(searchdir):
@@ -49,7 +50,10 @@ def find_version(joltdir):
     try:
         tree = ET.parse(manifest)
         root = tree.getroot()
-        return root.get("version", "latest")
+        verstr = root.get("version")
+        if not verstr:
+            return "latest"
+        return str(requirement(verstr).required())
     except FileNotFoundError:
         return "latest"
 
@@ -75,6 +79,7 @@ joltdir = find_joltdir(os.getcwd()) or cwd
 version = find_version(joltdir)
 image = find_image()
 image = f"{image}:{version}"
+verbose(f"Using image '{image}'")
 uid = os.getuid()
 gid = os.getgid()
 groups = os.getgroups()

@@ -423,3 +423,44 @@ class ToolsApi(JoltTest):
         """
         r = self.build("a")
         self.assertIn("method is deprecated: obsolete", r)
+
+    def test_version(self):
+        from jolt.version_utils import version, requirement
+
+        self.assertLess(version("0.9.0"), version("0.9.1"))
+        self.assertGreater(version("0.9.1"), version("0.9.0"))
+        self.assertEqual(version("0.9.0"), version("0.9.0"))
+
+        self.assertLess(version("0.9.0"), version("0.10.0"))
+        self.assertGreater(version("0.10.0"), version("0.9.0"))
+
+        self.assertLess(version("1.0.0"), version("2.0.0"))
+        self.assertGreater(version("2.0.0"), version("1.0.0"))
+
+        self.assertLess(version("1.1.0"), version("2.0.0"))
+        self.assertGreater(version("2.0.0"), version("1.1.0"))
+
+        self.assertLess(version("1.1.1"), version("2.0.0"))
+        self.assertGreater(version("2.0.0"), version("1.1.1"))
+
+        self.assertTrue(requirement(">1.0.0").satisfied(version("2.0.0")))
+        self.assertFalse(requirement(">1.0").satisfied(version("1.0.1")))
+        self.assertTrue(requirement(">1.0").satisfied(version("1.1.0")))
+
+        self.assertTrue(requirement(">=1.0.0").satisfied(version("2.0.0")))
+        self.assertTrue(requirement(">=1.0").satisfied(version("1.0.0")))
+        self.assertTrue(requirement(">=1.0").satisfied(version("1.0")))
+
+        self.assertFalse(requirement("1.0.0").satisfied(version("2.0.0")))
+        self.assertTrue(requirement("1.0.0").satisfied(version("1.0.0")))
+
+        self.assertEqual(str(requirement("1.0.0")), "=1.0.0")
+        self.assertEqual(str(requirement(">1.0.0")), ">1.0.0")
+
+        self.assertEqual(version("1.0"), version("1.0.0"))
+        self.assertEqual(version("1.0"), version("1.0.1"))
+
+        self.assertEqual(requirement(">1.0.0").required(), version("1.0.1"))
+        self.assertEqual(requirement(">1.0").required(), version("1.1"))
+        self.assertEqual(requirement(">=1.0").required(), version("1.0"))
+        self.assertEqual(requirement("<=1.0").required(), version("1.0"))

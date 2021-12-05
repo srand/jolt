@@ -132,6 +132,14 @@ def cli(ctx, verbose, extra_verbose, config_file, debug_exception, profile,
     manifest.process_import()
     ctx.obj["manifest"] = manifest
 
+    if manifest.version:
+        from jolt.version_utils import requirement, version
+        req = requirement(manifest.version)
+        ver = version(__version__)
+        raise_error_if(not req.satisfied(ver),
+                       "this project requires Jolt version {} (running {})",
+                       req, __version__)
+
     loader = JoltLoader.get()
     tasks = loader.load()
     for cls in tasks:

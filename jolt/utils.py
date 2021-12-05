@@ -3,7 +3,7 @@ import fnmatch
 import re
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from functools import partial, wraps
+from functools import partial, wraps, total_ordering
 from threading import RLock
 from string import Formatter
 import os

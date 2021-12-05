@@ -104,6 +104,7 @@ class _JoltNetworkParameter(SubElement):
 @Attribute("result", child=True)
 @Attribute("duration", child=True)
 @Attribute("workspace")
+@Attribute("version")
 @Composition(_JoltRecipe, "recipe")
 @Composition(_JoltTask, "task")
 @Composition(_JoltBuild, "build")
