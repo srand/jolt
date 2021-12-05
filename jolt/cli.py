@@ -97,19 +97,22 @@ class PluginGroup(click.Group):
 def cli(ctx, verbose, extra_verbose, config_file, debug_exception, profile,
         force, salt, debug, network, local, keep_going, jobs):
     """
-    Jolt - a task execution tool.
+    A task execution tool.
 
     When invoked without any commands and arguments, Jolt by default tries
-    to execute and build the artifact of a task called `default`. If the
-    default task doesn't exist this help text is printed. All other tasks
-    can be executed with the build command. Note that most build command
-    options can be used also when executing the default task without
-    specifying a command. See the build command help for details.
+    to execute and build the artifact of a task called `default`. To build
+    artifacts of other tasks use the build subcommand.
 
-    To execute the default task and its dependencies without stopping on
-    failures, run:
+    The Jolt command line interface is hierarchical. One set of options
+    can be passed to the top-level command and a different set of options
+    to the subcommands, simultaneously. For example, verbose output is
+    a top-level option while forced rebuild is a build command option.
+    They may combined like this:
 
-      $ jolt -k
+      $ jolt --verbose build --force taskname
+
+    Most build command options are available also at the top-level when
+    build is invoked implicitly for the default task.
 
     """
 
@@ -175,11 +178,19 @@ def _autocomplete_tasks(ctx, args, incomplete):
 
 @cli.command()
 @click.argument("task", type=str, nargs=-1, autocompletion=_autocomplete_tasks, cls=ArgRequiredUnless, required_unless="worker")
-@click.option("-n", "--network", is_flag=True, default=False, help="Build on network.")
-@click.option("-l", "--local", is_flag=True, default=False, help="Disable all network operations.")
-@click.option("-k", "--keep-going", is_flag=True, default=False, help="Build as many tasks as possible, don't abort on first failure.")
-@click.option("-i", "--identity", type=str, help="Expected hash identity")
-@click.option("-j", "--jobs", type=int, default=1, help="Number of tasks allowed to execute in parallel (1). ")
+@click.option("-c", "--copy", type=click.Path(),
+              help="Copy artifact content to directory PATH.")
+@click.option("-d", "--default", type=str, multiple=True, help="Override default parameter values.", metavar="DEFAULT")
+@click.option("-f", "--force", is_flag=True, default=False, help="Force rebuild of TASK artifact.")
+@click.option("-g", "--debug", is_flag=True, default=False,
+              help="Start debug shell before executing TASK.")
+@click.option("-j", "--jobs", type=int, default=1, help="Number of tasks allowed to execute in parallel [1]. ", metavar="JOBS")
+@click.option("-k", "--keep-going", is_flag=True, default=False, help="Build as many task artifacts as possible.")
+@click.option("-l", "--local", is_flag=True, default=False, help="Disable remote cache access.")
+@click.option("-n", "--network", is_flag=True, default=False, help="Distribute tasks to network workers.")
+@click.option("-s", "--salt", type=str, help="Add salt as hash influence for all tasks in dependency tree.", metavar="SALT")
+@click.option("--result", type=click.Path(), hidden=True,
+              help="Write result manifest to this file.")
 @click.option("--no-download", is_flag=True, default=False,
               help="Don't download artifacts from remote storage")
 @click.option("--no-upload", is_flag=True, default=False,
@@ -190,22 +201,40 @@ def _autocomplete_tasks(ctx, args, incomplete):
               help="Do upload artifacts to remote storage")
 @click.option("--worker", is_flag=True, default=False,
               help="Run with the worker build strategy", hidden=True)
-@click.option("-d", "--default", type=str, multiple=True, help="Override default parameter values.")
-@click.option("-f", "--force", is_flag=True, default=False, help="Force rebuild of target tasks.")
-@click.option("-s", "--salt", type=str, help="Add salt as task influence.")
-@click.option("-g", "--debug", is_flag=True, default=False,
-              help="Start debug shell before executing task.")
-@click.option("-c", "--copy", type=click.Path(),
-              help="Copy artifact content to this directory upon completion.")
-@click.option("--result", type=click.Path(), hidden=True,
-              help="Write result manifest to this file.")
 @click.pass_context
 @hooks.cli_build
-def build(ctx, task, network, keep_going, identity, default, local,
+def build(ctx, task, network, keep_going, default, local,
           no_download, no_upload, download, upload, worker, force,
           salt, copy, debug, result, jobs):
     """
-    Execute a specific task.
+    Build task artifact.
+
+    TASK is the name of the task to execute. It is optionally followed by a colon and
+    parameter value assignments. Assignments are separated by commas. Example:
+
+       taskname:param1=value1,param2=value2
+
+    Default parameter values can be overridden for any task in the dependency tree
+    with --default. DEFAULT is a qualified task name, just like TASK, but parameter
+    assignments change default values.
+
+    By default, a task is executed locally and the resulting artifact is stored
+    in the local artifact cache. If an artifact is already available in the cache,
+    no execution takes place. Artifacts are identified with a hash digest,
+    constructed from hashing task attributes.
+
+    When remote cache providers are configured, artifacts may be downloaded from and/or
+    uploaded to the remote cache as execution progresses. Several options exist to control
+    the behavior, such as --local which disables all remote caches.
+
+    Distributed task execution is enabled by passing the --network option. Tasks are then
+    distributed to and executed by a pool of workers, if one has been configured.
+
+    Rebuilds can be forced with either --force or --salt. --force rebuilds the requested
+    task, but not its dependencies. --salt affects the entire dependency tree. Both add
+    an extra attribute to the task hash calculation in order to taint the identity and
+    induce a cache miss. In both cases, existing intermediate files in build directories
+    are removed before execution starts.
 
     """
     raise_error_if(network and local,
@@ -376,16 +405,16 @@ def build(ctx, task, network, keep_going, identity, default, local,
 @click.pass_context
 def clean(ctx, task, deps, expired):
     """
-    Removes task artifacts and intermediate files.
+    Delete task artifacts and intermediate files.
 
     When run without arguments, this command removes all task artifacts
     from the local cache, but no intermediate files are removed.
 
-    When a task is specified, the task clean() method is invoked to remove
+    When TASK is specified, the task clean() method is invoked to remove
     any intermediate files still present in persistent build directories.
     Secondly, the task artifact will be removed from the local cache.
     Global caches are not affected. The --deps parameter can be used to also
-    clean all dependencies of the specified task.
+    clean all dependencies of the specified TASK.
 
     By default, task artifacts are removed without considering any
     artifact expiration metadata. To only remove artifact which have expired,
@@ -644,13 +673,12 @@ def freeze(ctx, task, default, output, remove):
 
 @cli.command(name="list")
 @click.argument("task", type=str, nargs=-1, required=False, autocompletion=_autocomplete_tasks)
-@click.option("-r", "--reverse", type=str, help="List consumers of REVERSE if TASK is executed.")
+@click.option("-r", "--reverse", type=str, help="Only list dependencies of TASK that are also reverse dependencies of REVERSE.", metavar="REVERSE")
 @click.pass_context
 def _list(ctx, task=None, reverse=None):
     """
-    List all tasks, or dependencies of a specific task.
+    List all tasks, or dependencies of a task.
 
-    <WIP>
     """
 
     raise_error_if(not task and reverse, "TASK required with --reverse")
@@ -696,9 +724,8 @@ def _list(ctx, task=None, reverse=None):
 @click.option("-d", "--delete", is_flag=True, help="Delete the log file")
 def _log(follow, delete):
     """
-    Access the Jolt log file.
+    Display the Jolt log file.
 
-    <WIP>
     """
     if follow:
         subprocess.call("tail -f {0}".format(logfile), shell=True)
