@@ -57,7 +57,7 @@ class DiskVolume(cache.StorageProvider):
                     raise StaleFileHandleError(e)
                 else:
                     log.exception()
-            except Exception as e:
+            except Exception:
                 log.exception()
 
         return False
@@ -84,7 +84,7 @@ class DiskVolume(cache.StorageProvider):
                 if e.errno != errno.EEXIST:
                     log.verbose("[VOLUME] Failed to copy artifact, errno={}", os.strerror(e.errno))
                 return e.errno == errno.EEXIST
-            except Exception as e:
+            except Exception:
                 log.exception()
             finally:
                 fs.unlink(temp, ignore_errors=True)

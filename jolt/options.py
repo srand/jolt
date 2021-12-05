@@ -1,6 +1,4 @@
 
-
-
 class JoltOptions(object):
     def __init__(self, **kwargs):
         self.debug = False

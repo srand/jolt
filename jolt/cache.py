@@ -6,8 +6,7 @@ import fasteners
 import json
 import os
 import sqlite3
-from tempfile import mkdtemp
-from threading import Lock, RLock
+from threading import RLock
 import uuid
 
 from jolt import config
@@ -157,13 +156,13 @@ class ArtifactAttributeSetProvider(object):
         ArtifactAttributeSetRegistry.providers.append(cls)
 
     def create(self, artifact):
-        raise NotImplemented()
+        raise NotImplementedError()
 
     def parse(self, artifact, content):
-        raise NotImplemented()
+        raise NotImplementedError()
 
     def format(self, artifact, content):
-        raise NotImplemented()
+        raise NotImplementedError()
 
     def apply(self, task, artifact):
         pass
@@ -189,10 +188,10 @@ class ArtifactAttribute(object):
         return self._name
 
     def set_value(self, value, expand=True):
-        raise NotImplemented()
+        raise NotImplementedError()
 
     def get_value(self):
-        raise NotImplemented()
+        raise NotImplementedError()
 
     def apply(self, task, artifact):
         pass
@@ -201,7 +200,7 @@ class ArtifactAttribute(object):
         pass
 
     def __str__(self):
-        raise NotImplemented()
+        raise NotImplementedError()
 
 
 class ArtifactStringAttribute(ArtifactAttribute):
@@ -314,6 +313,7 @@ class ArtifactFileAttributeProvider(ArtifactAttributeSetProvider):
 def json_serializer(obj):
     if isinstance(obj, datetime):
         return dict(type="datetime", value=obj.strftime("%Y-%m-%d %H:%M:%S.%f"))
+
 
 def json_deserializer(dct):
     if dct.get("type") == "datetime":
@@ -484,7 +484,7 @@ class Artifact(object):
             self._valid = True
         except KeyboardInterrupt as e:
             raise e
-        except:
+        except Exception:
             self._valid = False
             return
         self._size = content["size"]
@@ -608,18 +608,17 @@ class Artifact(object):
             log.verbose("Collected {0} -> {2}/{1}", src, dest, self._temp)
             return
 
-
         # Expand directories into full file list if flatting a tree
         # Determine relative artifact destination paths
         if flatten:
             files = [q
-                for f in files
-                for q in ([p for p in fs.scandir(fs.path.join(self.tools.getcwd(), f))]
-                          if fs.path.isdir(fs.path.join(self.tools.getcwd(), f)) else [f])]
+                     for f in files
+                     for q in ([p for p in fs.scandir(fs.path.join(self.tools.getcwd(), f))]
+                               if fs.path.isdir(fs.path.join(self.tools.getcwd(), f)) else [f])]
             reldestfiles = [fs.path.join(dest, fs.path.basename(f)) for f in files]
         else:
             reldestfiles = [fs.path.join(dest, self.tools.expand_relpath(f, self.tools.getcwd()))
-                         for f in files]
+                            for f in files]
 
         # General case
         for srcpath, reldstpath in zip(files, reldestfiles):
@@ -630,7 +629,6 @@ class Artifact(object):
                 self.files.append(self.tools.expand_relpath(srcpath), reldstpath)
                 self.tools.copy(srcpath, dstpath, symlinks=symlinks)
                 log.verbose("Collected {0} -> {1}", relsrcpath, reldstpath)
-
 
     def copy(self, files, dest, flatten=False, symlinks=False, cwd=None):
         """ Copy files from the artifact.
@@ -684,8 +682,8 @@ class Artifact(object):
         # Determine relative artifact destination paths
         if flatten:
             files = [q
-                for f in files
-                for q in ([p for p in fs.scandir(f)] if fs.path.isdir(f) else [f])]
+                     for f in files
+                     for q in ([p for p in fs.scandir(f)] if fs.path.isdir(f) else [f])]
             reldestfiles = [fs.path.join(dest, fs.path.basename(f)) for f in files]
         else:
             reldestfiles = [fs.path.join(dest, self.tools.expand_relpath(f, self._path))
@@ -917,7 +915,7 @@ class ArtifactCache(StorageProvider):
 
         # Read configuration
         self._max_size = config.getsize(
-            "jolt", "cachesize", os.environ.get("JOLT_CACHESIZE", 1*1024**3))
+            "jolt", "cachesize", os.environ.get("JOLT_CACHESIZE", 1 * 1024 ** 3))
 
         # Create cache directory
         self._fs_create_cachedir()
@@ -949,7 +947,6 @@ class ArtifactCache(StorageProvider):
                         cur_size, max_size, count, in_use)
         atexit.register(self.close)
 
-
     ############################################################################
     # Internal API
     ############################################################################
@@ -968,7 +965,6 @@ class ArtifactCache(StorageProvider):
 
     def _db_create_tables(self, db):
         cur = db.cursor()
-        #cur.execute("PRAGMA foreign_keys = ON")
 
         # All artifacts currently residing in the cache
         cur.execute("CREATE TABLE IF NOT EXISTS artifacts "
@@ -1109,7 +1105,7 @@ class ArtifactCache(StorageProvider):
                     self._db_delete_locks_by_pid(db, pid)
             except KeyboardInterrupt as e:
                 raise e
-            except:
+            except Exception:
                 pass
 
         for lock in locks:
@@ -1128,7 +1124,7 @@ class ArtifactCache(StorageProvider):
                     self._db_delete_references_by_pid(db, pid)
             except KeyboardInterrupt as e:
                 raise e
-            except:
+            except Exception:
                 pass
 
     def _fs_invalidate_pids(self, db, try_all=False):
@@ -1144,7 +1140,7 @@ class ArtifactCache(StorageProvider):
                 fs.unlink(pid, ignore_errors=True)
             except KeyboardInterrupt as e:
                 raise e
-            except Exception as e:
+            except Exception:
                 pass
 
     def _fs_create_cachedir(self):
@@ -1153,7 +1149,7 @@ class ArtifactCache(StorageProvider):
             fs.makedirs(self.root)
         except KeyboardInterrupt as e:
             raise e
-        except:
+        except Exception:
             raise_error("failed to create cache directory '{0}'", self.root)
 
     def _fs_get_artifact(self, node, tools=None):
@@ -1181,7 +1177,7 @@ class ArtifactCache(StorageProvider):
             task.tools.archive(artifact.path, archive)
         except KeyboardInterrupt as e:
             raise e
-        except:
+        except Exception:
             raise_task_error(task, "failed to compress task artifact")
         try:
             yield
@@ -1195,7 +1191,7 @@ class ArtifactCache(StorageProvider):
             task.tools.extract(archive, artifact.temporary_path)
         except KeyboardInterrupt as e:
             raise e
-        except:
+        except Exception:
             raise_task_error(task, "failed to extract task artifact archive")
         finally:
             fs.unlink(archive, ignore_errors=True)
@@ -1244,7 +1240,7 @@ class ArtifactCache(StorageProvider):
             return strategy.is_evictable(manifest)
         except KeyboardInterrupt as e:
             raise e
-        except:
+        except Exception:
             return True
 
     def close(self):
@@ -1294,7 +1290,6 @@ class ArtifactCache(StorageProvider):
                 evicted += 1
                 log.debug("Evicted {}: {}", identity, name)
         return evicted == len(artifacts)
-
 
     ############################################################################
     # Public API
@@ -1477,7 +1472,7 @@ class ArtifactCache(StorageProvider):
             return
         with self._cache_lock(), self._db() as db:
             self._fs_commit_artifact(artifact, uploadable)
-            with utils.ignore_exception(): # Possibly already exists in DB, e.g. unpacked
+            with utils.ignore_exception():  # Possibly already exists in DB, e.g. unpacked
                 self._db_insert_artifact(db, artifact.get_task().identity, artifact.get_task().canonical_name, artifact.get_size())
             self._db_update_artifact_size(db, artifact.get_task().identity, artifact.get_size())
             self._db_insert_reference(db, artifact.get_task().identity)
@@ -1533,7 +1528,7 @@ class ArtifactCache(StorageProvider):
                         # which allows us to a break deadlock condition.
                         with self._pid_lock(pid, wait=True, timeout=1):
                             break
-                    except RuntimeError as e:
+                    except RuntimeError:
                         with self._cache_lock(), self._db() as db:
                             lockpids = self._db_select_artifact_lock_pids(db, node.identity)
 

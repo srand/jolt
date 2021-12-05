@@ -41,8 +41,7 @@ class Http(cache.StorageProvider):
             config.set(NAME, "keyring.username", username)
             config.save()
 
-        password = config.get(NAME, "keyring.password") or \
-                   keyring.get_password(NAME, username)
+        password = config.get(NAME, "keyring.password") or keyring.get_password(NAME, username)
         if not password:
             password = getpass.getpass(NAME + " password: ")
             raise_error_if(not password, "no password in keyring for " + NAME)

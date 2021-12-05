@@ -1,9 +1,4 @@
-import base64
 from configparser import SafeConfigParser, NoOptionError, NoSectionError
-try:
-    from StringIO import StringIO
-except:
-    from io import StringIO
 import os
 
 from jolt import filesystem as fs
@@ -22,6 +17,7 @@ elif os.name == "nt":
 else:
     location = fs.path.join(fs.userhome(), ".config", "jolt", "config")
     location_user = fs.path.join(fs.userhome(), ".config", "jolt", "user")
+
 
 class ConfigFile(SafeConfigParser):
     def __init__(self, location, *args, **kwargs):
@@ -168,7 +164,7 @@ def getsize(section, key, default=None, alias=None):
     raise_error_if(
         unit not in units,
         "config: unit invalid for '{0}.{1}', expected [B,K,M,G,T]", section, key)
-    return int(size)*units[unit]
+    return int(size) * units[unit]
 
 
 def getfloat(section, key, default=None, alias=None):

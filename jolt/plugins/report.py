@@ -1,12 +1,5 @@
 from contextlib import contextmanager
-from datetime import datetime
 
-from jolt import *
-from jolt import config
-from jolt import filesystem as fs
-from jolt import log
-from jolt import utils
-from jolt.error import raise_error_if
 from jolt.hooks import TaskHook, TaskHookFactory
 from jolt.manifest import JoltManifest
 
@@ -46,10 +39,13 @@ class ReportHooks(TaskHook):
     def update(self):
         yield self.manifest
 
+
 _report_hooks = ReportHooks()
+
 
 def update():
     return _report_hooks.update()
+
 
 def write(filename):
     return _report_hooks.write(filename)

@@ -3,26 +3,22 @@ import fnmatch
 import re
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from functools import partial, wraps, total_ordering
+from functools import partial, wraps
 from threading import RLock
 from string import Formatter
 import os
 import hashlib
-import sys
 from fasteners import lock, process_lock
-import errno
 import json
 
 
-if sys.version_info[0] == 3:
-    read_input = input
-else:
-    read_input = raw_input
+read_input = input
+
 
 try:
     from inspect import getattr_static
     getattr_safe = getattr_static
-except:
+except Exception:
     getattr_safe = getattr
 
 
@@ -35,11 +31,13 @@ def is_str(s):
     except NameError:
         return type(s) == str
 
+
 def decode_str(s):
     try:
         return s.decode()
-    except:
+    except Exception:
         return s
+
 
 def decorate_append(func, extra_func):
     def _f(*args, **kwargs):
@@ -48,14 +46,17 @@ def decorate_append(func, extra_func):
         return val
     return _f
 
+
 def decorate_prepend(func, extra_func):
     def _f(*args, **kwargs):
         extra_func(*args, **kwargs)
         return func(*args, **kwargs)
     return _f
 
+
 def as_list(t):
     return [t] if type(t) == str or not is_iterable(t) else list(t)
+
 
 def is_iterable(x):
     try:
@@ -64,6 +65,7 @@ def is_iterable(x):
         return False
     else:
         return True
+
 
 def as_stable_string_list(o):
     if type(o) == list or type(o) == tuple:
@@ -74,10 +76,12 @@ def as_stable_string_list(o):
     else:
         return [str(o)]
 
+
 def as_stable_tuple_list(o):
     assert type(o) == dict, "as_stable_tuple_list: argument is not a dict"
-    l = [(key, value) for key, value in o.items()]
-    return sorted(l, key=lambda x: x[0])
+    list = [(key, value) for key, value in o.items()]
+    return sorted(list, key=lambda x: x[0])
+
 
 def as_human_size(size):
     unit_precision = [("B", 0), ("KB", 0), ("MB", 1), ("GB", 2), ("TB", 2), ("PB", 2)]
@@ -87,58 +91,71 @@ def as_human_size(size):
         index += 1
     return "{0} {1}".format(round(size, ndigits=unit_precision[index][1]), unit_precision[index][0])
 
+
 def as_dirpath(dirpath):
     return dirpath + os.path.sep if dirpath[-1] != os.path.sep else dirpath
+
 
 def call_or_return(obj, t):
     return t(obj) if callable(t) else t
 
+
 def call_or_return_list(obj, t):
     return as_list(call_or_return(obj, t))
+
 
 def call_and_catch(f, *args, **kwargs):
     try:
         return f(*args, **kwargs)
     except KeyboardInterrupt as e:
         raise e
-    except:
+    except Exception:
         return None
+
 
 def call_and_catch_and_log(f, *args, **kwargs):
     try:
         return f(*args, **kwargs)
     except KeyboardInterrupt as e:
         raise e
-    except:
+    except Exception:
         from jolt import log
         log.exception()
         return None
+
 
 def parse_task_name(name):
     if ":" in name:
         task, params = name.split(":", 1)
         params = params.split(",")
+
         def _param(param):
             if "=" in param:
                 key, value = param.split("=", 1)
             else:
                 key, value = param, None
             return key, value
+
         return task, {key: value for key, value in map(_param, params) if key}
     else:
         return name, {}
 
+
 def format_task_name(name, params):
     if not params:
         return name
+
     def _param(key, value):
         return "{0}={1}".format(key, value) if value is not None else key
+
     params = sorted([(key, value) for key, value in params.items()], key=lambda x: x[0])
     return "{0}:{1}".format(name, ",".join([_param(key, value) for key, value in params]))
+
 
 def stable_task_name(name):
     task, params = parse_task_name(name)
     return format_task_name(task, params)
+
 
 def canonical(s):
     return "".join([c if c.isalnum() else '_' for c in s])
@@ -209,7 +226,7 @@ class duration(object):
 
     def __sub__(self, delta):
         assert type(delta) in [int, float]
-        self._time -= int(delta+.5)
+        self._time -= int(delta + .5)
         return self
 
     def diff(self, d):
@@ -227,6 +244,7 @@ class duration(object):
     @property
     def milliseconds(self):
         return (time.time() - self._time) * 1000
+
 
 class duration_diff(object):
     def __init__(self, elapsed):
@@ -281,7 +299,7 @@ class cached:
 
 class retried:
     @staticmethod
-    def on_exception(exc_type, pattern=None, count=8, backoff=[1,4,10,15,20,25,35,40]):
+    def on_exception(exc_type, pattern=None, count=8, backoff=[1, 4, 10, 15, 20, 25, 35, 40]):
         def _decorate(f):
             def _f(*args, **kwargs):
                 for i in range(0, count):
@@ -290,7 +308,7 @@ class retried:
                             time.sleep(backoff[i - 1])
                         return f(*args, **kwargs)
                     except exc_type as e:
-                        if i+1 >= count:
+                        if i + 1 >= count:
                             raise e
                         if pattern is None or pattern in str(e):
                             from jolt import log
@@ -299,16 +317,20 @@ class retried:
             return _f
         return _decorate
 
+
 def ignore_exception(exc=Exception):
     return contextlib.suppress(exc)
 
+
 def Singleton(cls):
     cls._instance = None
+
     @staticmethod
     def get(*args, **kwargs):
         if not cls._instance:
             cls._instance = cls(*args, **kwargs)
         return cls._instance
+
     cls.get = get
     return cls
 
@@ -330,6 +352,7 @@ class LockFile(object):
 
 def map_consecutive(method, iterable):
     return list(map(method, iterable))
+
 
 def map_concurrent(method, iterable, *args, **kwargs):
     max_workers = kwargs.get("max_workers", None)
@@ -384,12 +407,14 @@ def tojson(filepath, data, ignore_errors=False, indent=2):
 def concat_attributes(attrib, postfix, prepend=False):
     def _decorate(cls):
         _orig = getattr(cls, "_" + attrib)
+
         def _get(self):
             orig = _orig(self)
             if prepend:
                 return getattr(self, self.expand(postfix), type(orig)()) + orig
             else:
                 return orig + getattr(self, self.expand(postfix), type(orig)())
+
         setattr(cls, "_" + attrib, _get)
         return cls
     return _decorate

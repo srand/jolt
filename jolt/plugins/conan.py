@@ -1,8 +1,8 @@
 import json
 from os import path
 
-from jolt import *
-from jolt.tasks import TaskRegistry
+from jolt import Task
+from jolt import influence
 from jolt.error import raise_task_error_if
 
 
@@ -219,7 +219,6 @@ class Conan(Task):
             for dep in self._manifest["dependencies"]:
                 self.info("Collecting '{}' files from: {}", dep["name"], dep["rootpath"])
                 tools.copy(dep["rootpath"], dep["name"])
-
 
     def publish(self, artifact, tools):
         self.info("Publishing package files")

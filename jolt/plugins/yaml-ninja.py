@@ -60,7 +60,6 @@ class LibraryYamlTaskBuilder(yamltask.YamlTaskBuilder):
         return LoadedYamlTask
 
 
-
 @influence.attribute("yaml")
 class ExecutableYamlTask(ninja.CXXExecutable):
     def run(self, d, t):

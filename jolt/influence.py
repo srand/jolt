@@ -1,17 +1,16 @@
 import datetime
 import hashlib
 import os
-import uuid
 from pathlib import Path, PurePath
 
 from jolt import inspect
 from jolt import utils
-from jolt import log
 from jolt import filesystem as fs
 from jolt import tools
 
 
 _providers = []
+
 
 @utils.Singleton
 class HashInfluenceRegistry(object):
@@ -28,7 +27,6 @@ class HashInfluenceRegistry(object):
     def apply_all(self, task, sha):
         for influence in self.get_strings(task):
             sha.update(influence.encode())
-            #log.debug("{0}: {1}", task.name, influence)
 
     def get_strings(self, task):
         content = []
@@ -40,8 +38,9 @@ class HashInfluenceRegistry(object):
 
 class HashInfluenceProvider(object):
     name = "X"
+
     def get_influence(self, task):
-        raise NotImplemented()
+        raise NotImplementedError()
 
 
 class TaintInfluenceProvider(object):
@@ -87,10 +86,12 @@ def attribute(name, sort=False):
 
     def _decorate(cls):
         _old_influence = cls._influence
+
         def _influence(self, *args, **kwargs):
             influence = _old_influence(self, *args, **kwargs)
             influence.append(TaskAttributeInfluence(name, sort))
             return influence
+
         cls._influence = _influence
         return cls
     return _decorate
@@ -111,7 +112,7 @@ class TaskSourceInfluence(HashInfluenceProvider):
         try:
             funcname = self.funcname
             funcname = obj.expand(funcname)
-        except:
+        except Exception:
             pass
 
         # Collect all functions from the class hierarchy
@@ -155,10 +156,12 @@ def source(name, obj=None):
     """
     def _decorate(cls):
         _old_influence = cls._influence
+
         def _influence(self, *args, **kwargs):
             influence = _old_influence(self, *args, **kwargs)
             influence.append(TaskSourceInfluence(name, obj))
             return influence
+
         cls._influence = _influence
         return cls
     return _decorate
@@ -193,12 +196,13 @@ class TaskRequirementInfluence(HashInfluenceProvider):
         self._name = proxy.short_qualified_name
 
     def get_influence(self, task):
-        return "{}: {}".format(self._identity,self._name)
+        return "{}: {}".format(self._identity, self._name)
 
 
 @HashInfluenceRegistry.Register
 class TaskNameInfluence(HashInfluenceProvider):
     name = "Name"
+
     def get_influence(self, task):
         return task.name
 
@@ -206,12 +210,12 @@ class TaskNameInfluence(HashInfluenceProvider):
 @HashInfluenceRegistry.Register
 class TaskParameterInfluence(HashInfluenceProvider):
     name = "Parameters"
+
     def get_influence(self, task):
         return ",".join(
             sorted(["{0}={1}".format(key, value)
                     for key, value in task._get_parameter_objects().items()
                     if value.is_influencer()]))
-
 
 
 class InstanceInfluence(HashInfluenceProvider):
@@ -235,10 +239,12 @@ def always(cls):
 
     """
     _old_influence = cls._influence
+
     def _influence(self, *args, **kwargs):
         influence = _old_influence(self, *args, **kwargs)
         influence.append(InstanceInfluence())
         return influence
+
     cls._influence = _influence
     return cls
 
@@ -257,10 +263,12 @@ class TaskDateInfluence(HashInfluenceProvider):
 def _date_influence(fmt):
     def _decorate(cls):
         _old_influence = cls._influence
+
         def _influence(self, *args, **kwargs):
             influence = _old_influence(self, *args, **kwargs)
             influence.append(TaskDateInfluence(fmt))
             return influence
+
         cls._influence = _influence
         return cls
     return _decorate
@@ -282,6 +290,7 @@ Example:
 
 """
 
+
 weekly = _date_influence("%Y-%w")
 """ Add weekly hash influence.
 
@@ -297,6 +306,7 @@ Example:
         class Example(Task):
 
 """
+
 
 monthly = _date_influence("%Y-%m")
 """ Add monthly hash influence.
@@ -314,6 +324,7 @@ Example:
 
 """
 
+
 daily = _date_influence("%Y-%m-%d")
 """ Add daily hash influence.
 
@@ -329,6 +340,7 @@ Example:
         class Example(Task):
 
 """
+
 
 hourly = _date_influence("%Y-%m-%d %H")
 """ Add hourly hash influence.
@@ -376,10 +388,12 @@ def environ(variable):
     """
     def _decorate(cls):
         _old_influence = cls._influence
+
         def _influence(self, *args, **kwargs):
             influence = _old_influence(self, *args, **kwargs)
             influence.append(TaskEnvironmentInfluence(variable))
             return influence
+
         cls._influence = _influence
         return cls
 
@@ -439,7 +453,7 @@ class FileInfluence(HashInfluenceProvider):
 
 class DirectoryInfluence(FileInfluence):
     def __init__(self, path):
-        super().__init__(path.rstrip(os.sep)+"/**")
+        super().__init__(path.rstrip(os.sep) + "/**")
 
 
 def files(pathname):
@@ -464,10 +478,12 @@ def files(pathname):
     """
     def _decorate(cls):
         _old_influence = cls._influence
+
         def _influence(self, *args, **kwargs):
             influence = _old_influence(self, *args, **kwargs)
             influence.append(FileInfluence(pathname))
             return influence
+
         cls._influence = _influence
         return cls
 
@@ -525,10 +541,12 @@ def whitelist(pathname):
     """
     def _decorate(cls):
         _old_influence = cls._influence
+
         def _influence(self, *args, **kwargs):
             influence = _old_influence(self, *args, **kwargs)
             influence.append(WhitelistInfluence(pathname))
             return influence
+
         cls._influence = _influence
         return cls
 

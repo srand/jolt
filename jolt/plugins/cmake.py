@@ -14,7 +14,7 @@ class CMake(Task):
     options = []
     """ List of options and their values (``option[:type]=value``) """
 
-    def run(self, deps, tools): 
+    def run(self, deps, tools):
         raise_task_error_if(not self.cmakelists, self, "cmakelists attribute has not been defined")
 
         cmake = tools.cmake()

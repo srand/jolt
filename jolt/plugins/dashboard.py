@@ -12,7 +12,7 @@ class DashboardHooks(telemetry.TelemetryHooks):
     def __init__(self, uri=None):
         uri = config.get("dashboard", "uri", "http://dashboard")
         error.raise_error_if(not uri, "dashboard.uri not configured")
-        super().__init__(plugin="dashboard", uri=uri+"/api/v1/tasks", local=False)
+        super().__init__(plugin="dashboard", uri=uri + "/api/v1/tasks", local=False)
 
 
 @TaskHookFactory.register

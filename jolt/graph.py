@@ -7,13 +7,11 @@ from collections import OrderedDict
 import uuid
 
 from jolt.tasks import Alias, Resource, WorkspaceResource, Task
-#from jolt.utils import *
 from jolt.influence import HashInfluenceRegistry, TaskRequirementInfluence
 from jolt import log
 from jolt import utils
 from jolt import colors
 from jolt import hooks
-from jolt import tools
 from jolt import filesystem as fs
 from jolt.error import raise_error_if
 from jolt.error import raise_task_error_if
@@ -100,7 +98,7 @@ class TaskProxy(object):
 
     @weight.setter
     def weight(self, weight):
-        self.task.weight =  weight
+        self.task.weight = weight
 
     def __str__(self):
         return "{0}{1}".format(self.short_qualified_name, "*" if self.is_extension() else '')
@@ -253,8 +251,7 @@ class TaskProxy(object):
 
         # Exclude transitive alias and resources dependencies
         self.children = list(
-            filter(lambda n: not n.is_alias() and (not n.is_resource() or \
-                   dag.are_neighbors(self, n)),
+            filter(lambda n: not n.is_alias() and (not n.is_resource() or dag.are_neighbors(self, n)),
                    utils.unique_list(self.children)))
 
         self.descendants = list(self.descendants)

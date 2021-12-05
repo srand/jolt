@@ -8,19 +8,15 @@ from jolt.hooks import TaskHook, TaskHookFactory
 from jolt.loader import JoltLoader
 import time
 
-import allure
-import allure_commons
-from allure_commons import plugin_manager
 from allure_commons.logger import AllureFileLogger
 from allure_commons.lifecycle import AllureLifecycle
 from allure_commons.model2 import Attachment
 from allure_commons.model2 import Status
 from allure_commons.model2 import StatusDetails
 from allure_commons.model2 import Label
-from allure_commons.types import AttachmentType
 from allure_commons.types import LabelType
 from allure_commons.utils import host_tag, thread_tag
-from allure_commons.utils import platform_label, md5
+from allure_commons.utils import platform_label
 from allure_commons.utils import format_traceback
 from contextlib import contextmanager
 import unittest as ut
@@ -92,7 +88,7 @@ class Reporter(object):
     def test(self, name, description=None, suite=None):
         with self._lifecycle.schedule_test_case() as result:
             result.name = name
-            result.start = time.time()*1000
+            result.start = time.time() * 1000
             result.fullName = self._task.__class__.__name__ + "." + name
             result.testCaseId = utils.sha1(result.fullName)
             result.historyId = utils.sha1(self._task.identity + result.testCaseId)
@@ -108,9 +104,9 @@ class Reporter(object):
             try:
                 yield reporter
             except ut.SkipTest as e:
-                    result.status = Status.SKIPPED
-                    result.statusDetails = StatusDetails(message=str(e))
-                    raise e
+                result.status = Status.SKIPPED
+                result.statusDetails = StatusDetails(message=str(e))
+                raise e
             except AssertionError as e:
                 with self._lifecycle.update_test_case() as result:
                     result.status = Status.FAILED
@@ -133,7 +129,7 @@ class Reporter(object):
                 if testlog.getvalue():
                     reporter.attach("log", testlog.getvalue(), "text/plain")
                 with self._lifecycle.update_test_case() as result:
-                    result.stop = time.time()*1000
+                    result.stop = time.time() * 1000
                 self._lifecycle.write_test_case()
                 self._logger.report_result(result)
 
@@ -177,7 +173,6 @@ class Test(jolt.Test):
             yield step
 
 
-
 class AllureHooks(TaskHook):
     LOGLEVEL = {
         "INFO": log.INFO,
@@ -198,7 +193,7 @@ class AllureHooks(TaskHook):
         task.allure_lifecycle = AllureLifecycle()
         with task.allure_lifecycle.schedule_test_case() as result:
             result.name = task.short_qualified_name
-            result.start = time.time()*1000
+            result.start = time.time() * 1000
             result.fullName = task.qualified_name
             result.description = task.task.__doc__
             result.testCaseId = utils.sha1(result.fullName)
@@ -222,7 +217,7 @@ class AllureHooks(TaskHook):
                         Attachment(source=logpath, name="log", type="text/plain"))
             result.status = status
             if status != Status.SKIPPED:
-                result.stop = time.time()*1000
+                result.stop = time.time() * 1000
             else:
                 result.start = None
                 result.stop = None

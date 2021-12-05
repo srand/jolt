@@ -68,7 +68,7 @@ class RepoProject(SubElement):
         with self.tools.cwd(self.path_or_name):
             try:
                 return True if self.tools.run("git show-ref {0}", ref, output=False) else False
-            except:
+            except Exception:
                 return False
 
     def get_remote_ref(self, commit, remote, pattern=None):

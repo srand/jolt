@@ -1,5 +1,4 @@
 from concurrent.futures import ThreadPoolExecutor, as_completed, Future
-from functools import partial
 import os
 import queue
 
@@ -15,7 +14,6 @@ from jolt.graph import PruneStrategy
 from jolt.manifest import ManifestExtension
 from jolt.manifest import ManifestExtensionRegistry
 from jolt.options import JoltOptions
-
 
 
 class JoltEnvironment(object):
@@ -241,7 +239,7 @@ class NetworkExecutorExtensionFactory(object):
         return cls
 
     def create(self):
-        raise NotImplemented()
+        raise NotImplementedError()
 
 
 class NetworkExecutorExtension(object):
@@ -295,7 +293,7 @@ class ExecutorFactory(object):
         self.pool.shutdown()
 
     def create(self, task):
-        raise NotImplemented()
+        raise NotImplementedError()
 
     def _run(self):
         job = self._queue.get(False)
@@ -352,7 +350,7 @@ class NetworkExecutorFactory(ExecutorFactory):
 
 class ExecutionStrategy(object):
     def create_executor(self, task):
-        raise NotImplemented()
+        raise NotImplementedError()
 
 
 class LocalStrategy(ExecutionStrategy, PruneStrategy):
@@ -513,6 +511,7 @@ class TaskIdentityExtension(ManifestExtension):
                 manifest_task.name = child.qualified_name
             manifest_task.identity = child.identity
 
+
 ManifestExtensionRegistry.add(TaskIdentityExtension())
 
 
@@ -542,5 +541,6 @@ class TaskExportExtension(ManifestExtension):
             for task in default_task_names:
                 default = build.create_default()
                 default.name = task
+
 
 ManifestExtensionRegistry.add(TaskExportExtension())

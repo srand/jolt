@@ -2,7 +2,7 @@ import glob
 import os
 import yaml
 
-from jolt.tasks import Parameter, Task, TaskGenerator, TaskRegistry
+from jolt.tasks import Task
 from jolt import log
 from jolt import loader
 from jolt.error import raise_error_if
@@ -51,6 +51,8 @@ class YamlTaskBuilder(object):
 
 
 _builders = {}
+
+
 def register(cls):
     raise_error_if(not issubclass(cls, YamlTaskBuilder),
                    "{} is not a YamlTaskBuilder", cls.__name__)

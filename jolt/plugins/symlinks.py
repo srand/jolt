@@ -1,6 +1,4 @@
-from datetime import datetime
 
-from jolt import *
 from jolt import cache
 from jolt import config
 from jolt import filesystem as fs

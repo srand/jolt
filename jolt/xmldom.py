@@ -3,7 +3,6 @@ from base64 import encodebytes as base64_encodebytes
 import codecs
 from xml.etree.ElementTree import Element
 from xml.etree.ElementTree import ElementTree
-from xml.etree import ElementTree as ET
 
 
 class SubElement(object):
@@ -84,7 +83,7 @@ class Attribute(object):
                 if value is None:
                     try:
                         self.attrib.pop(attribute)
-                    except:
+                    except Exception:
                         pass
                     finally:
                         return
@@ -97,10 +96,10 @@ class Attribute(object):
                 return self.set(attribute, value)
 
             def child_get(self):
-                if not hasattr(self, '_'+varname):
+                if not hasattr(self, '_' + varname):
                     e = SubElement(attribute, elem=self._elem.find(attribute))
-                    setattr(self, '_'+varname, e)
-                value = getattr(self, '_'+varname).text
+                    setattr(self, '_' + varname, e)
+                value = getattr(self, '_' + varname).text
                 if value is None:
                     return None
                 if base64:
@@ -109,23 +108,24 @@ class Attribute(object):
                         if zlib:
                             value = codecs.decode(value, "zlib")
                         value = value.decode()
-                    except:
-                        value = getattr(self, '_'+varname).text
+                    except Exception:
+                        value = getattr(self, '_' + varname).text
                 return str(value)
 
             def child_set(self, value):
                 _check_value(value, values)
-                if value is None: return
-                if not hasattr(self, '_'+varname):
+                if value is None:
+                    return
+                if not hasattr(self, '_' + varname):
                     e = SubElement(attribute)
                     self.append(e)
-                    setattr(self, '_'+varname, e)
+                    setattr(self, '_' + varname, e)
                 if base64:
                     value = value.encode()
                     if zlib:
                         value = codecs.encode(value, "zlib")
                     value = base64_encodebytes(value).decode()
-                getattr(self,'_'+varname).text = value
+                getattr(self, '_' + varname).text = value
 
             if not child:
                 setattr(cls, varname, property(attr_get, attr_set))

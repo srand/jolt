@@ -1,0 +1,8 @@
+from jolt import *
+
+
+class Flake8(Task):
+    def run(self, deps, tools):
+        with tools.cwd(".."):
+            tools.run("pip install flake8")
+            tools.run("flake8 --ignore=E501 jolt")

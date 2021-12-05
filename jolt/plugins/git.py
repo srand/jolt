@@ -1,10 +1,9 @@
-import copy
 import os
 import pygit2
 import re
 
-from jolt.tasks import Resource, WorkspaceResource, Parameter, BooleanParameter, Export, TaskRegistry
-from jolt.influence import HashInfluenceProvider, HashInfluenceRegistry, FileInfluence
+from jolt.tasks import BooleanParameter, Export, Parameter, TaskRegistry, WorkspaceResource
+from jolt.influence import FileInfluence, HashInfluenceRegistry
 from jolt.tools import Tools
 from jolt.loader import JoltLoader
 from jolt import config
@@ -122,11 +121,11 @@ class GitRepository(object):
                 self.fetch()
                 try:
                     commit = self.repository.revparse_single(rev)
-                except Exception as e:
+                except Exception:
                     raise_error("invalid git reference: {}", rev)
             try:
                 return str(commit.id)
-            except:
+            except Exception:
                 return str(commit)
 
     @utils.cached.instance
@@ -202,14 +201,14 @@ class GitRepository(object):
         with self.tools.cwd(self.path):
             try:
                 return self.tools.run("git checkout -f {rev}", rev=rev, output=False)
-            except:
+            except Exception:
                 self.fetch()
                 return self.tools.run("git checkout -f {rev}", rev=rev, output_on_error=True)
         self._original_head = False
 
 
-
 _gits = {}
+
 
 def new_git(url, path, relpath, refspecs=None):
     refspecs = utils.as_list(refspecs or [])
@@ -219,10 +218,9 @@ def new_git(url, path, relpath, refspecs=None):
         raise_error_if(git.refspecs != refspecs,
                        "conflicting refspecs detected for git repository at  {}", relpath)
         return git
-    except:
+    except Exception:
         git = _gits[path] = GitRepository(url, path, relpath, refspecs)
         return git
-
 
 
 class GitInfluenceProvider(FileInfluence):
@@ -251,8 +249,8 @@ class GitInfluenceProvider(FileInfluence):
         tools = Tools(task, task.joltdir)
         path = tools.expand_path(self.path)
         git_abs = self._find_dotgit(path)
-        git_rel = git_abs[len(self.joltdir)+1:]
-        relpath = path[len(git_abs)+1:]
+        git_rel = git_abs[len(self.joltdir) + 1:]
+        relpath = path[len(git_abs) + 1:]
         relpath = fs.as_posix(relpath) if relpath else relpath
 
         if not fs.path.exists(path):
@@ -280,10 +278,12 @@ def global_influence(path, cls=GitInfluenceProvider):
 def influence(path, git_cls=GitInfluenceProvider):
     def _decorate(cls):
         _old_influence = cls._influence
+
         def _influence(self, *args, **kwargs):
             influence = _old_influence(self, *args, **kwargs)
             influence.append(git_cls(path=path))
             return influence
+
         cls._influence = _influence
         return cls
     return _decorate

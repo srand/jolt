@@ -50,7 +50,7 @@ class Depfile(object):
         try:
             with open(filepath, "rb") as f:
                 sha.update(f.read())
-        except:
+        except Exception:
             sha.update(str(uuid.uuid4()).encode())
 
         _hash_cache[filepath] = digest = sha.hexdigest()
@@ -89,7 +89,7 @@ class LibraryManifest(object):
         try:
             with open(self._path, "r") as f:
                 self._data = json.loads(f.read())
-        except:
+        except Exception:
             pass
 
     def write(self):
@@ -126,12 +126,11 @@ class LibraryManifest(object):
         if rv != 0:
             return False
 
-        with open(objpath+".d", "w") as f:
+        with open(objpath + ".d", "w") as f:
             f.write("{}: {}\n".format(objpath, " ".join(data["deps"])))
             return True
 
         return False
-
 
     @property
     def objects(self):
@@ -218,7 +217,6 @@ class LockFile(object):
 
     def __exit__(self, *args, **kwargs):
         self._file.release()
-        pass
 
 
 ###############################################################################
@@ -228,9 +226,9 @@ def argscan(args, arg):
         index = args.index(arg)
     except ValueError:
         return None
-    if len(args) <= index+1:
+    if len(args) <= index + 1:
         return None
-    return args[index+1]
+    return args[index + 1]
 
 
 def verbose(fmt, *args, **kwargs):
@@ -269,5 +267,5 @@ def cli(compiler_args):
 
 
 if __name__ == "__main__":
-    compiler_args = sys.argv[sys.argv.index("--")+1:]
+    compiler_args = sys.argv[sys.argv.index("--") + 1:]
     cli(compiler_args)

@@ -189,41 +189,54 @@ class CliHookRegistry(object):
 def task_created(task):
     TaskHookRegistry.get().task_created(task)
 
+
 def task_started(task):
     TaskHookRegistry.get().task_started(task)
+
 
 def task_failed(task):
     TaskHookRegistry.get().task_failed(task)
 
+
 def task_finished(task):
     TaskHookRegistry.get().task_finished(task)
+
 
 def task_pruned(task):
     TaskHookRegistry.get().task_pruned(task)
 
+
 def task_skipped(task):
     TaskHookRegistry.get().task_skipped(task)
+
 
 def task_prerun(task, deps, tools):
     TaskHookRegistry.get().task_prerun(task, deps, tools)
 
+
 def task_prepublish(task, artifact, tools):
     TaskHookRegistry.get().task_prepublish(task, artifact, tools)
+
 
 def task_preunpack(task, artifact, tools):
     TaskHookRegistry.get().task_preunpack(task, artifact, tools)
 
+
 def task_postrun(task, deps, tools):
     TaskHookRegistry.get().task_postrun(task, deps, tools)
+
 
 def task_postpublish(task, artifact, tools):
     TaskHookRegistry.get().task_postpublish(task, artifact, tools)
 
+
 def task_postunpack(task, artifact, tools):
     TaskHookRegistry.get().task_postunpack(task, artifact, tools)
 
+
 def task_run(task):
     return TaskHookRegistry.get().task_run(task)
+
 
 def cli_build(cmd):
     @functools.wraps(cmd)

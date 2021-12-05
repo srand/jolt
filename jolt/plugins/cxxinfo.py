@@ -1,5 +1,3 @@
-from jolt import filesystem as fs
-from jolt import utils
 from jolt.cache import ArtifactListAttribute
 from jolt.cache import ArtifactAttributeSet
 from jolt.cache import ArtifactAttributeSetProvider

@@ -1,7 +1,8 @@
 from xml.dom import minidom
+from xml.etree import ElementTree as ET
 import os
 
-from jolt.xmldom import Attribute, Composition, SubElement, Element, ElementTree, ET
+from jolt.xmldom import Attribute, Composition, SubElement, Element, ElementTree
 from jolt import filesystem as fs
 from jolt import log
 

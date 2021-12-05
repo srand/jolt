@@ -2,8 +2,6 @@ import copy
 from itertools import zip_longest
 import ninja_syntax as ninja
 import os
-import platform
-import re
 import sys
 
 from jolt.tasks import Task, attributes as task_attributes
@@ -13,7 +11,7 @@ from jolt.influence import HashInfluenceProvider, TaskAttributeInfluence
 from jolt import log
 from jolt import utils
 from jolt import filesystem as fs
-from jolt.error import raise_task_error_if, raise_error_on_exception
+from jolt.error import raise_task_error_if
 from jolt.error import JoltError, JoltCommandError
 
 
@@ -173,6 +171,7 @@ class influence:
     def _list(attrib, provider=FileInfluence):
         def _decorate(cls):
             _old_influence = cls._influence
+
             def _influence(self, *args, **kwargs):
                 influence = _old_influence(self, *args, *kwargs)
                 items = getattr(self, attrib, [])
@@ -181,6 +180,7 @@ class influence:
                 for item in items:
                     influence.append(provider(item))
                 return influence
+
             cls._influence = _influence
             return cls
         return _decorate
@@ -459,7 +459,7 @@ class Rule(HashInfluenceProvider):
                 in_ext=in_ext)
 
             if outfile.startswith(project.joltdir) and not outfile.startswith(project.outdir):
-                outfile = outfile[len(project.joltdir)+1:]
+                outfile = outfile[len(project.joltdir) + 1:]
                 outfile = fs.path.join(project.outdir, outfile)
 
             result_files.append(outfile.replace("..", "__"))
@@ -534,12 +534,12 @@ class MakeDirectory(Rule):
 
     def __init__(self, name):
         super(MakeDirectory, self).__init__(
-            command=getattr(self, "command_"+self.system))
+            command=getattr(self, "command_" + self.system))
         self.dirname = name
 
     def create(self, project, writer, deps, tools):
         super().create(project, writer, deps, tools)
-        writer.build(fs.path.normpath(self.dirname), self.name, [], variables={"desc": "[MKDIR] "+self.dirname})
+        writer.build(fs.path.normpath(self.dirname), self.name, [], variables={"desc": "[MKDIR] " + self.dirname})
 
     def build(self, project, writer, infiles):
         return None
@@ -585,7 +585,7 @@ class FileListWriter(Rule):
         try:
             with open(flhp, "r") as f:
                 disk_digest = f.read()
-        except:
+        except Exception:
             return False
 
         return digest == disk_digest
@@ -1269,7 +1269,7 @@ class CXXProject(Task):
             for depfile in depfiles:
                 try:
                     data = tools.read_file(depfile)
-                except:
+                except Exception:
                     continue
                 data = data.split(":", 1)
                 if len(data) <= 1:
@@ -1285,21 +1285,21 @@ class CXXProject(Task):
     def _expand_headers(self):
         headers = []
         for header in getattr(self, "headers", []):
-            l = self.tools.glob(header)
+            list = self.tools.glob(header)
             raise_task_error_if(
-                not l and not ('*' in header or '?' in header), self,
+                not list and not ('*' in header or '?' in header), self,
                 "header file '{0}' not found", fs.path.basename(header))
-            headers += l
+            headers += list
         self.headers = headers
 
     def _expand_sources(self):
         sources = []
         for source in self.sources:
-            l = self.tools.glob(source)
+            list = self.tools.glob(source)
             raise_task_error_if(
-                not l and not ('*' in source or '?' in source), self,
+                not list and not ('*' in source or '?' in source), self,
                 "listed source file '{0}' not found in workspace", fs.path.basename(source))
-            sources += l
+            sources += list
         self.sources = sources
 
     def _write_ninja_file(self, basedir, deps, tools, filename="build.ninja"):
@@ -1312,13 +1312,11 @@ class CXXProject(Task):
             writer.sources = copy.copy(self.sources)
             self._populate_rules_and_variables(writer, deps, tools)
             self._populate_inputs(writer, deps, tools)
-            #self._populate_project(writer, deps, tools)
             writer.close()
             return writer
 
     def _write_ninja_cache(self, deps, tools):
         """ Hooked from ninja-cache plugin """
-        pass
 
     def _write_shell_file(self, basedir, deps, tools, writer):
         filepath = fs.path.join(basedir, "compile")
@@ -1514,7 +1512,6 @@ if __name__ == "__main__":
                 self._report_errors(report, "\n".join(e.stdout))
             raise CompileError()
 
-
     def shell(self, deps, tools):
         """
         Invoked to start a debug shell.
@@ -1656,6 +1653,7 @@ class CXXLibrary(CXXProject):
             artifact.strings.library = fs.path.join(
                 self.publishdir, fs.path.basename(self._binaries[0]))
 
+
 CXXLibrary.__doc__ += CXXProject.__doc__
 
 
@@ -1721,5 +1719,6 @@ class CXXExecutable(CXXProject):
         artifact.environ.PATH.append(self.publishdir)
         artifact.strings.executable = fs.path.join(
             self.publishdir, self.binary)
+
 
 CXXExecutable.__doc__ += CXXProject.__doc__

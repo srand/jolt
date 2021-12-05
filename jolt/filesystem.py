@@ -9,6 +9,7 @@ import sys
 
 from jolt.error import raise_error_if
 
+
 path = os.path
 sep = os.sep
 anysep = [posixpath.sep, ntpath.sep]
@@ -18,8 +19,10 @@ pathsep = os.pathsep
 def as_posix(path):
     return pathlib.Path(path).as_posix()
 
+
 def as_dirpath(path):
     return path if path[-1] == sep else path + sep
+
 
 def is_relative_to(pathname, rootdir):
     try:
@@ -28,8 +31,10 @@ def is_relative_to(pathname, rootdir):
     except ValueError:
         return False
 
+
 def userhome():
     return os.path.expanduser("~")
+
 
 def makedirs(path):
     try:
@@ -38,6 +43,7 @@ def makedirs(path):
         if e.errno != errno.EEXIST:
             raise
 
+
 def mkdir(path):
     try:
         os.mkdir(path)
@@ -45,10 +51,13 @@ def mkdir(path):
         if e.errno != errno.EEXIST:
             raise
 
+
 mkdtemp = tempfile.mkdtemp
+
 
 def exists(path):
     return os.path.exists(path)
+
 
 def identical_files(path1, path2):
     stat1 = os.stat(path1)
@@ -61,14 +70,18 @@ def identical_files(path1, path2):
                 return False
     return True
 
+
 def rename(old, new):
     return os.rename(old, new)
+
 
 def move(src, dst):
     return shutil.move(src, dst)
 
+
 def rmtree(path, ignore_errors=False):
     shutil.rmtree(path, ignore_errors)
+
 
 def unlink(path, ignore_errors=False):
     try:
@@ -80,18 +93,19 @@ def unlink(path, ignore_errors=False):
         if not ignore_errors:
             raise e
 
+
 _symlinks = None
+
+
 def has_symlinks():
     global _symlinks
     if _symlinks is None:
-        if os.name != "nt" or (
-                sys.getwindowsversion().major >= 10 and \
-                sys.version_info.major >= 3 and \
-                sys.version_info.minor >= 8):
+        if os.name != "nt" or (sys.getwindowsversion().major >= 10 and sys.version_info.major >= 3 and sys.version_info.minor >= 8):
             _symlinks = True
         else:
             _symlinks = False
     return _symlinks
+
 
 def symlink(src, dest, *args, **kwargs):
     if os.name == "nt":
@@ -102,7 +116,7 @@ def symlink(src, dest, *args, **kwargs):
             return
         except KeyboardInterrupt as e:
             raise e
-        except:
+        except Exception:
             # Ok, probably linking a file and not a directory
             # trying a regular symlink.
             try:
@@ -170,8 +184,10 @@ def copy(src, dst, symlinks=False, ignore=None, metadata=True):
 def scandir(scanpath, filterfn=lambda path: path[0] != ".", relative=False):
     def relresult(path, fp):
         return os.path.relpath(os.path.join(path, fp), scanpath)
+
     def absresult(path, fp):
         return os.path.join(path, fp)
+
     resfn = relresult if relative else absresult
     return [resfn(path, f)
             for path, dirs, files in os.walk(scanpath)
@@ -181,4 +197,3 @@ def scandir(scanpath, filterfn=lambda path: path[0] != ".", relative=False):
 
 def get_archive(path):
     return path + ".tar.gz"
-

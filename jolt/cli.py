@@ -573,9 +573,9 @@ def display(ctx, task, reverse=None, show_cache=False):
         def iterator(task):
             return list(dag.predecessors(task))
         reverse = utils.as_list(reverse)
-        tasklist = dag.select(lambda graph, node:
-                              node.short_qualified_name in reverse or
-                              node.qualified_name in reverse)
+        tasklist = dag.select(
+            lambda graph, node:
+            node.short_qualified_name in reverse or node.qualified_name in reverse)
     else:
         def iterator(task):
             return task.children
@@ -704,9 +704,9 @@ def _list(ctx, task=None, reverse=None):
         raise_error("an exception occurred during task dependency evaluation, see log for details")
 
     task = reverse or task
-    nodes = dag.select(lambda graph, node:
-                       node.short_qualified_name in task or
-                       node.qualified_name in task)
+    nodes = dag.select(
+        lambda graph, node:
+        node.short_qualified_name in task or node.qualified_name in task)
 
     tasklist = set()
     iterator = dag.predecessors if reverse else dag.successors

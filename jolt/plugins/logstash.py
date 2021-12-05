@@ -1,11 +1,9 @@
 from contextlib import contextmanager
 from datetime import datetime
 
-from jolt import *
 from jolt import config
 from jolt import filesystem as fs
 from jolt import log
-from jolt import utils
 from jolt.error import raise_error_if
 from jolt.hooks import TaskHook, TaskHookFactory
 

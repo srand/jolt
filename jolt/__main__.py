@@ -4,8 +4,6 @@ import sys
 
 from jolt import cli
 from jolt import log
-from jolt import config
-from jolt import filesystem as fs
 
 
 def start_pdb(sig, frame):
@@ -16,7 +14,6 @@ def start_pdb(sig, frame):
 def dump_threads(sig, frame):
     import traceback
     print("\n===============================================================================")
-    code = []
     for threadId, stack in sys._current_frames().items():
         print("\n--- ThreadID:", threadId)
         for filename, lineno, name, line in traceback.extract_stack(stack):
@@ -34,7 +31,7 @@ def main():
 
     try:
         cli.cli(obj=dict())
-    except KeyboardInterrupt as e:
+    except KeyboardInterrupt:
         log.warning("Interrupted by user")
         if cli.debug_enabled:
             import pdb

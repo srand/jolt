@@ -12,13 +12,11 @@ from jolt import log
 from jolt import scheduler
 from jolt import utils
 from jolt import loader
-from jolt.error import raise_task_error_if
 from jolt.hooks import TaskHook, TaskHookFactory, TaskHookRegistry
 from jolt.influence import StringInfluence
 from jolt.options import JoltOptions
 from jolt.plugins import ninja
 from jolt.tasks import TaskRegistry
-from jolt.tools import Tools
 
 log.verbose("[NinjaCompDB] Loaded")
 
@@ -50,7 +48,7 @@ class CompDB(object):
             try:
                 with open(self.metapath(path or self.path)) as f:
                     self.attribs = json.load(f)
-            except:
+            except Exception:
                 self.attribs = {}
         except OSError:
             pass
@@ -78,12 +76,15 @@ class CompDB(object):
     def merge(self, db):
         self.commands.extend(db.commands)
 
+
 def has_incpaths(artifact):
     return artifact.cxxinfo.incpaths.count() > 0
+
 
 def stage_artifacts(artifacts, tools):
     for artifact in filter(has_incpaths, artifacts):
         tools.sandbox(artifact, incremental=True, reflect=fs.has_symlinks())
+
 
 def get_task_artifacts(task, artifact=None):
     acache = cache.ArtifactCache.get()
@@ -135,7 +136,7 @@ class CompDBHooks(TaskHook):
             outdir = task.tools.builddir("compdb", incremental=True)
             dbpath = fs.path.join(outdir, "all_compile_commands.json")
             db.write(dbpath, force=True)
-            stage_artifacts(deps+[artifact], task.tools)
+            stage_artifacts(deps + [artifact], task.tools)
 
     def task_skipped(self, task):
         self.task_finished(task)
@@ -172,7 +173,7 @@ def compdb(ctx, task, default):
     manifest = ctx.obj["manifest"]
     options = JoltOptions(default=default)
     acache = cache.ArtifactCache.get(options)
-    hooks = TaskHookRegistry.get(options)
+    TaskHookRegistry.get(options)
     executors = scheduler.ExecutorRegistry.get(options)
     registry = TaskRegistry.get()
     strategy = scheduler.DownloadStrategy(executors, acache)
@@ -218,5 +219,5 @@ def compdb(ctx, task, default):
         outdir = goal.tools.builddir("compdb", incremental=True)
         dbpath = fs.path.join(outdir, "all_compile_commands.json")
         db.write(dbpath, force=True)
-        stage_artifacts(deps+[artifact], goal.tools)
+        stage_artifacts(deps + [artifact], goal.tools)
         log.info("Compilation DB: {}", dbpath)

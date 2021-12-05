@@ -1,17 +1,10 @@
-import click
 import functools
-import hashlib
-import json
-import os
 import sys
-import subprocess
 
 from jolt import cache
 from jolt import config
-from jolt import error
 from jolt import filesystem as fs
 from jolt import log
-from jolt import tools
 from jolt import utils
 from jolt.hooks import TaskHook, TaskHookFactory
 from jolt.influence import StringInfluence

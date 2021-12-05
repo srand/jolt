@@ -1,5 +1,5 @@
-from jolt import BooleanParameter, Download, Task, TaskGenerator, Tools, Parameter, Resource
-from jolt import attributes, config, filesystem as fs, utils, loader
+from jolt import BooleanParameter, Parameter, Task
+from jolt import attributes, filesystem as fs, loader
 from jolt.tasks import TaskRegistry
 
 from jolt.cache import ArtifactListAttribute
@@ -9,7 +9,6 @@ from jolt.cache import ArtifactAttributeSetProvider
 import contextlib
 import os
 import platform
-import subprocess
 
 
 class DebianListVariable(ArtifactListAttribute):
@@ -68,7 +67,7 @@ class DebianAttributeProvider(ArtifactAttributeSetProvider):
             task.__unshare.close()
             with task.tools.cwd(task.__chroot):
                 task.tools.run("fusermount -u root")
-        except:
+        except Exception:
             pass
 
 
@@ -138,7 +137,6 @@ class Debian(Task):
                 packages,
             )
 
-
     def publish(self, artifact, tools):
         with tools.cwd(tools.builddir()):
             artifact.collect("*", symlinks=True)
@@ -168,17 +166,16 @@ class DebianPkgBase(Debian):
 
             for incdir in ["usr/include"]:
                 if os.path.exists(tools.expand_path(incdir)):
-                    pass #artifact.cxxinfo.incpaths.append(incdir)
+                    pass  # artifact.cxxinfo.incpaths.append(incdir)
 
             for libdir in ["lib", "usr/lib"]:
                 if os.path.exists(tools.expand_path(libdir)):
-                    pass #artifact.cxxinfo.libpaths.append(libdir)
+                    pass  # artifact.cxxinfo.libpaths.append(libdir)
                     artifact.environ.LD_LIBRARY_PATH.append(libdir)
 
             for pkgdir in ["usr/share/pkgconfig"]:
                 if os.path.exists(tools.expand_path(pkgdir)):
                     artifact.environ.PKG_CONFIG_PATH.append(pkgdir)
-
 
 
 @attributes.method("run", "run_{download[download,build]}")
@@ -221,6 +218,7 @@ class MMDebstrap(DebianPkgBase):
             tools.extract("debstrap.tgz", ".")
             tools.unlink("debstrap.tgz")
 
+
 TaskRegistry.get().add_task_class(MMDebstrap)
 
 
@@ -240,6 +238,7 @@ class DebianEssential(DebianPkg):
     @property
     def joltdir(self):
         return loader.JoltLoader.get().joltdir
+
 
 TaskRegistry.get().add_task_class(DebianEssential)
 

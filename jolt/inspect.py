@@ -16,6 +16,7 @@ import sys
 # Cache of parsed modules (ClassFinder objects), indexed by module.
 _modules = {}
 
+
 def _populate_cache(module):
     global _modules
 
@@ -50,11 +51,13 @@ def _populate_cache(module):
     _modules[module] = class_finder
     return class_finder
 
+
 def getmodule(cls_or_func):
     """ Returns module in which a class or function is defined """
     if hasattr(cls_or_func, '__module__'):
         return sys.modules.get(cls_or_func.__module__)
     raise TypeError('{!r} is a built-in object'.format(cls_or_func))
+
 
 def getfile(cls_or_func):
     """ Returns the name of the file in which a class or function is defined """
@@ -63,6 +66,7 @@ def getfile(cls_or_func):
         return module.__file__
     raise TypeError('{!r} is a built-in object'.format(cls_or_func))
 
+
 def getlineno(cls_or_func):
     """ Returns the name of the file in which a class or function is defined """
     if isinstance(cls_or_func, type):
@@ -70,6 +74,7 @@ def getlineno(cls_or_func):
     else:
         ast = getfuncast(cls_or_func)
     return ast.lineno
+
 
 def getclassast(cls):
     """ Returns the Abstract Syntax Tree of a class """
@@ -80,6 +85,7 @@ def getclassast(cls):
         module_ast = _populate_cache(module)
     return module_ast.classes[cls.__qualname__]
 
+
 def getfuncast(func):
     """ Returns the Abstract Syntax Tree of a function """
     global _modules
@@ -88,6 +94,7 @@ def getfuncast(func):
     if not module_ast:
         module_ast = _populate_cache(module)
     return module_ast.functions[func.__qualname__]
+
 
 def getclasssource(cls):
     """ Returns the source code of a class """
@@ -98,10 +105,12 @@ def getclasssource(cls):
         # For Python <3.9
         return ast.dump(tree, annotate_fields=False)
 
+
 def getfuncsource(func):
     """ Returns the source code of a function """
     tree = getfuncast(func)
     return ast.dump(tree, annotate_fields=False)
+
 
 def getmoduleclasses(module, searchtypes, predicate=None):
     """

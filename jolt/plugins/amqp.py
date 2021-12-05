@@ -8,7 +8,6 @@ from pika.exceptions import AMQPConnectionError
 from pika.adapters.utils.connection_workflow import AMQPConnectorStackTimeout
 import threading
 import time
-import uuid
 
 from jolt.cli import cli
 from jolt import config
@@ -35,8 +34,7 @@ def _get_auth():
     if not username:
         return "guest", "guest"
 
-    password = config.get(NAME, "keyring.password") or \
-               keyring.get_password(NAME, username)
+    password = config.get(NAME, "keyring.password") or keyring.get_password(NAME, username)
     if not password:
         password = getpass.getpass(NAME + " password: ")
         assert password, "no password in keyring for " + NAME
@@ -290,7 +288,7 @@ class WorkerTaskConsumer(object):
         self._channel.queue_bind(
             queue_name,
             self.EXCHANGE,
-            routing_key="jolt_"+self._routing_key)
+            routing_key="jolt_" + self._routing_key)
 
     def on_bindok(self, _unused_frame, userdata):
         """Invoked by pika when the Queue.Bind method has completed. At this
@@ -449,27 +447,27 @@ class WorkerTaskConsumer(object):
                         manifest = JoltManifest()
                         try:
                             manifest.parse("result.joltxmanifest")
-                        except:
+                        except Exception:
                             manifest.duration = "0"
                         manifest.result = "FAILED"
                         manifest.stdout = "\n".join(e.stdout)
                         manifest.stderr = "\n".join(e.stderr)
                         self.response = manifest.format()
-                    except:
+                    except Exception:
                         log.exception()
                     log.error("Task failed")
-                except Exception as e:
+                except Exception:
                     log.exception()
                     self.response = ""
                     try:
                         manifest = JoltManifest()
                         try:
                             manifest.parse("result.joltxmanifest")
-                        except:
+                        except Exception:
                             manifest.duration = "0"
                         manifest.result = "FAILED"
                         self.response = manifest.format()
-                    except:
+                    except Exception:
                         log.exception()
                     log.error("Task failed")
                 else:
@@ -478,11 +476,11 @@ class WorkerTaskConsumer(object):
                         manifest = JoltManifest()
                         try:
                             manifest.parse("result.joltxmanifest")
-                        except:
+                        except Exception:
                             manifest.duration = "0"
                         manifest.result = "SUCCESS"
                         self.response = manifest.format()
-                    except:
+                    except Exception:
                         log.exception()
                     log.info("Task succeeded")
 
@@ -788,7 +786,7 @@ class AmqpExecutor(scheduler.NetworkExecutor):
             for extension in self.task.extensions:
                 extension.finished(TYPE)
             self.task.finished(TYPE)
-        except (ConnectionError, AMQPConnectionError) as e:
+        except (ConnectionError, AMQPConnectionError):
             log.exception()
             for extension in self.task.extensions:
                 extension.failed(TYPE)

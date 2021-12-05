@@ -1,4 +1,4 @@
-from jolt import *
+from jolt import Download, Parameter, Resource, Task
 from jolt.error import raise_task_error_if
 from jolt.tasks import TaskRegistry
 from jolt import filesystem as fs
@@ -8,10 +8,8 @@ from jolt.cache import ArtifactListAttribute
 from jolt.cache import ArtifactAttributeSet
 from jolt.cache import ArtifactAttributeSetProvider
 
-from functools import partial
 from os import path
 from platform import system
-
 
 
 class DockerListVariable(ArtifactListAttribute):
@@ -34,7 +32,6 @@ class DockerRmiListVariable(DockerListVariable):
     def unapply(self, task, artifact):
         for image in self.items():
             task.tools.run("docker rmi -f {}", image)
-
 
 
 class DockerAttributeSet(ArtifactAttributeSet):
@@ -299,7 +296,7 @@ class DockerImage(Task):
                   tools.expand_relpath(context))
 
         with tools.cwd(context):
-            image = tools.run("docker build . -f {} -t {} {}{}", dockerfile, tags[0], buildargs, pull)
+            tools.run("docker build . -f {} -t {} {}{}", dockerfile, tags[0], buildargs, pull)
             for tag in tags[1:]:
                 tools.run("docker tag {} {}", tags[0], tag)
 
@@ -335,4 +332,3 @@ class DockerImage(Task):
                         artifact.docker.load.append("{_imagefile}")
         if self._autoload:
             artifact.docker.rmi.append(artifact.strings.tag.get_value())
-

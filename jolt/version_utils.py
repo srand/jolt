@@ -105,7 +105,6 @@ class version_operator(object):
         return str(self.opstr)
 
 
-#@total_ordering
 class requirement(object):
     def __init__(self, verstr):
         self.operator = version_operator(verstr)

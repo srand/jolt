@@ -6,8 +6,8 @@ import tqdm
 if os.name == "nt":
     # FIXME: Workaround to make tqdm behave correctly on Windows
     import colorama
-    colorama.deinit() # Undo the work of tqdm
-    os.system("")     # Hack to enable vt100
+    colorama.deinit()  # Undo the work of tqdm
+    os.system("")      # Hack to enable vt100
 import traceback
 from datetime import datetime
 import threading
@@ -16,7 +16,7 @@ import logging.handlers
 from contextlib import contextmanager
 try:
     from StringIO import StringIO
-except:
+except Exception:
     from io import StringIO
 
 from jolt import config
@@ -27,7 +27,7 @@ from jolt import colors
 
 default_path = fs.path.join(config.get_logpath(), "jolt.log")
 logfile = config.get("jolt", "logfile", default_path)
-logsize = config.getsize("jolt", "logsize", os.environ.get("JOLT_LOGSIZE", 10*1024**2))  # 10MiB
+logsize = config.getsize("jolt", "logsize", os.environ.get("JOLT_LOGSIZE", 10 * 1024 ** 2))  # 10MiB
 logcount = config.getint("jolt", "logcount", os.environ.get("JOLT_LOGCOUNT", 1))
 
 dirpath = fs.path.dirname(logfile)
@@ -63,7 +63,7 @@ class Formatter(logging.Formatter):
     def format(self, record):
         try:
             record.message = record.msg.format(*record.args)
-        except:
+        except Exception:
             record.message = record.msg
         record.asctime = datetime.fromtimestamp(record.created).strftime("%Y-%m-%d %H:%M:%S.%f")
         return self.fmt.format(
@@ -86,7 +86,7 @@ class ConsoleFormatter(logging.Formatter):
     def format(self, record):
         try:
             msg = record.msg.format(*record.args)
-        except:
+        except Exception:
             msg = record.msg
         if sys.stdout.isatty() and sys.stderr.isatty():
             if record.levelno >= ERROR:
@@ -129,7 +129,6 @@ class TqdmStream(object):
 
     def flush(self):
         getattr(self.stream, 'flush', lambda: None)()
-        pass
 
 
 # create logger
@@ -165,31 +164,37 @@ _logger.addHandler(_stderr)
 _logger.addHandler(_file)
 
 
-
 def info(fmt, *args, **kwargs):
     _logger.info(fmt, *args, **kwargs)
+
 
 def warning(fmt, *args, **kwargs):
     _logger.warning(fmt, *args, **kwargs)
 
+
 def verbose(fmt, *args, **kwargs):
     _logger.log(VERBOSE, fmt, *args, **kwargs)
+
 
 def debug(fmt, *args, **kwargs):
     _logger.debug(fmt, *args, **kwargs)
 
+
 def error(fmt, *args, **kwargs):
     _logger.error(fmt, *args, **kwargs)
+
 
 def stdout(line, **kwargs):
     line = line.replace("{", "{{")
     line = line.replace("}", "}}")
     _logger.log(STDOUT, line, extra=kwargs)
 
+
 def stderr(line, **kwargs):
     line = line.replace("{", "{{")
     line = line.replace("}", "}}")
     _logger.log(STDERR, line, extra=kwargs)
+
 
 def exception(exc=None):
     if exc:
@@ -221,6 +226,7 @@ def exception(exc=None):
         line = line.replace("{", "{{")
         line = line.replace("}", "}}")
         _logger.log(EXCEPTION, line.strip())
+
 
 def transfer(line, context):
     context = "[{}] ".format(context)
@@ -276,7 +282,6 @@ def progress(desc, count, unit, estimates=True, debug=False):
     bar_format = '{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}]' \
                  if not estimates else None
     if not debug and sys.stdout.isatty() and sys.stderr.isatty() and not is_verbose():
-        size = os.get_terminal_size()
         p = tqdm.tqdm(total=count, unit=unit, unit_scale=True, bar_format=bar_format, dynamic_ncols=True)
         p.set_description("[   INFO] " + desc)
         return p
@@ -309,6 +314,7 @@ class _ThreadMapper(Filter):
     def filter(self, record):
         record.thread = self.thread_map.get(record.thread, record.thread)
         return True
+
 
 _thread_map = _ThreadMapper()
 

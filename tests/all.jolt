@@ -23,5 +23,6 @@ class All(Alias):
         "ext/ninja-compdb",
         "ext/symlinks",
         "int/utils",
+	"flake8",
 	"nfr",
     ]

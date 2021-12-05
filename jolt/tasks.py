@@ -4,7 +4,6 @@ from contextlib import contextmanager
 import copy
 import fnmatch
 import functools
-from pathlib import Path
 import platform
 import subprocess
 from os import environ
@@ -22,7 +21,7 @@ from jolt.error import raise_error_if, raise_task_error, raise_task_error_if
 from jolt.error import raise_unreported_task_error_if
 from jolt.error import JoltError, JoltCommandError
 from jolt.expires import Immediately
-from jolt.influence import FileInfluence, TaskSourceInfluence, TaintInfluenceProvider
+from jolt.influence import FileInfluence, TaintInfluenceProvider
 from jolt.influence import TaskClassSourceInfluence
 from jolt.influence import attribute as attribute_influence
 from jolt.influence import environ as environ_influence
@@ -63,7 +62,6 @@ class Export(object):
 
     def set_task(self, task):
         self._task = task
-
 
 
 class EnvironExport(Export):
@@ -125,8 +123,10 @@ class Parameter(object):
 
     def _help_values(self, accepted=None):
         accepted = accepted or self._accepted_values or []
+
         def highlight(value):
             return colors.bright(value) if self._is_default(value) else colors.dim(value)
+
         return "[{}]".format(", ".join([highlight(value) for value in accepted])) if accepted else ""
 
     def __str__(self):
@@ -364,7 +364,6 @@ class BooleanParameter(Parameter):
         return key[0] if self.is_true else key[1]
 
 
-
 class ListParameter(Parameter):
     """ List parameter type.
 
@@ -582,7 +581,7 @@ class TaskRegistry(object):
 
         cls = self.tests.get(name)
         if cls:
-            task = _Test(cls, parameters=params)
+            task = cls(parameters=params)
             task = self.instances.get(task.qualified_name, task)
             self._apply_task_manifest(task, manifest)
             self.instances[task.qualified_name] = task
@@ -661,7 +660,6 @@ class TaskGenerator(object):
 
         """
         raise NotImplementedError()
-
 
 
 class attributes:
@@ -743,7 +741,6 @@ class attributes:
                 source_influence(target)(cls)
             return cls
         return _decorate
-
 
     @staticmethod
     def system(cls):
@@ -930,7 +927,7 @@ class TaskBase(object):
         for key, value in params.items():
             try:
                 param = utils.getattr_safe(self, key)
-            except AttributeError as e:
+            except AttributeError:
                 raise_task_error(self, "no such parameter '{0}'", key)
             if isinstance(param, Parameter):
                 try:
@@ -1111,7 +1108,6 @@ class Task(TaskBase):
 
         An implementation must not clean any local or remote artifact cache.
         """
-        pass
 
     def run(self, deps, tools):
         """
@@ -1129,7 +1125,6 @@ class Task(TaskBase):
         When using methods from the toolbox, task parameters, such
         as ``target`` above,  are automatically expanded to their values.
         """
-        pass
 
     def publish(self, artifact, tools):
         """
@@ -1151,7 +1146,6 @@ class Task(TaskBase):
           artifact.strings.foo = "bar"
 
         """
-        pass
 
     def unpack(self, artifact, tools):
         """
@@ -1256,8 +1250,8 @@ class ReportProxy(object):
                 try:
                     details = self._task.tools.read_file(error["file"])
                     details = details.splitlines()
-                    details = str(error["line"]) + ": " + details[int(error["line"])-1]
-                except:
+                    details = str(error["line"]) + ": " + details[int(error["line"]) - 1]
+                except Exception:
                     details = ""
             self.add_error(type, error.get("location", ""), message, details)
 
@@ -1346,7 +1340,6 @@ class Resource(Task):
             tools (:class:`~jolt.Tools`): A task specific toolbox.
 
         """
-        pass
 
     def release(self, artifact, deps, tools):
         """ Called to release the resource.
@@ -1361,7 +1354,6 @@ class Resource(Task):
                 artifacts of dependencies.
             tools (:class:`~jolt.Tools`): A task specific toolbox.
         """
-        pass
 
     def run(self, env, tools):
         self._run_env = env
@@ -1397,7 +1389,6 @@ class WorkspaceResource(Resource):
         An implementor overrides this method in a subclass. The acquired
         resource must be released manually if an exception occurs before the
         method has returned. """
-        pass
 
     def release_ws(self):
         """ Called to release the resource.
@@ -1405,7 +1396,6 @@ class WorkspaceResource(Resource):
         An implementor overrides this method in a subclass.
 
         """
-        pass
 
 
 class Alias(Task):
@@ -1683,7 +1673,6 @@ class _TestResult(ut.TextTestResult):
         self._end()
 
 
-
 class Test(Task):
     """ A test task.
 
@@ -1859,9 +1848,6 @@ class Test(Task):
     def assertRegex(self, *args, **kwargs):
         return self._curtest.assertRegex(*args, **kwargs)
 
-    def assertRegex(self, *args, **kwargs):
-        return self._curtest.assertRegex(*args, **kwargs)
-
     def assertCountEqual(self, *args, **kwargs):
         return self._curtest.assertCountEqual(*args, **kwargs)
 
@@ -1890,7 +1876,6 @@ class Test(Task):
             "{} tests out of {} were successful".format(
                 len(self.testresult.successes),
                 self.testresult.testsRun))
-
 
 
 @ArtifactAttributeSetProvider.Register

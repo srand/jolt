@@ -1,4 +1,3 @@
-import base64
 import glob
 import imp
 import os
@@ -98,6 +97,7 @@ class NativeLoader(Loader):
 
 _loaders = []
 
+
 def register(factory):
     raise_error_if(not issubclass(factory, LoaderFactory),
                    "{} is not a LoaderFactory", factory.__name__)
@@ -140,8 +140,9 @@ class JoltLoader(object):
 
     def _add_project_resource(self, project, resource_name, resource_task):
         class ProjectResource(Alias):
-            name =  project + "/" + resource_name
+            name = project + "/" + resource_name
             requires = [resource_task]
+
         self._tasks.append(ProjectResource)
         resources = self._project_resources.get(project, [])
         resources.append((resource_name, resource_task))
@@ -175,17 +176,7 @@ class JoltLoader(object):
         return self._find_joltdir(parentdir)
 
     def _get_searchpaths(self):
-        searchpaths = [self.joltdir]
-        # Only allow recipes to be loaded from the same directory as the
-        # the manifest if it exists. Otherwise stop at the first
-        # directory with a .jolt file.
-        #
-        #path = os.path.relpath(os.getcwd(), self.joltdir)
-        #while path and path != '.':
-        #    searchpath = os.path.join(self.joltdir, path)
-        #    searchpaths.append(searchpath)
-        #    path = os.path.dirname(path)
-        return searchpaths
+        return [self.joltdir]
 
     def load(self, manifest=None):
         if not self.joltdir:
@@ -213,8 +204,6 @@ class JoltLoader(object):
         searchpath = config.get("jolt", "pluginpath")
         searchpath = searchpath.split(":") if searchpath else []
         searchpath.append(fs.path.join(fs.path.dirname(__file__), "plugins"))
-
-        import jolt.plugins
 
         for plugin in config.plugins():
             for path in searchpath:
@@ -270,7 +259,6 @@ class RecipeExtension(ManifestExtension):
                 module = manifest_project.create_module()
                 module.src = src
 
-
     def import_manifest(self, manifest):
         loader = JoltLoader.get()
         loader.set_joltdir(manifest.joltdir)
@@ -295,5 +283,6 @@ class RecipeExtension(ManifestExtension):
             for module in project.modules:
                 loader._add_project_module(project.name, module.src)
                 sys.path.append(fs.path.join(manifest.joltdir, module.src))
+
 
 ManifestExtensionRegistry.add(RecipeExtension())

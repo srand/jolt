@@ -16,7 +16,6 @@ from jolt import log
 from jolt import utils
 
 
-
 log.verbose("[SelfDeploy] Loaded")
 
 _path = fs.path.dirname(__file__)
@@ -89,9 +88,10 @@ class SelfDeployExtension(NetworkExecutorExtension):
         jolt_url = acache.location(task)
         raise_error_if(not jolt_url, "failed to deploy jolt to a remote cache")
         return {
-            "jolt_url":  jolt_url,
+            "jolt_url": jolt_url,
             "jolt_identity": task.identity[:8],
-            "jolt_requires": config.get("selfdeploy", "requires", "") }
+            "jolt_requires": config.get("selfdeploy", "requires", "")
+        }
 
 
 @NetworkExecutorExtensionFactory.Register

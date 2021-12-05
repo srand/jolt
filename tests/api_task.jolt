@@ -730,7 +730,7 @@ class TaskApi(JoltTest):
 
         class C(Script):
             \"\"\"
-            #!/usr/bin/env python
+            #!/usr/bin/env python3
 
             print("Hello world")
             \"\"\"

@@ -21,7 +21,7 @@ def catch(func, *args, **kwargs):
     try:
         val = func(*args, **kwargs)
         return val if val is not None else True
-    except:
+    except Exception:
         log.exception()
         return False
 
@@ -50,8 +50,7 @@ class FtpStorage(cache.StorageProvider):
             config.set(NAME, "keyring.username", username)
             config.save()
 
-        password = config.get(NAME, "keyring.password") or \
-                   keyring.get_password(NAME, username)
+        password = config.get(NAME, "keyring.password") or keyring.get_password(NAME, username)
         if not password:
             password = getpass.getpass(NAME + " password: ")
             raise_error_if(not password, "no password in keyring for " + NAME)
@@ -77,7 +76,7 @@ class FtpStorage(cache.StorageProvider):
                         ftp.mkd(component)
                         ftp.cwd(component)
             return ftp
-        except:
+        except Exception:
             log.exception()
             log.warning("[FTP] failed to establish server connection, disabled")
             self._disabled = True
@@ -98,7 +97,7 @@ class FtpStorage(cache.StorageProvider):
             try:
                 ftp.cwd(node.canonical_name)
                 size = ftp.size(name)
-            except:
+            except Exception:
                 return False
             with log.progress("Downloading {0}".format(name), size, "B") as pbar:
                 with open(pathname, 'wb') as out_file:
@@ -169,7 +168,7 @@ class FtpStorage(cache.StorageProvider):
                         archive=name)
                     log.debug("[FTP] {0}", url)
                     return url
-            except:
+            except Exception:
                 return False
         return False
 

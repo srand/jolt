@@ -77,7 +77,7 @@ def _run(cmd, cwd, env, *args, **kwargs):
                         line = line.decode(errors='ignore')
                         if self.output:
                             self.output(line)
-                        self.logbuf.append((self,line))
+                        self.logbuf.append((self, line))
             except Exception as e:
                 if self.output:
                     self.output("{0}", str(e))
@@ -165,8 +165,8 @@ class _tmpdir(object):
             self._path = fs.mkdtemp(prefix=self._name + "-", dir=dirname)
         except KeyboardInterrupt as e:
             raise e
-        except:
-            raise
+        except Exception as e:
+            raise e
         raise_error_if(not self._path, "failed to create temporary directory")
         return self
 
@@ -198,12 +198,13 @@ class _CMake(object):
         extra_args = " ".join(extra_args)
 
         with self.tools.cwd(self.builddir):
-            self.tools.run("cmake {0} -B {1} -DCMAKE_INSTALL_PREFIX={2} {3}",
-                           sourcedir, 
-                           self.builddir, 
-                           self.installdir, 
-                           extra_args,
-                           output=True)
+            self.tools.run(
+                "cmake {0} -B {1} -DCMAKE_INSTALL_PREFIX={2} {3}",
+                sourcedir,
+                self.builddir,
+                self.installdir,
+                extra_args,
+                output=True)
 
     def build(self, release=True, *args, **kwargs):
         threading_args = ''
@@ -211,7 +212,7 @@ class _CMake(object):
             threading_args = ' -j {}'.format(kwargs.get("threads", self.tools.thread_count())) \
                 if "--parallel" in self.tools.run("cmake --help-manual cmake 2>&1", output=False) \
                    else ''
-        except:
+        except Exception:
             pass
 
         with self.tools.cwd(self.builddir):
@@ -288,9 +289,6 @@ class _AutoTools(object):
             artifact.collect(files, *args, **kwargs)
 
 
-
-
-
 class Tools(object):
     """ A collection of useful tools.
 
@@ -301,7 +299,6 @@ class Tools(object):
     """
 
     _builddir_lock = threading.RLock()
-
 
     def __init__(self, task=None, cwd=None, env=None):
         self._chroot = None
@@ -380,28 +377,22 @@ class Tools(object):
         fmt = None
         if filename.endswith(".zip"):
             fmt = "zip"
-            basename = filename[:-4]
         elif filename.endswith(".tar"):
             fmt = "tar"
-            basename = filename[:-4]
         elif filename.endswith(".tar.gz"):
             if shutil.which("tar") and shutil.which("pigz"):
                 self.run("tar -I pigz -cf {} -C {} .", filename, pathname)
                 return filename
             fmt = "targz"
-            basename = filename[:-7]
         elif filename.endswith(".tgz"):
             if shutil.which("tar") and shutil.which("pigz"):
                 self.run("tar -I pigz -cf {} -C {} .", filename, pathname)
                 return filename
             fmt = "targz"
-            basename = filename[:-4]
         elif filename.endswith(".tar.bz2"):
             fmt = "tarbz2"
-            basename = filename[:-8]
         elif filename.endswith(".tar.xz"):
             fmt = "tarxz"
-            basename = filename[:-7]
         raise_task_error_if(
             not fmt, self._task,
             "unknown archive type '{0}'", fs.path.basename(filename))
@@ -870,7 +861,7 @@ class Tools(object):
             stat = os.stat(pathname)
         except KeyboardInterrupt as e:
             raise e
-        except:
+        except Exception:
             raise_task_error(self._task, "file not found '{0}'", pathname)
         else:
             return stat.st_size
@@ -994,7 +985,7 @@ class Tools(object):
                 f.write(data)
         except KeyboardInterrupt as e:
             raise e
-        except:
+        except Exception:
             raise_task_error(self._task, "failed to replace string in file '{0}'", pathname)
 
     def rmtree(self, pathname, *args, **kwargs):
@@ -1080,7 +1071,6 @@ class Tools(object):
             if not fs.identical_files(src, dst):
                 fs.copy(src, dst, metadata=False)
 
-
     def run(self, cmd, *args, **kwargs):
         """ Runs a command in a shell interpreter.
 
@@ -1121,7 +1111,7 @@ class Tools(object):
                 stde = termios.tcgetattr(sys.stderr.fileno())
             except KeyboardInterrupt as e:
                 raise e
-            except:
+            except Exception:
                 pass
             if self._cmd_prefix:
                 if type(cmd) == list:
@@ -1204,7 +1194,7 @@ class Tools(object):
                 if fs.path.isdir(dstpath):
                     files = fs.scandir(srcpath)
                     for file in files:
-                        relfile = file[len(srcpath)+1:]
+                        relfile = file[len(srcpath) + 1:]
                         self.symlink(file, fs.path.join(dstpath, relfile))
                 else:
                     self.symlink(srcpath, dstpath)
@@ -1233,7 +1223,7 @@ class Tools(object):
                 del self._env[key]
             except KeyboardInterrupt as e:
                 raise e
-            except:
+            except Exception:
                 pass
         else:
             self._env[key] = self.expand(value)
@@ -1404,7 +1394,7 @@ class Tools(object):
             content (str, optional): Data to be written to the file.
             expand (boolean, optional): Expand macros in file content.
                Default: True.
-            **kwargs (dict, optional): Additional key value dictionary 
+            **kwargs (dict, optional): Additional key value dictionary
                 used in macro expansion.
         """
         pathname = self.expand_path(pathname)
