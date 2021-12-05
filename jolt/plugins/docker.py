@@ -1,14 +1,19 @@
 from jolt import Download, Parameter, Resource, Task
 from jolt.error import raise_task_error_if
 from jolt.tasks import TaskRegistry
+from jolt import attributes
+from jolt import config
 from jolt import filesystem as fs
+from jolt import log
+from jolt import tools
 from jolt import utils
 
 from jolt.cache import ArtifactListAttribute
 from jolt.cache import ArtifactAttributeSet
 from jolt.cache import ArtifactAttributeSetProvider
 
-from os import path
+import json
+from os import path, getuid
 from platform import system
 
 
@@ -18,20 +23,28 @@ class DockerListVariable(ArtifactListAttribute):
 
 class DockerLoadListVariable(DockerListVariable):
     def apply(self, task, artifact):
+        if isinstance(task, Resource):
+            return
         for image in self.items():
-            task.tools.run("docker load -i {}", fs.path.join(artifact.path, image))
+            task.tools.run(
+                "docker load -i {}",
+                fs.path.join(artifact.path, image), output_on_error=True)
 
 
 class DockerPullListVariable(DockerListVariable):
     def apply(self, task, artifact):
+        if isinstance(task, Resource):
+            return
         for image in self.items():
-            task.tools.run("docker pull {}", image)
+            task.tools.run("docker pull {}", image, output_on_error=True)
 
 
 class DockerRmiListVariable(DockerListVariable):
     def unapply(self, task, artifact):
+        if isinstance(task, Resource):
+            return
         for image in self.items():
-            task.tools.run("docker rmi -f {}", image)
+            task.tools.run("docker rmi -f {}", image, output_on_error=True)
 
 
 class DockerAttributeSet(ArtifactAttributeSet):
@@ -99,6 +112,98 @@ class DockerClient(Download):
         with tools.cwd(self._builddir):
             artifact.collect("docker/docker")
         artifact.environ.PATH.append("docker")
+
+
+@attributes.requires("_image")
+class DockerContainer(Resource):
+    """
+    Resource: Starts and stops a Docker container.
+    """
+
+    arguments = []
+    """ Container argument list """
+
+    environment = []
+    """ Environment variables """
+
+    image = None
+    """
+    Image tag or Jolt task.
+
+    If a Jolt task is specified, its artifact must export a
+    metadata string named ``tag`` with the name of the image tag.
+    """
+
+    volumes = []
+    """
+    A list of volumes to mount.
+
+    By default, the cache directory and ``joltdir`` are automatically
+    mounted in the container.
+    """
+
+    user = None
+    """
+    Username of UID.
+
+    Defaults to the current user.
+    """
+
+    @property
+    def _arguments(self):
+        return " ".join(self.arguments)
+
+    @property
+    def _environment(self):
+        return " ".join(["-e " + self.tools.expand(env) for env in self.environment])
+
+    @property
+    def _image(self):
+        registry = TaskRegistry.get()
+        tool = tools.Tools(self)
+        if registry.get_task_class(tool.expand(self.image)):
+            return [self.image]
+        return []
+
+    def _info(self, fmt, *args, **kwargs):
+        """
+        Log information about the task.
+        """
+        fmt = self.tools.expand(fmt, *args, **kwargs)
+        log.info(fmt, *args, **kwargs)
+
+    @property
+    def _user(self):
+        return f"--user {self.user}" if self.user else "--user " + str(getuid())
+
+    @property
+    def _volumes(self):
+        cachedir = config.get_cachedir()
+        volumes = ["{joltdir}:{joltdir}", f"{cachedir}:{cachedir}"]
+        return " ".join(["-v " + self.tools.expand(vol) for vol in self.volumes + volumes])
+
+    def acquire(self, artifact, deps, tools):
+        try:
+            image = deps[self.image]
+            image = str(image.strings.tag)
+        except Exception:
+            image = tools.expand(self.image)
+
+        self._info(f"Creating container from image '{image}'")
+        self.container = tools.run(
+            "docker run -d {_user} {_environment} {_volumes} {image} {_arguments}",
+            image=image, output_on_error=True)
+
+        self._info("Created container '{container}'")
+        info = tools.run("docker inspect {container}", output_on_error=True)
+        artifact.info = json.loads(info)[0]
+
+    def release(self, artifact, deps, tools):
+        self._info("Stopping container '{container}'")
+        tools.run("docker stop {container}", output_on_error=True)
+
+        self._info("Deleting container '{container}'")
+        tools.run("docker rm {container}", output_on_error=True)
 
 
 class DockerLogin(Resource):

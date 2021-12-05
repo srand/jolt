@@ -346,7 +346,15 @@ DockerClient
 
 .. reference-docker-dockerclient-end
 
-.. reference-docker-end
+DockerContainer
+^^^^^^^^^^^^^^^
+
+.. reference-docker-dockercontainer-start
+
+.. autoclass:: jolt.plugins.docker.DockerContainer
+   :members: arguments, environment, image, volumes, user
+
+.. reference-docker-dockercontainer-end
 
 DockerImage
 ^^^^^^^^^^^
@@ -367,8 +375,6 @@ DockerLogin
    :members: name, user, passwd
 
 .. reference-docker-dockerlogin-end
-
-.. reference-docker-end
 
 Metadata
 ^^^^^^^^
