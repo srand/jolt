@@ -744,7 +744,7 @@ def _log(follow, delete):
 @click.argument("task", autocompletion=_autocomplete_tasks)
 @click.option("-i", "--influence", is_flag=True, help="Print influence attributes and values.")
 @click.option("-a", "--artifact", is_flag=True, help="Print artifact cache status.")
-@click.option("-s", "--salt", type=str, help="Add salt as task influence.")
+@click.option("-s", "--salt", type=str, help="Add salt as task influence.", metavar="SALT")
 @click.pass_context
 def inspect(ctx, task, influence=False, artifact=False, salt=None):
     """
@@ -765,46 +765,46 @@ def inspect(ctx, task, influence=False, artifact=False, salt=None):
 
     from jolt import inspect
 
-    click.echo()
-    click.echo("  {0}".format(task.name))
-    click.echo()
+    print()
+    print("  {0}".format(task.name))
+    print()
     if task.__doc__:
-        click.echo("  {0}".format(task.__doc__.strip()))
-        click.echo()
-    click.echo("  Parameters")
+        print("  {0}".format(task.__doc__.strip()))
+        print()
+    print("  Parameters")
     has_param = False
     params = {key: getattr(task, key) for key in dir(task)
               if isinstance(utils.getattr_safe(task, key), Parameter)}
     for item, param in params.items():
         has_param = True
-        click.echo("    {0:<15}   {1}".format(item, param.help or ""))
+        print("    {0:<15}   {1}".format(item, param.help or ""))
     if not has_param:
-        click.echo("    None")
+        print("    None")
 
-    click.echo()
-    click.echo("  Definition")
-    click.echo("    {0:<15}   {1} ({2})".format(
+    print()
+    print("  Definition")
+    print("    {0:<15}   {1} ({2})".format(
         "File", fs.path.relpath(inspect.getfile(task), JoltLoader.get().joltdir),
         inspect.getlineno(task)))
 
-    click.echo()
-    click.echo("  Requirements")
+    print()
+    print("  Requirements")
     manifest = ctx.obj["manifest"]
     try:
         task = task_registry.get_task(task_name, manifest=manifest)
         for req in sorted(utils.as_list(utils.call_or_return(task, task.requires))):
-            click.echo("    {0}".format(task.tools.expand(req)))
+            print("    {0}".format(task.tools.expand(req)))
         if not task.requires:
-            click.echo("    None")
-        click.echo()
+            print("    None")
+        print()
     except Exception as e:
         log.exception()
         if "has not been set" in str(e):
-            click.echo("    Unavailable (parameters must be set)")
-            click.echo()
+            print("    Unavailable (parameters must be set)")
+            print()
             return
-        click.echo("    Unavailable (exception during evaluation)")
-        click.echo()
+        print("    Unavailable (exception during evaluation)")
+        print()
         return
 
     if salt:
@@ -819,23 +819,23 @@ def inspect(ctx, task, influence=False, artifact=False, salt=None):
         proxy = tasks[0]
         task = proxy.task
 
-        click.echo("  Cache")
-        click.echo("    Identity          {0}".format(proxy.identity))
+        print("  Cache")
+        print("    Identity          {0}".format(proxy.identity))
         if acache.is_available_locally(proxy):
             with acache.get_artifact(proxy) as artifact:
-                click.echo("    Location          {0}".format(artifact.path))
-            click.echo("    Local             True ({0})".format(
+                print("    Location          {0}".format(artifact.path))
+            print("    Local             True ({0})".format(
                 utils.as_human_size(acache.get_artifact(proxy).get_size())))
         else:
-            click.echo("    Local             False")
-        click.echo("    Remote            {0}".format(acache.is_available_remotely(proxy)))
-        click.echo()
+            print("    Local             False")
+        print("    Remote            {0}".format(acache.is_available_remotely(proxy)))
+        print()
 
     if influence:
-        click.echo("  Influence")
+        print("  Influence")
         for string in HashInfluenceRegistry.get().get_strings(task):
             string = string.split(":", 1)
-            click.echo("    {:<18}{}".format(string[0][10:], string[1].strip()))
+            print("    {:<18}{}".format(string[0][10:], string[1].strip()))
 
 
 @cli.command()
