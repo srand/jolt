@@ -134,4 +134,30 @@ class ArtifactApi(JoltTest):
         a = self.artifacts(r)
         self.assertExists(join(a[0], "file1.txt"))
 
+    def test_extend(self):
+        """
+        --- file: main.cpp
+        #if !defined(TEST_A) || !defined(TEST_B)
+        #error "Macro not defined"
+        #endif
+        int main() {{return 0;}}
 
+        --- tasks:
+        from jolt.plugins import ninja
+
+        class Dep(Task):
+            def publish(self, a, t):
+                a.cxxinfo.macros.extend(["TEST_A", "TEST_B"])
+
+        class Bad(Task):
+            def publish(self, a, t):
+                a.cxxinfo.macros.extend("TEST_A")
+
+        class Exe(ninja.CXXExecutable):
+            requires = ["dep"]
+            sources = ["main.cpp"]
+        ---
+        """
+        self.build("exe")
+        with self.assertRaises(Exception, msg="list expected"):
+            self.build("bad")

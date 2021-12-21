@@ -252,6 +252,12 @@ class ArtifactListAttribute(ArtifactAttribute):
         else:
             self._value.append(self._artifact.get_task().expand(value))
 
+    def extend(self, value):
+        raise_error_if(
+            type(value) != list,
+            "illegal type passed to {}.extend() - list expected".format(self._name))
+        self._value.extend(self._artifact.get_task().expand(value))
+
     def items(self):
         return list(self._value)
 
