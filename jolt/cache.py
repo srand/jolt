@@ -1492,7 +1492,11 @@ class ArtifactCache(StorageProvider):
             self._db_invalidate_locks(db)
             self._db_invalidate_references(db)
             self._fs_invalidate_pids(db)
-            return self._discard(db, self._db_select_artifact_not_in_use(db, node.identity), if_expired)
+            discarded = self._discard(
+                db, self._db_select_artifact_not_in_use(db, node.identity), if_expired)
+            if discarded and hasattr(node, "_ArtifactCache__available"):
+                del node.__available
+            return discarded
 
     def _discard_wait(self, node):
         """
@@ -1534,6 +1538,8 @@ class ArtifactCache(StorageProvider):
 
         with self._cache_lock(), self._db() as db:
             assert self._discard(db, artifacts, False), "Failed to discard artifact"
+            if hasattr(node, "_ArtifactCache__available"):
+                del node.__available
         return self._fs_get_artifact(node)
 
     def discard_all(self, if_expired=False):

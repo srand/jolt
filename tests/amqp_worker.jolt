@@ -17,7 +17,7 @@ class JoltAmqp(Task):
     name = "jolt/image"
 
     requires = ["docker/cli"]
-    
+
     def run(self, deps, tools):
         with tools.cwd(".."):
             tools.run("docker build -t robrt/jolt:{identity} -f docker/Dockerfile.test .")

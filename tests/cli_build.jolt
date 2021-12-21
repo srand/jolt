@@ -514,3 +514,22 @@ class BuildCli(testsupport.JoltTest):
             r = self.build("b")
             self.assertNoBuild(r, "a")
             self.assertBuild(r, "b")
+
+    def test_cache_forced_discard(self):
+        """
+        --- tasks:
+        class A(Task):
+            def unpack(self, artifact, tools):
+                pass
+        ---
+        """
+        if not self.network:
+            self.skipTest("network build required")
+
+        r = self.build("a")
+        self.assertBuild(r, "a")
+        self.jolt("clean a")
+        self.tools.run("docker run --rm -i -v jolt_test_cache-http:/cache -w /cache busybox:latest find -delete")
+        r = self.build("a")
+        self.assertBuild(r, "a")
+
