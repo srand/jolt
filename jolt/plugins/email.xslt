@@ -95,6 +95,7 @@
             <p>
               This is an automated build report from Jolt. The build was successful.
               <xsl:call-template name="jenkins-url" />
+              <xsl:call-template name="gerrit-url" />
             </p>
           </xsl:otherwise>
         </xsl:choose>
@@ -165,6 +166,19 @@
         full build log
       </xsl:element>
       for details.
+    </xsl:if>
+  </xsl:template>
+
+  <xsl:template name="gerrit-url">
+    <xsl:if test="jolt-manifest/parameter[@key='GERRIT_URL']/@value != ''">
+      This
+      <xsl:element name="a">
+        <xsl:attribute name="href">
+          <xsl:value-of select="jolt-manifest/parameter[@key='GERRIT_URL']/@value"/>
+        </xsl:attribute>
+        Gerrit change
+      </xsl:element>
+      was built.
     </xsl:if>
   </xsl:template>
 
