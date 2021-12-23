@@ -60,13 +60,7 @@ class EnvironmentVariableSet(ArtifactAttributeSet):
         super(ArtifactAttributeSet, self).__setattr__("_artifact", artifact)
 
     def create(self, name):
-        if name == "PATH":
-            return PathEnvironmentVariable(self._artifact, name)
-        if name == "PYTHONPATH":
-            return PathEnvironmentVariable(self._artifact, name)
-        if name == "LD_LIBRARY_PATH":
-            return PathEnvironmentVariable(self._artifact, name)
-        if name == "PKG_CONFIG_PATH":
+        if "PATH" in name:
             return PathEnvironmentVariable(self._artifact, name)
         return EnvironmentVariable(self._artifact, name)
 
