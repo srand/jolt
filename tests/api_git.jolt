@@ -274,3 +274,37 @@ class GitApi(testsupport.JoltTest):
         r5 = self.build("a b")
         self.assertIn(self.artifacts(r1)[0], self.artifacts(r5))
         self.assertIn(self.artifacts(r3)[0], self.artifacts(r5))
+
+    def test_fetches_tags(self):
+        """
+        --- tasks:
+        class A(Task):
+            requires = ["git:url={ws}/hello_world_bare.git,sha=test_tag1"]
+
+        class B(Task):
+            requires = ["git:url={ws}/hello_world_bare.git,sha=test_tag2"]
+        ---
+        """
+        if self.network:
+            self.skipTest("network build not supported")
+
+        with self.tools.cwd(self.ws):
+            self.tools.run("git clone --bare https://github.com/gideont/hello_world.git hello_world_bare.git")
+            with self.tools.cwd("hello_world_bare.git"):
+                self.tools.run("git tag test_tag1")
+
+        r1 = self.build("a")
+        self.assertBuild(r1, "a")
+
+        with self.assertRaises(Exception):
+            self.build("b")
+
+        with self.tools.cwd(self.ws):
+            self.tools.run("git clone hello_world_bare.git hello_world_copy")
+            with self.tools.cwd("hello_world_copy"):
+                self.tools.run("git -c user.email='e@mail' -c user.name='Name' commit --allow-empty -m Tag2")
+                self.tools.run("git tag test_tag2")
+                self.tools.run("git push origin test_tag2:test_tag2")
+
+        r1 = self.build("b")
+        self.assertBuild(r1, "b")

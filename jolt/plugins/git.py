@@ -25,6 +25,10 @@ class GitRepository(object):
         self.relpath = relpath
         self.tools = Tools()
         self.url = url
+        self.default_refspecs = [
+            '+refs/heads/*:refs/remotes/origin/*',
+            '+refs/tags/*:refs/remotes/origin/*',
+        ]
         self.refspecs = refspecs or []
         self._tree_hash = {}
         self._original_head = True
@@ -187,14 +191,13 @@ class GitRepository(object):
             return self.tools.run("git reset --hard", output_on_error=True)
 
     def fetch(self):
-        refspecs = self.refspecs or []
-        for refspec in [''] + refspecs:
-            with self.tools.cwd(self.path):
-                log.info("Fetching {0} from {1}", refspec or 'commits', self.url)
-                self.tools.run("git fetch {url} {refspec}",
-                               url=self.url,
-                               refspec=refspec or '',
-                               output_on_error=True)
+        refspec = " ".join(self.default_refspecs + self.refspecs)
+        with self.tools.cwd(self.path):
+            log.info("Fetching {0} from {1}", refspec or 'commits', self.url)
+            self.tools.run("git fetch {url} {refspec}",
+                           url=self.url,
+                           refspec=refspec or '',
+                           output_on_error=True)
 
     def checkout(self, rev):
         log.info("Checking out {0} in {1}", rev, self.path)
