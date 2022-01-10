@@ -89,6 +89,7 @@
             <p>
               This is an automated build report from Jolt. The build failed.
               <xsl:call-template name="jenkins-url" />
+              <xsl:call-template name="gerrit-url" />
             </p>
           </xsl:when>
           <xsl:otherwise>
