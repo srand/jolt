@@ -1126,7 +1126,7 @@ class Tools(object):
                 if type(cmd) == list:
                     cmd = self._cmd_prefix.split() + cmd
                 else:
-                    cmd = self._cmd_prefix.split() + cmd
+                    cmd = self._cmd_prefix + cmd
             return _run(cmd, self._cwd, self._env, *args, **kwargs)
         finally:
             if stdi:
@@ -1297,7 +1297,7 @@ class Tools(object):
         Mounts the specified chroot as the root filesystem in a new mount namespace,
         which is used in calls to Tools.run().
 
-        Requires Bubblewrap and Linux host.
+        Requires a Linux host and the 'unshare' utility program.
 
         Example:
 
@@ -1307,25 +1307,19 @@ class Tools(object):
                   tools.run("ls")
 
         """
-        raise_error_if(not self.which("bwrap"), "Tools.chroot() requires Bubblewrap to be installed")
         raise_error_if(platform.system() != "Linux", "Tools.chroot() is only supported on Linux")
+        raise_error_if(not self.which("unshare"), "Tools.chroot() requires 'unshare' to be installed")
         old_chroot = self._chroot
         old_prefix = self._cmd_prefix
         cmd = [
-            "bwrap",
-            "--bind", chroot, "/",
-            "--bind", config.get_cachedir(), config.get_cachedir(),
-            "--bind", "/etc/resolv.conf", "/etc/resolv.conf",
-            "--proc", "/proc",
-            "--dev", "/dev",
-            "--tmpfs", "/tmp",
-            "--unshare-user",
-            "--cap-add", "ALL",
-            "--uid", "0",
-            "--gid", "0",
+            "unshare",
+            "-fmpr",
+            "--mount-proc",
+            "sh",
+            fs.path.join(fs.path.dirname(__file__), "chroot.sh"),
+            chroot,
         ]
-        if self._task and self._task.joltdir != ".":
-            cmd += ["--bind", self._task.joltdir, self._task.joltdir]
+
         self._chroot = chroot
         self._cmd_prefix = " ".join(cmd) + " "
 
