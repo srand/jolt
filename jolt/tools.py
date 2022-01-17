@@ -306,6 +306,9 @@ class Tools(object):
         self._cwd = fs.path.normpath(fs.path.join(os.getcwd(), cwd or os.getcwd()))
         self._env = copy.deepcopy(env or os.environ)
         self._task = task
+        if task:
+            self._env["JOLTDIR"] = task.joltdir
+            self._env["JOLTCACHEDIR"] = config.get_cachedir()
         self._builddir = {}
 
     def __enter__(self):
@@ -1072,7 +1075,13 @@ class Tools(object):
                 fs.copy(src, dst, metadata=False)
 
     def run(self, cmd, *args, **kwargs):
-        """ Runs a command in a shell interpreter.
+        """
+        Runs a command in a shell interpreter.
+
+        These additional environment variables will be set when the command is run:
+
+            - ``JOLTDIR`` - Set to :attr:`Task.joltdir <jolt.tasks.Task.joltdir>`
+            - ``JOLTCACHEDIR`` - Set to the location of the Jolt cache
 
         Args:
             cmd (str): Command format string.

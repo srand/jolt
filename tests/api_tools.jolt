@@ -306,6 +306,13 @@ class ToolsApi(JoltTest):
             self.tools.extract("tests.tar.bz2", self.ws)
             self.assertExists("api_tools.jolt")
 
+    def test_run_environment_variables(self):
+        s = self.tools.run(["echo $JOLTDIR"])
+        self.assertEqual(s, self.joltdir)
+        s = self.tools.run(["echo $JOLTCACHEDIR"])
+        from jolt import config
+        self.assertEqual(s, config.get_cachedir())
+
     def test_run_shell(self):
         s = self.tools.run(["echo Hello world"])
         self.assertEqual(s, "Hello world")

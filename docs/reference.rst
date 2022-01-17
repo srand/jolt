@@ -165,7 +165,7 @@ Task
 
 .. autoclass:: jolt.tasks.Task
    :undoc-members:
-   :members: info, warning, error, run, publish, unpack
+   :members: joltdir, info, warning, error, run, publish, unpack
 
 
     .. attribute:: cacheable = True
@@ -240,10 +240,6 @@ Task
     .. attribute:: influence = []
 
        List of influence provider objects.
-
-    .. attribute:: joltdir = "."
-
-       Path to the directory of the .jolt file where the task was defined.
 
     .. attribute:: name
 
