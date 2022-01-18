@@ -282,6 +282,30 @@ class ToolsApi(JoltTest):
             shalist = self.tools.checksum_file(["test1.txt", "test2.txt"], filterfn=lambda data: filter(lambda n: n == " ", data))
             self.assertEqual(shalist[0], shalist[1])
 
+    def test_chroot(self):
+        """
+        --- tasks:
+        from jolt.plugins import docker
+        import os
+
+        class Busybox(docker.DockerImage):
+            dockerfile = "FROM busybox:latest"
+            extract = True
+
+        class Test(Task):
+            requires = "busybox"
+
+            def run(self, d, t):
+                with t.chroot(d["busybox"].paths.rootfs):
+                    t.run("busybox > {{}}/output.txt", t.builddir())
+
+            def publish(self, a, t):
+                a.collect("*", cwd=t.builddir())
+        ---
+        """
+        o = self.build("test")
+        a = self.artifacts(o)
+        self.assertExists(os.path.join(a[0], "output.txt"))
 
     def test_cwd_non_existing(self):
         with self.assertRaises(Exception, msg="failed to change directory"):

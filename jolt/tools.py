@@ -1331,7 +1331,7 @@ class Tools(object):
         return fs.unlink(pathname)
 
     @contextmanager
-    def chroot(self, chroot):
+    def chroot(self, chroot, *args, **kwargs):
         """
         Experimental: Use chroot as root filesystem when running commands.
 
@@ -1351,6 +1351,11 @@ class Tools(object):
         raise_error_if(platform.system() != "Linux", "Tools.chroot() is only supported on Linux")
         raise_error_if(not self.which("unshare"), "Tools.chroot() requires 'unshare' to be installed")
 
+        chroot = self.expand_path(chroot, *args, **kwargs)
+        raise_task_error_if(
+            not fs.path.exists(chroot) or not fs.path.isdir(chroot),
+            self._task, "failed to change root to '{0}'", chroot)
+
         cmd = [
             "unshare",
             "-fmpr",
@@ -1361,13 +1366,15 @@ class Tools(object):
         ]
 
         old_chroot = self._chroot
-        olf_prefix = copy.copy(self._run_prefix)
+        old_prefix = copy.copy(self._run_prefix)
 
         self._chroot = chroot
         self._run_prefix = cmd + self._run_prefix
-        yield
-        self._run_prefix = old_prefix
-        self._chroot = old_chroot
+        try:
+            yield self._chroot
+        finally:
+            self._run_prefix = old_prefix
+            self._chroot = old_chroot
 
     def upload(self, pathname, url, exceptions=False, auth=None, **kwargs):
         """ Uploads a file using HTTP (PUT).
