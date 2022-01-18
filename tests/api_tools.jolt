@@ -313,6 +313,18 @@ class ToolsApi(JoltTest):
         from jolt import config
         self.assertEqual(s, config.get_cachedir())
 
+    def test_run_prefix(self):
+        s = self.tools.run("uname")
+        self.assertEqual(s, "Linux")
+        with self.tools.runprefix("echo"):
+            s = self.tools.run("uname")
+            self.assertEqual(s, "uname")
+            with self.tools.runprefix("abc"):
+                s = self.tools.run("uname")
+                self.assertEqual(s, "abc uname")
+        s = self.tools.run("uname")
+        self.assertEqual(s, "Linux")
+
     def test_run_shell(self):
         s = self.tools.run(["echo Hello world"])
         self.assertEqual(s, "Hello world")

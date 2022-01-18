@@ -302,7 +302,7 @@ class Tools(object):
 
     def __init__(self, task=None, cwd=None, env=None):
         self._chroot = None
-        self._cmd_prefix = ""
+        self._run_prefix = []
         self._cwd = fs.path.normpath(fs.path.join(os.getcwd(), cwd or os.getcwd()))
         self._env = copy.deepcopy(env or os.environ)
         self._task = task
@@ -1122,11 +1122,11 @@ class Tools(object):
                 raise e
             except Exception:
                 pass
-            if self._cmd_prefix:
+            if self._run_prefix:
                 if type(cmd) == list:
-                    cmd = self._cmd_prefix.split() + cmd
+                    cmd = self._run_prefix + cmd
                 else:
-                    cmd = self._cmd_prefix + cmd
+                    cmd = " ".join(self._run_prefix) + " " + cmd
             return _run(cmd, self._cwd, self._env, *args, **kwargs)
         finally:
             if stdi:
@@ -1135,6 +1135,47 @@ class Tools(object):
                 termios.tcsetattr(sys.stdout.fileno(), termios.TCSANOW, stdo)
             if stde:
                 termios.tcsetattr(sys.stderr.fileno(), termios.TCSANOW, stde)
+
+    @contextmanager
+    def runprefix(self, cmdprefix, *args, **kwargs):
+        """
+        Adds a command prefix to all commands executed by :func:`~run`.
+
+        A new prefix is appended to any existing prefix.
+
+        Args:
+            cmdprefix (str, list): The command prefix. The string, or list,
+                is expanded with :func:`~expand`.
+            args (str, optional): Additional positional values passed to
+                :func:`~expand`.
+            kwargs (str, optional): Additional keyword values passed to
+                :func:`~expand`.
+
+        Example:
+
+          .. code-block:: python
+
+            with tools.runprefix("docker exec container"):
+                tools.run("ls")
+
+
+        The above code is equivalent to:
+
+          .. code-block:: python
+
+            tools.run("docker exec container ls")
+
+        """
+        cmdprefix = self.expand(cmdprefix, *args, **kwargs)
+        if type(cmdprefix) == str:
+            cmdprefix = cmdprefix.split()
+
+        old_prefix = copy.copy(self._run_prefix)
+        self._run_prefix += cmdprefix
+        try:
+            yield
+        finally:
+            self._run_prefix = old_prefix
 
     @utils.locked(lock='_builddir_lock')
     def sandbox(self, artifact, incremental=False, reflect=False):
@@ -1309,8 +1350,7 @@ class Tools(object):
         """
         raise_error_if(platform.system() != "Linux", "Tools.chroot() is only supported on Linux")
         raise_error_if(not self.which("unshare"), "Tools.chroot() requires 'unshare' to be installed")
-        old_chroot = self._chroot
-        old_prefix = self._cmd_prefix
+
         cmd = [
             "unshare",
             "-fmpr",
@@ -1320,13 +1360,14 @@ class Tools(object):
             chroot,
         ]
 
+        old_chroot = self._chroot
+        olf_prefix = copy.copy(self._run_prefix)
+
         self._chroot = chroot
-        self._cmd_prefix = " ".join(cmd) + " "
-
-        yield self._cmd_prefix
-
+        self._run_prefix = cmd + self._run_prefix
+        yield
+        self._run_prefix = old_prefix
         self._chroot = old_chroot
-        self._cmd_prefix = old_prefix
 
     def upload(self, pathname, url, exceptions=False, auth=None, **kwargs):
         """ Uploads a file using HTTP (PUT).
