@@ -191,11 +191,12 @@ class DockerContainer(Resource):
 
         self._info(f"Creating container from image '{image}'")
         self.container = tools.run(
-            "docker run -d {_user} {_environment} {_volumes} {image} {_arguments}",
+            "docker run -i -d {_user} {_environment} {_volumes} {image} {_arguments}",
             image=image, output_on_error=True)
 
         self._info("Created container '{container}'")
         info = tools.run("docker inspect {container}", output_on_error=True)
+        artifact.container = self.container
         artifact.info = json.loads(info)[0]
 
     def release(self, artifact, deps, tools):
@@ -347,6 +348,9 @@ class DockerImage(Task):
     dockerfile = "Dockerfile"
     """ Path to the Dockerfile to build, or the full source code of such a file. """
 
+    extract = False
+    """ Extract image and publish rootfs tree """
+
     imagefile = "{canonical_name}.tar"
     """
     Name of the image tarball published by the task.
@@ -411,9 +415,19 @@ class DockerImage(Task):
                 for tag in tags:
                     tools.run("docker push {}", tag)
 
-            self.info("Saving image to file")
-            with tools.cwd(tools.builddir()):
-                if self._imagefile:
+            if self.extract:
+                self.info("Extracting image")
+                tools.run("docker create --name {canonical_name}.{identity} {}", tags[0])
+                try:
+                    with tools.cwd(tools.builddir("rootfs")):
+                        tools.run("docker export {canonical_name}.{identity} -o rootfs.tar")
+                        tools.extract("rootfs.tar", "rootfs/")
+                finally:
+                    tools.run("docker rm {canonical_name}.{identity}")
+
+            if self._imagefile:
+                self.info("Saving image to file")
+                with tools.cwd(tools.builddir()):
                     tools.run("docker image save {} -o {_imagefile}", tags[0])
                     if self.compression is not None:
                         tools.compress("{_imagefile}", "{_imagefile}.{compression}")
@@ -425,8 +439,8 @@ class DockerImage(Task):
 
     def publish(self, artifact, tools):
         artifact.strings.tag = tools.expand(self.tags[0])
-        with tools.cwd(tools.builddir()):
-            if self._imagefile:
+        if self._imagefile:
+            with tools.cwd(tools.builddir()):
                 if self.compression is not None:
                     artifact.collect("{_imagefile}.{compression}")
                     if self._autoload:
@@ -435,5 +449,9 @@ class DockerImage(Task):
                     artifact.collect("{_imagefile}")
                     if self._autoload:
                         artifact.docker.load.append("{_imagefile}")
+        if self.extract:
+            with tools.cwd(tools.builddir("rootfs")):
+                artifact.collect("rootfs", symlinks=True)
+            artifact.paths.rootfs = "rootfs"
         if self._autoload:
             artifact.docker.rmi.append(artifact.strings.tag.get_value())
