@@ -1592,7 +1592,12 @@ class CXXLibrary(CXXProject):
     """
 
     strip = True
-    """ Strip binary from debug information.
+    """
+    Remove debug information from binary.
+
+    When using the GNU toolchain, debug information is kept in a separate binary
+    which is either published or not depending on the value of this attribute.
+    It's found in a .debug directory if present.
 
     Only applicable to shared libraries.
     """
@@ -1677,7 +1682,15 @@ class CXXExecutable(CXXProject):
     """ The artifact path where the binary is published. """
 
     strip = True
-    """ Strip binary from debug information. """
+    """
+    Remove debug information from binary.
+
+    When using the GNU toolchain, debug information is kept in a separate binary
+    which is either published or not depending on the value of this attribute.
+    It's found in a .debug directory if present.
+
+    Only applicable to shared libraries.
+    """
 
     def __init__(self, *args, **kwargs):
         super(CXXExecutable, self).__init__(*args, **kwargs)

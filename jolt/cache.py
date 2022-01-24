@@ -377,13 +377,9 @@ class Artifact(object):
     consumer tasks are executed. A common use-case is to add
     programs to the PATH.
 
-    Values appended to PATH-type variables are relative to the artifact
-    root. They will be automatically expanded to absolute paths. These
-    PATH-type variables are supported:
-
-    - ``PATH``
-    - ``LD_LIBRARY_PATH``
-    - ``PKG_CONFIG_PATH``
+    Values appended to PATH variables are relative to the artifact
+    root. They will be automatically expanded to absolute paths.
+    This applies to all variables with ``PATH`` in the name.
 
     Example:
 

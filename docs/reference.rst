@@ -427,23 +427,24 @@ CXXExecutable
 
 .. autoclass:: jolt.plugins.ninja.CXXExecutable
 
-  .. autoattribute:: CXXProject.asflags
-  .. autoattribute:: CXXProject.binary
-  .. autoattribute:: CXXProject.cflags
-  .. autoattribute:: CXXProject.cxxflags
-  .. autoattribute:: CXXProject.incpaths
-  .. autoattribute:: CXXProject.incremental
-  .. autoattribute:: CXXProject.ldflags
-  .. autoattribute:: CXXProject.libpaths
-  .. autoattribute:: CXXProject.libraries
-  .. autoattribute:: CXXProject.macros
-  .. autoattribute:: CXXExecutable.publishdir
-  .. automethod:: CXXLibrary.publish
-  .. automethod:: CXXProject.run
-  .. autoattribute:: CXXLibrary.selfsustained
-  .. automethod:: CXXProject.shell
-  .. autoattribute:: CXXProject.sources
-  .. autoattribute:: CXXProject.source_influence
+  .. autoattribute:: asflags
+  .. autoattribute:: binary
+  .. autoattribute:: cflags
+  .. autoattribute:: cxxflags
+  .. autoattribute:: incpaths
+  .. autoattribute:: incremental
+  .. autoattribute:: ldflags
+  .. autoattribute:: libpaths
+  .. autoattribute:: libraries
+  .. autoattribute:: macros
+  .. autoattribute:: publishdir
+  .. automethod:: publish
+  .. automethod:: run
+  .. autoattribute:: selfsustained
+  .. automethod:: shell
+  .. autoattribute:: sources
+  .. autoattribute:: source_influence
+  .. autoattribute:: strip
 
 .. reference-ninja-cxxexecutable-end
 
@@ -454,25 +455,26 @@ CXXLibrary
 
 .. autoclass:: jolt.plugins.ninja.CXXLibrary
 
-  .. autoattribute:: CXXProject.asflags
-  .. autoattribute:: CXXProject.binary
-  .. autoattribute:: CXXProject.cflags
-  .. autoattribute:: CXXProject.cxxflags
-  .. autoattribute:: CXXLibrary.headers
-  .. autoattribute:: CXXProject.incpaths
-  .. autoattribute:: CXXProject.incremental
-  .. autoattribute:: CXXProject.ldflags
-  .. autoattribute:: CXXProject.libpaths
-  .. autoattribute:: CXXProject.libraries
-  .. autoattribute:: CXXProject.macros
-  .. automethod:: CXXProject.run
-  .. autoattribute:: CXXLibrary.publishapi
-  .. autoattribute:: CXXLibrary.publishdir
-  .. automethod:: CXXLibrary.publish
-  .. autoattribute:: CXXLibrary.selfsustained
-  .. automethod:: CXXProject.shell
-  .. autoattribute:: CXXProject.sources
-  .. autoattribute:: CXXProject.source_influence
+  .. autoattribute:: asflags
+  .. autoattribute:: binary
+  .. autoattribute:: cflags
+  .. autoattribute:: cxxflags
+  .. autoattribute:: headers
+  .. autoattribute:: incpaths
+  .. autoattribute:: incremental
+  .. autoattribute:: ldflags
+  .. autoattribute:: libpaths
+  .. autoattribute:: libraries
+  .. autoattribute:: macros
+  .. automethod:: run
+  .. autoattribute:: publishapi
+  .. autoattribute:: publishdir
+  .. automethod:: publish
+  .. autoattribute:: selfsustained
+  .. automethod:: shell
+  .. autoattribute:: sources
+  .. autoattribute:: source_influence
+  .. autoattribute:: strip
 
 
 .. reference-ninja-cxxlibrary-end
