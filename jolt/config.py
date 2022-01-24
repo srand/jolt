@@ -236,7 +236,7 @@ def sections(alias=None):
 
 
 def plugins():
-    automatic = ["cxxinfo", "environ", "python", "strings"]
+    automatic = ["cxxinfo", "environ", "paths", "python", "strings"]
     return sections() + automatic
 
 

@@ -161,3 +161,29 @@ class ArtifactApi(JoltTest):
         self.build("exe")
         with self.assertRaises(Exception, msg="list expected"):
             self.build("bad")
+
+    def test_path(self):
+        """
+        --- tasks:
+        class A(Task):
+            arg = Parameter()
+
+            def publish(self, a, t):
+                with t.cwd(t.builddir()):
+                    t.mkdir("{{arg}}")
+                    t.write_file("{{arg}}/testfile", "testdata")
+                    a.collect("testdir", "{{arg}}")
+                a.paths.testdir = "{{arg}}"
+                a.paths.testfile = "{{arg}}/testfile"
+
+        class B(Task):
+            requires = ["a:arg=testdir"]
+
+            def run(self, d, t):
+                a = d[self.requires[0]]
+                with t.cwd(a.paths.testdir):
+                   assert t.read_file("testfile") == "testdata"
+                assert t.read_file(a.paths.testfile) == "testdata"
+        ---
+        """
+        self.build("b")

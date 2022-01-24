@@ -394,6 +394,35 @@ class Artifact(object):
                 artifact.environ.JAVA_HOME = artifact.final_path
     """
 
+    paths = {}
+    """ Artifact paths.
+
+    A task can add paths to files and directories inside an artifact.
+    Paths are relative to the root of the artifact when created, but
+    are expanded to absolute paths when the artifact is consumed by
+    a task.
+
+    This is useful as an abstraction when directories or filenames
+    have varying names.
+
+    Example:
+
+        .. code-block:: python
+
+            def publish(self, artifact, tools):
+                artifact.paths.file = "{date}.txt"
+
+    The ``file`` path is then expanded to a full path for consumers:
+
+        .. code-block:: python
+
+            requires = ["dep"]
+
+            def run(self, deps, tools):
+                filedata = tools.read_file(deps["dep"].paths.file)
+
+    """
+
     python = {}
     """ Artifact Python configuration.
 

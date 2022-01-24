@@ -52,7 +52,7 @@ Artifact
 .. reference-artifact-start
 
 .. autoclass:: jolt.Artifact
-   :members: collect, copy, cxxinfo, environ, path, python, final_path, strings
+   :members: collect, copy, cxxinfo, environ, path, paths, python, final_path, strings
 
 .. reference-artifact-end
 

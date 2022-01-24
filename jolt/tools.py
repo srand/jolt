@@ -612,7 +612,7 @@ class Tools(object):
                 with tools.cwd("subdir") as cwd:
                     print(cwd)
         """
-        path = self.expand_path(fs.path.join(pathname, *args))
+        path = self.expand_path(fs.path.join(str(pathname), *args))
         prev = self._cwd
         try:
             raise_task_error_if(
