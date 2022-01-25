@@ -1365,6 +1365,15 @@ class Tools(object):
         mount_joltdir = kwargs.get("mount_joltdir", True)
         mount_cachedir = kwargs.get("mount_cachedir", True)
 
+        overlaydir = self.builddir("overlay")
+        overlayrootdir = fs.path.join(overlaydir, "root")
+        with self.cwd(overlaydir):
+            self.mkdir("root")
+            self.mkdir("work")
+            self.mkdir("uppr")
+        overlayopts = f"upperdir={overlaydir}/uppr,workdir={overlaydir}/work,lowerdir={chroot}"
+        chroot = overlayrootdir
+
         def unshare_chroot():
             Tools._unshare()
 
@@ -1373,6 +1382,14 @@ class Tools(object):
 
             MS_BIND       = 4096
             MS_REC        = 16384
+
+            def mount_overlay():
+                libc.mount(
+                    c_char_p("overlay".encode("utf-8")),
+                    c_char_p(chroot.encode("utf-8")),
+                    c_char_p("overlay".encode("utf-8")),
+                    0,
+                    c_char_p(overlayopts.encode("utf-8"))) == 0
 
             def mount_bind(path):
                 os.makedirs(chroot + path, exist_ok=True)
@@ -1383,6 +1400,7 @@ class Tools(object):
                     MS_BIND|MS_REC,
                     None) == 0
 
+            mount_overlay()
             if mount_dev:
                 mount_bind("/dev")
             if mount_proc:
