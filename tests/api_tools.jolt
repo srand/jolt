@@ -289,7 +289,11 @@ class ToolsApi(JoltTest):
         import os
 
         class Busybox(docker.DockerImage):
-            dockerfile = "FROM busybox:latest"
+            dockerfile = \"\"\"
+            FROM busybox:latest
+            RUN busybox mkdir -p /sbin /usr/bin
+            RUN busybox --install
+            \"\"\"
             extract = True
 
         class Test(Task):
@@ -298,10 +302,10 @@ class ToolsApi(JoltTest):
             def run(self, d, t):
                 with t.cwd(t.builddir()):
                     with t.chroot(d["busybox"].paths.rootfs):
-                        workdir = t.run("busybox pwd")
+                        workdir = t.run("pwd")
                         t.run("busybox > output.txt")
                         with t.environ(FOO="bar"):
-                            foo = t.run("busybox env | busybox grep FOO")
+                            foo = t.run("env | grep FOO")
                 assert t.builddir() == workdir, "incorrect working directory"
                 assert "bar" in foo, "incorrect environment variable"
 

@@ -38,7 +38,7 @@ def stderr_write(line):
     sys.stderr.flush()
 
 
-def _run(cmd, cwd, env, *args, **kwargs):
+def _run(cmd, cwd, env, preexec_fn, *args, **kwargs):
     output = kwargs.get("output")
     output_on_error = kwargs.get("output_on_error")
     output_rstrip = kwargs.get("output_rstrip", True)
@@ -56,7 +56,8 @@ def _run(cmd, cwd, env, *args, **kwargs):
         stderr=subprocess.PIPE,
         shell=shell,
         cwd=cwd,
-        env=env)
+        env=env,
+        preexec_fn=preexec_fn)
 
     class Reader(threading.Thread):
         def __init__(self, parent, stream, output=None, logbuf=None):
@@ -303,6 +304,7 @@ class Tools(object):
     def __init__(self, task=None, cwd=None, env=None):
         self._chroot = None
         self._run_prefix = []
+        self._preexec_fn = None
         self._cwd = fs.path.normpath(fs.path.join(os.getcwd(), cwd or os.getcwd()))
         self._env = copy.deepcopy(env or os.environ)
         self._task = task
@@ -620,9 +622,11 @@ class Tools(object):
                 self._task,
                 "failed to change directory to '{0}'", path)
             self._cwd = path
+            self._env["PWD"] = self._cwd
             yield fs.path.normpath(self._cwd)
         finally:
             self._cwd = prev
+            self._env["PWD"] = prev
 
     def download(self, url, pathname, exceptions=False, **kwargs):
         """ Downloads a file using HTTP.
@@ -1127,7 +1131,7 @@ class Tools(object):
                     cmd = self._run_prefix + ["'" + " ".join(cmd) + "'"]
                 else:
                     cmd = " ".join(self._run_prefix) + " '" + cmd + "'"
-            return _run(cmd, self._cwd, self._env, *args, **kwargs)
+            return _run(cmd, self._cwd, self._env, self._preexec_fn, *args, **kwargs)
         finally:
             if stdi:
                 termios.tcsetattr(sys.stdin.fileno(), termios.TCSANOW, stdi)
@@ -1349,32 +1353,87 @@ class Tools(object):
 
         """
         raise_error_if(platform.system() != "Linux", "Tools.chroot() is only supported on Linux")
-        raise_error_if(not self.which("unshare"), "Tools.chroot() requires 'unshare' to be installed")
 
         chroot = self.expand_path(chroot, *args, **kwargs)
         raise_task_error_if(
             not fs.path.exists(chroot) or not fs.path.isdir(chroot),
             self._task, "failed to change root to '{0}'", chroot)
 
-        cmd = [
-            "unshare",
-            "-fmpr",
-            "--mount-proc",
-            sys.executable,
-            fs.path.join(fs.path.dirname(__file__), "chroot.py"),
-            chroot,
-        ]
+        mount_dev = kwargs.get("mount_dev", True)
+        mount_home = kwargs.get("mount_home", False)
+        mount_proc = kwargs.get("mount_proc", True)
+        mount_joltdir = kwargs.get("mount_joltdir", True)
+        mount_cachedir = kwargs.get("mount_cachedir", True)
+
+        def unshare_chroot():
+            Tools._unshare()
+
+            from ctypes import CDLL, c_char_p
+            libc = CDLL("libc.so.6")
+
+            MS_BIND       = 4096
+            MS_REC        = 16384
+
+            def mount_bind(path):
+                os.makedirs(chroot + path, exist_ok=True)
+                assert libc.mount(
+                    c_char_p(path.encode("utf-8")),
+                    c_char_p((chroot + path).encode("utf-8")),
+                    None,
+                    MS_BIND|MS_REC,
+                    None) == 0
+
+            if mount_dev:
+                mount_bind("/dev")
+            if mount_proc:
+                mount_bind("/proc")
+            if mount_home:
+                mount_bind("/home")
+            if mount_joltdir and self._task:
+                mount_bind(self._task.joltdir)
+            if mount_cachedir:
+                mount_bind(config.get_cachedir())
+
+            os.chroot(chroot)
 
         old_chroot = self._chroot
-        old_prefix = copy.copy(self._run_prefix)
-
+        old_preexec_fn = self._preexec_fn
         self._chroot = chroot
-        self._run_prefix = cmd + self._run_prefix
+        self._preexec_fn = unshare_chroot
         try:
             yield self._chroot
         finally:
-            self._run_prefix = old_prefix
-            self._chroot = old_chroot
+            self._chroot = chroot
+            self._preexec_fn = old_preexec_fn
+
+    @staticmethod
+    def _unshare():
+        from ctypes import CDLL, c_char_p
+        libc = CDLL("libc.so.6")
+
+        CLONE_NEWNS   = 0x00020000
+        CLONE_NEWUSER = 0x10000000
+
+        uid = os.getuid()
+        gid = os.getgid()
+
+        assert libc.unshare(CLONE_NEWNS|CLONE_NEWUSER) == 0
+
+        def map_ids(filename, ids):
+            with open(filename, 'w') as file_:
+                for new_id, old_id in ids:
+                    file_.write(f"{new_id} {old_id} 1")
+
+        def map_uids(uids):
+            return map_ids("/proc/self/uid_map", uids)
+
+        def map_gids(uids):
+            with open("/proc/self/setgroups", "w") as f:
+                f.write("deny")
+            return map_ids("/proc/self/gid_map", uids)
+
+        map_uids([(0, uid)])
+        map_gids([(0, gid)])
 
     def upload(self, pathname, url, exceptions=False, auth=None, **kwargs):
         """ Uploads a file using HTTP (PUT).
