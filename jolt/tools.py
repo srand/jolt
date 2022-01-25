@@ -1124,9 +1124,9 @@ class Tools(object):
                 pass
             if self._run_prefix:
                 if type(cmd) == list:
-                    cmd = self._run_prefix + cmd
+                    cmd = self._run_prefix + ["'" + " ".join(cmd) + "'"]
                 else:
-                    cmd = " ".join(self._run_prefix) + " " + cmd
+                    cmd = " ".join(self._run_prefix) + " '" + cmd + "'"
             return _run(cmd, self._cwd, self._env, *args, **kwargs)
         finally:
             if stdi:
@@ -1360,8 +1360,8 @@ class Tools(object):
             "unshare",
             "-fmpr",
             "--mount-proc",
-            "sh",
-            fs.path.join(fs.path.dirname(__file__), "chroot.sh"),
+            sys.executable,
+            fs.path.join(fs.path.dirname(__file__), "chroot.py"),
             chroot,
         ]
 

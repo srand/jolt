@@ -296,8 +296,14 @@ class ToolsApi(JoltTest):
             requires = "busybox"
 
             def run(self, d, t):
-                with t.chroot(d["busybox"].paths.rootfs):
-                    t.run("busybox > {{}}/output.txt", t.builddir())
+                with t.cwd(t.builddir()):
+                    with t.chroot(d["busybox"].paths.rootfs):
+                        workdir = t.run("busybox pwd")
+                        t.run("busybox > output.txt")
+                        with t.environ(FOO="bar"):
+                            foo = t.run("busybox env | busybox grep FOO")
+                assert t.builddir() == workdir, "incorrect working directory"
+                assert "bar" in foo, "incorrect environment variable"
 
             def publish(self, a, t):
                 a.collect("*", cwd=t.builddir())
