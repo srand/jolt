@@ -622,11 +622,9 @@ class Tools(object):
                 self._task,
                 "failed to change directory to '{0}'", path)
             self._cwd = path
-            self._env["PWD"] = self._cwd
             yield fs.path.normpath(self._cwd)
         finally:
             self._cwd = prev
-            self._env["PWD"] = prev
 
     def download(self, url, pathname, exceptions=False, **kwargs):
         """ Downloads a file using HTTP.
@@ -1373,6 +1371,7 @@ class Tools(object):
             self.mkdir("uppr")
         overlayopts = f"upperdir={overlaydir}/uppr,workdir={overlaydir}/work,lowerdir={chroot}"
         chroot = overlayrootdir
+        cwd = self.getcwd()
 
         def unshare_chroot():
             Tools._unshare()
@@ -1413,6 +1412,7 @@ class Tools(object):
                 mount_bind(config.get_cachedir())
 
             os.chroot(chroot)
+            os.chdir(cwd)
 
         old_chroot = self._chroot
         old_preexec_fn = self._preexec_fn
