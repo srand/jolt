@@ -80,7 +80,19 @@ def move(src, dst):
 
 
 def rmtree(path, ignore_errors=False):
-    shutil.rmtree(path, ignore_errors)
+    def onerror(func, path, exc_info):
+        if os.path.isdir(path):
+            try:
+                os.rmdir(path)
+            except Exception:
+                pass
+            else:
+                return
+        if not ignore_errors:
+            _, exc, _ = exc_info
+            raise exc
+
+    shutil.rmtree(path, onerror=onerror)
 
 
 def unlink(path, ignore_errors=False):
