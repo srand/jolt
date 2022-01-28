@@ -1379,8 +1379,8 @@ class Tools(object):
             from ctypes import CDLL, c_char_p
             libc = CDLL("libc.so.6")
 
-            MS_BIND       = 4096
-            MS_REC        = 16384
+            MS_BIND = 4096
+            MS_REC = 16384
 
             def mount_overlay():
                 libc.mount(
@@ -1399,7 +1399,7 @@ class Tools(object):
                     c_char_p(path.encode("utf-8")),
                     c_char_p((chroot + path).encode("utf-8")),
                     None,
-                    MS_BIND|MS_REC,
+                    MS_BIND | MS_REC,
                     None) == 0
 
             mount_overlay()
@@ -1427,21 +1427,21 @@ class Tools(object):
         try:
             yield self._chroot
         finally:
-            self._chroot = chroot
+            self._chroot = old_chroot
             self._preexec_fn = old_preexec_fn
 
     @staticmethod
     def _unshare():
-        from ctypes import CDLL, c_char_p
+        from ctypes import CDLL
         libc = CDLL("libc.so.6")
 
-        CLONE_NEWNS   = 0x00020000
+        CLONE_NEWNS = 0x00020000
         CLONE_NEWUSER = 0x10000000
 
         uid = os.getuid()
         gid = os.getgid()
 
-        assert libc.unshare(CLONE_NEWNS|CLONE_NEWUSER) == 0
+        assert libc.unshare(CLONE_NEWNS | CLONE_NEWUSER) == 0
 
         def map_ids(filename, ids):
             with open(filename, 'w') as file_:
