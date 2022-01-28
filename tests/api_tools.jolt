@@ -295,6 +295,7 @@ class ToolsApi(JoltTest):
             RUN busybox --install
             \"\"\"
             extract = True
+            requires = ["docker/cli"]
 
         class Test(Task):
             requires = "busybox"
