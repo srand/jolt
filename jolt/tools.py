@@ -1358,6 +1358,7 @@ class Tools(object):
             self._task, "failed to change root to '{0}'", chroot)
 
         mount_dev = kwargs.get("mount_dev", True)
+        mount_etc = kwargs.get("mount_etc", True)
         mount_home = kwargs.get("mount_home", False)
         mount_proc = kwargs.get("mount_proc", True)
         mount_joltdir = kwargs.get("mount_joltdir", True)
@@ -1390,7 +1391,10 @@ class Tools(object):
                     c_char_p(overlayopts.encode("utf-8"))) == 0
 
             def mount_bind(path):
-                os.makedirs(chroot + path, exist_ok=True)
+                if os.path.isdir(path):
+                    os.makedirs(chroot + path, exist_ok=True)
+                else:
+                    os.makedirs(os.path.dirname(chroot + path), exist_ok=True)
                 assert libc.mount(
                     c_char_p(path.encode("utf-8")),
                     c_char_p((chroot + path).encode("utf-8")),
@@ -1401,6 +1405,9 @@ class Tools(object):
             mount_overlay()
             if mount_dev:
                 mount_bind("/dev")
+            if mount_etc:
+                mount_bind("/etc/hostname")
+                mount_bind("/etc/resolv.conf")
             if mount_proc:
                 mount_bind("/proc")
             if mount_home:
