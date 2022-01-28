@@ -1126,9 +1126,9 @@ class Tools(object):
                 pass
             if self._run_prefix:
                 if type(cmd) == list:
-                    cmd = self._run_prefix + ["'" + " ".join(cmd) + "'"]
+                    cmd = self._run_prefix + cmd
                 else:
-                    cmd = " ".join(self._run_prefix) + " '" + cmd + "'"
+                    cmd = " ".join(self._run_prefix) + " " + cmd
             return _run(cmd, self._cwd, self._env, self._preexec_fn, *args, **kwargs)
         finally:
             if stdi:
@@ -1371,7 +1371,6 @@ class Tools(object):
             self.mkdir("uppr")
         overlayopts = f"upperdir={overlaydir}/uppr,workdir={overlaydir}/work,lowerdir={chroot}"
         chroot = overlayrootdir
-        cwd = self.getcwd()
 
         def unshare_chroot():
             Tools._unshare()
@@ -1412,7 +1411,7 @@ class Tools(object):
                 mount_bind(config.get_cachedir())
 
             os.chroot(chroot)
-            os.chdir(cwd)
+            os.chdir(self.getcwd())
 
         old_chroot = self._chroot
         old_preexec_fn = self._preexec_fn
@@ -1450,8 +1449,8 @@ class Tools(object):
                 f.write("deny")
             return map_ids("/proc/self/gid_map", uids)
 
-        map_uids([(0, uid)])
-        map_gids([(0, gid)])
+        map_uids([(uid, uid)])
+        map_gids([(gid, gid)])
 
     def upload(self, pathname, url, exceptions=False, auth=None, **kwargs):
         """ Uploads a file using HTTP (PUT).

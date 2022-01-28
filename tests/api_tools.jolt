@@ -303,6 +303,8 @@ class ToolsApi(JoltTest):
                 with t.cwd(t.builddir()):
                     with t.chroot(d["busybox"].paths.rootfs):
                         workdir = t.run("pwd")
+                        workdir2 = t.run("pwd")
+                        assert workdir == workdir2, "working dir not stable"
                         t.run("busybox > output.txt")
                         with t.environ(FOO="bar"):
                             foo = t.run("env | grep FOO")
