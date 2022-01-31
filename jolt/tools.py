@@ -1406,8 +1406,10 @@ class Tools(object):
             if mount_dev:
                 mount_bind("/dev")
             if mount_etc:
+                mount_bind("/etc/group")
                 mount_bind("/etc/hostname")
                 mount_bind("/etc/resolv.conf")
+                mount_bind("/etc/passwd")
             if mount_proc:
                 mount_bind("/proc")
             if mount_home:
@@ -1445,8 +1447,8 @@ class Tools(object):
 
         def map_ids(filename, ids):
             with open(filename, 'w') as file_:
-                for new_id, old_id in ids:
-                    file_.write(f"{new_id} {old_id} 1")
+                for new_id, old_id, count in ids:
+                    file_.write(f"{new_id} {old_id} {count}")
 
         def map_uids(uids):
             return map_ids("/proc/self/uid_map", uids)
@@ -1456,8 +1458,8 @@ class Tools(object):
                 f.write("deny")
             return map_ids("/proc/self/gid_map", uids)
 
-        map_uids([(uid, uid)])
-        map_gids([(gid, gid)])
+        map_uids([(uid, uid, 1)])
+        map_gids([(gid, gid, 1)])
 
     def upload(self, pathname, url, exceptions=False, auth=None, **kwargs):
         """ Uploads a file using HTTP (PUT).
