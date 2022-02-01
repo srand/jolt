@@ -343,6 +343,26 @@ class ToolsApi(JoltTest):
             self.tools.extract("tests.tar.bz2", self.ws)
             self.assertExists("api_tools.jolt")
 
+    def test_render(self):
+        """
+        --- file: identity.template
+        {{{{ identity }}}}
+        --- file: arg.template
+        {{{{ arg }}}}
+        --- file: tools.template
+        {{{{ tools.expand_path("test") }}}}
+        --- tasks:
+        class A(Task):
+            def run(self, deps, tools):
+                assert tools.render("identity.template") == self.identity
+                assert tools.render("arg.template", arg="argvalue") == "argvalue"
+                assert tools.render("tools.template") == tools.expand_path("test")
+        ---
+        """
+        self.build("a")
+        with self.assertRaises(Exception, msg="template not found"):
+            self.tools.render("notfound.template")
+
     def test_run_environment_variables(self):
         s = self.tools.run(["echo $JOLTDIR"])
         self.assertEqual(s, self.joltdir)

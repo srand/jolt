@@ -18,6 +18,10 @@ import bz2file
 import hashlib
 from contextlib import contextmanager
 
+from jinja2 import Environment, FileSystemLoader, select_autoescape
+from jinja2.runtime import Context
+
+
 from jolt import cache
 from jolt import filesystem as fs
 from jolt import log
@@ -288,6 +292,20 @@ class _AutoTools(object):
     def publish(self, artifact, files='*', *args, **kwargs):
         with self.tools.cwd(self.installdir):
             artifact.collect(files, *args, **kwargs)
+
+
+class JinjaTaskContext(Context):
+    """
+    Helper context for Jinja templates.
+
+    Attempts to resolves any missing keywords by looking up task class attributes.
+    """
+    def resolve_or_missing(self, key):
+        if key != "task":
+            task = self.get("task")
+            if task and hasattr(task, key):
+                return getattr(task, key)
+        return super(JinjaTaskContext, self).resolve_or_missing(key)
 
 
 class Tools(object):
@@ -961,6 +979,32 @@ class Tools(object):
     def meson(self, deps=None):
         """ Creates a Meson invokation helper """
         return _Meson(deps, self)
+
+    def render(self, pathname, **kwargs):
+        """ Render Jinja template file.
+
+        Args:
+            pathname (str): Name/path of file to modify.
+            kwargs (dict): Keywords made available to the template context.
+               Task attributes are automatically available.
+
+        Returns:
+            str: Renderered template data.
+
+        """
+
+        raise_error_if(
+            not os.path.exists(self.expand_path(pathname)),
+            "template not found: {}".format(pathname))
+
+        env = Environment(
+            loader=FileSystemLoader(self.getcwd()),
+            autoescape=select_autoescape(),
+            trim_blocks=True,
+            lstrip_blocks=True)
+        env.context_class = JinjaTaskContext
+        template = env.get_template(pathname)
+        return template.render(task=self._task, tools=self, **kwargs)
 
     def replace_in_file(self, pathname, search, replace):
         """ Replaces all occurrences of a substring in a file.
