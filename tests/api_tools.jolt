@@ -316,6 +316,10 @@ class ToolsApi(JoltTest):
                 a.collect("*", cwd=t.builddir())
         ---
         """
+        try:
+            self.tools.run("unshare -rm uname")
+        except Exception:
+            self.skip("required privileges not held")
         o = self.build("test")
         a = self.artifacts(o)
         self.assertExists(os.path.join(a[0], "output.txt"))
