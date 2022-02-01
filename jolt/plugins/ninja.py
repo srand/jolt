@@ -737,13 +737,18 @@ class Toolchain(object):
 
 
 class Macros(Variable):
-    def __init__(self, prefix=None):
+    def __init__(self, prefix=None, attrib="macros", imported=True):
         self.prefix = prefix or ''
+        self.attrib = attrib
+        self.imported = imported
 
     def create(self, project, writer, deps, tools):
-        macros = [tools.expand(macro) for macro in project.macros]
-        for _, artifact in deps.items():
-            macros += artifact.cxxinfo.macros.items()
+        macros = []
+        if self.attrib:
+            macros = [tools.expand(macro) for macro in getattr(project, self.attrib)]
+        if self.imported:
+            for _, artifact in deps.items():
+                macros += artifact.cxxinfo.macros.items()
         macros = ["{0}{1}".format(self.prefix, macro) for macro in macros]
         writer.variable(self.name, " ".join(macros))
 
@@ -770,8 +775,11 @@ class ImportedFlags(Variable):
 
 
 class IncludePaths(Variable):
-    def __init__(self, prefix=None):
+    def __init__(self, prefix=None, attrib="incpaths", imported=True, outdir=True):
         self.prefix = prefix or ''
+        self.outdir = outdir
+        self.attrib = attrib
+        self.imported = imported
 
     def create(self, project, writer, deps, tools):
         def expand(path):
@@ -788,12 +796,17 @@ class IncludePaths(Variable):
                 path = fs.path.join(project.joltdir, path[1:])
             return tools.expand_relpath(fs.path.join(sandbox, path), project.outdir)
 
-        incpaths = ["."] + [expand(path) for path in project.incpaths]
-        for _, artifact in deps.items():
-            incs = artifact.cxxinfo.incpaths.items()
-            if incs:
-                sandbox = tools.sandbox(artifact, project.incremental)
-                incpaths += [expand_artifact(sandbox, path) for path in incs]
+        incpaths = []
+        if self.outdir:
+            incpaths += ["."]
+        if self.attrib:
+            incpaths += [expand(path) for path in getattr(project, self.attrib)]
+        if self.imported:
+            for _, artifact in deps.items():
+                incs = artifact.cxxinfo.incpaths.items()
+                if incs:
+                    sandbox = tools.sandbox(artifact, project.incremental)
+                    incpaths += [expand_artifact(sandbox, path) for path in incs]
 
         incpaths = ["{0}{1}".format(self.prefix, path) for path in incpaths]
         writer.variable(self.name, " ".join(incpaths))
@@ -804,18 +817,23 @@ class IncludePaths(Variable):
 
 
 class LibraryPaths(Variable):
-    def __init__(self, prefix=None):
+    def __init__(self, prefix=None, attrib="libpaths", imported=True):
         self.prefix = prefix or ''
+        self.attrib = attrib
+        self.imported = imported
 
     def create(self, project, writer, deps, tools):
         if isinstance(project, CXXLibrary) and not project.shared:
             return
-        libpaths = [tools.expand_relpath(path, project.outdir) for path in project.libpaths]
-        for _, artifact in deps.items():
-            libs = artifact.cxxinfo.libpaths.items()
-            if libs:
-                sandbox = tools.sandbox(artifact, project.incremental)
-                libpaths += [fs.path.join(sandbox, path) for path in libs]
+        libpaths = []
+        if self.attrib:
+            libpaths = [tools.expand_relpath(path, project.outdir) for path in getattr(project, self.attrib)]
+        if self.imported:
+            for _, artifact in deps.items():
+                libs = artifact.cxxinfo.libpaths.items()
+                if libs:
+                    sandbox = tools.sandbox(artifact, project.incremental)
+                    libpaths += [fs.path.join(sandbox, path) for path in libs]
         libpaths = ["{0}{1}".format(self.prefix, path) for path in libpaths]
         writer.variable(self.name, " ".join(libpaths))
 
@@ -825,16 +843,21 @@ class LibraryPaths(Variable):
 
 
 class Libraries(Variable):
-    def __init__(self, prefix=None, suffix=None):
+    def __init__(self, prefix=None, suffix=None, attrib="libraries", imported=True):
         self.prefix = prefix or ''
         self.suffix = suffix or ''
+        self.attrib = attrib
+        self.imported = imported
 
     def create(self, project, writer, deps, tools):
         if isinstance(project, CXXLibrary) and not project.shared:
             return
-        libraries = [tools.expand(lib) for lib in project._libraries()]
-        for _, artifact in deps.items():
-            libraries += artifact.cxxinfo.libraries.items()
+        libraries = []
+        if self.attrib:
+            libraries = [tools.expand(lib) for lib in getattr(project, self.attrib)]
+        if self.imported:
+            for _, artifact in deps.items():
+                libraries += artifact.cxxinfo.libraries.items()
         libraries = ["{0}{1}{2}".format(self.prefix, path, self.suffix) for path in libraries]
         writer.variable(self.name, " ".join(libraries))
 
