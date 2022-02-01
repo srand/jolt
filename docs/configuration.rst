@@ -330,6 +330,7 @@ These configuration keys exist:
 * ``to`` - Receiver email address. May also be read from environment, e.g.
   ``{ENV|GERRIT_PATCHSET_UPLOADER_EMAIL}``. Multiple addresses should be
   separated by a single space.
+* ``cc`` - Copy recipients.
 * ``stylesheet`` - An optional custom XSLT stylesheet used to transform the
   Jolt result manifest into an HTML email.
 * ``on_success`` - Send emails when builds are successful. Default: ``true``

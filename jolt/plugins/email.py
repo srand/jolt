@@ -17,6 +17,7 @@ class EmailHooks(CliHook):
     def __init__(self):
         self._server = config.get("email", "server")
         self._to = config.get("email", "to")
+        self._cc = config.get("email", "cc")
         self._from = config.get("email", "from", "jolt@localhost")
         self._subject = config.get("email", "subject", "Jolt Build Report")
         self._stylesheet = config.get(
@@ -65,6 +66,8 @@ class EmailHooks(CliHook):
         msg['Subject'] = self._subject
         msg['From'] = self._from
         msg['To'] = ", ".join(utils.unique_list(self._to.split()))
+        if self._cc:
+            msg['Cc'] = ", ".join(utils.unique_list(self._cc.split()))
         msg.set_content("Your e-mail client cannot display HTML formatted e-mails.")
         msg.add_alternative(report.transform(self._stylesheet), subtype='html')
 
