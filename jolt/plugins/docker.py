@@ -375,6 +375,9 @@ class DockerImage(Task):
     The ``docker/login`` Jolt resource can be used for that purpose.
     """
 
+    squash = False
+    """ Squash image layers """
+
     tags = ["{canonical_name}:{identity}"]
     """ Optional list of image tags. Defaults to task's canonical name. """
 
@@ -388,6 +391,7 @@ class DockerImage(Task):
         self._imagefile = tools.expand(self.imagefile) if self.imagefile else None
         self._autoload = self._imagefile and self.autoload
         pull = " --pull" if self.pull else ""
+        squash = " --squash" if self.squash else ""
         tags = [tools.expand(tag) for tag in self.tags]
 
         # If dockerfile is not relative to joltdir, look for it in context
@@ -405,7 +409,7 @@ class DockerImage(Task):
                   tools.expand_relpath(context))
 
         with tools.cwd(context):
-            tools.run("docker build . -f {} -t {} {}{}", dockerfile, tags[0], buildargs, pull)
+            tools.run("docker build . -f {} -t {} {}{}{}", dockerfile, tags[0], buildargs, pull, squash)
             for tag in tags[1:]:
                 tools.run("docker tag {} {}", tags[0], tag)
 
@@ -415,22 +419,25 @@ class DockerImage(Task):
                 for tag in tags:
                     tools.run("docker push {}", tag)
 
-            if self.extract:
-                self.info("Extracting image")
-                tools.run("docker create --name {canonical_name}.{identity} {}", tags[0])
-                try:
-                    with tools.cwd(tools.builddir("rootfs")):
-                        tools.run("docker export {canonical_name}.{identity} -o rootfs.tar")
-                        tools.extract("rootfs.tar", "rootfs/")
-                finally:
-                    tools.run("docker rm {canonical_name}.{identity}")
-
-            if self._imagefile:
+            if self._imagefile or self.extract:
                 self.info("Saving image to file")
                 with tools.cwd(tools.builddir()):
-                    tools.run("docker image save {} -o {_imagefile}", tags[0])
+                    tools.run("docker image save {} -o {}", tags[0], self._imagefile or "image.tar")
+
+            if self.extract:
+                with tools.cwd(tools.builddir()):
+                    tools.extract(self._imagefile or "image.tar", "layers/")
+                    manifest = json.loads(tools.read_file("layers/manifest.json"))
+                    for image in manifest:
+                        for layer in image.get("Layers", []):
+                            self.info("Extracting layer {}", fs.path.dirname(layer))
+                            tools.extract(fs.path.join("layers", layer), "rootfs/")
+
+            if self._imagefile:
+                with tools.cwd(tools.builddir()):
                     if self.compression is not None:
                         tools.compress("{_imagefile}", "{_imagefile}.{compression}")
+
         finally:
             if self.cleanup:
                 self.info("Removing image from Docker daemon")
@@ -450,7 +457,7 @@ class DockerImage(Task):
                     if self._autoload:
                         artifact.docker.load.append("{_imagefile}")
         if self.extract:
-            with tools.cwd(tools.builddir("rootfs")):
+            with tools.cwd(tools.builddir()):
                 artifact.collect("rootfs", symlinks=True)
             artifact.paths.rootfs = "rootfs"
         if self._autoload:
