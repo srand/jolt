@@ -673,12 +673,20 @@ def freeze(ctx, task, default, output, remove):
 
 @cli.command(name="list")
 @click.argument("task", type=str, nargs=-1, required=False, autocompletion=_autocomplete_tasks)
+@click.option("-a", "--all", is_flag=True, help="List all direct and indirect dependencies of TASK.")
 @click.option("-r", "--reverse", type=str, help="Only list dependencies of TASK that are also reverse dependencies of REVERSE.", metavar="REVERSE")
 @click.pass_context
-def _list(ctx, task=None, reverse=None):
+def _list(ctx, task=None, all=False, reverse=None):
     """
     List all tasks, or dependencies of a task.
 
+    By default, when no TASK is specified, all known task names
+    are listed in alphabetical order.
+
+    When a TASK is specified, only direct dependencies of that task
+    are listed. Use -a to also list its indirect dependencies.
+
+    Multiple TASK names are allowed.
     """
 
     raise_error_if(not task and reverse, "TASK required with --reverse")
@@ -707,12 +715,16 @@ def _list(ctx, task=None, reverse=None):
     nodes = dag.select(
         lambda graph, node:
         node.short_qualified_name in task or node.qualified_name in task)
-
-    tasklist = set()
+    nodes = list(nodes)
     iterator = dag.predecessors if reverse else dag.successors
 
-    for node in nodes:
+    tasklist = set()
+    while nodes:
+        node = nodes.pop()
         for task in iterator(node):
+            if all and task.short_qualified_name not in tasklist:
+                new_node = dag.get_task(task.qualified_name)
+                nodes.append(new_node)
             tasklist.add(task.short_qualified_name)
 
     for task in sorted(list(tasklist)):

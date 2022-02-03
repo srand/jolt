@@ -41,11 +41,35 @@ class ListCli(JoltTest):
             pass
         class Task2(Task):
             requires = ["task1"]
+        class Task3(Task):
+            requires = ["task1", "task2"]
+        class Task4(Task):
+            requires = ["task3"]
         ---
         """
         r = self.jolt("list task2")
         self.assertIn("task1", r)
         self.assertNotIn("task2", r)
+        self.assertNotIn("task3", r)
+        self.assertNotIn("task4", r)
+
+        r = self.jolt("list task4")
+        self.assertNotIn("task1", r)
+        self.assertNotIn("task2", r)
+        self.assertIn("task3", r)
+        self.assertNotIn("task4", r)
+
+        r = self.jolt("list -a task2")
+        self.assertIn("task1", r)
+        self.assertNotIn("task2", r)
+        self.assertNotIn("task3", r)
+        self.assertNotIn("task4", r)
+
+        r = self.jolt("list -a task4")
+        self.assertIn("task1", r)
+        self.assertIn("task2", r)
+        self.assertIn("task3", r)
+        self.assertNotIn("task4", r)
 
     def test_list_reverse(self):
         """
@@ -61,10 +85,25 @@ class ListCli(JoltTest):
         ---
         """
         r = self.jolt("list task2 -r task1")
-        self.assertIn("task2", r)
         self.assertNotIn("task1", r)
+        self.assertIn("task2", r)
+        self.assertNotIn("task3", r)
+        self.assertNotIn("task4", r)
 
         r = self.jolt("list task4 -r task1")
+        self.assertNotIn("task1", r)
         self.assertIn("task2", r)
         self.assertIn("task3", r)
+        self.assertNotIn("task4", r)
+
+        r = self.jolt("list -a task2 -r task1")
         self.assertNotIn("task1", r)
+        self.assertIn("task2", r)
+        self.assertNotIn("task3", r)
+        self.assertNotIn("task4", r)
+
+        r = self.jolt("list -a task4 -r task1")
+        self.assertNotIn("task1", r)
+        self.assertIn("task2", r)
+        self.assertIn("task3", r)
+        self.assertIn("task4", r)
