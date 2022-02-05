@@ -360,6 +360,9 @@ class DockerImage(Task):
     Defaults to the task's canonical name.
     """
 
+    platform = None
+    """ Target platform, e.g. linux/arm/v7. """
+
     pull = True
     """
     Always pull images when building.
@@ -390,6 +393,7 @@ class DockerImage(Task):
         dockerfile = tools.expand_path(self.dockerfile)
         self._imagefile = tools.expand(self.imagefile) if self.imagefile else None
         self._autoload = self._imagefile and self.autoload
+        platform = f" --platform {self.platform}" if self.platform else ""
         pull = " --pull" if self.pull else ""
         squash = " --squash" if self.squash else ""
         tags = [tools.expand(tag) for tag in self.tags]
@@ -409,7 +413,7 @@ class DockerImage(Task):
                   tools.expand_relpath(context))
 
         with tools.cwd(context):
-            tools.run("docker build . -f {} -t {} {}{}{}", dockerfile, tags[0], buildargs, pull, squash)
+            tools.run("docker build {platform} . -f {} -t {} {}{}{}", dockerfile, tags[0], buildargs, pull, squash, platform=platform)
             for tag in tags[1:]:
                 tools.run("docker tag {} {}", tags[0], tag)
 
