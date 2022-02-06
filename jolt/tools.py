@@ -993,8 +993,10 @@ class Tools(object):
 
         """
 
+        pathname = self.expand_relpath(pathname, self.getcwd())
+
         raise_error_if(
-            not os.path.exists(self.expand_path(pathname)),
+            not os.path.exists(pathname),
             "template not found: {}".format(pathname))
 
         env = Environment(
