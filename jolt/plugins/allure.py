@@ -35,7 +35,7 @@ class _ReporterTest(object):
     def attach(self, name, content, mime_type=None):
         with self._task.tools.cwd(self._outdirfull):
             logpath = utils.sha1(content) + "-" + name
-            self._task.tools.write_file(logpath, content)
+            self._task.tools.write_file(logpath, content, expand=False)
             self._result.attachments.append(
                 Attachment(source=logpath, name=name, type=mime_type))
 
