@@ -1441,6 +1441,8 @@ class Tools(object):
                     os.makedirs(chroot + path, exist_ok=True)
                 else:
                     os.makedirs(os.path.dirname(chroot + path), exist_ok=True)
+                    with open(chroot + path, "a"):
+                        pass
                 assert libc.mount(
                     c_char_p(path.encode("utf-8")),
                     c_char_p((chroot + path).encode("utf-8")),
@@ -1468,6 +1470,15 @@ class Tools(object):
             os.chroot(chroot)
             os.chdir(self.getcwd())
 
+        def catcher():
+            try:
+                unshare_chroot()
+            except Exception as e:
+                import traceback
+                with open("/tmp/exception", "w") as f:
+                    f.write(traceback.format_exc())
+                raise e
+
         old_chroot = self._chroot
         old_preexec_fn = self._preexec_fn
         self._chroot = chroot
@@ -1493,8 +1504,10 @@ class Tools(object):
 
         def map_ids(filename, ids):
             with open(filename, 'w') as file_:
+                idmap = ""
                 for new_id, old_id, count in ids:
-                    file_.write(f"{new_id} {old_id} {count}")
+                    idmap += f"{new_id} {old_id} {count}\n"
+                file_.write(idmap)
 
         def map_uids(uids):
             return map_ids("/proc/self/uid_map", uids)
