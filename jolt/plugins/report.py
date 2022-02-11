@@ -10,13 +10,19 @@ class ReportHooks(TaskHook):
 
     def finalize_report(self, report, task, result):
         report.name = task.qualified_name
-        report.duration = str(task.duration_running.seconds)
         report.goal = str(task.is_goal()).lower()
         report.identity = task.identity
         report.result = result
+        if task.duration_running:
+            report.duration = str(task.duration_running.seconds)
         if hasattr(task, "logstash"):
             report.logstash = task.logstash
         self.manifest.append(report)
+
+    def task_skipped(self, task):
+        if task.is_goal():
+            with task.task.report() as report:
+                self.finalize_report(report.manifest, task, "SKIPPED")
 
     @contextmanager
     def task_run(self, task):
