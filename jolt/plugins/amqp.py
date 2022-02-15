@@ -719,16 +719,16 @@ class AmqpExecutor(scheduler.NetworkExecutor):
             raise_error("[AMQP] remote build failed with status: {0}".format(manifest.result))
 
         raise_task_error_if(
-            not env.cache.is_available_remotely(self.task), self.task,
+            self.task.has_artifact() and not env.cache.is_available_remotely(self.task), self.task,
             "no task artifact available in any cache, check configuration")
 
         raise_task_error_if(
-            not env.cache.download(self.task) and env.cache.download_enabled(),
+            self.task.has_artifact() and not env.cache.download(self.task) and env.cache.download_enabled(),
             self.task, "failed to download task artifact")
 
         for extension in self.task.extensions:
             raise_task_error_if(
-                not env.cache.download(extension) and env.cache.download_enabled(),
+                self.task.has_artifact() and not env.cache.download(extension) and env.cache.download_enabled(),
                 self.task, "failed to download task artifact")
 
         return self.task

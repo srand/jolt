@@ -46,6 +46,9 @@ class TaskApi(JoltTest):
 
         class Cacheable(Task):
             cacheable = True
+
+        class AsReq(Task):
+            requires = ["noncacheable"]
         ---
         """
         r = self.jolt("build cacheable")
@@ -58,6 +61,13 @@ class TaskApi(JoltTest):
         r = self.jolt("build noncacheable")
         self.assertBuild(r, "noncacheable")
         self.assertNoArtifact(r)
+
+        r = self.jolt("build asreq")
+        self.assertBuild(r, "noncacheable")
+        self.assertBuild(r, "asreq")
+        r = self.jolt("build asreq")
+        self.assertBuild(r, "noncacheable")
+        self.assertNoBuild(r, "asreq")
 
     def test_expires_whenunused(self):
         """
