@@ -182,7 +182,7 @@ class DockerContainer(Resource):
         volumes = ["{joltdir}:{joltdir}", f"{cachedir}:{cachedir}"]
         return " ".join(["-v " + self.tools.expand(vol) for vol in self.volumes + volumes])
 
-    def acquire(self, artifact, deps, tools):
+    def acquire(self, artifact, deps, tools, owner):
         try:
             image = deps[self.image]
             image = str(image.strings.tag)
@@ -199,7 +199,7 @@ class DockerContainer(Resource):
         artifact.container = self.container
         artifact.info = json.loads(info)[0]
 
-    def release(self, artifact, deps, tools):
+    def release(self, artifact, deps, tools, owner):
         self._info("Stopping container '{container}'")
         tools.run("docker stop {container}", output_on_error=True)
 

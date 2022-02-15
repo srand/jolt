@@ -441,6 +441,6 @@ def deprecated(func):
     @wraps(func)
     def deprecation_warning(*args, **kwargs):
         from jolt import log
-        log.warning("Called method is deprecated: {}", func.__name__)
+        log.warning("Called method is deprecated: {}", func.__qualname__)
         return func(*args, **kwargs)
     return deprecation_warning

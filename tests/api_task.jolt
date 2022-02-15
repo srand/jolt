@@ -690,9 +690,10 @@ class TaskApi(JoltTest):
         """
         --- tasks:
         class R1(Resource):
-            def acquire(self, artifact, deps, tools):
+            def acquire(self, artifact, deps, tools, owner):
                 print("Acquire R1")
                 tools.write_file("r1.lock", "locked")
+                assert owner.name == "a", "Incorrect task argument"
                 assert False, "Acquisition Error"
             def release(self, artifact, deps, tools):
                 print("Release R1")
@@ -703,9 +704,10 @@ class TaskApi(JoltTest):
             def acquire(self, artifact, deps, tools):
                 print("Acquire R2")
                 tools.write_file("r2.lock", "locked")
-            def release(self, artifact, deps, tools):
+            def release(self, artifact, deps, tools, owner):
                 print("Release R2")
                 tools.write_file("r2.lock", "unlocked")
+                assert owner.name == "a", "Incorrect task argument"
 
         class A(Task):
             requires = ["r1", "r2"]

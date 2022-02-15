@@ -31,7 +31,7 @@ class AmqpWorker(Resource):
 
     requires = ["jolt/image"]
 
-    def acquire(self, artifact, deps, tools):
+    def acquire(self, artifact, deps, tools, owner):
         try:
             with tools.cwd(tools.builddir()):
                 for file in tools.glob("{joltdir}/../docker/swarm/*"):
@@ -60,7 +60,7 @@ class AmqpWorker(Resource):
             else:
                 raise e
 
-    def release(self, artifact, deps, tools):
+    def release(self, artifact, deps, tools, owner):
         if artifact.active:
             tools.run("docker stack rm jolt_test")
             for i in range(0, 20):

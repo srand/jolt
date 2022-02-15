@@ -1322,7 +1322,7 @@ class Resource(Task):
     def info(self, fmt, *args, **kwargs):
         pass
 
-    def acquire(self, artifact, deps, tools):
+    def acquire(self, artifact, deps, tools, owner):
         """ Called to acquire the resource.
 
         An implementor overrides this method in a subclass. The acquired
@@ -1338,10 +1338,11 @@ class Resource(Task):
             deps (:class:`~jolt.Context`): Task execution context used to access the
                 artifacts of dependencies.
             tools (:class:`~jolt.Tools`): A task specific toolbox.
+            owner (:class:`~jolt.Task`): The owner task for which the resource is acquired.
 
         """
 
-    def release(self, artifact, deps, tools):
+    def release(self, artifact, deps, tools, owner):
         """ Called to release the resource.
 
         An implementor overrides this method in a subclass.
@@ -1353,6 +1354,7 @@ class Resource(Task):
             deps (:class:`~jolt.Context`): Task execution context used to access the
                 artifacts of dependencies.
             tools (:class:`~jolt.Tools`): A task specific toolbox.
+            owner (:class:`~jolt.Task`): The owner task for which the resource is released.
         """
 
     def run(self, env, tools):
@@ -1377,10 +1379,10 @@ class WorkspaceResource(Resource):
         raise_task_error_if(len(self.requires) > 0, self,
                             "workspace resource is not allowed to have requirements")
 
-    def acquire(self, artifact, deps, tools):
+    def acquire(self, **kwargs):
         return self.acquire_ws()
 
-    def release(self, artifact, deps, tools):
+    def release(self, **kwargs):
         return self.release_ws()
 
     def acquire_ws(self):
@@ -1890,15 +1892,33 @@ class ResourceAttributeSetProvider(ArtifactAttributeSetProvider):
         pass
 
     def apply(self, task, artifact):
-        task = artifact.get_task()
-        if isinstance(task, Resource):
-            deps = task._run_env
+        resource = artifact.get_task()
+        if isinstance(resource, Resource):
+            from inspect import signature
+
+            deps = resource._run_env
             deps.__enter__()
-            task.acquire(artifact, deps, task.tools)
+            sig = signature(resource.acquire)
+            try:
+                ba = sig.bind_partial(artifact=artifact, deps=deps, tools=resource.tools, owner=task)
+                acquire = resource.acquire
+            except:
+                ba = sig.bind_partial(artifact, deps, resource.tools)
+                acquire = utils.deprecated(resource.acquire)
+            acquire(*ba.args, **ba.kwargs)
 
     def unapply(self, task, artifact):
-        task = artifact.get_task()
-        if isinstance(task, Resource):
-            env = task._run_env
-            task.release(artifact, env, task.tools)
-            env.__exit__(None, None, None)
+        resource = artifact.get_task()
+        if isinstance(resource, Resource):
+            from inspect import signature
+
+            deps = resource._run_env
+            sig = signature(resource.release)
+            try:
+                ba = sig.bind_partial(artifact=artifact, deps=deps, tools=resource.tools, owner=task)
+                release = resource.release
+            except:
+                ba = sig.bind_partial(artifact, deps, resource.tools)
+                release = utils.deprecated(resource.release)
+            release(*ba.args, **ba.kwargs)
+            deps.__exit__(None, None, None)

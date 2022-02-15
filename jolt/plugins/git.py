@@ -328,7 +328,7 @@ class GitSrc(WorkspaceResource, FileInfluence):
             return self.sha.get_value()
         return None
 
-    def acquire(self, artifact, env, tools):
+    def acquire(self, **kwargs):
         self._acquire_ws()
 
     def acquire_ws(self):
