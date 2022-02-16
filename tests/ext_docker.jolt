@@ -24,12 +24,11 @@ class DockerExt(JoltTest):
             pass
 
         ---
-	"""
+        """
 
         b = self.build("busybox")
         a = self.artifacts(b)
         self.assertExists(path.join(a[0], "busybox.tar"))
-
 
     def test_dockerfile(self):
         """
@@ -43,13 +42,11 @@ class DockerExt(JoltTest):
             dockerfile = "Testfile"
 
         ---
-	"""
+        """
 
         b = self.build("busybox")
         a = self.artifacts(b)
         self.assertExists(path.join(a[0], "busybox.tar"))
-
-
 
     def test_dockerfile_as_source(self):
         """
@@ -66,12 +63,32 @@ class DockerExt(JoltTest):
             \"\"\"
 
         ---
-	"""
+        """
 
         b = self.build("busybox")
         a = self.artifacts(b)
         self.assertExists(path.join(a[0], "busybox.tar"))
 
+    def test_extract(self):
+        """
+        --- file: Testfile
+        FROM busybox:latest
+        RUN touch test-file1 test-file2
+        RUN rm test-file1
+
+        --- tasks:
+        from jolt.plugins.docker import *
+
+        class Busybox(DockerImage):
+            dockerfile = "Testfile"
+            extract = True
+        ---
+        """
+
+        b = self.build("busybox")
+        a = self.artifacts(b)
+        self.assertNotExists(path.join(a[0], "rootfs", "test-file1"))
+        self.assertExists(path.join(a[0], "rootfs", "test-file2"))
 
     def test_imagefile(self):
         """
@@ -85,12 +102,11 @@ class DockerExt(JoltTest):
             imagefile = "image.tar"
 
         ---
-	"""
+        """
 
         b = self.build("busybox")
         a = self.artifacts(b)
         self.assertExists(path.join(a[0], "image.tar"))
-
 
     def test_compression(self):
         """
@@ -113,7 +129,7 @@ class DockerExt(JoltTest):
             compression = "xz"
 
         ---
-	"""
+        """
 
         b1 = self.build("busybox/bz2")
         b2 = self.build("busybox/gz")
@@ -131,7 +147,6 @@ class DockerExt(JoltTest):
         self.assertIn("gzip", self.tools.run("file {}", f2))
         self.assertIn("XZ compressed", self.tools.run("file {}", f3))
 
-
     def test_tag(self):
         """
         --- file: Dockerfile
@@ -144,7 +159,7 @@ class DockerExt(JoltTest):
             tags = ["busybox:jolt", "busybox:latest-jolt"]
 
         ---
-	"""
+        """
 
         b = self.build("busybox")
         a = self.artifacts(b)
@@ -155,7 +170,6 @@ class DockerExt(JoltTest):
             self.assertIn("busybox:jolt", loaded)
         finally:
             utils.call_and_catch(self.tools.run, "docker image rm busybox:jolt")
-
 
     def test_cleanup(self):
         """
@@ -169,7 +183,7 @@ class DockerExt(JoltTest):
             tags = ["busybox:jolt"]
             cleanup = BooleanParameter()
         ---
-	"""
+        """
 
         try:
             b = self.build("busybox:cleanup=true")
@@ -183,7 +197,6 @@ class DockerExt(JoltTest):
         finally:
             self.tools.run("docker image rm -f busybox:jolt")
 
-
     def test_imagefile(self):
         """
         --- file: Dockerfile
@@ -196,7 +209,7 @@ class DockerExt(JoltTest):
             tags = ["busybox:jolt"]
             imagefile = Parameter()
         ---
-	"""
+        """
         b = self.build("busybox:imagefile=image.tar")
         a = self.artifacts(b)
         f = path.join(a[0], "image.tar")
@@ -208,7 +221,6 @@ class DockerExt(JoltTest):
         a = self.artifacts(b)
         f = self.tools.glob(path.join(a[0], "*"))
         self.assertEqual(0, len(f))
-
 
     def test_autoload_used(self):
         """
@@ -228,9 +240,8 @@ class DockerExt(JoltTest):
                 images = tools.run("docker image ls --format '{{{{{{{{.Repository}}}}}}}}:{{{{{{{{.Tag}}}}}}}}'")
                 assert deps["busybox"].strings.tag.get_value() in images, "image not properly loaded"
         ---
-	"""
+        """
         self.build("consumer")
-
 
     def test_autoload_not_used_when_imagefile_is_none(self):
         """
@@ -254,7 +265,7 @@ class DockerExt(JoltTest):
                 images = tools.run("docker image ls --format '{{{{{{{{.Repository}}}}}}}}:{{{{{{{{.Tag}}}}}}}}'")
                 assert deps["busybox"].strings.tag.get_value() not in images, "image not properly loaded"
         ---
-	"""
+        """
         self.build("consumer")
         self.assertNotIn("busybox:latest", self.tools.run("docker image ls --format '{{{{.Repository}}}}:{{{{.Tag}}}}'"))
 
@@ -280,7 +291,7 @@ class DockerExt(JoltTest):
                 images = tools.run("docker image ls --format '{{{{{{{{.Repository}}}}}}}}:{{{{{{{{.Tag}}}}}}}}'")
                 assert deps["busybox"].strings.tag.get_value() not in images, "image not properly loaded"
         ---
-	"""
+        """
         self.build("consumer")
         self.assertNotIn("busybox:latest", self.tools.run("docker image ls --format '{{{{.Repository}}}}:{{{{.Tag}}}}'"))
 
@@ -304,6 +315,6 @@ class DockerExt(JoltTest):
                 images = tools.run("docker image ls --format '{{{{{{{{.Repository}}}}}}}}:{{{{{{{{.Tag}}}}}}}}'")
                 assert "busybox:latest" in images, "image not properly loaded"
         ---
-	"""
+        """
         self.build("consumer")
         self.assertNotIn("busybox:latest", self.tools.run("docker image ls --format '{{{{.Repository}}}}:{{{{.Tag}}}}'"))

@@ -15,6 +15,7 @@ from jolt.cache import ArtifactAttributeSetProvider
 import json
 from os import path, getuid
 from platform import system
+import tarfile
 
 
 class DockerListVariable(ArtifactListAttribute):
@@ -268,6 +269,43 @@ TaskRegistry.get().add_task_class(DockerClient)
 TaskRegistry.get().add_task_class(DockerLogin)
 
 
+class _Tarfile(tarfile.TarFile):
+
+    def without(self, targetpath):
+        dirname, filename = fs.path.split(targetpath)
+        if not filename.startswith(".wh."):
+            return None
+        fs.unlink(fs.path.join(dirname, filename[4:]), ignore_errors=True, tree=True)
+        return True
+
+    def makedev(self, tarinfo, targetpath):
+        if self.without(targetpath):
+            return
+        super().makedev(tarinfo, targetpath)
+
+    def makedir(self, tarinfo, targetpath):
+        if self.without(targetpath):
+            return
+        super().makedir(tarinfo, targetpath)
+
+    def makefifo(self, tarinfo, targetpath):
+        if self.without(targetpath):
+            return
+        super().makefifo(tarinfo, targetpath)
+
+    def makefile(self, tarinfo, targetpath):
+        if self.without(targetpath):
+            return
+        if fs.path.lexists(targetpath):
+            fs.unlink(targetpath)
+        super().makefile(tarinfo, targetpath)
+
+    def makelink(self, tarinfo, targetpath):
+        if self.without(targetpath):
+            return
+        super().makelink(tarinfo, targetpath)
+
+
 class DockerImage(Task):
     """
     Abstract Task: Builds and publishes a Docker image.
@@ -387,6 +425,13 @@ class DockerImage(Task):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
+    def _extract_layer(self, tools, layerpath, targetpath):
+        layerpath = tools.expand_path(layerpath)
+        targetpath = tools.expand_path(targetpath)
+
+        with _Tarfile.open(layerpath, 'r') as tar:
+            tar.extractall(targetpath)
+
     def run(self, deps, tools):
         buildargs = " ".join(["--build-arg " + tools.expand(arg) for arg in self.buildargs])
         context = tools.expand_relpath(self.context, self.joltdir)
@@ -435,7 +480,7 @@ class DockerImage(Task):
                     for image in manifest:
                         for layer in image.get("Layers", []):
                             self.info("Extracting layer {}", fs.path.dirname(layer))
-                            tools.extract(fs.path.join("layers", layer), "rootfs/")
+                            self._extract_layer(tools, fs.path.join("layers", layer), "rootfs/")
 
             if self._imagefile:
                 with tools.cwd(tools.builddir()):

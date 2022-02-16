@@ -95,10 +95,13 @@ def rmtree(path, ignore_errors=False):
     shutil.rmtree(path, onerror=onerror)
 
 
-def unlink(path, ignore_errors=False):
+def unlink(path, ignore_errors=False, tree=False):
     try:
         if os.path.isdir(path) and not os.path.islink(path):
-            os.rmdir(path)
+            if tree:
+                rmtree(path, ignore_errors=ignore_errors)
+            else:
+                os.rmdir(path)
         else:
             os.unlink(path)
     except Exception as e:
