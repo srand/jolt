@@ -30,7 +30,7 @@ class LogStashHooks(TaskHook):
             with open(filepath, "w") as f:
                 f.write(logbuffer)
             task.logstash = self._get_uri(task)
-            task.tools.upload(filepath, task.logstash)
+            task.tools.upload(filepath, task.logstash, exceptions=False)
 
     @contextmanager
     def task_run(self, task):

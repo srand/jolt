@@ -63,7 +63,7 @@ class Http(cache.StorageProvider):
             return False
         with self._cache.get_artifact(node) as artifact:
             url = self._get_url(node, artifact)
-            if node.tools.download(url, artifact.get_archive_path(), exceptions=True, timeout=TIMEOUT):
+            if node.tools.download(url, artifact.get_archive_path(), exceptions=False, timeout=TIMEOUT):
                 return True
         return False
 
@@ -79,8 +79,11 @@ class Http(cache.StorageProvider):
         with self._cache.get_artifact(node) as artifact:
             url = self._get_url(node, artifact)
             archive = artifact.get_archive()
-            return node.tools.upload(archive, url, exceptions=True,
-                                     auth=self._get_auth(), timeout=TIMEOUT)
+            return node.tools.upload(
+                archive, url,
+                exceptions=False,
+                auth=self._get_auth(),
+                timeout=TIMEOUT)
         return False
 
     def upload_enabled(self):

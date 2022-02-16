@@ -644,22 +644,30 @@ class Tools(object):
         finally:
             self._cwd = prev
 
-    def download(self, url, pathname, exceptions=False, **kwargs):
-        """ Downloads a file using HTTP.
+    def download(self, url, pathname, exceptions=True, **kwargs):
+        """
+        Downloads a file using HTTP.
+
+        Throws a JoltError exception on failure.
 
         Args:
            url (str): URL to the file to be downloaded.
            pathname (str): Name/path of destination file.
-           exceptions (boolean): Raise exception if connection fails. Default: false.
            kwargs (optional): Addidional keyword arguments passed on
                directly ``requests.get()``.
 
         """
+
         url = self.expand(url)
         pathname = self.expand_path(pathname)
         try:
             from requests.api import get
+
             response = get(url, stream=True, **kwargs)
+            raise_error_if(
+                exceptions and response.status_code not in [200],
+                f"Download from '{url}' failed with status '{response.status_code}'")
+
             name = fs.path.basename(pathname)
             size = int(response.headers.get('content-length', 0))
             with log.progress("Downloading {0}".format(name), size, "B") as pbar:
@@ -671,18 +679,12 @@ class Tools(object):
                 actual_size = self.file_size(pathname)
                 raise_error_if(
                     size != 0 and size != actual_size,
-                    "downloaded file was truncated to {actual_size}/{size} bytes: {name}".format(
-                        actual_size=actual_size, size=size, name=name))
-            if response.status_code not in [200, 404]:
-                log.verbose("Server response {} for {}", response.status_code, url)
+                    f"Downloaded file was truncated to {actual_size}/{size} bytes: {name}")
+
             return response.status_code == 200
-        except KeyboardInterrupt as e:
-            raise e
         except Exception as e:
-            log.exception()
-            if exceptions:
-                raise e
-            return False
+            utils.call_and_catch(self.unlink, pathname)
+            raise e
 
     @contextmanager
     def environ(self, **kwargs):
@@ -1520,42 +1522,35 @@ class Tools(object):
         map_uids([(uid, uid, 1)])
         map_gids([(gid, gid, 1)])
 
-    def upload(self, pathname, url, exceptions=False, auth=None, **kwargs):
-        """ Uploads a file using HTTP (PUT).
+    def upload(self, pathname, url, exceptions=True, auth=None, **kwargs):
+        """
+        Uploads a file using HTTP (PUT).
+
+        Throws a JoltError exception on failure.
 
         Args:
            pathname (str): Name/path of file to be uploaded.
            url (str): Destination URL.
-           exceptions (boolean): Raise exception if connection fails. Default: false.
            auth (requests.auth.AuthBase, optional): Authentication helper.
                See requests.auth for details.
            kwargs (optional): Addidional keyword arguments passed on
                directly to `~requests.put()`.
 
         """
-
         pathname = self.expand_path(pathname)
-        try:
-            name = fs.path.basename(pathname)
-            size = self.file_size(pathname)
-            with log.progress("Uploading " + name, size, "B") as pbar, \
-                 open(pathname, 'rb') as fileobj:
-                def read():
-                    data = fileobj.read(4096)
-                    pbar.update(len(data))
-                    return data
-                from requests.api import put
-                response = put(url, data=iter(read, b''), auth=auth, **kwargs)
-                if response.status_code not in [201, 204]:
-                    log.verbose("Server response {} for {}", response.status_code, url)
-                return response.status_code in [201, 204]
-        except KeyboardInterrupt as e:
-            raise e
-        except Exception as e:
-            log.exception()
-            if exceptions:
-                raise e
-        return False
+        name = fs.path.basename(pathname)
+        size = self.file_size(pathname)
+        with log.progress("Uploading " + name, size, "B") as pbar, open(pathname, 'rb') as fileobj:
+            def read():
+                data = fileobj.read(4096)
+                pbar.update(len(data))
+                return data
+            from requests.api import put
+            response = put(url, data=iter(read, b''), auth=auth, **kwargs)
+            raise_error_if(
+                exceptions and response.status_code not in [201, 204],
+                f"Upload to '{url}' failed with status '{response.status_code}'")
+        return response.status_code in [201, 204]
 
     def read_file(self, pathname, binary=False):
         """ Reads a file. """

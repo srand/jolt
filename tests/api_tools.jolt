@@ -325,9 +325,21 @@ class ToolsApi(JoltTest):
         self.assertExists(os.path.join(a[0], "output.txt"))
 
     def test_cwd_non_existing(self):
-        with self.assertRaises(Exception, msg="failed to change directory"):
+        with self.assertRaisesRegex(Exception, "failed to change directory"):
             with self.tools.cwd("nonexisting"):
                 pass
+
+    def test_download(self):
+        with self.tools.cwd(self.ws):
+            with self.assertRaisesRegex(Exception, r"Download from .* failed with status .*"):
+                self.tools.download("https://www.sunet.se/invalid", "index.html")
+            self.tools.download("https://www.sunet.se/", "index.html")
+
+    def test_upload(self):
+        with self.tools.cwd(self.ws):
+            self.tools.write_file("index.html")
+            with self.assertRaisesRegex(Exception, r"Upload to .* failed with status .*"):
+                self.tools.upload("index.html", "https://www.example.com/invalid")
 
     def test_extract_zip(self):
         with self.tools.cwd(self.ws):
@@ -502,7 +514,7 @@ class ToolsApi(JoltTest):
         ---
         """
         r = self.build("a")
-        self.assertIn("method is deprecated: obsolete", r)
+        self.assertIn("method is deprecated: A.obsolete", r)
 
     def test_version(self):
         from jolt.version_utils import version, requirement

@@ -1495,10 +1495,10 @@ class Download(Task):
         self._builddir = tools.builddir()
         filename = self._filename_from_url(tools)
         with tools.cwd(self._builddir):
-            raise_task_error_if(
-                not tools.download(self.url, filename), self,
-                "download failed: {}", tools.expand(self.url))
-        if self.extract and any(map(lambda n: filename.endswith(n), [".tar", ".tar.bz2", ".tar.gz", ".tar.xz", ".tgz", ".zip"])):
+            tools.download(self.url, filename), self,
+
+        supported_formats = [".tar", ".tar.bz2", ".tar.gz", ".tar.xz", ".tgz", ".zip"]
+        if self.extract and any(map(lambda n: filename.endswith(n), supported_formats)):
             self._srcdir = self._builddir
             self._builddir = tools.builddir("extracted")
             with tools.cwd(self._builddir):
@@ -1902,7 +1902,7 @@ class ResourceAttributeSetProvider(ArtifactAttributeSetProvider):
             try:
                 ba = sig.bind_partial(artifact=artifact, deps=deps, tools=resource.tools, owner=task)
                 acquire = resource.acquire
-            except:
+            except Exception:
                 ba = sig.bind_partial(artifact, deps, resource.tools)
                 acquire = utils.deprecated(resource.acquire)
             acquire(*ba.args, **ba.kwargs)
@@ -1917,7 +1917,7 @@ class ResourceAttributeSetProvider(ArtifactAttributeSetProvider):
             try:
                 ba = sig.bind_partial(artifact=artifact, deps=deps, tools=resource.tools, owner=task)
                 release = resource.release
-            except:
+            except Exception:
                 ba = sig.bind_partial(artifact, deps, resource.tools)
                 release = utils.deprecated(resource.release)
             release(*ba.args, **ba.kwargs)

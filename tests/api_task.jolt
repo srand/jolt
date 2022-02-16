@@ -678,6 +678,9 @@ class TaskApi(JoltTest):
         self.assertExists(os.path.join(a[0], "zlib2", "gzlib.c"))
         self.assertExists(os.path.join(a[0], "zlib3", "gzlib.c"))
 
+        with self.assertRaises(Exception):
+            self.build("zlib:version=invalid")
+
         r = self.build("zlibarchive")
         a = self.artifacts(r)
         self.assertExists(os.path.join(a[0], "zlib-1.2.11.tar.gz"))
