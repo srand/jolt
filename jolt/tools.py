@@ -1419,7 +1419,7 @@ class Tools(object):
             self.mkdir("work")
             self.mkdir("uppr")
         overlayopts = f"upperdir={overlaydir}/uppr,workdir={overlaydir}/work,lowerdir={chroot}"
-        chroot = overlayrootdir
+        chrootoverlay = overlayrootdir
 
         def unshare_chroot():
             Tools._unshare()
@@ -1433,21 +1433,21 @@ class Tools(object):
             def mount_overlay():
                 libc.mount(
                     c_char_p("overlay".encode("utf-8")),
-                    c_char_p(chroot.encode("utf-8")),
+                    c_char_p(chrootoverlay.encode("utf-8")),
                     c_char_p("overlay".encode("utf-8")),
                     0,
                     c_char_p(overlayopts.encode("utf-8"))) == 0
 
             def mount_bind(path):
                 if os.path.isdir(path):
-                    os.makedirs(chroot + path, exist_ok=True)
+                    os.makedirs(chrootoverlay + path, exist_ok=True)
                 else:
-                    os.makedirs(os.path.dirname(chroot + path), exist_ok=True)
-                    with open(chroot + path, "a"):
+                    os.makedirs(os.path.dirname(chrootoverlay + path), exist_ok=True)
+                    with open(chrootoverlay + path, "a"):
                         pass
                 assert libc.mount(
                     c_char_p(path.encode("utf-8")),
-                    c_char_p((chroot + path).encode("utf-8")),
+                    c_char_p((chrootoverlay + path).encode("utf-8")),
                     None,
                     MS_BIND | MS_REC,
                     None) == 0
@@ -1469,7 +1469,7 @@ class Tools(object):
             if mount_cachedir:
                 mount_bind(config.get_cachedir())
 
-            os.chroot(chroot)
+            os.chroot(chrootoverlay)
             os.chdir(self.getcwd())
 
         def catcher():
@@ -1570,8 +1570,12 @@ class Tools(object):
         executable = self.expand(executable)
         path = self._env.get("PATH")
         if self._chroot:
-            path = self._chroot + fs.pathsep + path
-        return shutil.which(executable, path=path)
+            path = fs.pathsep.join(
+                [self._chroot + p for p in path.split(fs.pathsep)]) + fs.pathsep + path
+        result = shutil.which(executable, path=path)
+        if result and self._chroot and result.startswith(self._chroot):
+            result = result[len(self._chroot):]
+        return result
 
     def write_file(self, pathname, content=None, expand=True, **kwargs):
         """ Creates a file.
