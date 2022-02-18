@@ -347,17 +347,94 @@ class ToolsApi(JoltTest):
             self.tools.extract("tests.zip", self.ws)
             self.assertExists("api_tools.jolt")
 
+    def test_extract_zip_with_execute_bits(self):
+        """
+        --- file: test1.txt
+        test
+        --- file: test2.txt
+        t e s t
+        ---
+        """
+        with self.tools.cwd(self.ws):
+            self.tools.chmod("test1.txt", 0o555)
+            self.tools.run("zip tests.zip *.txt")
+            self.tools.extract("tests.zip", "extracted/")
+            self.assertExists("extracted/test1.txt")
+            self.assertTrue(os.access(self.tools.expand_path("extracted/test1.txt"), os.X_OK))
+
+    def test_extract_zip_specific_file(self):
+        """
+        --- file: test1.txt
+        test
+        --- file: test2.txt
+        t e s t
+        ---
+        """
+        with self.tools.cwd(self.ws):
+            self.tools.run("zip tests.zip *.txt")
+            self.tools.extract("tests.zip", "extracted/", files=["test1.txt"])
+            self.assertExists("extracted/test1.txt")
+            self.assertNotExists("extracted/test2.txt")
+
     def test_extract_tar_gz(self):
         with self.tools.cwd(self.ws):
             self.tools.run("tar czvf tests.tar.gz ../../api_tools.jolt")
             self.tools.extract("tests.tar.gz", self.ws)
             self.assertExists("api_tools.jolt")
 
+    def test_extract_tar_gz_specific_file(self):
+        """
+        --- file: test1.txt
+        test
+        --- file: test2.txt
+        t e s t
+        ---
+        """
+        with self.tools.cwd(self.ws):
+            self.tools.run("tar czvf tests.tar.gz ./test1.txt ./test2.txt")
+            self.tools.extract("tests.tar.gz", "extracted/", files=["./test1.txt"])
+            self.assertExists("extracted/test1.txt")
+            self.assertNotExists("extracted/test2.txt")
+
     def test_extract_tar_bz2(self):
         with self.tools.cwd(self.ws):
             self.tools.run("tar cjvf tests.tar.bz2 ../../api_tools.jolt")
             self.tools.extract("tests.tar.bz2", self.ws)
             self.assertExists("api_tools.jolt")
+
+    def test_extract_tar_bz2_specific_file(self):
+        """
+        --- file: test1.txt
+        test
+        --- file: test2.txt
+        t e s t
+        ---
+        """
+        with self.tools.cwd(self.ws):
+            self.tools.run("tar cjvf tests.tar.bz2 ./test1.txt ./test2.txt")
+            self.tools.extract("tests.tar.bz2", "extracted/", files=["./test1.txt"])
+            self.assertExists("extracted/test1.txt")
+            self.assertNotExists("extracted/test2.txt")
+
+    def test_extract_tar_xz(self):
+        with self.tools.cwd(self.ws):
+            self.tools.run("tar cJvf tests.tar.xz ../../api_tools.jolt")
+            self.tools.extract("tests.tar.xz", self.ws)
+            self.assertExists("api_tools.jolt")
+
+    def test_extract_tar_xz_specific_file(self):
+        """
+        --- file: test1.txt
+        test
+        --- file: test2.txt
+        t e s t
+        ---
+        """
+        with self.tools.cwd(self.ws):
+            self.tools.run("tar cJvf tests.tar.xz ./test1.txt ./test2.txt")
+            self.tools.extract("tests.tar.xz", "extracted/", files=["./test1.txt"])
+            self.assertExists("extracted/test1.txt")
+            self.assertNotExists("extracted/test2.txt")
 
     def test_render(self):
         """

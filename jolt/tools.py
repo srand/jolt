@@ -294,6 +294,26 @@ class _AutoTools(object):
             artifact.collect(files, *args, **kwargs)
 
 
+class ZipFile(zipfile.ZipFile):
+    """ ZipFile customization that preserves file permissions. """
+
+    def extract(self, member, path=None, pwd=None):
+        out_path = super().extract(member, path, pwd)
+
+        # Restore permissions
+        info = self.getinfo(member)
+        os.chmod(out_path, info.external_attr >> 16)
+
+        return out_path
+
+    def extractall(self, path=None, members=None, pwd=None):
+        if members is None:
+            members = self.namelist()
+
+        for member in members:
+            self.extract(member, path, pwd)
+
+
 class JinjaTaskContext(Context):
     """
     Helper context for Jinja templates.
@@ -832,24 +852,24 @@ class Tools(object):
         try:
             fs.makedirs(filepath)
             if filename.endswith(".zip"):
-                with zipfile.ZipFile(filename, 'r') as zip:
-                    if files:
-                        zip.extract(files, filepath)
-                    else:
-                        zip.extractall(filepath)
+                with ZipFile(filename, 'r') as zip:
+                    zip.extractall(filepath, files)
             elif filename.endswith(".tar"):
                 with tarfile.open(filename, 'r') as tar:
                     if files:
-                        tar.extract(files, filepath)
+                        for file in files:
+                            tar.extract(file, filepath)
                     else:
                         tar.extractall(filepath)
             elif filename.endswith(".tar.gz") or filename.endswith(".tgz"):
                 if shutil.which("tar") and shutil.which("pigz"):
-                    self.run("tar -I pigz -xf {} -C {} {}", filename, filepath, files or "")
+                    self.run("tar -I pigz -xf {} -C {} {}", filename, filepath,
+                             " ".join(files) if files else "")
                     return
                 with tarfile.open(filename, 'r:gz') as tar:
                     if files:
-                        tar.extract(files, filepath)
+                        for file in files:
+                            tar.extract(file, filepath)
                     else:
                         tar.extractall(filepath)
             elif filename.endswith(".tar.bz2"):
@@ -857,13 +877,15 @@ class Tools(object):
                 with bz2file.open(filename) as bz2:
                     with tarfile.open(fileobj=bz2) as tar:
                         if files:
-                            tar.extract(files, filepath)
+                            for file in files:
+                                tar.extract(file, filepath)
                         else:
                             tar.extractall(filepath)
             elif filename.endswith(".tar.xz"):
                 with tarfile.open(filename, 'r:xz') as tar:
                     if files:
-                        tar.extract(files, filepath)
+                        for file in files:
+                            tar.extract(file, filepath)
                     else:
                         tar.extractall(filepath)
             else:
