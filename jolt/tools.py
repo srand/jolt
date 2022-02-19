@@ -300,9 +300,11 @@ class ZipFile(zipfile.ZipFile):
     def extract(self, member, path=None, pwd=None):
         out_path = super().extract(member, path, pwd)
 
-        # Restore permissions
+        # Restore permissions, if UNIX permissions are available
         info = self.getinfo(member)
-        os.chmod(out_path, info.external_attr >> 16)
+        attr = info.external_attr >> 16
+        if attr != 0:
+            os.chmod(out_path, attr)
 
         return out_path
 
