@@ -331,14 +331,14 @@ class ToolsApi(JoltTest):
 
     def test_download(self):
         with self.tools.cwd(self.ws):
-            with self.assertRaisesRegex(Exception, r"Download from .* failed with status .*"):
+            with self.assertRaises(Exception):
                 self.tools.download("https://www.sunet.se/invalid", "index.html")
             self.tools.download("https://www.sunet.se/", "index.html")
 
     def test_upload(self):
         with self.tools.cwd(self.ws):
             self.tools.write_file("index.html")
-            with self.assertRaisesRegex(Exception, r"Upload to .* failed with status .*"):
+            with self.assertRaises(Exception):
                 self.tools.upload("index.html", "https://www.example.com/invalid")
 
     def test_extract_zip(self):
