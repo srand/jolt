@@ -444,3 +444,10 @@ def deprecated(func):
         log.warning("Called method is deprecated: {}", func.__qualname__)
         return func(*args, **kwargs)
     return deprecation_warning
+
+
+def quote(value, char='"'):
+    return f"{char}{value}{char}" if value is not None else None
+
+def option(prefix, value):
+    return f"{prefix}{value}" if value else ""

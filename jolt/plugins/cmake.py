@@ -1,6 +1,8 @@
-
 from jolt import Task
+from jolt import utils
 from jolt.error import raise_task_error_if
+
+import os
 
 
 class CMake(Task):
@@ -11,17 +13,44 @@ class CMake(Task):
     cmakelists = "CMakeLists.txt"
     """ Path to CMakeLists.txt or directory containing CMakelists.txt """
 
+    generator = None
+
+    incremental = True
+
     options = []
     """ List of options and their values (``option[:type]=value``) """
 
     def run(self, deps, tools):
         raise_task_error_if(not self.cmakelists, self, "cmakelists attribute has not been defined")
 
-        cmake = tools.cmake()
-        cmake.configure(tools.expand(self.cmakelists), *["-D" + tools.expand(option) for option in self.options])
+        cmake = tools.cmake(incremental=self.incremental)
+        cmake.configure(tools.expand(self.cmakelists), *["-D" + tools.expand(option) for option in self.options], generator=utils.quote(self.generator, "'"))
         cmake.build()
         cmake.install()
 
     def publish(self, artifact, tools):
         cmake = tools.cmake()
         cmake.publish(artifact)
+
+
+class _CMakeCXXLibrary(CMake):
+    binary = None
+
+    generator = "Eclipse CDT4 - Ninja"
+
+    incremental = True
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.binary = self.binary or self.canonical_name
+
+    def run(self, deps, tools):
+        with tools.cwd(tools.builddir(incremental=self.incremental)):
+            self.cmakelists = tools.expand_path(self.cmakelists)
+            project = utils.render("cxxlibrary.cmake.template", deps=deps, task=self, tools=tools, os=os)
+            print(project)
+            tools.write_file(self.cmakelists, project)
+        super().run(deps, tools)
+
+    def publish(self, artifact, tools):
+        super().publish(artifact, tools)

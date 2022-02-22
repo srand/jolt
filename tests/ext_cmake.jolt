@@ -19,9 +19,9 @@ class CMakeExtension(JoltTest):
         --- file: main.cpp
         #ifdef JOLTERROR
         #error "JOLTERROR is defined"
-        #endif 
+        #endif
         int main() {{return 0;}}
-        
+
         --- file: CMakeLists.txt
         project(test)
         cmake_minimum_required(VERSION 2.8)
@@ -48,4 +48,17 @@ class CMakeExtension(JoltTest):
 
         with self.assertRaises(Exception, msg="JOLTERROR is defined"):
             self.build("a:e=true")
-        
+
+    def test_cxxlibrary(self):
+        """
+        --- file: main.cpp
+        int main() {{return 0;}}
+
+        --- tasks:
+        from jolt.plugins.cmake import _CMakeCXXLibrary
+
+        class A(_CMakeCXXLibrary):
+            sources = ["main.cpp"]
+        ---
+        """
+        self.build("a")
