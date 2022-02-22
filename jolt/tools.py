@@ -188,13 +188,13 @@ class _tmpdir(object):
 
 
 class _CMake(object):
-    def __init__(self, deps, tools):
+    def __init__(self, deps, tools, incremental=False):
         self.deps = deps
         self.tools = tools
-        self.builddir = self.tools.builddir()
-        self.installdir = self.tools.builddir("install")
+        self.builddir = self.tools.builddir(incremental=incremental)
+        self.installdir = self.tools.builddir("install", incremental=incremental)
 
-    def configure(self, sourcedir, *args, **kwargs):
+    def configure(self, sourcedir, *args, generator=None, **kwargs):
         sourcedir = self.tools.expand_path(sourcedir)
 
         extra_args = list(args)
@@ -204,10 +204,11 @@ class _CMake(object):
 
         with self.tools.cwd(self.builddir):
             self.tools.run(
-                "cmake {0} -B {1} -DCMAKE_INSTALL_PREFIX={2} {3}",
+                "cmake {0} -B {1} -DCMAKE_INSTALL_PREFIX={2} {3} {4}",
                 sourcedir,
                 self.builddir,
                 self.installdir,
+                utils.option("-G", generator),
                 extra_args,
                 output=True)
 
@@ -559,9 +560,9 @@ class Tools(object):
         pathname = self.expand_path(pathname)
         return os.chmod(pathname, mode)
 
-    def cmake(self, deps=None):
+    def cmake(self, deps=None, incremental=False):
         """ Creates a CMake invokation helper """
-        return _CMake(deps, self)
+        return _CMake(deps, self, incremental)
 
     def compress(self, src, dst):
         """ Compress a file.

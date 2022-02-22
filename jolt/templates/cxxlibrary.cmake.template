@@ -1,0 +1,11 @@
+project({{ task.canonical_name }})
+cmake_minimum_required(VERSION 3.0)
+
+add_executable(
+    {{ task.binary or task.canonical_name }}
+{% for source in task.sources %}
+    {{ tools.expand_relpath(os.path.join(task.joltdir, source), tools.getcwd()) }}
+{% endfor %}
+)
+
+install(TARGETS {{ task.canonical_name }})
