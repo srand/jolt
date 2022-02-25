@@ -24,6 +24,21 @@ class ReportHooks(TaskHook):
             with task.task.report() as report:
                 self.finalize_report(report.manifest, task, "SKIPPED")
 
+    def task_finished_download(self, task):
+        if task.is_goal():
+            with task.task.report() as report:
+                self.finalize_report(report.manifest, task, "DOWNLOADED")
+
+    def task_finished_upload(self, task):
+        if task.is_goal():
+            with task.task.report() as report:
+                self.finalize_report(report.manifest, task, "UPLOADED")
+
+    def task_failed(self, task):
+        if task.is_goal():
+            with task.task.report() as report:
+                self.finalize_report(report.manifest, task, "FAILED")
+
     @contextmanager
     def task_run(self, task):
         try:
@@ -32,7 +47,6 @@ class ReportHooks(TaskHook):
             with task.task.report() as report:
                 if not report.errors:
                     report.add_exception(e)
-                self.finalize_report(report.manifest, task, "FAILED")
             raise e
         else:
             with task.task.report() as report:

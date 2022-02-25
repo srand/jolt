@@ -99,6 +99,7 @@ class LocalExecutor(Executor):
             return
         try:
             self.task.started()
+            hooks.task_started_execution(self.task)
             with hooks.task_run(self.task):
                 self.task.run(
                     env.cache,
@@ -109,6 +110,7 @@ class LocalExecutor(Executor):
             self.task.failed()
             raise e
         else:
+            hooks.task_finished_execution(self.task)
             self.task.finished()
         return self.task
 
@@ -141,13 +143,17 @@ class Downloader(Executor):
             return
         try:
             task.started("Download")
+            hooks.task_started_download(task)
             raise_task_error_if(
                 not env.cache.download(task),
-                task, "failed to download task artifact")
+                task, "Failed to download task artifact")
         except Exception as e:
+            with task.task.report() as report:
+                report.add_exception(e)
             task.failed("Download")
             raise e
         else:
+            hooks.task_finished_download(task)
             task.finished("Download")
 
     def run(self, env):
@@ -167,13 +173,17 @@ class Uploader(Executor):
             return
         try:
             task.started("Upload")
+            hooks.task_started_upload(task)
             raise_task_error_if(
                 not env.cache.upload(task),
-                task, "failed to upload task artifact")
+                task, "Failed to upload task artifact")
         except Exception as e:
+            with task.task.report() as report:
+                report.add_exception(e)
             task.failed("Upload")
             raise e
         else:
+            hooks.task_finished_upload(task)
             task.finished("Upload")
 
     def run(self, env):

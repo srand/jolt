@@ -779,12 +779,16 @@ class AmqpExecutor(scheduler.NetworkExecutor):
     def run(self, env):
         try:
             self.task.started(TYPE)
+            hooks.task_started_execution(self.task)
             for extension in self.task.extensions:
                 extension.started(TYPE)
+                hooks.task_started_execution(extension)
             with hooks.task_run([self.task] + self.task.extensions):
                 self._run(env)
             for extension in self.task.extensions:
+                hooks.task_finished_execution(extension)
                 extension.finished(TYPE)
+            hooks.task_finished_execution(self.task)
             self.task.finished(TYPE)
         except (ConnectionError, AMQPConnectionError):
             log.exception()

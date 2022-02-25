@@ -11,8 +11,27 @@ class TaskHook(object):
     def task_started(self, task):
         pass
 
+    def task_started_download(self, task):
+        """ Called after task_started, if the task artifact is being downloaded """
+
+    def task_started_execution(self, task):
+        """ Called after task_started, if the task is being executed """
+
+    def task_started_upload(self, task):
+        """ Called after task_started, if the task artifact is being uploaded """
+
     def task_finished(self, task):
-        pass
+        """ Called for all tasks that finish successfully
+        (executed, uploaded, downloaded) """
+
+    def task_finished_download(self, task):
+        """ Called before task_finished, if the task artifact was downloaded """
+
+    def task_finished_execution(self, task):
+        """ Called before task_finished, if the task artifact was executed """
+
+    def task_finished_upload(self, task):
+        """ Called before task_finished, if the task artifact was uploaded """
 
     def task_failed(self, task):
         pass
@@ -82,11 +101,47 @@ class TaskHookRegistry(object):
         for ext in self.hooks:
             utils.call_and_catch_and_log(ext.task_started, task)
 
+    def task_started_download(self, task):
+        if task.is_resource():
+            return
+        for ext in self.hooks:
+            utils.call_and_catch_and_log(ext.task_started_download, task)
+
+    def task_started_execution(self, task):
+        if task.is_resource():
+            return
+        for ext in self.hooks:
+            utils.call_and_catch_and_log(ext.task_started_execution, task)
+
+    def task_started_upload(self, task):
+        if task.is_resource():
+            return
+        for ext in self.hooks:
+            utils.call_and_catch_and_log(ext.task_started_upload, task)
+
     def task_finished(self, task):
         if task.is_resource():
             return
         for ext in self.hooks:
             utils.call_and_catch_and_log(ext.task_finished, task)
+
+    def task_finished_download(self, task):
+        if task.is_resource():
+            return
+        for ext in self.hooks:
+            utils.call_and_catch_and_log(ext.task_finished_download, task)
+
+    def task_finished_execution(self, task):
+        if task.is_resource():
+            return
+        for ext in self.hooks:
+            utils.call_and_catch_and_log(ext.task_finished_execution, task)
+
+    def task_finished_upload(self, task):
+        if task.is_resource():
+            return
+        for ext in self.hooks:
+            utils.call_and_catch_and_log(ext.task_finished_upload, task)
 
     def task_failed(self, task):
         if task.is_resource():
@@ -193,6 +248,17 @@ def task_created(task):
 def task_started(task):
     TaskHookRegistry.get().task_started(task)
 
+def task_started_download(task):
+    TaskHookRegistry.get().task_started_download(task)
+
+
+def task_started_execution(task):
+    TaskHookRegistry.get().task_started_execution(task)
+
+
+def task_started_upload(task):
+    TaskHookRegistry.get().task_started_upload(task)
+
 
 def task_failed(task):
     TaskHookRegistry.get().task_failed(task)
@@ -200,6 +266,18 @@ def task_failed(task):
 
 def task_finished(task):
     TaskHookRegistry.get().task_finished(task)
+
+
+def task_finished_download(task):
+    TaskHookRegistry.get().task_finished_download(task)
+
+
+def task_finished_execution(task):
+    TaskHookRegistry.get().task_finished_execution(task)
+
+
+def task_finished_upload(task):
+    TaskHookRegistry.get().task_finished_upload(task)
 
 
 def task_pruned(task):
