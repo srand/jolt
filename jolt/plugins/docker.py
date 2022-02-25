@@ -13,7 +13,8 @@ from jolt.cache import ArtifactAttributeSet
 from jolt.cache import ArtifactAttributeSetProvider
 
 import json
-from os import path, getuid
+from os import path
+
 from platform import system
 import tarfile
 
@@ -175,7 +176,13 @@ class DockerContainer(Resource):
 
     @property
     def _user(self):
-        return f"--user {self.user}" if self.user else "--user " + str(getuid())
+        if self.user:
+            return f"--user {self.user}"
+        try:
+            from os import getuid
+            return "--user " + str(getuid())
+        except ImportError:
+            return ""
 
     @property
     def _volumes(self):
