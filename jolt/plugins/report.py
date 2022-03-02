@@ -35,9 +35,8 @@ class ReportHooks(TaskHook):
                 self.finalize_report(report.manifest, task, "UPLOADED")
 
     def task_failed(self, task):
-        if task.is_goal():
-            with task.task.report() as report:
-                self.finalize_report(report.manifest, task, "FAILED")
+        with task.task.report() as report:
+            self.finalize_report(report.manifest, task, "FAILED")
 
     @contextmanager
     def task_run(self, task):
