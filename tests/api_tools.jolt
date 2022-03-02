@@ -447,14 +447,12 @@ class ToolsApi(JoltTest):
         --- tasks:
         class A(Task):
             def run(self, deps, tools):
-                assert tools.render("identity.template") == self.identity
-                assert tools.render("arg.template", arg="argvalue") == "argvalue"
-                assert tools.render("tools.template") == tools.expand_path("test")
+                assert tools.render(tools.read_file("identity.template")) == self.identity
+                assert tools.render(tools.read_file("arg.template"), arg="argvalue") == "argvalue"
+                assert tools.render(tools.read_file("tools.template")) == tools.expand_path("test")
         ---
         """
         self.build("a")
-        with self.assertRaises(Exception, msg="template not found"):
-            self.tools.render("notfound.template")
 
     def test_run_environment_variables(self):
         s = self.tools.run(["echo $JOLTDIR"])

@@ -1007,11 +1007,11 @@ class Tools(object):
         """ Creates a Meson invokation helper """
         return _Meson(deps, self)
 
-    def render(self, pathname, **kwargs):
-        """ Render Jinja template file.
+    def render(self, template, **kwargs):
+        """ Render a Jinja template string.
 
         Args:
-            pathname (str): Name/path of file to modify.
+            template (str): Jinja template string.
             kwargs (dict): Keywords made available to the template context.
                Task attributes are automatically available.
 
@@ -1019,21 +1019,13 @@ class Tools(object):
             str: Renderered template data.
 
         """
-
-        pathname = self.expand_relpath(pathname, self.getcwd())
-
-        raise_error_if(
-            not os.path.exists(pathname),
-            "template not found: {}".format(pathname))
-
         env = Environment(
-            loader=FileSystemLoader(self.getcwd()),
             autoescape=select_autoescape(),
             trim_blocks=True,
             lstrip_blocks=True)
         env.context_class = JinjaTaskContext
-        template = env.get_template(pathname)
-        return template.render(task=self._task, tools=self, **kwargs)
+        tmpl = env.from_string(template)
+        return tmpl.render(task=self._task, tools=self, **kwargs)
 
     def replace_in_file(self, pathname, search, replace):
         """ Replaces all occurrences of a substring in a file.
