@@ -75,8 +75,8 @@ class PluginGroup(click.Group):
 @click.option("-vv", "--extra-verbose", is_flag=True, help="Extra verbose output.")
 @click.option("-c", "--config", "config_file", multiple=True, type=str,
               help="Load a configuration file or set a configuration key.")
-@click.option("-d", "--debug-exception", is_flag=True, hidden=True,
-              help="Attach debugger on exception")
+@click.option("-d", "--debugger", is_flag=True,
+              help="Attach debugger on exception.")
 @click.option("-p", "--profile", is_flag=True, hidden=True,
               help="Profile code while running")
 @click.option("-f", "--force", is_flag=True, default=False, hidden=True,
@@ -94,7 +94,7 @@ class PluginGroup(click.Group):
 @click.option("-j", "--jobs", type=int, default=1, hidden=True,
               help="Number of tasks allowed to execute in parallel (1). ")
 @click.pass_context
-def cli(ctx, verbose, extra_verbose, config_file, debug_exception, profile,
+def cli(ctx, verbose, extra_verbose, config_file, debugger, profile,
         force, salt, debug, network, local, keep_going, jobs):
     """
     A task execution tool.
@@ -117,7 +117,7 @@ def cli(ctx, verbose, extra_verbose, config_file, debug_exception, profile,
     """
 
     global debug_enabled
-    debug_enabled = debug_exception
+    debug_enabled = debugger
 
     log.verbose("Jolt host: {}", environ.get("HOSTNAME", "localhost"))
     log.verbose("Jolt install path: {}", fs.path.dirname(__file__))
