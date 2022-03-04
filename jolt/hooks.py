@@ -248,6 +248,7 @@ def task_created(task):
 def task_started(task):
     TaskHookRegistry.get().task_started(task)
 
+
 def task_started_download(task):
     TaskHookRegistry.get().task_started_download(task)
 

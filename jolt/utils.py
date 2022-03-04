@@ -449,5 +449,6 @@ def deprecated(func):
 def quote(value, char='"'):
     return f"{char}{value}{char}" if value is not None else None
 
+
 def option(prefix, value):
     return f"{prefix}{value}" if value else ""

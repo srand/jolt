@@ -18,7 +18,7 @@ import bz2file
 import hashlib
 from contextlib import contextmanager
 
-from jinja2 import Environment, FileSystemLoader, select_autoescape
+from jinja2 import Environment, select_autoescape
 from jinja2.runtime import Context
 
 
