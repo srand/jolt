@@ -454,6 +454,24 @@ class ToolsApi(JoltTest):
         """
         self.build("a")
 
+    def test_render_file(self):
+        """
+        --- file: identity.template
+        {{{{ identity }}}}
+        --- file: arg.template
+        {{{{ arg }}}}
+        --- file: tools.template
+        {{{{ tools.expand_path("test") }}}}
+        --- tasks:
+        class A(Task):
+            def run(self, deps, tools):
+                assert tools.render_file("identity.template") == self.identity
+                assert tools.render_file("arg.template", arg="argvalue") == "argvalue"
+                assert tools.render_file("tools.template") == tools.expand_path("test")
+        ---
+        """
+        self.build("a")
+
     def test_run_environment_variables(self):
         s = self.tools.run(["echo $JOLTDIR"])
         self.assertEqual(s, self.joltdir)

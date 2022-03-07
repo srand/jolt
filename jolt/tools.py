@@ -18,7 +18,7 @@ import bz2file
 import hashlib
 from contextlib import contextmanager
 
-from jinja2 import Environment, select_autoescape
+from jinja2 import Environment, FileSystemLoader, select_autoescape
 from jinja2.runtime import Context
 
 
@@ -1020,11 +1020,33 @@ class Tools(object):
 
         """
         env = Environment(
+            loader=FileSystemLoader(self.getcwd()),
             autoescape=select_autoescape(),
             trim_blocks=True,
             lstrip_blocks=True)
         env.context_class = JinjaTaskContext
         tmpl = env.from_string(template)
+        return tmpl.render(task=self._task, tools=self, **kwargs)
+
+    def render_file(self, template, **kwargs):
+        """ Render a Jinja template file.
+
+        Args:
+            template (str): Filesystem path to template file.
+            kwargs (dict): Keywords made available to the template context.
+               Task attributes are automatically available.
+
+        Returns:
+            str: Renderered template data.
+
+        """
+        env = Environment(
+            loader=FileSystemLoader(self.getcwd()),
+            autoescape=select_autoescape(),
+            trim_blocks=True,
+            lstrip_blocks=True)
+        env.context_class = JinjaTaskContext
+        tmpl = env.get_template(self.expand(template))
         return tmpl.render(task=self._task, tools=self, **kwargs)
 
     def replace_in_file(self, pathname, search, replace):
