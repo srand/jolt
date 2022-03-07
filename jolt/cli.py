@@ -119,6 +119,7 @@ def cli(ctx, verbose, extra_verbose, config_file, debugger, profile,
     global debug_enabled
     debug_enabled = debugger
 
+    log.verbose("Jolt command: {}", " ".join([fs.path.basename(sys.argv[0])] + sys.argv[1:]))
     log.verbose("Jolt host: {}", environ.get("HOSTNAME", "localhost"))
     log.verbose("Jolt install path: {}", fs.path.dirname(__file__))
 
