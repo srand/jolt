@@ -346,7 +346,7 @@ class Tools(object):
         self._chroot = None
         self._run_prefix = []
         self._preexec_fn = None
-        self._cwd = fs.path.normpath(fs.path.join(os.getcwd(), cwd or os.getcwd()))
+        self._cwd = fs.path.normpath(fs.path.join(config.get_workdir(), cwd or config.get_workdir()))
         self._env = copy.deepcopy(env or os.environ)
         self._task = task
         if task:
@@ -514,8 +514,8 @@ class Tools(object):
     @property
     def buildroot(self):
         """ Return the root path of all build directories """
-        root = self._task.joltdir if self._task else self.getcwd()
-        return fs.path.normpath(fs.path.join(self.expand(root), "build"))
+        from jolt.loader import get_workspacedir
+        return fs.path.normpath(fs.path.join(get_workspacedir(), "build"))
 
     def checksum_file(self, filelist, concat=False, hashfn=hashlib.sha1, filterfn=None):
         """ Calculate a checksum of one or multiple files.

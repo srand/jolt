@@ -7,6 +7,9 @@ from jolt.error import raise_error_if
 from jolt.manifest import ManifestExtension, ManifestExtensionRegistry
 
 
+_workdir = os.getcwd()
+
+
 if os.getenv("JOLT_CONFIG_PATH"):
     location = fs.path.join(os.getenv("JOLT_CONFIG_PATH"), "config")
     location_user = fs.path.join(os.getenv("JOLT_CONFIG_PATH"), "user")
@@ -193,6 +196,10 @@ def get_cachedir():
     else:
         default = fs.path.join(fs.userhome(), ".cache", "jolt")
     return get("jolt", "cachedir", default)
+
+
+def get_workdir():
+    return _workdir
 
 
 def get_shell():

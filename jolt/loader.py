@@ -286,3 +286,9 @@ class RecipeExtension(ManifestExtension):
 
 
 ManifestExtensionRegistry.add(RecipeExtension())
+
+
+def get_workspacedir():
+    workspacedir = JoltLoader.get().joltdir
+    assert workspacedir is not None, "No workspace present"
+    return workspacedir
