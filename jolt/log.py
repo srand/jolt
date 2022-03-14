@@ -131,7 +131,11 @@ class TqdmStream(object):
         getattr(self.stream, 'flush', lambda: None)()
 
 
-# create logger
+# silence root logger
+_root = logging.getLogger()
+_root.setLevel(logging.CRITICAL)
+
+# create jolt logger
 _logger = logging.getLogger('jolt')
 _logger.setLevel(logging.DEBUG)
 
