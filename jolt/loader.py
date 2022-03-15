@@ -54,10 +54,14 @@ class NativeRecipe(Recipe):
         name = utils.canonical(self.path)
         module = imp.load_source("joltfile_{0}".format(name), self.path)
         classes = inspect.getmoduleclasses(module, [Task, TaskGenerator], NativeRecipe._is_abstract)
+        generators = []
 
         for cls in classes[TaskGenerator]:
             cls.joltdir = self.joltdir or os.path.dirname(self.path)
-            generated_tasks = utils.as_list(cls().generate())
+            generators.append(cls())
+
+        for generator in generators:
+            generated_tasks = utils.as_list(generator.generate())
             classes[Task] += filter(NativeRecipe._is_task, generated_tasks)
 
         for task in classes[Task]:
