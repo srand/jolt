@@ -1425,6 +1425,7 @@ if __name__ == "__main__":
             return
 
         sources = list(zip_longest(copy.copy(sources), [None]))
+        sources = [(tools.expand_path(source), origin) for source, origin in sources]
 
         # Aggregated list of sources for each rule
         rule_source_list = {}
