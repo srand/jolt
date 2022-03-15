@@ -1429,7 +1429,7 @@ class Alias(Task):
 
 class Download(Task):
     """
-    Downloads a file over HTTP(S).
+    Downloads file(s) over HTTP(S).
 
     Once downloaded, archives are extracted and all of their files are published.
     If the file is not an archive it is published as is. Recognized archive extensions are:
@@ -1481,29 +1481,37 @@ class Download(Task):
     """ Automatically extract archives. """
 
     url = None
-    """ URL of file to download. """
+    """
+    URL(s) of file(s) to download.
+
+    A single URL string is accepted, as well as a list of URL strings.
+    """
 
     symlinks = True
     """ Publish symlinks (True) """
 
-    def _filename_from_url(self, tools):
+    def _filename_from_url(self, tools, url):
         from urllib.parse import urlparse
-        url = urlparse(tools.expand(self.url))
+        url = urlparse(tools.expand(url))
         return fs.posixpath.basename(url.path) or "file"
 
     def run(self, deps, tools):
-        self._builddir = tools.builddir()
-        filename = self._filename_from_url(tools)
-        with tools.cwd(self._builddir):
-            tools.download(self.url, filename), self,
-
         supported_formats = [".tar", ".tar.bz2", ".tar.gz", ".tar.xz", ".tgz", ".zip"]
-        if self.extract and any(map(lambda n: filename.endswith(n), supported_formats)):
-            self._srcdir = self._builddir
-            self._builddir = tools.builddir("extracted")
+
+        raise_task_error_if(not self.url, self, "No URL(s) specified")
+
+        self._builddir = tools.builddir()
+        for url in utils.as_list(self.url):
+            filename = self._filename_from_url(tools, url)
             with tools.cwd(self._builddir):
-                self.info("Extracting {}", filename)
-                tools.extract(fs.path.join(self._srcdir, filename), ".")
+                tools.download(url, filename)
+
+            if self.extract and any(map(lambda n: filename.endswith(n), supported_formats)):
+                self._srcdir = self._builddir
+                self._builddir = tools.builddir("extracted")
+                with tools.cwd(self._builddir):
+                    self.info("Extracting {}", filename)
+                    tools.extract(fs.path.join(self._srcdir, filename), ".")
 
     def publish(self, artifact, tools):
         with tools.cwd(self._builddir):

@@ -668,7 +668,15 @@ class TaskApi(JoltTest):
 
         class PlainText(Download):
             version = Parameter("1.2.11")
-            url = "https://nodejs.org/dist/latest/SHASUMS256.txt"
+            url = ["https://nodejs.org/dist/latest/SHASUMS256.txt"]
+
+        class Multiple(Download):
+            version = Parameter("1.2.11")
+            url = [
+                "https://nodejs.org/dist/latest/SHASUMS256.txt",
+                "https://nodejs.org/dist/latest/SHASUMS256.txt.asc",
+                "https://nodejs.org/dist/latest/SHASUMS256.txt.sig",
+            ]
 
         ---
         """
@@ -688,6 +696,12 @@ class TaskApi(JoltTest):
         r = self.build("plaintext")
         a = self.artifacts(r)
         self.assertExists(os.path.join(a[0], "SHASUMS256.txt"))
+
+        r = self.build("multiple")
+        a = self.artifacts(r)
+        self.assertExists(os.path.join(a[0], "SHASUMS256.txt"))
+        self.assertExists(os.path.join(a[0], "SHASUMS256.txt.asc"))
+        self.assertExists(os.path.join(a[0], "SHASUMS256.txt.sig"))
 
     def test_resource(self):
         """
