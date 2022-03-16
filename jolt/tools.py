@@ -351,6 +351,7 @@ class Tools(object):
         self._task = task
         if task:
             self._env["JOLTDIR"] = task.joltdir
+            self._env["JOLTBUILDDIR"] = self.buildroot
             self._env["JOLTCACHEDIR"] = config.get_cachedir()
         self._builddir = {}
 

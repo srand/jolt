@@ -526,6 +526,8 @@ class ToolsApi(JoltTest):
     def test_run_environment_variables(self):
         s = self.tools.run(["echo $JOLTDIR"])
         self.assertEqual(s, self.joltdir)
+        s = self.tools.run(["echo $JOLTBUILDDIR"])
+        self.assertEqual(s, self.tools.buildroot)
         s = self.tools.run(["echo $JOLTCACHEDIR"])
         from jolt import config
         self.assertEqual(s, config.get_cachedir())
