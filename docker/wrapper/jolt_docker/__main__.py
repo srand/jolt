@@ -107,7 +107,7 @@ if os.name == "posix":
 
 # Build command line
 
-cmd = ["docker", "run", "-i", "--rm", "-u", f"{uid}:{gid}", "-w", cwd]
+cmd = ["docker", "run", "-i", "--privileged", "--rm", "-u", f"{uid}:{gid}", "-w", cwd]
 if sys.stdin.isatty() and sys.stdout.isatty():
     cmd += ["-t"]
 for volume in volumes:
