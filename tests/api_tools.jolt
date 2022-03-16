@@ -324,6 +324,57 @@ class ToolsApi(JoltTest):
         a = self.artifacts(o)
         self.assertExists(os.path.join(a[0], "output.txt"))
 
+    def test_chroot_mounts_buildroot(self):
+        """
+        --- file: default.joltxmanifest
+        <?xml version="1.0" ?>
+        <jolt-manifest workspace="." version=">=0.9.0">
+          <project name="test">
+            <recipe src="subdir/build.py" joltdir="subdir" />
+          </project>
+        </jolt-manifest>
+
+        --- file: subdir/build.py
+        from jolt import Task
+        from jolt.plugins import docker
+        import os
+
+        class Busybox(docker.DockerImage):
+            dockerfile = \"\"\"
+            FROM busybox:latest
+            RUN busybox mkdir -p /sbin /usr/bin
+            RUN busybox --install
+            \"\"\"
+            extract = True
+            requires = ["docker/cli"]
+
+        class Test(Task):
+            requires = "busybox"
+
+            def run(self, d, t):
+                with t.cwd(t.builddir()):
+                    with t.chroot(d["busybox"].paths.rootfs):
+                        workdir = t.run("pwd")
+                        workdir2 = t.run("pwd")
+                        assert workdir == workdir2, "working dir not stable"
+                        t.run("busybox > output.txt")
+                        with t.environ(FOO="bar"):
+                            foo = t.run("env | grep FOO")
+                assert t.builddir() == workdir, "incorrect working directory"
+                assert "bar" in foo, "incorrect environment variable"
+
+            def publish(self, a, t):
+                a.collect("*", cwd=t.builddir())
+        ---
+        """
+        try:
+            self.tools.run("unshare -rm uname")
+        except Exception:
+            self.skip("required privileges not held")
+        o = self.build("test")
+        a = self.artifacts(o)
+        self.assertExists(os.path.join(a[0], "output.txt"))
+
     def test_cwd_non_existing(self):
         with self.assertRaisesRegex(Exception, "failed to change directory"):
             with self.tools.cwd("nonexisting"):
