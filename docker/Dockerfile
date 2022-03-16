@@ -1,5 +1,8 @@
 FROM python:3-slim
-
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update
+RUN apt-get install -y git ninja-build
+RUN apt-get clean
 RUN pip3 install virtualenv
 
 COPY . /opt/jolt
