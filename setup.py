@@ -6,11 +6,11 @@ from shutil import copyfile
 
 here = path.abspath(path.dirname(__file__))
 name = "jolt"
-exec(open('jolt/version.py').read())
+exec(open("jolt/version.py").read())
 
 
 # Get the long description from the README file
-with open(path.join(here, 'README.rst'), encoding='utf-8') as f:
+with open(path.join(here, "README.rst"), encoding="utf-8") as f:
     long_description = f.read()
 
 
@@ -29,20 +29,39 @@ setup(
     name=name,
     cmdclass={"build_py": BuildCommand},
     version=__version__,
-    description='A task executor',
+    description="A task executor",
     long_description=long_description,
-    url='https://bitbucket.org/rand_r/jolt',
-    author='Robert Andersson',
-    author_email='rand_r@bitbucket.org',
+    url="https://github.com/srand/jolt",
+    author="Robert Andersson",
+    author_email="srand@github.com",
     classifiers=[
-        'Development Status :: 4 - Beta',
-        'Intended Audience :: Developers',
-        'Topic :: Software Development :: Build Tools',
-        'License :: OSI Approved :: GNU General Public License v2 (GPLv2)',
-        'Programming Language :: Python :: 3',
+        "Development Status :: 5 - Production/Stable",
+        "Intended Audience :: Developers",
+        "Intended Audience :: System Administrators",
+        "Topic :: Software Development :: Build Tools",
+        "Topic :: Software Development :: Testing",
+        "License :: OSI Approved :: GNU General Public License v2 (GPLv2)",
+        "Operating System :: MacOS :: MacOS X",
+        "Operating System :: Microsoft :: Windows",
+        "Operating System :: POSIX",
+        "Programming Language :: C",
+        "Programming Language :: C++",
+        "Programming Language :: Java",
+        "Programming Language :: JavaScript",
+        "Programming Language :: Python :: 3",
     ],
-    keywords='build msbuild xcode make pam bazel jolt conan',
-    packages=find_packages(exclude=['contrib', 'docs', 'tests']),
+    keywords=[
+        "bazel",
+        "build",
+        "cmake",
+        "conan",
+        "jolt",
+        "make",
+        "meson",
+        "msbuild",
+        "xcode",
+    ],
+    packages=find_packages(exclude=["contrib", "docs", "tests"]),
     install_requires=[
         "bz2file",
         "click>=7.0",
@@ -60,18 +79,18 @@ setup(
     ],
     dependency_links=[],
     extras_require={
-        'allure': ['allure-python-commons'],
-        'amqp': ['pika'],
-        'dev': ['check-manifest'],
-        'doc': ['sphinx-click', 'sphinx-rtd-theme'],
-        'test': ['coverage'],
+        "allure": ["allure-python-commons"],
+        "amqp": ["pika"],
+        "dev": ["check-manifest"],
+        "doc": ["sphinx-click", "sphinx-rtd-theme"],
+        "test": ["coverage"],
     },
     package_data={
-        'jolt': ['**/*.sh', '**/*.xslt', '**/*.template'],
+        "jolt": ["**/*.sh", "**/*.xslt", "**/*.template"],
     },
     entry_points={
-        'console_scripts': [
-            'jolt=jolt.__main__:main',
+        "console_scripts": [
+            "jolt=jolt.__main__:main",
         ],
     },
 )
