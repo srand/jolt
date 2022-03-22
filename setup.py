@@ -21,7 +21,7 @@ class BuildCommand(build_py):
         # Install additional files required by selfdeploy plugin
         if not self.dry_run:
             target_dir = path.join(self.build_lib, name, "plugins", "selfdeploy")
-            makedirs(target_dir)
+            makedirs(target_dir, exist_ok=True)
             for fn in ["setup.py", "README.rst"]:
                 copyfile(path.join(here, fn), path.join(target_dir,fn))
 

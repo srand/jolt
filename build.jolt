@@ -107,6 +107,25 @@ class JoltWrapperWheel(Task):
              artifact.collect("dist")
 
 
+@git.influence("debian")
+class JoltDebianPackage(docker.DockerImage):
+    name = "jolt/debian"
+    dockerfile = "{joltdir}/debian/Dockerfile"
+    extract = True
+    imagefile = None
+    requires = ["jolt:version={version}"]
+    version = Parameter(__version__, influence=False)
+
+    def run(self, deps, tools):
+        self.context = tools.builddir()
+        with tools.cwd(self.context):
+            deps["jolt:version={version}"].copy("*", "jolt-{version}")
+            tools.copy("{joltdir}/debian", "jolt-{version}/debian/")
+            with tools.cwd("jolt-{version}/debian"):
+                tools.write_file("changelog", tools.render_file("changelog"))
+        super().run(deps, tools)
+
+
 class Default(Alias):
     push = BooleanParameter(False)
 
@@ -116,3 +135,5 @@ class Default(Alias):
         "jolt/docker/pypi:release={push}",
         "jolt/rabbitmq:push={push}",
     ]
+
+

@@ -1,0 +1,31 @@
+Source: jolt
+Section: python
+Priority: optional
+Maintainer: Robert Andersson <srand@github.com>
+Build-Depends: debhelper (>= 9), dh-python,
+               python3-all,
+               python3-bz2file,
+               python3-click,
+               python3-colorama,
+               python3-fasteners,
+               python3-jinja2,
+               python3-keyring,
+               python3-keyrings.alt,
+               python3-lxml,
+               python3-multi-key-dict,
+               python3-pygit2,
+               python3-requests,
+               python3-setuptools,
+               python3-tqdm,
+Standards-Version: 4.2.0
+Homepage: https://github.com/srand/jolt
+
+Package: python3-jolt
+Architecture: all
+Depends: ${misc:Depends}, ${python3:Depends},
+Recommends: ${python3:Recommends}
+Suggests: ${python3:Suggests}
+Description: Jolt is a task execution tool designed for software development tasks.
+ .
+ It can build your C/C++ applications and React frontends, run tests, deploy your web services,
+ and much more.

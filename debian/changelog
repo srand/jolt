@@ -1,0 +1,5 @@
+jolt ({{version}}-0) UNRELEASED; urgency=low
+
+  * Release {{version}}
+
+ -- Robert Andersson <srand@github.com>  {{ tools.run("date -R") }}
