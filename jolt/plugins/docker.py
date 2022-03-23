@@ -98,21 +98,22 @@ class DockerClient(Download):
     name = "docker/cli"
     """ Name of the task """
 
-    version = Parameter("20.10.9", help="Docker version")
-    """ Docker version [20.10.9] """
+    arch = Parameter("x86_64", help="Host architecture")
+    """ Host architecture [x86_64] """
+
+    collect = ["docker/docker"]
 
     host = Parameter(system().lower(), help="Host operating system")
     """ Host operating system [autodetected] """
 
-    arch = Parameter("x86_64", help="Host architecture")
-    """ Host architecture [x86_64] """
-
     url = "https://download.docker.com/{host}/static/stable/{arch}/docker-{version}.tgz"
     """ URL of binaries """
 
+    version = Parameter("20.10.9", help="Docker version")
+    """ Docker version [20.10.9] """
+
     def publish(self, artifact, tools):
-        with tools.cwd(self._builddir):
-            artifact.collect("docker/docker")
+        super().publish(artifact, tools)
         artifact.environ.PATH.append("docker")
 
 
