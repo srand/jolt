@@ -435,6 +435,13 @@ def clean(ctx, task, deps, expired):
             task.clean(acache, expired)
     else:
         acache.discard_all(expired)
+        try:
+            # May not be in a workspace when running the command
+            t = tools.Tools()
+            t.rmtree(t.buildroot)
+        except AssertionError:
+            pass
+
 
 
 @cli.command(name="config")
