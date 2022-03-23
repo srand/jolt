@@ -109,8 +109,8 @@ class DockerClient(Download):
     url = "https://download.docker.com/{host}/static/stable/{arch}/docker-{version}.tgz"
     """ URL of binaries """
 
-    version = Parameter("20.10.9", help="Docker version")
-    """ Docker version [20.10.9] """
+    version = Parameter("20.10.13", help="Docker version")
+    """ Docker version [20.10.13] """
 
     def publish(self, artifact, tools):
         super().publish(artifact, tools)
@@ -147,7 +147,7 @@ class DockerContainer(Resource):
 
     user = None
     """
-    Username of UID.
+    Username or UID.
 
     Defaults to the current user.
     """
