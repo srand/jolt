@@ -6,13 +6,15 @@ from jolt import loader
 from jolt import log
 from jolt import utils
 from jolt.error import raise_error_if
+from jolt.hooks import CliHook, CliHookFactory
 from jolt.hooks import TaskHook, TaskHookFactory
 
+from contextlib import contextmanager
 
 log.verbose("[Symlinks] Loaded")
 
 
-class SymlinkHooks(TaskHook):
+class SymlinkTaskHooks(TaskHook):
     def __init__(self):
         self._path = config.get("symlinks", "path", "artifacts")
         raise_error_if(not self._path, "symlinks.path not configured")
@@ -39,7 +41,28 @@ class SymlinkHooks(TaskHook):
         self.task_finished(task)
 
 
+class SymlinkCliHooks(CliHook):
+    def __init__(self):
+        self._path = config.get("symlinks", "path", "artifacts")
+        raise_error_if(not self._path, "symlinks.path not configured")
+
+    @contextmanager
+    def cli_clean(self, *args, **kwargs):
+        yield
+        try:
+            path = fs.path.join(loader.get_workspacedir(), self._path)
+            fs.rmtree(path)
+        except (AssertionError, FileNotFoundError):
+            pass
+
+
 @TaskHookFactory.register
-class SymlinkFactory(TaskHookFactory):
+class SymlinkTaskHookFactory(TaskHookFactory):
     def create(self, env):
-        return SymlinkHooks()
+        return SymlinkTaskHooks()
+
+
+@CliHookFactory.register
+class SymlinkCliHookFactory(CliHookFactory):
+    def create(self, env):
+        return SymlinkCliHooks()

@@ -37,3 +37,6 @@ class SymlinksExtension(JoltTest):
             d2 = self.tools.read_file("artifacts/a/data.txt")
 
         self.assertNotEqual(d1, d2)
+
+        self.jolt("clean")
+        self.assertNotExists("artifacts")
