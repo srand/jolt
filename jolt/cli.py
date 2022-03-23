@@ -404,6 +404,7 @@ def build(ctx, task, network, keep_going, default, local,
 @click.option("-d", "--deps", is_flag=True, help="Clean all task dependencies.")
 @click.option("-e", "--expired", is_flag=True, help="Only clean expired tasks.")
 @click.pass_context
+@hooks.cli_clean
 def clean(ctx, task, deps, expired):
     """
     Delete task artifacts and intermediate files.
@@ -441,7 +442,6 @@ def clean(ctx, task, deps, expired):
             t.rmtree(t.buildroot)
         except AssertionError:
             pass
-
 
 
 @cli.command(name="config")
