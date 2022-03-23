@@ -1500,21 +1500,23 @@ class Download(Task):
 
         raise_task_error_if(not self.url, self, "No URL(s) specified")
 
-        self._builddir = tools.builddir()
+        self._downloaddir = tools.builddir()
+        self._extractdir = tools.builddir("extracted")
         for url in utils.as_list(self.url):
             filename = self._filename_from_url(tools, url)
-            with tools.cwd(self._builddir):
+            with tools.cwd(self._downloaddir):
                 tools.download(url, filename)
 
             if self.extract and any(map(lambda n: filename.endswith(n), supported_formats)):
-                self._srcdir = self._builddir
-                self._builddir = tools.builddir("extracted")
-                with tools.cwd(self._builddir):
+                with tools.cwd(self._extractdir):
                     self.info("Extracting {}", filename)
-                    tools.extract(fs.path.join(self._srcdir, filename), ".")
+                    tools.extract(fs.path.join(self._downloaddir, filename), ".")
+            else:
+                with tools.cwd(self._downloaddir):
+                    tools.copy(filename, self._extractdir)
 
     def publish(self, artifact, tools):
-        with tools.cwd(self._builddir):
+        with tools.cwd(self._extractdir):
             for files in self.collect:
                 if type(files) == tuple:
                     artifact.collect(*files, symlinks=self.symlinks)
