@@ -415,7 +415,7 @@ class BuildCli(testsupport.JoltTest):
         with self.assertRaises(Exception):
             self.build("command")
         r1 = self.lastLog()
-        self.assertIn("command failed: false", r1)
+        self.assertIn("Command failed: false", r1)
 
         with self.assertRaises(Exception):
             self.build("error")

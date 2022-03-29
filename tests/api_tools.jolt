@@ -524,11 +524,11 @@ class ToolsApi(JoltTest):
         self.build("a")
 
     def test_run_environment_variables(self):
-        s = self.tools.run(["echo $JOLTDIR"])
+        s = self.tools.run("echo $JOLTDIR")
         self.assertEqual(s, self.joltdir)
-        s = self.tools.run(["echo $JOLTBUILDDIR"])
+        s = self.tools.run("echo $JOLTBUILDDIR")
         self.assertEqual(s, self.tools.buildroot)
-        s = self.tools.run(["echo $JOLTCACHEDIR"])
+        s = self.tools.run("echo $JOLTCACHEDIR")
         from jolt import config
         self.assertEqual(s, config.get_cachedir())
 
@@ -545,9 +545,6 @@ class ToolsApi(JoltTest):
         self.assertEqual(s, "Linux")
 
     def test_run_shell(self):
-        s = self.tools.run(["echo Hello world"])
-        self.assertEqual(s, "Hello world")
-
         s = self.tools.run("echo Hello world")
         self.assertEqual(s, "Hello world")
 
@@ -556,6 +553,21 @@ class ToolsApi(JoltTest):
 
         s = self.tools.run(["sh", "-c", "echo Hello world"], shell=False)
         self.assertEqual(s, "Hello world")
+
+    def test_run_timeout(self):
+        from datetime import datetime
+
+        start = datetime.now()
+        with self.assertRaises(Exception):
+            self.tools.run("sleep 10", timeout=2)
+        end = datetime.now()
+        self.assertLessEqual((end-start).seconds, 3)
+
+        start = datetime.now()
+        with self.assertRaises(Exception):
+            self.tools.run(["sleep", "10"], timeout=2, shell=False)
+        end = datetime.now()
+        self.assertLessEqual((end-start).seconds, 3)
 
     def test_rsync(self):
         """

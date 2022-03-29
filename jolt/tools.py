@@ -17,6 +17,7 @@ import zipfile
 import bz2file
 import hashlib
 from contextlib import contextmanager
+from psutil import NoSuchProcess, Process
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 from jinja2.runtime import Context
@@ -50,6 +51,7 @@ def _run(cmd, cwd, env, preexec_fn, *args, **kwargs):
     output = output if output is not None else True
     output = False if output_on_error else output
     shell = kwargs.get("shell", True)
+    timeout = kwargs.get("timeout", None)
 
     log.debug("Running: '{0}' (CWD: {1})", cmd, cwd)
 
@@ -61,7 +63,8 @@ def _run(cmd, cwd, env, preexec_fn, *args, **kwargs):
         shell=shell,
         cwd=cwd,
         env=env,
-        preexec_fn=preexec_fn)
+        preexec_fn=preexec_fn,
+    )
 
     class Reader(threading.Thread):
         def __init__(self, parent, stream, output=None, logbuf=None):
@@ -99,12 +102,42 @@ def _run(cmd, cwd, env, preexec_fn, *args, **kwargs):
     stderr = Reader(
         threading.current_thread(), p.stderr,
         output=stderr_func if output else None, logbuf=logbuf)
-    p.wait()
-    stdout.join()
-    stderr.join()
-    p.stdin.close()
-    p.stdout.close()
-    p.stderr.close()
+
+    def terminate(pid):
+        try:
+            process = Process(pid)
+            for chld in process.children(recursive=True):
+                chld.terminate()
+            process.terminate()
+        except NoSuchProcess:
+            pass
+
+    def kill(pid):
+        try:
+            process = Process(pid)
+            for chld in process.children(recursive=True):
+                chld.kill()
+            process.kill()
+        except NoSuchProcess:
+            pass
+
+    timedout = False
+    try:
+        p.wait(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        timedout = True
+        try:
+            terminate(p.pid)
+            p.wait(10)
+        except subprocess.TimeoutExpired:
+            kill(p.pid)
+            p.wait()
+    finally:
+        stdout.join()
+        stderr.join()
+        p.stdin.close()
+        p.stdout.close()
+        p.stderr.close()
 
     if p.returncode != 0 and output_on_error:
         for reader, line in logbuf:
@@ -124,7 +157,8 @@ def _run(cmd, cwd, env, preexec_fn, *args, **kwargs):
     if p.returncode != 0:
         stderrbuf = [line for reader, line in logbuf if reader is stderr]
         raise JoltCommandError(
-            "command failed: {0}".format(
+            "Command {0}: {1}".format(
+                "timeout" if timedout else "failed",
                 " ".join(cmd) if type(cmd) == list else cmd.format(*args, **kwargs)),
             stdoutbuf, stderrbuf, p.returncode)
     return "\n".join(stdoutbuf) if output_rstrip else "".join(stdoutbuf)
@@ -1176,6 +1210,8 @@ class Tools(object):
             - ``JOLTDIR`` - Set to :attr:`Task.joltdir <jolt.tasks.Task.joltdir>`
             - ``JOLTCACHEDIR`` - Set to the location of the Jolt cache
 
+        A JoltCommandError exception is raised on failure.
+
         Args:
             cmd (str): Command format string.
             args: Positional arguments for the command format string.
@@ -1191,6 +1227,10 @@ class Tools(object):
                 string. This can be disabled by setting this argument to False.
             shell (boolean, optional): Use a shell to run the command.
                 Default: True.
+            timeout (int, optional): Timeout in seconds. The command will
+                first be terminated if the timeout expires. If the command
+                refuses to terminate, it will be killed after an additional
+                10 seconds have passed. Default: None.
 
         Example:
 

@@ -73,6 +73,7 @@ setup(
         "lxml",
         "multi_key_dict",
         "ninja-syntax",
+        "psutil",
         "pygit2",
         "requests",
         "tqdm",
