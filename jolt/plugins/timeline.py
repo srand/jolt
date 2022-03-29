@@ -1,10 +1,8 @@
-from contextlib import contextmanager
 from datetime import datetime
 import os
 
 from jolt import utils
 from jolt.hooks import TaskHook, TaskHookFactory
-from jolt.manifest import JoltManifest
 from jolt.config import get_workdir
 
 
@@ -58,8 +56,7 @@ class TimelineHooks(TaskHook):
         self.finished(task)
 
 
-
-@TaskHookFactory.register_with_prio(-10)
+@TaskHookFactory.register
 class TimelineFactory(TaskHookFactory):
     def create(self, env):
         return TimelineHooks()
