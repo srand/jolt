@@ -1,4 +1,4 @@
-from configparser import SafeConfigParser, NoOptionError, NoSectionError
+from configparser import ConfigParser, NoOptionError, NoSectionError
 import os
 
 from jolt import filesystem as fs
@@ -22,7 +22,7 @@ else:
     location_user = fs.path.join(fs.userhome(), ".config", "jolt", "user")
 
 
-class ConfigFile(SafeConfigParser):
+class ConfigFile(ConfigParser):
     def __init__(self, location, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._location = location

@@ -1,7 +1,8 @@
 import glob
-import imp
+from importlib.machinery import SourceFileLoader
 import os
 import sys
+from types import ModuleType
 
 from jolt import inspect
 from jolt.tasks import attributes
@@ -52,7 +53,12 @@ class NativeRecipe(Recipe):
         super(NativeRecipe, self).load()
 
         name = utils.canonical(self.path)
-        module = imp.load_source("joltfile_{0}".format(name), self.path)
+        loader = SourceFileLoader("joltfile_{0}".format(name), self.path)
+        module = ModuleType(loader.name)
+        loader.exec_module(module)
+        module.__file__ = self.path
+        sys.modules[loader.name] = module
+
         classes = inspect.getmoduleclasses(module, [Task, TaskGenerator], NativeRecipe._is_abstract)
         generators = []
 
@@ -202,7 +208,7 @@ class JoltLoader(object):
 
     def load_plugin(self, filepath):
         plugin, ext = os.path.splitext(fs.path.basename(filepath))
-        imp.load_source("jolt.plugins." + plugin, filepath)
+        SourceFileLoader("jolt.plugins." + plugin, filepath).load_module()
 
     def load_plugins(self):
         searchpath = config.get("jolt", "pluginpath")

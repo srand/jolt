@@ -1,3 +1,4 @@
+import atexit
 import click
 import subprocess
 import sys
@@ -153,6 +154,7 @@ def cli(ctx, verbose, extra_verbose, config_file, debugger, profile,
         ctx.obj["workspace_lock"] = utils.LockFile(
             fs.path.join(loader.joltdir, "build"),
             log.info, "Workspace is locked by another process, please wait...")
+        atexit.register(ctx.obj["workspace_lock"].close)
 
     # If no command is given, we default to building the default task.
     # If the default task doesn't exist, help is printed inside build().

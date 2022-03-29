@@ -69,7 +69,7 @@ class JoltTest(Test):
     def _recipe(self):
         if not self._testMethodDoc:
             return ""
-        lines = "".join(re.findall(r"--- tasks:\n(.*?)---", self._testMethodDoc, re.M|re.DOTALL))
+        lines = "".join(re.findall(r"--- tasks:\n(.*?)\n        ---", self._testMethodDoc, re.M|re.DOTALL))
         return "\n".join([l[8:] for l in lines.splitlines()])
 
     def _config(self):
@@ -115,7 +115,7 @@ global_string("{test}")
     def jolt(self, command, *args, **kwargs):
         with self.tools.cwd(self.ws):
             try:
-                self._log = self.tools.run("jolt -c test.conf -c net.conf " + command.format(*args, **kwargs))
+                self._log = self.tools.run("python -W error -m jolt -c test.conf -c net.conf " + command.format(*args, **kwargs))
                 return self._log
             except error.JoltCommandError as e:
                 self._log = "\n".join(e.stdout + e.stderr)

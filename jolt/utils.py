@@ -343,6 +343,9 @@ class LockFile(object):
                 logfunc(*args, **kwargs)
             self._file.acquire()
 
+    def close(self):
+        self._file.release()
+
     def __enter__(self, *args, **kwargs):
         return self
 
