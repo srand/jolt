@@ -102,6 +102,9 @@ def _run(cmd, cwd, env, preexec_fn, *args, **kwargs):
     p.wait()
     stdout.join()
     stderr.join()
+    p.stdin.close()
+    p.stdout.close()
+    p.stderr.close()
 
     if p.returncode != 0 and output_on_error:
         for reader, line in logbuf:
