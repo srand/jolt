@@ -654,7 +654,7 @@ class TaskApi(JoltTest):
         """
         --- tasks:
         class Zlib(Download):
-            version = Parameter("1.2.11")
+            version = Parameter("1.2.12")
             url = "https://zlib.net/zlib-{{version}}.tar.gz"
             collect = [
                 ("zlib-{{version}}", "zlib1"),
@@ -663,15 +663,15 @@ class TaskApi(JoltTest):
             ]
         class ZlibArchive(Download):
             extract = False
-            version = Parameter("1.2.11")
+            version = Parameter("1.2.12")
             url = "https://zlib.net/zlib-{{version}}.tar.gz"
 
         class PlainText(Download):
-            version = Parameter("1.2.11")
+            version = Parameter("1.2.12")
             url = ["https://nodejs.org/dist/latest/SHASUMS256.txt"]
 
         class Multiple(Download):
-            version = Parameter("1.2.11")
+            version = Parameter("1.2.12")
             url = [
                 "https://nodejs.org/dist/latest/SHASUMS256.txt",
                 "https://nodejs.org/dist/latest/SHASUMS256.txt.asc",
@@ -691,7 +691,7 @@ class TaskApi(JoltTest):
 
         r = self.build("zlibarchive")
         a = self.artifacts(r)
-        self.assertExists(os.path.join(a[0], "zlib-1.2.11.tar.gz"))
+        self.assertExists(os.path.join(a[0], "zlib-1.2.12.tar.gz"))
 
         r = self.build("plaintext")
         a = self.artifacts(r)
