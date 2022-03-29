@@ -64,7 +64,7 @@ setup(
     packages=find_packages(exclude=["contrib", "docs", "tests"]),
     install_requires=[
         "bz2file",
-        "click>=7.0",
+        "click>=8.1",
         "colorama",
         "fasteners",
         "jinja2",

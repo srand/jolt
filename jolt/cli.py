@@ -178,7 +178,7 @@ def _autocomplete_tasks(ctx, args, incomplete):
 
 
 @cli.command()
-@click.argument("task", type=str, nargs=-1, autocompletion=_autocomplete_tasks, cls=ArgRequiredUnless, required_unless="worker")
+@click.argument("task", type=str, nargs=-1, shell_complete=_autocomplete_tasks, cls=ArgRequiredUnless, required_unless="worker")
 @click.option("-c", "--copy", type=click.Path(),
               help="Copy artifact content to directory PATH.")
 @click.option("-d", "--default", type=str, multiple=True, help="Override default parameter values.", metavar="DEFAULT")
@@ -400,7 +400,7 @@ def build(ctx, task, network, keep_going, default, local,
 
 
 @cli.command()
-@click.argument("task", type=str, nargs=-1, required=False, autocompletion=_autocomplete_tasks)
+@click.argument("task", type=str, nargs=-1, required=False, shell_complete=_autocomplete_tasks)
 @click.option("-d", "--deps", is_flag=True, help="Clean all task dependencies.")
 @click.option("-e", "--expired", is_flag=True, help="Only clean expired tasks.")
 @click.pass_context
@@ -561,7 +561,7 @@ def _config(ctx, list, delete, global_, user, key, value):
 
 
 @cli.command()
-@click.argument("task", type=str, nargs=-1, required=False, autocompletion=_autocomplete_tasks)
+@click.argument("task", type=str, nargs=-1, required=False, shell_complete=_autocomplete_tasks)
 @click.option("-r", "--reverse", type=str, help="Display consumers of REVERSE if TASK is executed.")
 @click.option("-c", "--cached", "show_cache", is_flag=True, help="Highlight cache presence with colors.")
 @click.pass_context
@@ -680,7 +680,7 @@ def freeze(ctx, task, default, output, remove):
 
 
 @cli.command(name="list")
-@click.argument("task", type=str, nargs=-1, required=False, autocompletion=_autocomplete_tasks)
+@click.argument("task", type=str, nargs=-1, required=False, shell_complete=_autocomplete_tasks)
 @click.option("-a", "--all", is_flag=True, help="List all direct and indirect dependencies of TASK.")
 @click.option("-r", "--reverse", type=str, help="Only list dependencies of TASK that are also reverse dependencies of REVERSE.", metavar="REVERSE")
 @click.pass_context
@@ -761,7 +761,7 @@ def _log(follow, delete):
 
 
 @cli.command()
-@click.argument("task", autocompletion=_autocomplete_tasks)
+@click.argument("task", shell_complete=_autocomplete_tasks)
 @click.option("-i", "--influence", is_flag=True, help="Print influence attributes and values.")
 @click.option("-a", "--artifact", is_flag=True, help="Print artifact cache status.")
 @click.option("-s", "--salt", type=str, help="Add salt as task influence.", metavar="SALT")
@@ -859,7 +859,7 @@ def inspect(ctx, task, influence=False, artifact=False, salt=None):
 
 
 @cli.command()
-@click.argument("task", type=str, nargs=-1, required=True, autocompletion=_autocomplete_tasks)
+@click.argument("task", type=str, nargs=-1, required=True, shell_complete=_autocomplete_tasks)
 @click.pass_context
 def export(ctx, task):
     """

@@ -149,7 +149,7 @@ class CompDBHookFactory(TaskHookFactory):
 
 
 @cli.cli.command(name="compdb")
-@click.argument("task", type=str, nargs=-1, required=False, autocompletion=cli._autocomplete_tasks)
+@click.argument("task", type=str, nargs=-1, required=False, shell_complete=cli._autocomplete_tasks)
 @click.option("-d", "--default", type=str, multiple=True, help="Override default parameter values.")
 @click.pass_context
 def compdb(ctx, task, default):
