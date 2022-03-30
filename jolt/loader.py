@@ -55,8 +55,8 @@ class NativeRecipe(Recipe):
         name = utils.canonical(self.path)
         loader = SourceFileLoader("joltfile_{0}".format(name), self.path)
         module = ModuleType(loader.name)
-        loader.exec_module(module)
         module.__file__ = self.path
+        loader.exec_module(module)
         sys.modules[loader.name] = module
 
         classes = inspect.getmoduleclasses(module, [Task, TaskGenerator], NativeRecipe._is_abstract)
