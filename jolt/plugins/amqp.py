@@ -413,6 +413,8 @@ class WorkerTaskConsumer(object):
                             tools.run(". {}/bin/activate && pip install -e {}", env, src)
                             if requires:
                                 tools.run(". {}/bin/activate && pip install {}", env, requires)
+                            if "autocompletion=" in tools.read_file(f"{src}/jolt/cli.py"):
+                                tools.run(". {}/bin/activate && pip install 'click<8.1'", env, src)
                         except Exception as e:
                             tools.rmtree("build/selfdeploy/{}", ident, ignore_errors=True)
                             raise e
