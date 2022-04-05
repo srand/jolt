@@ -454,4 +454,4 @@ def quote(value, char='"'):
 
 
 def option(prefix, value):
-    return f"{prefix}{value}" if value else ""
+    return "{}{}".format(prefix, quote(value)) if value else ""

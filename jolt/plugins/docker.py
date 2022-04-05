@@ -126,6 +126,15 @@ class DockerContainer(Resource):
     arguments = []
     """ Container argument list """
 
+    cap_adds = []
+    """ A list of capabilities to add to the container """
+
+    cap_drops = []
+    """ A list of capabilities to remove from the container """
+
+    entrypoint = None
+    """ Container entrypoint """
+
     environment = []
     """ Environment variables """
 
@@ -137,12 +146,31 @@ class DockerContainer(Resource):
     metadata string named ``tag`` with the name of the image tag.
     """
 
+    labels = []
+    """ A list of container metadata labels """
+
+    privileged = False
+    """
+    Start container with elevated privileges.
+    """
+
     volumes = []
     """
     A list of volumes to mount.
 
     By default, the cache directory and ``joltdir`` are automatically
-    mounted in the container.
+    mounted in the container. See :attr:`volumes_default`.
+    """
+
+    volumes_default = [
+        "{joltdir}:{joltdir}",
+        "{joltcachedir}:{joltcachedir}",
+    ]
+    """
+    A list of default volumes to mount.
+
+    By default, the cache directory and ``joltdir`` are automatically
+    mounted in the container. Override to disable.
     """
 
     user = None
@@ -157,8 +185,20 @@ class DockerContainer(Resource):
         return " ".join(self.arguments)
 
     @property
+    def _cap_adds(self):
+        return " ".join([utils.option("--cap-add ", cap) for cap in self.cap_adds])
+
+    @property
+    def _cap_drops(self):
+        return " ".join([utils.option("--cap-drop ", cap) for cap in self.cap_drops])
+
+    @property
+    def _entrypoint(self):
+        return utils.option("--entrypoint ", self.entrypoint)
+
+    @property
     def _environment(self):
-        return " ".join(["-e " + self.tools.expand(env) for env in self.environment])
+        return " ".join([utils.option("-e ", self.tools.expand(env)) for env in self.environment])
 
     @property
     def _image(self):
@@ -176,6 +216,14 @@ class DockerContainer(Resource):
         log.info(fmt, *args, **kwargs)
 
     @property
+    def _labels(self):
+        return " ".join([utils.option("-l ", self.tools.expand(label)) for label in self.labels])
+
+    @property
+    def _privileged(self):
+        return "--privileged" if self.privileged else ""
+
+    @property
     def _user(self):
         if self.user:
             return f"--user {self.user}"
@@ -187,11 +235,11 @@ class DockerContainer(Resource):
 
     @property
     def _volumes(self):
-        cachedir = config.get_cachedir()
-        volumes = ["{joltdir}:{joltdir}", f"{cachedir}:{cachedir}"]
-        return " ".join(["-v " + self.tools.expand(vol) for vol in self.volumes + volumes])
+        return " ".join([utils.option("-v ", self.tools.expand(vol))
+                         for vol in self.volumes_default + self.volumes])
 
     def acquire(self, artifact, deps, tools, owner):
+        self.joltcachedir = config.get_cachedir()
         try:
             image = deps[self.image]
             image = str(image.strings.tag)
@@ -200,7 +248,7 @@ class DockerContainer(Resource):
 
         self._info(f"Creating container from image '{image}'")
         self.container = tools.run(
-            "docker run -i -d {_user} {_environment} {_volumes} {image} {_arguments}",
+            "docker run -i -d {_cap_adds} {_cap_drops} {_entrypoint} {_labels} {_privileged} {_user} {_environment} {_volumes} {image} {_arguments}",
             image=image, output_on_error=True)
 
         self._info("Created container '{container}'")
@@ -406,6 +454,9 @@ class DockerImage(Task):
     Defaults to the task's canonical name.
     """
 
+    labels = []
+    """ A list of image metadata labels """
+
     platform = None
     """ Target platform, e.g. linux/arm/v7. """
 
@@ -440,16 +491,31 @@ class DockerImage(Task):
         with _Tarfile.open(layerpath, 'r') as tar:
             tar.extractall(targetpath)
 
+    @property
+    def _buildargs(self):
+        return " ".join([utils.option("--build-arg ", self.tools.expand(ba)) for ba in self.buildargs])
+
+    @property
+    def _labels(self):
+        return " ".join([utils.option("-l ", self.tools.expand(label)) for label in self.labels])
+
+    @property
+    def _platform(self):
+        platform = self.tools.expand(self.platform) if self.platform else None
+        return utils.option("--platform ", platform)
+
+    @property
+    def _tags(self):
+        return " ".join([utils.option("-t ", tag) for tag in self.tags])
+
     def run(self, deps, tools):
-        buildargs = " ".join(["--build-arg " + tools.expand(arg) for arg in self.buildargs])
         context = tools.expand_relpath(self.context, self.joltdir)
         dockerfile = tools.expand_path(self.dockerfile)
         self._imagefile = tools.expand(self.imagefile) if self.imagefile else None
         self._autoload = self._imagefile and self.autoload
-        platform = f" --platform {self.platform}" if self.platform else ""
+        self.tags = [self.tools.expand(tag) for tag in self.tags]
         pull = " --pull" if self.pull else ""
         squash = " --squash" if self.squash else ""
-        tags = [tools.expand(tag) for tag in self.tags]
 
         # If dockerfile is not relative to joltdir, look for it in context
         if not path.exists(dockerfile):
@@ -466,20 +532,19 @@ class DockerImage(Task):
                   tools.expand_relpath(context))
 
         with tools.cwd(context):
-            tools.run("docker build {platform} . -f {} -t {} {}{}{}", dockerfile, tags[0], buildargs, pull, squash, platform=platform)
-            for tag in tags[1:]:
-                tools.run("docker tag {} {}", tags[0], tag)
+            tools.run("docker build {_platform} . -f {} {_buildargs} {_labels} {_tags} {pull}{squash}",
+                      utils.quote(dockerfile), pull=pull, squash=squash)
 
         try:
             if self.push:
                 self.info("Pushing image")
-                for tag in tags:
+                for tag in self.tags:
                     tools.run("docker push {}", tag)
 
             if self._imagefile or self.extract:
                 self.info("Saving image to file")
                 with tools.cwd(tools.builddir()):
-                    tools.run("docker image save {} -o {}", tags[0], self._imagefile or "image.tar")
+                    tools.run("docker image save {} -o {}", self.tags[0], self._imagefile or "image.tar")
 
             if self.extract:
                 with tools.cwd(tools.builddir()):
@@ -498,7 +563,7 @@ class DockerImage(Task):
         finally:
             if self.cleanup:
                 self.info("Removing image from Docker daemon")
-                for tag in tags:
+                for tag in self.tags:
                     utils.call_and_catch(tools.run("docker image rm {}", tag))
 
     def publish(self, artifact, tools):

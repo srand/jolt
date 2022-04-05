@@ -297,9 +297,6 @@ class DockerExt(JoltTest):
 
     def test_artifact_pull_rmi(self):
         """
-        --- file: Dockerfile
-        FROM busybox:latest
-
         --- tasks:
         from jolt.plugins.docker import *
 
@@ -318,3 +315,166 @@ class DockerExt(JoltTest):
         """
         self.build("consumer")
         self.assertNotIn("busybox:latest", self.tools.run("docker image ls --format '{{{{.Repository}}}}:{{{{.Tag}}}}'"))
+
+    def test_container_user(self):
+        """
+        --- tasks:
+        from jolt.plugins.docker import *
+
+        class A(DockerContainer):
+            image = "busybox:latest"
+            user = Parameter("root")
+
+        class ATest(Task):
+            requires = "a:user={{user}}"
+            user = Parameter("root")
+
+            def run(self, deps, tools):
+                self.id = deps[self.requires[0]].info["Id"]
+                assert tools.run("docker exec {{id}} whoami") == str(self.user)
+        ---
+        """
+        self.build("atest:user=root atest:user=nobody")
+
+    def test_container_environment(self):
+        """
+        --- tasks:
+        from jolt.plugins.docker import *
+
+        class A(DockerContainer):
+            image = "busybox:latest"
+            arg = Parameter()
+            environment = ["PARAM={{arg}}"]
+
+        class ATest(Task):
+            requires = "a:arg={{arg}}"
+            arg = Parameter()
+
+            def run(self, deps, tools):
+                self.id = deps[self.requires[0]].info["Id"]
+                assert tools.run("docker exec {{id}} sh -c 'echo $PARAM'") == str(self.arg)
+        ---
+        """
+        self.build("atest:arg=root atest:arg=nobody")
+
+    def test_container_privileged(self):
+        """
+        --- tasks:
+        from jolt.plugins.docker import *
+
+        class A(DockerContainer):
+            image = "busybox:latest"
+            privileged = BooleanParameter()
+            user = "root"
+
+        class ATest(Task):
+            requires = "a:privileged={{privileged}}"
+            privileged = BooleanParameter()
+
+            def run(self, deps, tools):
+                self.id = deps[self.requires[0]].info["Id"]
+                try:
+                    tools.run("docker exec {{id}} ip link add jolt0 type dummy")
+                except Exception:
+                    assert not self.privileged
+                else:
+                    assert self.privileged
+        ---
+        """
+        self.build("atest:privileged=true atest:privileged=false")
+
+    def test_container_labels(self):
+        """
+        --- tasks:
+        from jolt.plugins.docker import *
+
+        class A(DockerContainer):
+            image = "busybox:latest"
+            labels = ["jolt.identity={{identity}}"]
+
+        class ATest(Task):
+            requires = "a"
+
+            def run(self, deps, tools):
+                a = deps[self.requires[0]]
+                assert a.info["Config"]["Labels"]["jolt.identity"] == a.identity
+
+        ---
+        """
+        self.build("atest")
+
+    def test_container_entrypoint(self):
+        """
+        --- tasks:
+        from jolt.plugins.docker import *
+
+        class A(DockerContainer):
+            image = "busybox:latest"
+            entrypoint = "cat"
+
+        class ATest(Task):
+            requires = "a"
+
+            def run(self, deps, tools):
+                self.id = deps[self.requires[0]].info["Id"]
+                entry = tools.run("docker exec {{id}} cat /proc/1/cmdline")
+                assert "cat" in entry, f"Got '{{entry}}', expected 'cat'"
+
+        ---
+        """
+        self.build("atest")
+
+    def test_container_caps(self):
+        """
+        --- tasks:
+        from jolt.plugins.docker import *
+
+        class A(DockerContainer):
+            image = "busybox:latest"
+            cap_adds = ["ALL"]
+            cap_drops = ["NET_ADMIN"]
+            user = "root"
+
+        class ATest(Task):
+            requires = "a"
+
+            def run(self, deps, tools):
+                assert "ALL" in deps[self.requires[0]].info["HostConfig"]["CapAdd"]
+                assert "NET_ADMIN" in deps[self.requires[0]].info["HostConfig"]["CapDrop"]
+
+        ---
+        """
+        self.build("atest")
+
+    def test_container_volumes(self):
+        """
+        --- file: a/a.txt
+        --- tasks:
+        from jolt.plugins.docker import *
+
+
+        class B(Task):
+            def publish(self, artifact, tools):
+                with tools.cwd(tools.builddir()):
+                    tools.write_file("b.txt", "")
+                    artifact.collect("b.txt")
+
+
+        class A(DockerContainer):
+            image = "busybox:latest"
+            requires = ["b"]
+            volumes = ["{{joltdir}}/a:/a"]
+
+
+        class ATest(Task):
+            requires = "a"
+
+            def run(self, deps, tools):
+                self.id = deps[self.requires[0]].info["Id"]
+                tools.run("docker exec {{id}} cat {{joltdir}}/a/a.txt")
+                tools.run("docker exec {{id}} cat {{}}/b.txt", deps["b"].path)
+                tools.run("docker exec {{id}} cat /a/a.txt")
+
+        ---
+        """
+        self.build("atest")
