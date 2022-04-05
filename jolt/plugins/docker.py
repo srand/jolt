@@ -154,6 +154,22 @@ class DockerContainer(Resource):
     Start container with elevated privileges.
     """
 
+    ports = []
+    """
+    A list of container ports to publish.
+
+    Example:
+
+    .. code-block:: python
+
+        ports = [
+            "80",
+            "443:443",
+        ]
+
+    Alternatively, assign ``True`` to publish all exposed ports to random ports.
+    """
+
     volumes = []
     """
     A list of volumes to mount.
@@ -224,6 +240,12 @@ class DockerContainer(Resource):
         return "--privileged" if self.privileged else ""
 
     @property
+    def _ports(self):
+        if self.ports is True:
+            return "-P"
+        return " ".join([utils.option("-p ", self.tools.expand(port)) for port in self.ports])
+
+    @property
     def _user(self):
         if self.user:
             return f"--user {self.user}"
@@ -248,7 +270,7 @@ class DockerContainer(Resource):
 
         self._info(f"Creating container from image '{image}'")
         self.container = tools.run(
-            "docker run -i -d {_cap_adds} {_cap_drops} {_entrypoint} {_labels} {_privileged} {_user} {_environment} {_volumes} {image} {_arguments}",
+            "docker run -i -d {_cap_adds} {_cap_drops} {_entrypoint} {_labels} {_ports} {_privileged} {_user} {_environment} {_volumes} {image} {_arguments}",
             image=image, output_on_error=True)
 
         self._info("Created container '{container}'")

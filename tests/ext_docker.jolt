@@ -478,3 +478,39 @@ class DockerExt(JoltTest):
         ---
         """
         self.build("atest")
+
+    def test_container_publish(self):
+        """
+        --- file: a/a.txt
+        --- tasks:
+        from jolt.plugins.docker import *
+
+
+        class Busybox(DockerImage):
+            dockerfile = '''
+            FROM busybox:latest
+            EXPOSE 80
+            '''
+
+        class A(DockerContainer):
+            image = "busybox"
+            ports = True
+
+        class B(DockerContainer):
+            image = "busybox"
+            ports = ["80"]
+
+        class C(DockerContainer):
+            image = "busybox"
+            ports = ["8888:80"]
+
+        class ATest(Task):
+            requires = ["a", "b", "c"]
+
+            def run(self, deps, tools):
+                for req in self.requires:
+                    print(deps[req].info["NetworkSettings"]["Ports"]["80/tcp"])
+
+        ---
+        """
+        self.build("atest")
