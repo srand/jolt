@@ -32,12 +32,28 @@ from jolt import colors
 
 
 class Export(object):
+
     def __init__(self, value, encoded=False):
         self._imported = False
         self._task = None
         self._value = None
         self.exported_value = value
         self.encoded = encoded
+
+    @staticmethod
+    def __get_exports__(obj):
+        exports = {}
+        for mro in obj.__class__.__mro__:
+            for key, export in getattr(mro, "__export_list", {}).items():
+                attr = getattr(obj.__class__, key)
+                if isinstance(attr, Export):
+                    exports[key] = attr
+        return exports
+
+    def __set_name__(self, owner, name):
+        if "__export_list" not in owner.__dict__:
+            setattr(owner, "__export_list", {})
+        getattr(owner, "__export_list")[name] = self
 
     @property
     def value(self):
@@ -76,6 +92,21 @@ class EnvironExport(Export):
 
 class Parameter(object):
     """ Generic task parameter type. """
+
+    @staticmethod
+    def __get_params__(obj):
+        params = {}
+        for mro in obj.__class__.__mro__:
+            for key, param in getattr(mro, "__param_list", {}).items():
+                attr = getattr(obj.__class__, key)
+                if isinstance(attr, Parameter):
+                    params[key] = attr
+        return params
+
+    def __set_name__(self, owner, name):
+        if "__param_list" not in owner.__dict__:
+            setattr(owner, "__param_list", {})
+        getattr(owner, "__param_list")[name] = self
 
     def __init__(self, default=None, values=None, required=True,
                  const=False, influence=True, help=None):
@@ -910,17 +941,17 @@ class TaskBase(object):
     def _create_exports_and_parameters(self):
         self._exports = {}
         self._parameters = {}
-        for key in dir(self):
-            obj = utils.getattr_safe(self, key)
-            if isinstance(obj, Export):
-                export = copy.copy(obj)
-                setattr(self, key, export)
-                self._exports[key] = export
-                export.set_task(self)
-            if isinstance(obj, Parameter):
-                param = copy.copy(obj)
-                setattr(self, key, param)
-                self._parameters[key] = param
+
+        for key, export in Export.__get_exports__(self).items():
+            export = copy.copy(export)
+            export.set_task(self)
+            setattr(self, key, export)
+            self._exports[key] = export
+
+        for key, param in Parameter.__get_params__(self).items():
+            param = copy.copy(param)
+            setattr(self, key, param)
+            self._parameters[key] = param
 
     def _set_parameters(self, params):
         params = params or {}
