@@ -202,6 +202,22 @@ class Variable(HashInfluenceProvider):
     def __init__(self, value=None):
         self._value = value
 
+    @staticmethod
+    def __get_variables__(obj):
+        variables = {}
+        for mro in obj.__class__.__mro__:
+            for key, variable in getattr(mro, "__variable_list", {}).items():
+                attr = getattr(obj.__class__, key)
+                if isinstance(attr, Variable):
+                    variables[key] = attr
+        return variables
+
+    def __set_name__(self, owner, name):
+        self.name = name
+        if "__variable_list" not in owner.__dict__:
+            setattr(owner, "__variable_list", {})
+        getattr(owner, "__variable_list")[name] = self
+
     def create(self, project, writer, deps, tools):
         writer.variable(self.name, self._value)
 
@@ -442,6 +458,22 @@ class Rule(HashInfluenceProvider):
         self.implicit = implicit or []
         self.order_only = order_only
         self.aggregate = aggregate
+
+    @staticmethod
+    def __get_rules__(obj):
+        rules = {}
+        for mro in obj.__class__.__mro__:
+            for key, rule in getattr(mro, "__rule_list", {}).items():
+                attr = getattr(obj.__class__, key)
+                if isinstance(attr, Rule):
+                    rules[key] = attr
+        return rules
+
+    def __set_name__(self, owner, name):
+        self.name = name
+        if "__rule_list" not in owner.__dict__:
+            setattr(owner, "__rule_list", {})
+        getattr(owner, "__rule_list")[name] = self
 
     def _out(self, project, infile):
         in_dirname, in_basename = fs.path.split(infile)
@@ -706,14 +738,14 @@ class Toolchain(object):
         self._rules_by_ext = self.build_rules_and_vars(self)
 
     @staticmethod
-    def build_rules_and_vars(cls):
+    def build_rules_and_vars(obj):
         rule_map = {}
-        rules, vars = Toolchain.all_rules_and_vars(cls)
-        for name, rule in rules:
+        rules, vars = Toolchain.all_rules_and_vars(obj)
+        for name, rule in rules.items():
             rule.name = name
             for ext in rule.infiles:
                 rule_map[ext] = rule
-        for name, var in vars:
+        for name, var in vars.items():
             var.name = name
         return rule_map
 
@@ -721,16 +753,8 @@ class Toolchain(object):
         return self._rules_by_ext.get(ext)
 
     @staticmethod
-    def all_rules_and_vars(cls):
-        vars = []
-        rules = []
-        for key in dir(cls):
-            obj = getattr(cls, key)
-            if isinstance(obj, Variable):
-                vars.append((key, obj))
-            elif isinstance(obj, Rule):
-                rules.append((key, obj))
-        return rules, vars
+    def all_rules_and_vars(obj):
+        return Rule.__get_rules__(obj), Variable.__get_variables__(obj)
 
     def __str__(self):
         return self.__class__.__name__
@@ -1109,10 +1133,15 @@ class MSVCToolchain(Toolchain):
         suffix=".lib")
 
 
+_toolchains = {
+    GNUToolchain: GNUToolchain(),
+    MSVCToolchain: MSVCToolchain(),
+}
+
 if os.name == "nt":
-    toolchain = MSVCToolchain()
+    toolchain = _toolchains[MSVCToolchain]
 else:
-    toolchain = GNUToolchain()
+    toolchain = _toolchains[GNUToolchain]
 
 
 class CXXProject(Task):
@@ -1217,7 +1246,12 @@ class CXXProject(Task):
     def __init__(self, *args, **kwargs):
         super(CXXProject, self).__init__(*args, **kwargs)
         self._init_sources()
-        self.toolchain = self.__class__.toolchain() if self.__class__.toolchain else toolchain
+        if self.__class__.toolchain:
+            if self.__class__.toolchain not in _toolchains:
+                _toolchains[self.__class__.toolchain] = self.__class__.toolchain()
+            self.toolchain = _toolchains[self.__class__.toolchain]
+        else:
+            self.toolchain = toolchain
         self.binary = self.expand(utils.call_or_return(self, self.__class__._binary))
 
         self.asflags = self.expand(utils.as_list(utils.call_or_return(self, self.__class__._asflags)))
@@ -1266,16 +1300,15 @@ class CXXProject(Task):
                 self._linker = self.toolchain.archiver
 
         rules, variables = Toolchain.all_rules_and_vars(self)
-        for name, var in variables:
+        rules["_linker"] = self._linker
+        for name, var in variables.items():
             var = copy.copy(var)
-            setattr(self, name, var)
-            var.name = name
+            setattr(self, var.name, var)
             self._variables.append(var)
             self.influence.append(var)
-        for name, rule in rules:
+        for name, rule in rules.items():
             rule = copy.copy(rule)
-            setattr(self, name, rule)
-            rule.name = name
+            setattr(self, rule.name, rule)
             for ext in rule.infiles:
                 self._rules_by_ext[ext] = rule
             self._rules.append(rule)
@@ -1404,7 +1437,7 @@ if __name__ == "__main__":
         for var in self._variables:
             var.create(self, writer, deps, tools)
             variables.add(var.name)
-        for name, var in tc_vars:
+        for name, var in tc_vars.items():
             if name not in variables:
                 var.create(self, writer, deps, tools)
         writer.newline()
@@ -1413,7 +1446,7 @@ if __name__ == "__main__":
         for rule in self._rules:
             rule.create(self, writer, deps, tools)
             rules.add(rule.name)
-        for name, rule in tc_rules:
+        for name, rule in tc_rules.items():
             if name not in rules:
                 rule.create(self, writer, deps, tools)
         writer.newline()
