@@ -465,7 +465,12 @@ class DockerImage(Task):
     """ Path to the Dockerfile to build, or the full source code of such a file. """
 
     extract = False
-    """ Extract image and publish rootfs tree """
+    """
+    Extract image and publish rootfs tree.
+
+    This option is useful when building a chroot to be used with
+    :func:`jolt.Tools.chroot`. It disables saving of the image to a tarball.
+    """
 
     imagefile = "{canonical_name}.tar"
     """
@@ -576,8 +581,7 @@ class DockerImage(Task):
                         for layer in image.get("Layers", []):
                             self.info("Extracting layer {}", fs.path.dirname(layer))
                             self._extract_layer(tools, fs.path.join("layers", layer), "rootfs/")
-
-            if self._imagefile:
+            elif self._imagefile:
                 with tools.cwd(tools.builddir()):
                     if self.compression is not None:
                         tools.compress("{_imagefile}", "{_imagefile}.{compression}")
@@ -590,7 +594,11 @@ class DockerImage(Task):
 
     def publish(self, artifact, tools):
         artifact.strings.tag = tools.expand(self.tags[0])
-        if self._imagefile:
+        if self.extract:
+            with tools.cwd(tools.builddir()):
+                artifact.collect("rootfs", symlinks=True)
+            artifact.paths.rootfs = "rootfs"
+        elif self._imagefile:
             with tools.cwd(tools.builddir()):
                 if self.compression is not None:
                     artifact.collect("{_imagefile}.{compression}")
@@ -600,9 +608,5 @@ class DockerImage(Task):
                     artifact.collect("{_imagefile}")
                     if self._autoload:
                         artifact.docker.load.append("{_imagefile}")
-        if self.extract:
-            with tools.cwd(tools.builddir()):
-                artifact.collect("rootfs", symlinks=True)
-            artifact.paths.rootfs = "rootfs"
-        if self._autoload:
-            artifact.docker.rmi.append(artifact.strings.tag.get_value())
+            if self._autoload:
+                artifact.docker.rmi.append(artifact.strings.tag.get_value())

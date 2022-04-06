@@ -348,7 +348,7 @@ DockerContainer
 .. reference-docker-dockercontainer-start
 
 .. autoclass:: jolt.plugins.docker.DockerContainer
-   :members: arguments, environment, image, volumes, user
+   :members: arguments, cap_adds, cap_drops, entrypoint, environment, image, labels, privileged, ports, volumes, volumes_default, user
 
 .. reference-docker-dockercontainer-end
 
@@ -358,7 +358,7 @@ DockerImage
 .. reference-docker-dockerimage-start
 
 .. autoclass:: jolt.plugins.docker.DockerImage
-   :members: autoload, buildargs, cleanup, compression, context, dockerfile, imagefile, pull, push, tags
+   :members: autoload, buildargs, cleanup, compression, context, dockerfile, extract, imagefile, labels, platform, pull, push, squash, tags
 
 .. reference-docker-dockerimage-end
 
