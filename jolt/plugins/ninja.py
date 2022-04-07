@@ -1298,16 +1298,21 @@ class CXXProject(Task):
                 self._linker = self.toolchain.dynlinker
             else:
                 self._linker = self.toolchain.archiver
+        else:
+            self._linker = None
 
         rules, variables = Toolchain.all_rules_and_vars(self)
-        rules["_linker"] = self._linker
+        if self._linker:
+            rules["_linker"] = self._linker
         for name, var in variables.items():
             var = copy.copy(var)
+            var.name = name
             setattr(self, var.name, var)
             self._variables.append(var)
             self.influence.append(var)
         for name, rule in rules.items():
             rule = copy.copy(rule)
+            rule.name = name
             setattr(self, rule.name, rule)
             for ext in rule.infiles:
                 self._rules_by_ext[ext] = rule
