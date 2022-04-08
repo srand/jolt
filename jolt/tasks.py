@@ -26,7 +26,7 @@ from jolt.influence import TaskClassSourceInfluence
 from jolt.influence import attribute as attribute_influence
 from jolt.influence import environ as environ_influence
 from jolt.influence import source as source_influence
-from jolt import manifest
+from jolt.manifest import _JoltTask
 from jolt.tools import Tools
 from jolt import colors
 
@@ -78,6 +78,9 @@ class Export(object):
 
     def set_task(self, task):
         self._task = task
+
+    def __str__(self):
+        return str(self.value)
 
 
 class EnvironExport(Export):
@@ -578,20 +581,6 @@ class TaskRegistry(object):
     def get_test_classes(self):
         return list(self.tests.values())
 
-    def _apply_task_manifest(self, task, manifest=None):
-        if manifest is None:
-            return
-        manifest_task = manifest.find_task(task.qualified_name)
-        if manifest_task is not None:
-            if manifest_task.identity:
-                task.identity = manifest_task.identity
-            for attrib in manifest_task.attributes:
-                export = utils.getattr_safe(task, attrib.name)
-                assert isinstance(export, Export), \
-                    "'{0}' is not an exportable attribute of task '{1}'"\
-                    .format(attrib.name, task.qualified_name)
-                export.assign(attrib.value)
-
     def get_task(self, name, extra_params=None, manifest=None):
         name, params = utils.parse_task_name(name)
         params.update(extra_params or {})
@@ -603,17 +592,15 @@ class TaskRegistry(object):
 
         cls = self.tasks.get(name)
         if cls:
-            task = cls(parameters=params)
+            task = cls(parameters=params, manifest=manifest)
             task = self.instances.get(task.qualified_name, task)
-            self._apply_task_manifest(task, manifest)
             self.instances[task.qualified_name] = task
             self.instances[full_name] = task
             return task
 
         cls = self.tests.get(name)
         if cls:
-            task = cls(parameters=params)
-            task = self.instances.get(task.qualified_name, task)
+            task = cls(parameters=params, manifest=manifest)
             self._apply_task_manifest(task, manifest)
             self.instances[task.qualified_name] = task
             self.instances[full_name] = task
@@ -908,9 +895,9 @@ class TaskBase(object):
     _instance = Export(lambda t: str(uuid.uuid4()))
     # Instance identifier, global to cluster
 
-    def __init__(self, parameters=None, **kwargs):
+    def __init__(self, parameters=None, manifest=None, **kwargs):
         self._identity = None
-        self._report = manifest._JoltTask()
+        self._report = _JoltTask()
         self.name = self.__class__.name
 
         self._create_exports_and_parameters()
@@ -925,9 +912,25 @@ class TaskBase(object):
         self.influence = utils.call_or_return_list(self, self.__class__._influence)
         self.influence.append(TaskClassSourceInfluence())
         self.influence.append(TaintInfluenceProvider())
-        self.requires = self.expand(utils.unique_list(utils.call_or_return_list(self, self.__class__._requires)))
+        self.requires = utils.unique_list(utils.call_or_return_list(self, self.__class__._requires))
         self.selfsustained = utils.call_or_return(self, self.__class__._selfsustained)
         self.tools = Tools(self, self.joltdir)
+        self._apply_manifest(manifest)
+        self.requires = self.expand(self.requires)
+
+    def _apply_manifest(self, manifest):
+        if manifest is None:
+            return
+        manifest_task = manifest.find_task(self.qualified_name)
+        if manifest_task is not None:
+            if manifest_task.identity:
+                self.identity = manifest_task.identity
+            for attrib in manifest_task.attributes:
+                export = utils.getattr_safe(self, attrib.name)
+                assert isinstance(export, Export), \
+                    "'{0}' is not an exportable attribute of task '{1}'"\
+                    .format(attrib.name, self.qualified_name)
+                export.assign(attrib.value)
 
     def _influence(self):
         return utils.as_list(self.__class__.influence)

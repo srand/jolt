@@ -452,6 +452,24 @@ class BuildCli(testsupport.JoltTest):
         a = self.artifacts(r)
         self.tools.run("cat {}/.build.log", a[0])
 
+    def test_export_value_in_requirement(self):
+        """
+        --- tasks:
+        from jolt import EnvironExport
+
+        class Test(Task):
+            env = EnvironExport("ENV")
+            requires = ["dep:arg={{env}}"]
+
+        class Dep(Task):
+            arg = Parameter()
+            def run(self, deps, tools):
+                assert self.arg == "123"
+        ---
+        """
+        with self.tools.environ(ENV="123"):
+            self.build("test")
+
     def test_force_requirement(self):
         """
         --- tasks:
