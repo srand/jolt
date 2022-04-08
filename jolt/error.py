@@ -1,4 +1,4 @@
-from jolt import inspect
+from jolt import inspection
 from jolt import utils
 
 
@@ -23,7 +23,7 @@ def raise_task_error(task, msg, *args, **kwargs):
     if task:
         with utils.ignore_exception():
             with task.report() as report:
-                report.add_error("Error", inspect.getfile(task.__class__),
+                report.add_error("Error", inspection.getfile(task.__class__),
                                  msg.format(*args, **kwargs))
         raise_error(msg + " (" + str(task) + ")", *args, **kwargs)
     else:

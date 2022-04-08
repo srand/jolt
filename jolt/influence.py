@@ -3,7 +3,7 @@ import hashlib
 import os
 from pathlib import Path, PurePath
 
-from jolt import inspect
+from jolt import inspection
 from jolt import utils
 from jolt import filesystem as fs
 from jolt import tools
@@ -129,7 +129,7 @@ class TaskSourceInfluence(HashInfluenceProvider):
             try:
                 func.__influence
             except AttributeError:
-                func.__influence = utils.sha1(inspect.getfuncsource(func))
+                func.__influence = utils.sha1(inspection.getfuncsource(func))
             finally:
                 shasum.update(func.__influence.encode())
 
@@ -180,7 +180,7 @@ class TaskClassSourceInfluence(HashInfluenceProvider):
                 cls.__dict__["_TaskClassSourceInfluence__influence"]
             except KeyError:
                 try:
-                    cls.__influence = utils.sha1(inspect.getclasssource(cls))
+                    cls.__influence = utils.sha1(inspection.getclasssource(cls))
                 except TypeError:
                     continue
             result += cls.__dict__["_TaskClassSourceInfluence__influence"] + \

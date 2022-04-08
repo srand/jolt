@@ -785,7 +785,7 @@ def inspect(ctx, task, influence=False, artifact=False, salt=None):
         task_registry.get_test_class(task_cls_name)
     raise_task_error_if(not task, task_name, "no such task")
 
-    from jolt import inspect
+    from jolt import inspection
 
     print()
     print("  {0}".format(task.name))
@@ -806,8 +806,8 @@ def inspect(ctx, task, influence=False, artifact=False, salt=None):
     print()
     print("  Definition")
     print("    {0:<15}   {1} ({2})".format(
-        "File", fs.path.relpath(inspect.getfile(task), JoltLoader.get().joltdir),
-        inspect.getlineno(task)))
+        "File", fs.path.relpath(inspection.getfile(task), JoltLoader.get().joltdir),
+        inspection.getlineno(task)))
 
     print()
     print("  Requirements")

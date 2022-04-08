@@ -4,7 +4,7 @@ import os
 import sys
 from types import ModuleType
 
-from jolt import inspect
+from jolt import inspection
 from jolt.tasks import attributes
 from jolt.tasks import Alias, Task, TaskGenerator, TaskRegistry, WorkspaceResource
 from jolt.error import raise_error_if, raise_task_error_if
@@ -59,7 +59,7 @@ class NativeRecipe(Recipe):
         loader.exec_module(module)
         sys.modules[loader.name] = module
 
-        classes = inspect.getmoduleclasses(module, [Task, TaskGenerator], NativeRecipe._is_abstract)
+        classes = inspection.getmoduleclasses(module, [Task, TaskGenerator], NativeRecipe._is_abstract)
         generators = []
 
         for cls in classes[TaskGenerator]:
