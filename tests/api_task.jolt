@@ -473,6 +473,23 @@ class TaskApi(JoltTest):
             self.assertExists("a-a.txt")
             self.assertExists("b-b.txt")
 
+    def test_param_overridden(self):
+        """
+        --- tasks:
+        class ABase(Task):
+            a = Parameter("abase")
+
+        class A(ABase):
+            a = Parameter("a")
+            def run(self, deps, tools):
+                tools.write_file("{{a}}.txt", "")
+        ---
+        """
+        self.build("a")
+        with self.tools.cwd(self.ws):
+            self.jolt("inspect a")
+            self.assertExists("a.txt")
+
     def test_run_output(self):
         """
         --- tasks:

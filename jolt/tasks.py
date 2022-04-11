@@ -43,7 +43,7 @@ class Export(object):
     @staticmethod
     def __get_exports__(obj):
         exports = {}
-        for mro in obj.__class__.__mro__:
+        for mro in reversed(obj.__class__.__mro__):
             for key, export in getattr(mro, "__export_list", {}).items():
                 attr = getattr(obj.__class__, key)
                 if isinstance(attr, Export):
@@ -99,7 +99,7 @@ class Parameter(object):
     @staticmethod
     def __get_params__(obj):
         params = {}
-        for mro in obj.__class__.__mro__:
+        for mro in reversed(obj.__class__.__mro__):
             for key, param in getattr(mro, "__param_list", {}).items():
                 attr = getattr(obj.__class__, key)
                 if isinstance(attr, Parameter):

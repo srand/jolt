@@ -205,7 +205,7 @@ class Variable(HashInfluenceProvider):
     @staticmethod
     def __get_variables__(obj):
         variables = {}
-        for mro in obj.__class__.__mro__:
+        for mro in reversed(obj.__class__.__mro__):
             for key, variable in getattr(mro, "__variable_list", {}).items():
                 attr = getattr(obj.__class__, key)
                 if isinstance(attr, Variable):
@@ -462,7 +462,7 @@ class Rule(HashInfluenceProvider):
     @staticmethod
     def __get_rules__(obj):
         rules = {}
-        for mro in obj.__class__.__mro__:
+        for mro in reversed(obj.__class__.__mro__):
             for key, rule in getattr(mro, "__rule_list", {}).items():
                 attr = getattr(obj.__class__, key)
                 if isinstance(attr, Rule):
@@ -1291,26 +1291,26 @@ class CXXProject(Task):
         self._rules = []
         self._variables = []
 
+        linker = None
         if isinstance(self, CXXExecutable):
-            self._linker = self.toolchain.linker
+            linker = self.toolchain.linker
         elif isinstance(self, CXXLibrary):
             if self.shared:
-                self._linker = self.toolchain.dynlinker
+                linker = self.toolchain.dynlinker
             else:
-                self._linker = self.toolchain.archiver
-        else:
-            self._linker = None
+                linker = self.toolchain.archiver
 
+        default_rules, default_vars = [], []
         rules, variables = Toolchain.all_rules_and_vars(self)
-        if self._linker:
-            rules["_linker"] = self._linker
-        for name, var in variables.items():
+        if linker:
+            default_rules.append(("__linker", linker))
+        for name, var in default_vars + list(variables.items()):
             var = copy.copy(var)
             var.name = name
             setattr(self, var.name, var)
             self._variables.append(var)
             self.influence.append(var)
-        for name, rule in rules.items():
+        for name, rule in default_rules + list(rules.items()):
             rule = copy.copy(rule)
             rule.name = name
             setattr(self, rule.name, rule)
