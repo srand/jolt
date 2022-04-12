@@ -392,6 +392,21 @@ class ToolsApi(JoltTest):
             with self.assertRaises(Exception):
                 self.tools.upload("index.html", "https://www.example.com/invalid")
 
+    def test_expand(self):
+        """
+        --- tasks:
+        class A(Task):
+            param = Parameter("aA")
+
+            def run(self, deps, tools):
+                assert tools.expand("{{param!u}}") == "AA"
+                assert tools.expand("{{param!l}}") == "aa"
+                assert tools.expand("{{param.value.upper!c}}") == "AA"
+                assert tools.expand("{{param.value.lower!c}}") == "aa"
+        ---
+        """
+        self.build("a")
+
     def test_extract_zip(self):
         with self.tools.cwd(self.ws):
             self.tools.run("zip tests.zip ../../api_tools.jolt")

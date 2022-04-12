@@ -786,6 +786,12 @@ class Tools(object):
         automatically collects keyword arguments from a task's parameters
         and properties.
 
+        It also supports three additional conversion specifiers:
+
+          - c: call method without arguments
+          - l: convert string to lower case
+          - u: convert string to upper case
+
         Args:
             string (str): The string to be expanded.
             args (str, optional): Additional positional values required

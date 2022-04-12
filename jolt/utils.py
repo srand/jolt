@@ -201,9 +201,20 @@ class _SafeDict(object):
         return "{" + key + "}"
 
 
+class JoltFormatter(Formatter):
+    def convert_field(self, value, conversion):
+        if conversion == "u":
+            return str(value).upper()
+        elif conversion == "l":
+            return str(value).lower()
+        elif conversion == "c":
+            return value()
+        return super().convert_field(value, conversion)
+
+
 def expand(string, *args, **kwargs):
     ignore_errors = kwargs.get("ignore_errors") or False
-    return Formatter().vformat(str(string), args, _SafeDict(kwargs, ignore_errors))
+    return JoltFormatter().vformat(str(string), args, _SafeDict(kwargs, ignore_errors))
 
 
 class duration(object):
