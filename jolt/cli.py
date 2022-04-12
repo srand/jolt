@@ -705,7 +705,6 @@ def _list(ctx, task=None, all=False, reverse=None):
 
     if not task:
         classes = registry.get_task_classes()
-        classes += registry.get_test_classes()
         for task in sorted(classes, key=lambda x: x.name):
             if task.name:
                 print(task.name)
@@ -781,8 +780,7 @@ def inspect(ctx, task, influence=False, artifact=False, salt=None):
     task_name = task
     task_cls_name, task_params = utils.parse_task_name(task_name)
     task_registry = TaskRegistry.get()
-    task = task_registry.get_task_class(task_cls_name) or \
-        task_registry.get_test_class(task_cls_name)
+    task = task_registry.get_task_class(task_cls_name)
     raise_task_error_if(not task, task_name, "no such task")
 
     from jolt import inspection

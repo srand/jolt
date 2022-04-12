@@ -548,7 +548,6 @@ class TaskRegistry(object):
     def __init__(self, env=None):
         self.env = env
         self.tasks = {}
-        self.tests = {}
         self.instances = {}
 
     @staticmethod
@@ -560,9 +559,6 @@ class TaskRegistry(object):
     def add_task_class(self, cls):
         self.tasks[cls.name] = cls
 
-    def add_test_class(self, cls):
-        self.tests[cls.name] = cls
-
     def add_task(self, task, extra_params):
         name, params = utils.parse_task_name(task.name)
         params.update(extra_params or {})
@@ -572,14 +568,8 @@ class TaskRegistry(object):
     def get_task_class(self, name):
         return self.tasks.get(name)
 
-    def get_test_class(self, name):
-        return self.tests.get(name)
-
     def get_task_classes(self):
         return list(self.tasks.values())
-
-    def get_test_classes(self):
-        return list(self.tests.values())
 
     def get_task(self, name, extra_params=None, manifest=None):
         name, params = utils.parse_task_name(name)
@@ -598,27 +588,17 @@ class TaskRegistry(object):
             self.instances[full_name] = task
             return task
 
-        cls = self.tests.get(name)
-        if cls:
-            task = cls(parameters=params, manifest=manifest)
-            self._apply_task_manifest(task, manifest)
-            self.instances[task.qualified_name] = task
-            self.instances[full_name] = task
-            return task
-
         raise_task_error_if(not task, full_name, "no such task")
 
     def set_default_parameters(self, task):
         name, params = utils.parse_task_name(task)
 
         cls = self.tasks.get(name)
-        if not cls:
-            cls = self.tests.get(name)
         raise_task_error_if(not cls, task, "no such task")
         cls._set_default_parameters(cls, params)
 
     def set_joltdir(self, joltdir):
-        for task in list(self.tasks.values()) + list(self.tests.values()):
+        for task in list(self.tasks.values()):
             task.joltdir = joltdir
 
     def _create_parents(self, name):
