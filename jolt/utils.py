@@ -124,9 +124,17 @@ def call_and_catch_and_log(f, *args, **kwargs):
         return None
 
 
-def parse_task_name(name):
-    if ":" in name:
-        task, params = name.split(":", 1)
+def parse_aliased_task_name(name):
+    match = re.match(r"^((?P<alias>[^=:]+)=)?(?P<task>[^:]+)(:(?P<params>.*))?$", name)
+    if not match:
+        from jolt.error import raise_error
+        raise_error("Illegal task name: {}", name)
+    match = match.groupdict()
+    alias = match["alias"]
+    task = match["task"]
+    params = match["params"] or {}
+
+    if params:
         params = params.split(",")
 
         def _param(param):
@@ -136,9 +144,14 @@ def parse_task_name(name):
                 key, value = param, None
             return key, value
 
-        return task, {key: value for key, value in map(_param, params) if key}
-    else:
-        return name, {}
+        params = {key: value for key, value in map(_param, params) if key}
+
+    return alias, task, params
+
+
+def parse_task_name(name):
+    _, task, params = parse_aliased_task_name(name)
+    return task, params
 
 
 def format_task_name(name, params):

@@ -847,6 +847,9 @@ class Context(object):
 
         key = self._node.task.expand(key)
 
+        if key not in self._artifacts_index:
+            key = self._node.resolve_requirement_alias(key) or key
+
         # Parameters may be unordered, sort them
         key = utils.stable_task_name(key)
 

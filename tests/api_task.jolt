@@ -237,6 +237,23 @@ class TaskApi(JoltTest):
         t = self.tasks(r)
         self.assertEqual(t, ["base", "duplicate"])
 
+    def test_requires_aliased_name(self):
+        """
+        --- tasks:
+        class Base(Task):
+            i = Parameter()
+
+        class Consumer(Task):
+            requires = ["alias=base:i=1"]
+
+            def run(self, deps, tools):
+                raise_error_if(not deps["alias"], "dependency missing")
+        ---
+        """
+        r = self.build("consumer")
+        self.assertBuild(r, "base:i=1")
+        self.assertBuild(r, "consumer")
+
     def test_selfsustained(self):
         """
         --- tasks:

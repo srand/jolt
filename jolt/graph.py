@@ -31,6 +31,7 @@ class TaskProxy(object):
         self.extensions = []
         self.duration_queued = None
         self.duration_running = None
+        self.requirement_aliases = {}
 
         self._extended_task = None
         self._in_progress = False
@@ -218,6 +219,9 @@ class TaskProxy(object):
 
     def disable_download(self):
         self._download = False
+
+    def resolve_requirement_alias(self, name):
+        return self.requirement_aliases.get(name)
 
     def set_in_progress(self):
         self._in_progress = True
@@ -566,7 +570,8 @@ class GraphBuilder(object):
             parent = node
 
         for requirement in node.task.requires:
-            child = self._get_node(progress, requirement)
+            alias, task, name = utils.parse_aliased_task_name(requirement)
+            child = self._get_node(progress, utils.format_task_name(task, name))
             # Create direct edges from alias parents to alias children
             if child.is_alias():
                 for child_child in child.children:
@@ -574,6 +579,8 @@ class GraphBuilder(object):
                     node.children.append(child_child)
             self.graph.add_edges_from([(parent, child)])
             node.children.append(child)
+            if alias:
+                node.requirement_aliases[alias] = requirement
 
         node.children = utils.unique_list(node.children)
 
