@@ -6,6 +6,7 @@ import sys
 
 from jolt.tasks import Task, attributes as task_attributes
 from jolt import config
+from jolt.influence import attribute as influence_attribute
 from jolt.influence import DirectoryInfluence, FileInfluence
 from jolt.influence import HashInfluenceProvider, TaskAttributeInfluence
 from jolt import log
@@ -168,34 +169,16 @@ class attributes:
 
 class influence:
     @staticmethod
-    def _list(attrib, provider=FileInfluence):
-        def _decorate(cls):
-            _old_influence = cls._influence
-
-            def _influence(self, *args, **kwargs):
-                influence = _old_influence(self, *args, *kwargs)
-                items = getattr(self, attrib, [])
-                if callable(items):
-                    items = items()
-                for item in items:
-                    influence.append(provider(item))
-                return influence
-
-            cls._influence = _influence
-            return cls
-        return _decorate
+    def incpaths(type=DirectoryInfluence):
+        return influence_attribute("_incpaths", type=type)
 
     @staticmethod
-    def incpaths(provider=DirectoryInfluence):
-        return influence._list("_incpaths", provider)
+    def libpaths(type=DirectoryInfluence):
+        return influence_attribute("_libpaths", type=type)
 
     @staticmethod
-    def libpaths(provider=DirectoryInfluence):
-        return influence._list("_libpaths", provider)
-
-    @staticmethod
-    def sources(provider=FileInfluence):
-        return influence._list("_sources", provider)
+    def sources(type=FileInfluence):
+        return influence_attribute("_sources", type=type)
 
 
 class Variable(HashInfluenceProvider):

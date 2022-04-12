@@ -67,11 +67,20 @@ class TaskAttributeInfluence(HashInfluenceProvider):
         return value
 
 
-def attribute(name, sort=False):
+def attribute(name, type=None, sort=False):
     """ Add task attribute value as hash influence.
 
     Args:
         name (str): Name of task class attribute/property.
+        type (InfluenceProvider, optional): Alternative
+            HashInfluenceProvider implementation used to interpret
+            the value of the attribute. If the attribute is a list,
+            the provider will be instantiated once for each item in
+            the list. For example, if the attribute is a list of
+            filesystem paths, the FileInfluence class could be passed
+            as argument to automatically monitor files at those paths.
+        sort (boolean, optional): Optionally sort the value. Always sort
+            values that are unstable, such as dictionaries.
 
     Example:
 
@@ -82,6 +91,17 @@ def attribute(name, sort=False):
         @influence.attribute("attribute")
         class Example(Task):
             attribute = False
+
+    .. code-block:: python
+
+        from jolt import influence
+
+        @influence.attribute("sources", type=influence.FileInfluence)
+        class Example(Task):
+            sources = [
+                "main.cpp",
+                "utils.cpp",
+            ]
     """
 
     def _decorate(cls):
@@ -89,7 +109,16 @@ def attribute(name, sort=False):
 
         def _influence(self, *args, **kwargs):
             influence = _old_influence(self, *args, **kwargs)
-            influence.append(TaskAttributeInfluence(name, sort))
+            if type:
+                items = getattr(self, name, [])
+                if callable(items):
+                    items = items()
+                if sort:
+                    items = sorted(items)
+                for item in items:
+                    influence.append(type(item))
+            else:
+                influence.append(TaskAttributeInfluence(name, sort))
             return influence
 
         cls._influence = _influence

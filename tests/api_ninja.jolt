@@ -231,6 +231,38 @@ class NinjaApi(JoltTest):
         self.jolt("build exe")
 
 
+    def test_influence_incpaths(self):
+        """
+        --- file: inc1/test1.h
+
+        --- file: inc2/test2.h
+
+        --- file: test.cpp
+        #include "test1.h"
+        #include "test2.h"
+        int main() {{return 0;}}
+
+        --- tasks:
+        @jolt.plugins.ninja.influence.incpaths()
+        class Lib(CXXLibrary):
+            incpaths = ["inc1", "inc2"]
+            sources = ["test.cpp"]
+        ---
+        """
+        r = self.build("lib")
+        self.assertBuild(r, "lib")
+        r = self.build("lib")
+        self.assertNoBuild(r, "lib")
+        with self.tools.cwd(self.ws, "inc1"):
+            self.tools.append_file("test1.h", "// Test")
+        r = self.build("lib")
+        self.assertBuild(r, "lib")
+        with self.tools.cwd(self.ws, "inc2"):
+            self.tools.append_file("test2.h", "// Test")
+        r = self.build("lib")
+        self.assertBuild(r, "lib")
+
+
     def test_influence_missing(self):
         """
         --- file: inc/test.h
