@@ -621,6 +621,39 @@ class NinjaApi(JoltTest):
         """
         self.build("lib")
 
+    def test_protoc_with_generator_attr(self):
+        """
+        --- file: dog.proto
+        syntax = "proto2";
+
+        package tutorial;
+
+        message Dog {{
+            optional string name = 1;
+        }}
+
+        --- tasks:
+
+        class Pyth(CXXProject):
+            generator = "python"
+            proto_rule = ProtobufCompiler(
+                generator="{{generator}}",
+                outfiles=[
+                    "{{outdir}}/{{binary}}.dir/{{in_base}}_pb2.py"
+                ])
+            py_rule = Skip(infiles=[".py"])
+            sources = [
+                "dog.proto",
+            ]
+
+            def publish(self, artifact, tools):
+                with tools.cwd(self.outdir):
+                    artifact.collect("**/*.py", flatten=True)
+        ---
+        """
+        r = self.build("pyth")
+        self.assertExists(self.artifacts(r)[0], "dog_pb2.py")
+
 
     def test_publishdir(self):
         """

@@ -581,7 +581,7 @@ class ProtobufCompiler(Rule):
 
     def _out(self, project, infile):
         outfiles, variables = super()._out(project, infile)
-        variables["generator"] = self.generator
+        variables["generator"] = project.tools.expand(self.generator)
         return outfiles, variables
 
     @utils.cached.instance
