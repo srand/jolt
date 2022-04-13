@@ -12,12 +12,13 @@ class NinjaApi(JoltTest):
     name = "api/ninja"
 
     def assertCompiled(self, r, filename):
-        if filename not in r:
-            self.fail("{} was not compiled".format(filename))
+        assert filename in r, f"{filename} was not compiled"
+
+    def assertNotCompiled(self, r, filename):
+        assert filename not in r, f"{filename} was compiled"
 
     def _recipe(self):
         return "import jolt\nfrom jolt.plugins.ninja import *\n" + super(NinjaApi, self)._recipe()
-
 
     def test_asflags(self):
         """
@@ -503,12 +504,12 @@ class NinjaApi(JoltTest):
         r = self.jolt("-v build lib")
         self.assertCompiled(r, "precompiled.pch")
         self.assertCompiled(r, "main.cpp")
-        self.assertIn("! ./precompiled.pch.gch", r)
+        self.assertIn("! lib.dir/precompiled.pch.gch", r)
 
-        self.jolt("-v build exe")
+        r = self.jolt("-v build exe")
         self.assertCompiled(r, "precompiled.pch")
         self.assertCompiled(r, "main.cpp")
-        self.assertIn("! ./precompiled.pch.gch", r)
+        self.assertIn("! exe.dir/precompiled.pch.gch", r)
 
     def test_precompiled_header_multiple(self):
         """
@@ -539,6 +540,86 @@ class NinjaApi(JoltTest):
 
         with self.assertRaises(Exception, msg="only one allowed"):
             r = self.jolt("-v build exe")
+
+
+    def test_protoc(self):
+        """
+        --- file: proto/person.proto
+        syntax = "proto2";
+
+        package tutorial;
+
+        message Person {{
+            optional string name = 1;
+        }}
+
+        --- file: dog.proto
+        syntax = "proto2";
+
+        package tutorial;
+
+        message Dog {{
+            optional string name = 1;
+        }}
+
+        --- file: lib.cpp
+        #include "dog.pb.h"
+        #include "person.pb.h"
+
+        --- tasks:
+
+        class Lib(CXXLibrary):
+            protoflags = ["--error_format=msvs"]
+            sources = [
+                "dog.proto",
+                "lib.cpp",
+                "proto/person.proto",
+            ]
+
+        ---
+        """
+        r = self.build("lib")
+        assert "--error_format" in r
+
+        # Check that depfile is working
+        with self.tools.cwd(self.ws):
+            self.tools.append_file("dog.proto", "// Foo")
+        r = self.build("lib")
+        self.assertCompiled(r, "dog.pb.cc")
+        self.assertNotCompiled(r, "person.pb.cc")
+
+    def test_protoc_from_artifact(self):
+        """
+        --- file: proto/person.proto
+        syntax = "proto2";
+
+        package tutorial;
+
+        message Person {{
+            optional string name = 1;
+        }}
+
+        --- file: lib.cpp
+        #include "person.pb.h"
+
+        --- tasks:
+
+        @jolt.influence.files("proto/*.proto")
+        class Proto(Task):
+            def publish(self, artifact, tools):
+                artifact.collect("proto/*.proto")
+
+        class Lib(CXXLibrary):
+            requires = ["proto"]
+            sources = ["lib.cpp"]
+
+            def run(self, deps, tools):
+                proto = tools.sandbox(deps["proto"])
+                self.sources.append(proto + "/proto/*.proto")
+                super().run(deps, tools)
+        ---
+        """
+        self.build("lib")
 
 
     def test_publishdir(self):
@@ -579,9 +660,9 @@ class NinjaApi(JoltTest):
 
         --- tasks:
         class MyRule(Rule):
-            def build(self, project, writer, infiles, implicit=None):
+            def build(self, project, writer, infiles, implicit=None, order_only=None):
                 assert len(infiles) == 2, "incorrect number of inputs: " + str(len(infiles))
-                return super().build(project, writer, infiles, implicit)
+                return super().build(project, writer, infiles, implicit, order_only)
 
         class Exe(CXXExecutable):
             x_rule = Rule(
