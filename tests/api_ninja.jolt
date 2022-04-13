@@ -747,6 +747,26 @@ class NinjaApi(JoltTest):
         self.jolt("build exe:arg=*")
         self.assertCompiled(r, "main.cpp")
 
+    def test_sources_from_artifact(self):
+        """
+        --- file: main.cpp
+        int main() {{return 0;}}
+
+        --- tasks:
+        @jolt.influence.files("main.cpp")
+        class Sources(Task):
+            def publish(self, artifact, tools):
+                artifact.collect("main.cpp")
+                artifact.cxxinfo.sources.append("*.cpp")
+
+        class Exe(CXXExecutable):
+            requires = ["sources"]
+
+        ---
+        """
+        r = self.jolt("build exe")
+        self.assertCompiled(r, "main.cpp")
+
     def test_relink_on_change(self):
         """
         --- file: lib.cpp

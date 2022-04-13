@@ -351,6 +351,7 @@ class Artifact(object):
     - ``ldflags`` - linker flags (string)
     - ``libraries`` - libraries to link with (list, use append())
     - ``macros`` - preprocessor macros to set (list, use append())
+    - ``sources`` - source files to compile (list, use append())
 
     Values appended to PATH-type metadata fields are relative to the artifact
     root. They will be automatically expanded to absolute paths. These

@@ -1413,9 +1413,19 @@ class CXXProject(Task):
             headers += list
         self.headers = headers
 
-    def _expand_sources(self):
+    def _expand_sources(self, deps, tools):
+        imported_sources = []
+        for _, artifact in deps.items():
+            sources = artifact.cxxinfo.sources.items()
+            if sources:
+                sandbox = tools.sandbox(artifact, self.incremental)
+                imported_sources += [
+                    tools.expand_relpath(fs.path.join(sandbox, path), self.joltdir)
+                    for path in sources
+                ]
+
         sources = []
-        for source in self.sources:
+        for source in self.sources + imported_sources:
             list = self.tools.glob(source)
             raise_task_error_if(
                 not list and not ('*' in source or '?' in source), self,
@@ -1622,9 +1632,9 @@ if __name__ == "__main__":
         class attribute.
         """
 
-        self._expand_headers()
-        self._expand_sources()
         self.outdir = tools.builddir("ninja", self.incremental)
+        self._expand_headers()
+        self._expand_sources(deps, tools)
         self._writer = self._write_ninja_file(self.outdir, deps, tools)
         verbose = " -v" if log.is_verbose() else ""
         threads = config.get("jolt", "threads", tools.getenv("JOLT_THREADS", None))
@@ -1652,7 +1662,7 @@ if __name__ == "__main__":
         Task execution resumes normally when exiting the shell.
         """
         self._expand_headers()
-        self._expand_sources()
+        self._expand_sources(deps, tools)
         self.outdir = tools.builddir("ninja", self.incremental)
         writer = self._write_ninja_file(self.outdir, deps, tools)
         self._write_shell_file(self.outdir, deps, tools, writer)
