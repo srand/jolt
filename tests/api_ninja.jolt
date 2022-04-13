@@ -567,9 +567,14 @@ class NinjaApi(JoltTest):
         #include "person.pb.h"
 
         --- tasks:
+        from jolt.plugins.conan import Conan
+
+        class Protobuf(Conan):
+            packages = ["protobuf/3.19.2"]
 
         class Lib(CXXLibrary):
             protoflags = ["--error_format=msvs"]
+            requires = ["protobuf"]
             sources = [
                 "dog.proto",
                 "lib.cpp",
@@ -603,9 +608,14 @@ class NinjaApi(JoltTest):
         #include "person.pb.h"
 
         --- tasks:
+        from jolt.plugins.conan import Conan
+
+        class Protobuf(Conan):
+            packages = ["protobuf/3.19.2"]
 
         @jolt.influence.files("proto/*.proto")
         class Proto(Task):
+            requires = ["protobuf"]
             def publish(self, artifact, tools):
                 artifact.collect("proto/*.proto")
 
@@ -633,6 +643,11 @@ class NinjaApi(JoltTest):
         }}
 
         --- tasks:
+        from jolt.plugins.conan import Conan
+
+        class Protobuf(Conan):
+            packages = ["protobuf/3.19.2"]
+
 
         class Pyth(CXXProject):
             generator = "python"
@@ -642,6 +657,7 @@ class NinjaApi(JoltTest):
                     "{{outdir}}/{{binary}}.dir/{{in_base}}_pb2.py"
                 ])
             py_rule = Skip(infiles=[".py"])
+            requires = ["protobuf"]
             sources = [
                 "dog.proto",
             ]
