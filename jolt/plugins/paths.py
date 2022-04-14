@@ -17,6 +17,8 @@ class PathVariable(ArtifactStringAttribute):
         pass
 
     def __str__(self):
+        if self._value is None:
+            return ""
         return fs.path.join(self._artifact.path, self._value)
 
 

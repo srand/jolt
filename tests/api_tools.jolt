@@ -302,6 +302,9 @@ class ToolsApi(JoltTest):
 
             def run(self, d, t):
                 with t.cwd(t.builddir()):
+                    with t.chroot(d["busybox"]):
+                        workdir = t.run("pwd")
+                        assert workdir == t.builddir(), "working dir not stable"
                     with t.chroot(d["busybox"].paths.rootfs):
                         workdir = t.run("pwd")
                         workdir2 = t.run("pwd")
@@ -314,6 +317,12 @@ class ToolsApi(JoltTest):
 
             def publish(self, a, t):
                 a.collect("*", cwd=t.builddir())
+
+        class Test2(Task):
+            requires = ["test"]
+            def run(self, d, t):
+                with t.chroot(d["test"]):
+                    pass
         ---
         """
         try:
@@ -323,6 +332,9 @@ class ToolsApi(JoltTest):
         o = self.build("test")
         a = self.artifacts(o)
         self.assertExists(os.path.join(a[0], "output.txt"))
+        with self.assertRaises(Exception):
+            self.build("test2")
+        self.assertIn("No 'rootfs' path in artifact", self.lastLog())
 
     def test_chroot_mounts_buildroot(self):
         """

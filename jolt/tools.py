@@ -1474,10 +1474,14 @@ class Tools(object):
         """
         Experimental: Use chroot as root filesystem when running commands.
 
-        Mounts the specified chroot as the root filesystem in a new mount namespace,
-        which is used in calls to Tools.run().
+        Mounts the specified chroot as the root filesystem in a new Linux namespace,
+        which is used when calling Tools.run().
 
-        Requires a Linux host and the 'unshare' utility program.
+        Requires a Linux host.
+
+        Args:
+            chroot (str, artifact): Path to rootfs directory, or an artifact
+                with a 'rootfs' metadata path (artifact.paths.rootfs).
 
         Example:
 
@@ -1488,6 +1492,12 @@ class Tools(object):
 
         """
         raise_error_if(platform.system() != "Linux", "Tools.chroot() is only supported on Linux")
+
+        if type(chroot) == cache.Artifact:
+            raise_task_error_if(
+                not str(chroot.paths.rootfs), self._task,
+                "No 'rootfs' path in artifact")
+            chroot = chroot.paths.rootfs
 
         chroot = self.expand_path(chroot, *args, **kwargs)
         raise_task_error_if(
