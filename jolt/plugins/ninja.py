@@ -1749,7 +1749,7 @@ if __name__ == "__main__":
             logbuffer)
         report.add_regex_errors(
             "Linker Error",
-            r"(?P<location>ld): error: (?P<message>.*)",
+            r"(?P<location>ld): (error|warning): (?P<message>.*)",
             logbuffer)
 
 
