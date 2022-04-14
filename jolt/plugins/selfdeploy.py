@@ -35,7 +35,7 @@ class Jolt(Task):
         self.influence.append(
             influence.StringInfluence(
                 config.get("selfdeploy", "requires", "")))
-        for e in self.extras:
+        for e in self.extra_files:
             self.influence.append(influence.DirectoryInfluence(e))
 
     def _verify_influence(self, *args, **kwargs):
@@ -46,14 +46,76 @@ class Jolt(Task):
         return JoltLoader.get().joltdir
 
     @property
-    def extras(self):
+    def extra_files(self):
         ext = config.get("selfdeploy", "extra", "")
         return [fs.path.join(self.loaderdir, e) for e in ext.split(",")] if ext else []
+
+    @property
+    def extra_dependencies(self):
+        req = config.get("selfdeploy", "requires", "")
+        return req.split() if req else []
 
     def info(self, fmt, *args, **kwargs):
         log.verbose(fmt, *args, **kwargs)
 
+    @property
+    def dependencies(self):
+        """
+        Queries local pip database for packages and versions used by jolt.
+
+        The data is used to pin dependencies at specific versions so that
+        the virtalenv installed on a worker matches what the client had
+        installed locally.
+
+        If pip is not available or its internal implementation has changed,
+        no version pinning will be performed. Instead, workers will install
+        Jolt with its default loose version requirements.
+        """
+        def get_installed_distributions():
+            try:
+                from pip._internal.metadata import get_environment
+            except ImportError:
+                from pip._internal.utils import misc
+                return {
+                    dist.project_name.lower(): dist
+                    for dist in misc.get_installed_distributions()
+                }
+            else:
+                dists = get_environment(None).iter_installed_distributions()
+                return {dist._dist.project_name.lower(): dist._dist for dist in dists}
+
+        dists = get_installed_distributions()
+        reqs = ["jolt"] + [dep.lower() for dep in self.extra_dependencies]
+        pkgs = {}
+
+        while reqs:
+            req = reqs.pop()
+
+            dist = dists.get(req)
+            if dist is None:
+                self.info("[SelfDeploy] Dependency not found: {}", req)
+                pkgs["req"] = req
+                continue
+
+            for dep in dist.requires():
+                name = dep.project_name.lower()
+                if name not in pkgs:
+                    reqs.append(name)
+
+            pkgs[req] = f"{dist.project_name}=={dist.version}"
+
+        del pkgs["jolt"]
+        return pkgs.values()
+
     def publish(self, artifact, tools):
+        with tools.cwd(tools.builddir()):
+            try:
+                pinned_reqs = self.dependencies
+                if pinned_reqs:
+                    tools.write_file("requirements.txt", "\n".join(pinned_reqs))
+                    artifact.collect("requirements.txt")
+            except Exception:
+                log.exception()
         with tools.cwd(_path):
             artifact.collect('README.rst')
             artifact.collect('setup.py')
@@ -65,7 +127,7 @@ class Jolt(Task):
             artifact.collect('jolt/*/*.template')
             artifact.collect('jolt/plugins/selfdeploy/README.rst', flatten=True)
             artifact.collect('jolt/plugins/selfdeploy/setup.py', flatten=True)
-            for e in self.extras:
+            for e in self.extra_files:
                 with tools.cwd(fs.path.dirname(e)):
                     artifact.collect(fs.path.basename(e))
 

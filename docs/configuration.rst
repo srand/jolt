@@ -436,15 +436,19 @@ the Jolt configuration.
 Selfdeploy
 ^^^^^^^^^^
 
-The Selfdeploy plugin automatically deploys the running version of
-Jolt into all configured artifact storage providers. This is useful
-when using distributed task execution to ensure that the same
-version of Jolt is used everywhere. Before starting execution of a
-task, a network executor can download and install Jolt from a
-storage provider.
+The Selfdeploy plugin automatically deploys the running version
+of Jolt to all workers in a distrubuted execution environment.
+This is useful to ensure that the same version of Jolt and its
+dependencies are used everywhere when tasks are executed.
+
+Before starting execution of a task, a network executor will
+download Jolt from the configured storage provider and install
+it into a virtual environment. Multiple versions can co-exist
+on workers, thus avoiding manual deployment of multiple
+container images in clusters.
 
 The plugin is enabled by adding a ``[selfdeploy]`` section in
-the Jolt configuration.
+the Jolt configuration. Note that ``pip`` must be installed.
 
 These configuration keys exist:
 

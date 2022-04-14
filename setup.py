@@ -13,6 +13,12 @@ exec(open("jolt/version.py").read())
 with open(path.join(here, "README.rst"), encoding="utf-8") as f:
     long_description = f.read()
 
+try:
+    with open(path.join(here, "requirements.txt"), encoding="utf-8") as f:
+        pinned_reqs = f.readlines()
+except FileNotFoundError:
+    pinned_reqs = []
+
 
 class BuildCommand(build_py):
     def run(self):
@@ -62,7 +68,7 @@ setup(
         "xcode",
     ],
     packages=find_packages(exclude=["contrib", "docs", "tests"]),
-    install_requires=[
+    install_requires=pinned_reqs or [
         "bz2file",
         "click>=8.1",
         "colorama",
