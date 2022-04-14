@@ -403,6 +403,8 @@ class ToolsApi(JoltTest):
                 assert tools.expand("{{param!l}}") == "aa"
                 assert tools.expand("{{param.value.upper!c}}") == "AA"
                 assert tools.expand("{{param.value.lower!c}}") == "aa"
+                with tools.environ(FOO="foobar123"):
+                    assert tools.expand("{{environ[FOO]}}") == "foobar123"
         ---
         """
         self.build("a")

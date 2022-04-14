@@ -199,6 +199,11 @@ class _SafeDict(object):
     def _envget(self, key):
         if key.startswith("ENV|"):
             return os.environ.get(key[4:])
+        if key == "environ":
+            tools = getattr(self.values.get("_instance", object()), "tools", None)
+            if tools:
+                return tools._env
+            return os.environ
         return None
 
     def __getitem__(self, key):

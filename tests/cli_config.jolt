@@ -47,6 +47,26 @@ class ConfigCli(testsupport.JoltTest):
         self.assertEqual(val, True)
         self.assertEqual(type(val), bool)
 
+        config.set("test", "test", "{environ[TEST_STR]}")
+        val = config.get("test", "test")
+        self.assertEqual(val, "testing")
+        self.assertEqual(type(val), str)
+
+        config.set("test", "test", "{environ[TEST_INT]}")
+        val = config.getint("test", "test")
+        self.assertEqual(val, 12345)
+        self.assertEqual(type(val), int)
+
+        config.set("test", "test", "{environ[TEST_FLOAT]}")
+        val = config.getfloat("test", "test")
+        self.assertEqual(val, 1.2345)
+        self.assertEqual(type(val), float)
+
+        config.set("test", "test", "{environ[TEST_BOOL]}")
+        val = config.getboolean("test", "test")
+        self.assertEqual(val, True)
+        self.assertEqual(type(val), bool)
+
     def test_config_default(self):
         self.jolt("config section.key value")
 
