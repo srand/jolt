@@ -551,7 +551,7 @@ class Rule(HashInfluenceProvider):
 class ProtobufCompiler(Rule):
     def __init__(
             self,
-            command="$protoc_path -I$in_path_outdir $incpaths $protoflags $task_protoflags --dependency_out=$out_depfile --${{generator}}_out=$out_path $in",
+            command="$protoc_path -I$in_path_outdir $incpaths $protoflags $task_protoflags --dependency_out=$out_depfile --${{generator}}_out=$outdir_proto $in",
             infiles=[".proto"],
             deps="gcc",
             depfile="$out_depfile",
@@ -562,13 +562,15 @@ class ProtobufCompiler(Rule):
                 "{outdir}/{binary}.dir/{in_base}.pb.cc",
             ],
             phony=True,
-            variables={
+            variables=None,
+            **kwargs):
+        variables_final = {
                 "desc": "[PROTOC] {in_base}{in_ext}",
                 "out_depfile": "{binary}.dir/{in_base}.pb.d",
-                "out_path": "{binary}.dir/",
+                "outdir_proto": os.path.dirname(outfiles[0]),
                 "in_path_outdir": "{in_path_outdir}",
-            },
-            **kwargs):
+            }
+        variables_final.update(variables or {})
         super().__init__(
             command=command,
             infiles=infiles,
@@ -577,7 +579,7 @@ class ProtobufCompiler(Rule):
             implicit=implicit,
             outfiles=outfiles,
             phony=phony,
-            variables=variables,
+            variables=variables_final,
             **kwargs)
         self.generator = generator
 
@@ -605,11 +607,13 @@ class FlatbufferCompiler(Rule):
             implicit=["$flatc_path"],
             outfiles=["{outdir}/{binary}.dir/{in_base}_generated.h"],
             phony=True,
-            variables = {
-                "desc": "[FLATC] {in_base}{in_ext}",
-                "outdir_fb": "{outdir}/{binary}.dir/",
-            },
+            variables=None,
             **kwargs):
+        variables_final = {
+            "desc": "[FLATC] {in_base}{in_ext}",
+            "outdir_fb": os.path.dirname(outfiles[0]),
+        }
+        variables_final.update(variables or {})
         super().__init__(
             command=command,
             infiles=infiles,
@@ -618,7 +622,7 @@ class FlatbufferCompiler(Rule):
             implicit=implicit,
             outfiles=outfiles,
             phony=phony,
-            variables=variables,
+            variables=variables_final,
             **kwargs)
         self.generator = generator
 
