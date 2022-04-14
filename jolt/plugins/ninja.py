@@ -593,6 +593,30 @@ class ProtobufCompiler(Rule):
         return "ProtoC" + super().get_influence(task)
 
 
+class GRPCProtobufCompiler(ProtobufCompiler):
+    def __init__(
+            self,
+            command=[
+                "$protoc_path -I$in_path_outdir $incpaths $protoflags $task_protoflags --dependency_out=$out_depfile --${{generator}}_out=$outdir_proto $in",
+                "$protoc_path -I$in_path_outdir $incpaths $protoflags $task_protoflags --dependency_out=$out_depfile_grpc --grpc_out=$outdir_proto --plugin=protoc-gen-grpc=`which grpc_${{generator}}_plugin` $in",
+            ],
+            depfile=["$out_depfile", "$out_depfile_grpc"],
+            outfiles=[
+                "{outdir}/{binary}.dir/{in_base}.pb.h",
+                "{outdir}/{binary}.dir/{in_base}.pb.cc",
+                "{outdir}/{binary}.dir/{in_base}.grpc.pb.h",
+                "{outdir}/{binary}.dir/{in_base}.grpc.pb.cc",
+            ],
+            variables=None,
+            **kwargs):
+        variables_final = {
+            "out_depfile": "{binary}.dir/{in_base}.pb.d",
+            "out_depfile_grpc": "{binary}.dir/{in_base}.grpc.pb.d",
+        }
+        variables_final.update(variables or {})
+        super().__init__(command=command, depfile=depfile, outfiles=outfiles, variables=variables_final, **kwargs)
+
+
 class FlatbufferCompiler(Rule):
     def __init__(
             self,
