@@ -1895,6 +1895,8 @@ class Test(Task):
         with log.stream() as logstream:
             self.testresult = ut.TextTestRunner(resultclass=_TestResult, stream=logstream, verbosity=2).run(testsuite)
         with self.report() as report:
+            for tc, tb in self.testresult.errors:
+                report.add_error("Test Error", tc.name, tb.splitlines()[-1], tb)
             for tc, tb in self.testresult.failures:
                 report.add_error("Test Failed", tc.name, tb.splitlines()[-1], tb)
         raise_unreported_task_error_if(

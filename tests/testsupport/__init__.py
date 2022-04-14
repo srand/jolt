@@ -187,3 +187,7 @@ global_string("{test}")
 
     def assertIsDir(self, *args):
         self.assertTrue(os.path.isdir(fs.path.join(self.ws, *args)))
+
+    def assertContains(self, filename, data):
+        with self.tools.cwd(self.ws):
+            self.assertIn(data, self.tools.read_file(filename))

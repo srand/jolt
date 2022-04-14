@@ -299,7 +299,34 @@ class TaskApi(JoltTest):
         self.assertNoBuild(self.lastLog(), "a")
         self.assertBuild(self.lastLog(), "c2")
 
+    def test_test(self):
+        """
+        --- tasks:
+        from jolt.plugins import allure
 
+        class A(Test):
+            def test_error(self):
+                raise RuntimeError("Broken A")
+
+            def test_failure(self):
+                self.assertEqual(True, False)
+
+        class B(allure.Test):
+            def test_error(self):
+                raise RuntimeError("Broken B")
+
+            def test_failure(self):
+                self.assertEqual(True, False)
+        ---
+        """
+        with self.assertRaises(Exception):
+            r = self.jolt("build a --result a.joltxmanifest")
+        self.assertContains("a.joltxmanifest", "<message>AssertionError: True != False</message>")
+        self.assertContains("a.joltxmanifest", "<message>RuntimeError: Broken A</message>")
+        with self.assertRaises(Exception):
+            r = self.jolt("build b --result b.joltxmanifest")
+        self.assertContains("b.joltxmanifest", "<message>AssertionError: True != False</message>")
+        self.assertContains("b.joltxmanifest", "<message>RuntimeError: Broken B</message>")
 
     def test_weight(self):
         """
