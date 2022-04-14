@@ -119,6 +119,38 @@ class NinjaApi(JoltTest):
         self.jolt("build lib:arg=1337 exe:arg=1337")
 
 
+    def test_flatbuffers(self):
+        """
+        --- file: flatbufs/weapon.fbs
+        namespace Test;
+
+        table Weapon {{
+           name:string;
+           damage:short;
+        }}
+
+        --- file: lib.cpp
+        #include "weapon_generated.h"
+
+        --- tasks:
+        from jolt.plugins.conan import Conan
+
+        class Flatbuffers(Conan):
+            packages = ["flatbuffers/2.0.0"]
+
+        class Lib(CXXLibrary):
+            fbflags = ["--scoped-enums"]
+            requires = ["flatbuffers"]
+            sources = [
+                "flatbufs/weapon.fbs",
+                "lib.cpp",
+            ]
+
+        ---
+        """
+        r = self.build("lib")
+
+
     def test_headers(self):
         """
         --- file: test.h

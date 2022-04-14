@@ -508,7 +508,9 @@ class Rule(HashInfluenceProvider):
 
     def create(self, project, writer, deps, tools):
         if self.command is not None:
-            command = "cmd /c " + self.command if os.name == "nt" else self.command
+            command = utils.as_list(self.command)
+            command = ["cmd /c " + c for c in command] if os.name == "nt" else command
+            command = " && ".join(command)
             writer.rule(self.name, tools.expand(command), depfile=self.depfile, deps=self.deps, description="$desc")
             writer.newline()
 
@@ -587,6 +589,47 @@ class ProtobufCompiler(Rule):
     @utils.cached.instance
     def get_influence(self, task):
         return "ProtoC" + super().get_influence(task)
+
+
+class FlatbufferCompiler(Rule):
+    def __init__(
+            self,
+            command=[
+                "$flatc_path --${{generator}} $fbflags $task_fbflags $fbincpaths -o $outdir_fb $in",
+                "$flatc_path -M --${{generator}} $fbflags $task_fbflags $fbincpaths -o $outdir_fb $in > $out.d",
+            ],
+            infiles=[".fbs"],
+            deps="gcc",
+            depfile="$out.d",
+            generator="cpp",
+            implicit=["$flatc_path"],
+            outfiles=["{outdir}/{binary}.dir/{in_base}_generated.h"],
+            phony=True,
+            variables = {
+                "desc": "[FLATC] {in_base}{in_ext}",
+                "outdir_fb": "{outdir}/{binary}.dir/",
+            },
+            **kwargs):
+        super().__init__(
+            command=command,
+            infiles=infiles,
+            deps=deps,
+            depfile=depfile,
+            implicit=implicit,
+            outfiles=outfiles,
+            phony=phony,
+            variables=variables,
+            **kwargs)
+        self.generator = generator
+
+    def _out(self, project, infile):
+        outfiles, variables = super()._out(project, infile)
+        variables["generator"] = project.tools.expand(self.generator)
+        return outfiles, variables
+
+    @utils.cached.instance
+    def get_influence(self, task):
+        return "FlatC" + super().get_influence(task)
 
 
 class Skip(Rule):
@@ -976,11 +1019,13 @@ class GNUToolchain(Toolchain):
     ranlib = ToolEnvironmentVariable(default="ranlib", abspath=True)
     ccwrap = EnvironmentVariable(default="")
     cxxwrap = EnvironmentVariable(default="")
+    flatc = ToolEnvironmentVariable(default="flatc", envname="FLATC", abspath=True)
     protoc = ToolEnvironmentVariable(default="protoc", envname="PROTOC", abspath=True)
 
     asflags = EnvironmentVariable(default="")
     cflags = EnvironmentVariable(default="")
     cxxflags = EnvironmentVariable(default="")
+    fbflags = EnvironmentVariable(default="")
     ldflags = EnvironmentVariable(default="")
     protoflags = EnvironmentVariable(default="")
 
@@ -992,13 +1037,16 @@ class GNUToolchain(Toolchain):
     extra_cxxflags = ProjectVariable(attrib="cxxflags")
     extra_ldflags = ProjectVariable(attrib="ldflags")
 
+    task_fbflags = ProjectVariable(attrib="fbflags")
     task_protoflags = ProjectVariable(attrib="protoflags")
 
+    fbincpaths = IncludePaths("-I ")
     flags = ImportedFlags()
-    macros = Macros(prefix="-D")
     incpaths = IncludePaths(prefix="-I")
+    macros = Macros(prefix="-D")
     libpaths = LibraryPaths(prefix="-L")
     libraries = Libraries(prefix="-l")
+
 
     mkdir_debug = MakeDirectory(name=".debug")
 
@@ -1045,6 +1093,8 @@ class GNUToolchain(Toolchain):
         outfiles=["{outdir}/{binary}.dir/{in_path}/{in_base}{in_ext}.o"],
         variables={"desc": "[ASM] {in_base}{in_ext}"},
         implicit=["$cc_path"])
+
+    compile_fbs = FlatbufferCompiler(generator="cpp")
 
     compile_proto = ProtobufCompiler(generator="cpp")
 
@@ -1128,11 +1178,13 @@ class MSVCToolchain(Toolchain):
     cl = ToolEnvironmentVariable(default="cl", envname="cl_exe", abspath=True)
     lib = ToolEnvironmentVariable(default="lib", envname="lib_exe", abspath=True)
     link = ToolEnvironmentVariable(default="link", envname="link_exe", abspath=True)
+    flatc = ToolEnvironmentVariable(default="flatc", envname="FLATC", abspath=True)
     protoc = ToolEnvironmentVariable(default="protoc", envname="PROTOC", abspath=True)
 
     asflags = EnvironmentVariable(default="")
     cflags = EnvironmentVariable(default="/EHsc")
     cxxflags = EnvironmentVariable(default="/EHsc")
+    fbflags = EnvironmentVariable(default="")
     ldflags = EnvironmentVariable(default="")
     protoflags = EnvironmentVariable(default="")
 
@@ -1141,6 +1193,7 @@ class MSVCToolchain(Toolchain):
     extra_cxxflags = ProjectVariable(attrib="cxxflags")
     extra_ldflags = ProjectVariable(attrib="ldflags")
 
+    task_fbflags = ProjectVariable(attrib="fbflags")
     task_protoflags = ProjectVariable(attrib="protoflags")
 
     macros = Macros(prefix="/D")
@@ -1172,6 +1225,7 @@ class MSVCToolchain(Toolchain):
         variables={"desc": "[CXX] {in_base}{in_ext}"},
         implicit=["$cl_path"])
 
+    compile_fbs = FlatbufferCompiler(generator="cpp")
     compile_proto = ProtobufCompiler(generator="cpp")
 
     linker = MSVCLinker(
