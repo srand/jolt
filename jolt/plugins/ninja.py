@@ -528,7 +528,7 @@ class Rule(HashInfluenceProvider):
         if self.aggregate:
             outfiles, variables = self._out(project, infiles[0])
             outfiles_rel = [fs.path.relpath(outfile, project.outdir) for outfile in outfiles]
-            writer.build(outfiles_rel, self.name, infiles_rel, variables=variables, implicit=implicit, order_only=self.order_only+order_only)
+            writer.build(outfiles_rel, self.name, infiles_rel, variables=variables, implicit=implicit, order_only=self.order_only + order_only)
             result.extend(outfiles)
         else:
             for infile, infile_rel in zip(infiles, infiles_rel):
@@ -565,11 +565,11 @@ class ProtobufCompiler(Rule):
             variables=None,
             **kwargs):
         variables_final = {
-                "desc": "[PROTOC] {in_base}{in_ext}",
-                "out_depfile": "{binary}.dir/{in_base}.pb.d",
-                "outdir_proto": os.path.dirname(outfiles[0]),
-                "in_path_outdir": "{in_path_outdir}",
-            }
+            "desc": "[PROTOC] {in_base}{in_ext}",
+            "out_depfile": "{binary}.dir/{in_base}.pb.d",
+            "outdir_proto": os.path.dirname(outfiles[0]),
+            "in_path_outdir": "{in_path_outdir}",
+        }
         variables_final.update(variables or {})
         super().__init__(
             command=command,
@@ -1074,7 +1074,6 @@ class GNUToolchain(Toolchain):
     macros = Macros(prefix="-D")
     libpaths = LibraryPaths(prefix="-L")
     libraries = Libraries(prefix="-l")
-
 
     mkdir_debug = MakeDirectory(name=".debug")
 
@@ -1614,7 +1613,7 @@ if __name__ == "__main__":
         if not sources:
             return
 
-        sources = list(zip(copy.copy(sources), [None]*len(sources)))
+        sources = list(zip(copy.copy(sources), [None] * len(sources)))
         sources = [(tools.expand_path(source), origin) for source, origin in sources]
 
         # Aggregated list of sources for each rule
@@ -1637,12 +1636,12 @@ if __name__ == "__main__":
                 if not rule.aggregate:
                     output = rule.output(self, source)
                     if output:
-                        sources.extend(zip(output, [rule]*len(output)))
+                        sources.extend(zip(output, [rule] * len(output)))
             except KeyError:
                 rule_source_list[rule] = [(source, origin)]
                 output = rule.output(self, source)
                 if output:
-                    sources.extend(zip(output, [rule]*len(output)))
+                    sources.extend(zip(output, [rule] * len(output)))
 
         # No more inputs/outputs to process, now emit all build rules
         for rule, source_list_origin in rule_source_list.items():
