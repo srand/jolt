@@ -94,7 +94,8 @@ class Jolt(Task):
             dist = dists.get(req)
             if dist is None:
                 self.info("[SelfDeploy] Dependency not found: {}", req)
-                pkgs["req"] = req
+                req = req.partition("=")[0].partition("<")[0].partition(">")[0]
+                pkgs[req] = req
                 continue
 
             for dep in dist.requires():
