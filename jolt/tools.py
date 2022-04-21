@@ -1511,6 +1511,7 @@ class Tools(object):
         mount_joltdir = kwargs.get("mount_joltdir", True)
         mount_cachedir = kwargs.get("mount_cachedir", True)
         mount_builddir = kwargs.get("mount_builddir", True)
+        mount = kwargs.get("mount", [])
 
         overlaydir = self.builddir("overlay")
         overlayrootdir = fs.path.join(overlaydir, "root")
@@ -1571,6 +1572,9 @@ class Tools(object):
                 mount_bind(config.get_cachedir())
             if mount_builddir:
                 mount_bind(self.buildroot)
+            if mount:
+                for m in mount:
+                    mount_bind(m)
 
             os.chroot(chrootoverlay)
             os.chdir(self.getcwd())
