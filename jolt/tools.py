@@ -1558,8 +1558,9 @@ class Tools(object):
             if mount_etc:
                 mount_bind("/etc/group")
                 mount_bind("/etc/hostname")
-                mount_bind("/etc/resolv.conf")
+                mount_bind("/etc/hosts")
                 mount_bind("/etc/passwd")
+                mount_bind("/etc/resolv.conf")
             if mount_proc:
                 mount_bind("/proc")
             if mount_home:
