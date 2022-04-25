@@ -1223,7 +1223,7 @@ class ArtifactCache(StorageProvider):
         task = artifact.get_task()
         archive = artifact.get_archive_path()
         try:
-            task.tools.extract(archive, artifact.temporary_path)
+            task.tools.extract(archive, artifact.temporary_path, ignore_owner=True)
         except KeyboardInterrupt as e:
             raise e
         except Exception:

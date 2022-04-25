@@ -354,6 +354,19 @@ class ZipFile(zipfile.ZipFile):
             self.extract(member, path, pwd)
 
 
+class _Tarfile(tarfile.TarFile):
+    """ Tarfile customzation that can extract without uid/gids """
+
+    def __init__(self, *args, ignore_owner=False, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.__ignore_owner = ignore_owner
+
+    def chown(self, *args, **kwargs):
+        if self.__ignore_owner:
+            return
+        return super().chown(*args, **kwargs)
+
+
 class JinjaTaskContext(Context):
     """
     Helper context for Jinja templates.
@@ -875,7 +888,7 @@ class Tools(object):
         psep = fs.sep if pathname[-1] in fs.anysep else ""
         return fs.path.relpath(pathname, relpath) + psep
 
-    def extract(self, filename, pathname, files=None):
+    def extract(self, filename, pathname, files=None, ignore_owner=False):
         """ Extracts files in an archive.
 
         Supported formats are:
@@ -896,13 +909,14 @@ class Tools(object):
         """
         filename = self.expand_path(filename)
         filepath = self.expand_path(pathname)
+        ignore_owner_tar = "--no-same-owner" if ignore_owner else ""
         try:
             fs.makedirs(filepath)
             if filename.endswith(".zip"):
                 with ZipFile(filename, 'r') as zip:
                     zip.extractall(filepath, files)
             elif filename.endswith(".tar"):
-                with tarfile.open(filename, 'r') as tar:
+                with _Tarfile.open(filename, 'r', ignore_owner=ignore_owner) as tar:
                     if files:
                         for file in files:
                             tar.extract(file, filepath)
@@ -910,10 +924,11 @@ class Tools(object):
                         tar.extractall(filepath)
             elif filename.endswith(".tar.gz") or filename.endswith(".tgz"):
                 if shutil.which("tar") and shutil.which("pigz"):
-                    self.run("tar -I pigz -xf {} -C {} {}", filename, filepath,
+                    self.run("tar -I pigz {} -xf {} -C {} {}",
+                             ignore_owner_tar, filename, filepath,
                              " ".join(files) if files else "")
                     return
-                with tarfile.open(filename, 'r:gz') as tar:
+                with _Tarfile.open(filename, 'r:gz', ignore_owner=ignore_owner) as tar:
                     if files:
                         for file in files:
                             tar.extract(file, filepath)
@@ -922,14 +937,14 @@ class Tools(object):
             elif filename.endswith(".tar.bz2"):
                 # bz2file module for multistream support
                 with bz2file.open(filename) as bz2:
-                    with tarfile.open(fileobj=bz2) as tar:
+                    with _Tarfile.open(fileobj=bz2, ignore_owner=ignore_owner) as tar:
                         if files:
                             for file in files:
                                 tar.extract(file, filepath)
                         else:
                             tar.extractall(filepath)
             elif filename.endswith(".tar.xz"):
-                with tarfile.open(filename, 'r:xz') as tar:
+                with _Tarfile.open(filename, 'r:xz', ignore_owner=ignore_owner) as tar:
                     if files:
                         for file in files:
                             tar.extract(file, filepath)
@@ -1520,7 +1535,6 @@ class Tools(object):
             self.mkdir("work")
             self.mkdir("uppr")
         overlayopts = f"upperdir={overlaydir}/uppr,workdir={overlaydir}/work,lowerdir={chroot}"
-        chrootoverlay = overlayrootdir
 
         def unshare_chroot():
             Tools._unshare()
@@ -1534,36 +1548,33 @@ class Tools(object):
             def mount_overlay():
                 libc.mount(
                     c_char_p("overlay".encode("utf-8")),
-                    c_char_p(chrootoverlay.encode("utf-8")),
+                    c_char_p(overlayrootdir.encode("utf-8")),
                     c_char_p("overlay".encode("utf-8")),
                     0,
                     c_char_p(overlayopts.encode("utf-8"))) == 0
 
             def mount_bind(path):
                 if os.path.isdir(path):
-                    os.makedirs(chrootoverlay + path, exist_ok=True)
+                    os.makedirs(overlayrootdir + path, exist_ok=True)
                 else:
-                    os.makedirs(os.path.dirname(chrootoverlay + path), exist_ok=True)
-                    with open(chrootoverlay + path, "a"):
-                        pass
+                    os.makedirs(os.path.dirname(overlayrootdir + path), exist_ok=True)
+                    if not os.path.exists(overlayrootdir + path):
+                        with open(overlayrootdir + path, "a"):
+                            pass
                 assert libc.mount(
                     c_char_p(path.encode("utf-8")),
-                    c_char_p((chrootoverlay + path).encode("utf-8")),
+                    c_char_p((overlayrootdir + path).encode("utf-8")),
                     None,
                     MS_BIND | MS_REC,
                     None) == 0
 
             mount_overlay()
-            if mount_dev:
-                mount_bind("/dev")
             if mount_etc:
                 mount_bind("/etc/group")
                 mount_bind("/etc/hostname")
                 mount_bind("/etc/hosts")
                 mount_bind("/etc/passwd")
                 mount_bind("/etc/resolv.conf")
-            if mount_proc:
-                mount_bind("/proc")
             if mount_home:
                 mount_bind("/home")
             if mount_joltdir and self._task:
@@ -1575,23 +1586,24 @@ class Tools(object):
             if mount:
                 for m in mount:
                     mount_bind(m)
-
-            os.chroot(chrootoverlay)
+            if mount_dev:
+                mount_bind("/dev")
+            if mount_proc:
+                mount_bind("/proc")
+            os.chroot(overlayrootdir)
             os.chdir(self.getcwd())
 
-        def catcher():
+        def unshare_chroot_catch():
             try:
                 unshare_chroot()
             except Exception as e:
-                import traceback
-                with open("/tmp/exception", "w") as f:
-                    f.write(traceback.format_exc())
+                log.exception(e)
                 raise e
 
         old_chroot = self._chroot
         old_preexec_fn = self._preexec_fn
         self._chroot = chroot
-        self._preexec_fn = unshare_chroot
+        self._preexec_fn = unshare_chroot_catch
         try:
             yield self._chroot
         finally:
@@ -1621,10 +1633,10 @@ class Tools(object):
         def map_uids(uids):
             return map_ids("/proc/self/uid_map", uids)
 
-        def map_gids(uids):
+        def map_gids(gids):
             with open("/proc/self/setgroups", "w") as f:
                 f.write("deny")
-            return map_ids("/proc/self/gid_map", uids)
+            return map_ids("/proc/self/gid_map", gids)
 
         map_uids([(uid, uid, 1)])
         map_gids([(gid, gid, 1)])
