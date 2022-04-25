@@ -7,6 +7,7 @@ from jolt import inspection
 from jolt import utils
 from jolt import filesystem as fs
 from jolt import tools
+from jolt import version
 
 
 _providers = []
@@ -594,3 +595,14 @@ class StringInfluence(HashInfluenceProvider):
 
 def global_string(string):
     HashInfluenceRegistry.get().register(StringInfluence(string))
+
+
+class VersionInfluence(HashInfluenceProvider):
+    name = "Version"
+
+    def get_influence(self, task):
+        return version.__version__
+
+
+def global_version():
+    HashInfluenceRegistry.get().register(VersionInfluence())
