@@ -873,7 +873,14 @@ class TaskBase(object):
     """
 
     _instance = Export(lambda t: str(uuid.uuid4()))
-    # Instance identifier, global to cluster
+    """
+    Task instance identifier.
+
+    The instance ID identifies an execution request and is always unique.
+
+    While the task hash identity may be identical for multiple parallel
+    execution requests, the instance ID won't be.
+    """
 
     def __init__(self, parameters=None, manifest=None, **kwargs):
         self._identity = None
