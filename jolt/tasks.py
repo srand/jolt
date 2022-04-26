@@ -1276,7 +1276,7 @@ class ReportProxy(object):
                     details = ""
             self.add_error(type, error.get("location", ""), message, details)
 
-    def add_exception(self, exc):
+    def add_exception(self, exc, errtype=None, location=None):
         """
         Add an exception to the build report.
 
@@ -1293,7 +1293,7 @@ class ReportProxy(object):
             while len(tb) > 2 and installdir in tb[1]:
                 del tb[1]
         loc = re.findall("\"(.*?\", line [0-9]+, in .*?)\n", tb[1])
-        location = loc[0] if loc and len(loc) > 0 else ""
+        location = location or (loc[0] if loc and len(loc) > 0 else "")
         message = str(exc)
         if isinstance(exc, JoltCommandError):
             details = "\n".join(exc.stderr)
@@ -1303,7 +1303,7 @@ class ReportProxy(object):
             details = "".join(tb)
 
         self.add_error(
-            type="Exception" if not isinstance(exc, JoltError) else "Error",
+            type=errtype or ("Exception" if not isinstance(exc, JoltError) else "Error"),
             location=location,
             message=message,
             details=details)
@@ -1675,6 +1675,7 @@ class _TestResult(ut.TextTestResult):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.successes = []
+        self.errors_exc = []
 
     def _begin(self):
         log.stdout(ut.TextTestResult.separator1)
@@ -1694,6 +1695,8 @@ class _TestResult(ut.TextTestResult):
         self._end()
 
     def addError(self, test, err):
+        _, exc, tb = err
+        self.errors_exc.append((test, exc))
         super().addError(test, err)
         self._end()
 
@@ -1902,8 +1905,8 @@ class Test(Task):
         with log.stream() as logstream:
             self.testresult = ut.TextTestRunner(resultclass=_TestResult, stream=logstream, verbosity=2).run(testsuite)
         with self.report() as report:
-            for tc, tb in self.testresult.errors:
-                report.add_error("Test Error", tc.name, tb.splitlines()[-1], tb)
+            for tc, exc in self.testresult.errors_exc:
+                report.add_exception(exc, "Test Error", tc.name)
             for tc, tb in self.testresult.failures:
                 report.add_error("Test Failed", tc.name, tb.splitlines()[-1], tb)
         raise_unreported_task_error_if(
