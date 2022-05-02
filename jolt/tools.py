@@ -229,7 +229,7 @@ class _CMake(object):
         self.deps = deps
         self.tools = tools
         self.builddir = self.tools.builddir(incremental=incremental)
-        self.installdir = self.tools.builddir("install", incremental=incremental)
+        self.installdir = self.tools.builddir("install", incremental=False)
 
     def configure(self, sourcedir, *args, generator=None, **kwargs):
         sourcedir = self.tools.expand_path(sourcedir)

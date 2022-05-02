@@ -1,3 +1,4 @@
+from jolt import influence
 from jolt import Task
 from jolt import utils
 from jolt.error import raise_task_error_if
@@ -24,7 +25,7 @@ class CMake(Task):
         raise_task_error_if(not self.cmakelists, self, "cmakelists attribute has not been defined")
 
         cmake = tools.cmake(incremental=self.incremental)
-        cmake.configure(tools.expand(self.cmakelists), *["-D" + tools.expand(option) for option in self.options], generator=utils.quote(self.generator, "'"))
+        cmake.configure(tools.expand(self.cmakelists), *["-D" + tools.expand(option) for option in self.options], generator=self.generator)
         cmake.build()
         cmake.install()
 
@@ -33,12 +34,23 @@ class CMake(Task):
         cmake.publish(artifact)
 
 
-class _CMakeCXXLibrary(CMake):
+@influence.attribute("headers", type=influence.FileInfluence)
+@influence.attribute("sources", type=influence.FileInfluence)
+class _CMakeCXX(CMake):
+    asflags = []
     binary = None
+    cflags = []
+    cxxflags = []
+    headers = []
+    incpaths = []
+    ldflags = []
+    macros = []
+    shared = False
+    sources = []
 
-    generator = "Eclipse CDT4 - Ninja"
-
+    generator = None
     incremental = True
+    template = None
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -47,10 +59,35 @@ class _CMakeCXXLibrary(CMake):
     def run(self, deps, tools):
         with tools.cwd(tools.builddir(incremental=self.incremental)):
             self.cmakelists = tools.expand_path(self.cmakelists)
-            project = utils.render("cxxlibrary.cmake.template", deps=deps, task=self, tools=tools, os=os)
-            print(project)
-            tools.write_file(self.cmakelists, project)
+            project = utils.render(self.template, deps=deps, task=self, tools=tools, os=os)
+            tools.write_file(self.cmakelists, project, expand=False)
         super().run(deps, tools)
+
+    def publish(self, artifact, tools):
+        super().publish(artifact, tools)
+        if self.headers:
+            for header in self.headers:
+                artifact.collect(header)
+            artifact.cxxinfo.incpaths.append(".")
+
+
+class CXXLibrary(_CMakeCXX):
+    abstract = True
+    template = "cxxlibrary.cmake.template"
+
+    def publish(self, artifact, tools):
+        super().publish(artifact, tools)
+        if self.headers:
+            for header in self.headers:
+                artifact.collect(header)
+            artifact.cxxinfo.incpaths.append(".")
+        artifact.cxxinfo.libraries.append("{binary}")
+        artifact.cxxinfo.libpaths.append("lib")
+
+
+class CXXExecutable(_CMakeCXX):
+    abstract = True
+    template = "cxxexecutable.cmake.template"
 
     def publish(self, artifact, tools):
         super().publish(artifact, tools)

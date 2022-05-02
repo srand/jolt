@@ -31,13 +31,8 @@ link_directories("{{ tools.sandbox(dep) }}/{{ lib }}")
 {% endfor %}
 {% endfor %}
 
-add_library(
+add_executable(
     {{ task.binary or task.canonical_name }}
-    {% if task.shared %}
-    SHARED
-    {% else %}
-    STATIC
-    {% endif %}
 {% for source in task.sources %}
     {{ tools.expand_relpath(os.path.join(task.joltdir, source), tools.getcwd()) }}
 {% endfor %}
@@ -48,16 +43,14 @@ add_library(
 {% endfor %}
 )
 
-{% if task.shared %}
 {% for lib in task.libraries %}
-target_link_libraries("{{ lib }}")
+target_link_libraries({{ task.binary or task.canonical_name }} {{ lib }})
 {% endfor %}
 
 {% for _, dep in deps.items() %}
 {% for lib in dep.cxxinfo.libraries.items() %}
-target_link_libraries("{{ lib }}")
+target_link_libraries({{ task.binary or task.canonical_name }} {{ lib }})
 {% endfor %}
 {% endfor %}
-{% endif %}
 
 install(TARGETS {{ task.canonical_name }})
