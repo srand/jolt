@@ -512,7 +512,7 @@ class BuildCli(testsupport.JoltTest):
         @attributes.environ("FOO")
         class A(Task):
             def run(self, deps, tools):
-                assert tools.getenv("FOO", "bar"), "incorrect value of envvar."
+                assert tools.getenv("FOO") == "bar", "incorrect value of envvar."
             def publish(self, artifact, tools):
                 artifact.environ.BAR = "bar"
 
@@ -520,7 +520,7 @@ class BuildCli(testsupport.JoltTest):
         class B(Task):
             requires = "a"
             def run(self, deps, tools):
-                assert tools.getenv("BAR", "bar"), "incorrect value of envvar."
+                assert tools.getenv("BAR") == "bar", "incorrect value of envvar."
         ---
         """
         with self.tools.environ(FOO="bar", BAR="foo"):

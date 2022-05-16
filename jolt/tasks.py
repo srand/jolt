@@ -714,7 +714,10 @@ class attributes:
         def _decorate(cls):
             if influence:
                 environ_influence(envname)(cls)
-            setattr(cls, "_environ_" + utils.canonical(envname.lower()), EnvironExport(envname))
+            name = "_environ_" + utils.canonical(envname.lower())
+            export = EnvironExport(envname)
+            export.__set_name__(cls, name)
+            setattr(cls, name, export)
             return cls
         return _decorate
 
