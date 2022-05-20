@@ -588,13 +588,13 @@ class TaskRegistry(object):
             self.instances[full_name] = task
             return task
 
-        raise_task_error_if(not task, full_name, "no such task")
+        raise_task_error_if(not task, full_name, "No such task")
 
     def set_default_parameters(self, task):
         name, params = utils.parse_task_name(task)
 
         cls = self.tasks.get(name)
-        raise_task_error_if(not cls, task, "no such task")
+        raise_task_error_if(not cls, task, "No such task")
         cls._set_default_parameters(cls, params)
 
     def set_joltdir(self, joltdir):
@@ -897,7 +897,7 @@ class TaskBase(object):
         self.extends = self.expand(utils.call_or_return_list(self, self.__class__.extends))
         raise_task_error_if(
             len(self.extends) != 1, self,
-            "multiple tasks extended, only one allowed")
+            "Multiple tasks extended, only one allowed")
         self.extends = self.extends[0]
         self.influence = utils.call_or_return_list(self, self.__class__._influence)
         self.influence.append(TaskClassSourceInfluence())
@@ -952,17 +952,17 @@ class TaskBase(object):
             try:
                 param = utils.getattr_safe(self, key)
             except AttributeError:
-                raise_task_error(self, "no such parameter '{0}'", key)
+                raise_task_error(self, "No such parameter '{0}'", key)
             if isinstance(param, Parameter):
                 try:
                     param.set_value(value)
                 except ValueError as e:
                     raise_task_error(
                         self,
-                        "illegal value '{0}' assigned to parameter '{1}'",
+                        "Illegal value '{0}' assigned to parameter '{1}'",
                         str(e), key)
                 continue
-            raise_task_error(self, "no such parameter '{0}'", key)
+            raise_task_error(self, "No such parameter '{0}'", key)
         self._assert_required_parameters_assigned()
 
     @staticmethod
@@ -975,13 +975,13 @@ class TaskBase(object):
                 param.set_default(value)
                 setattr(cls, key, param)
                 continue
-            raise_task_error(cls.name, "no such parameter '{0}'", key)
+            raise_task_error(cls.name, "No such parameter '{0}'", key)
 
     def _assert_required_parameters_assigned(self):
         for key, param in self._get_parameter_objects().items():
             raise_task_error_if(
                 param.is_required() and param.is_unset(), self,
-                "required parameter '{0}' has not been set", key)
+                "Required parameter '{0}' has not been set", key)
 
     def _verify_influence(self, deps, artifact, tools, sources=None):
         # Verify that any transformed sources are influencing
@@ -1022,7 +1022,7 @@ class TaskBase(object):
             sources.difference_update(ok)
         for source in sources:
             log.warning("Missing influence: {} ({})", source, self.name)
-        raise_task_error_if(sources, self, "task is missing source influence")
+        raise_task_error_if(sources, self, "Task is missing source influence")
 
     def _get_export_objects(self):
         return self._exports
@@ -1075,7 +1075,7 @@ class TaskBase(object):
                 return [utils.expand(string, *args, **kwargs) for string in string_or_list]
             return utils.expand(string_or_list, *args, **kwargs)
         except KeyError as e:
-            raise_task_error(self, "invalid macro '{0}' encountered - forgot to set a parameter?", e)
+            raise_task_error(self, "Invalid macro '{0}' encountered - forgot to set a parameter?", e)
 
     @property
     def identity(self):
@@ -1401,7 +1401,7 @@ class WorkspaceResource(Resource):
     def __init__(self, *args, **kwargs):
         super(WorkspaceResource, self).__init__(*args, **kwargs)
         raise_task_error_if(len(self.requires) > 0, self,
-                            "workspace resource is not allowed to have requirements")
+                            "Workspace resource is not allowed to have requirements")
 
     def acquire(self, **kwargs):
         return self.acquire_ws()
@@ -1442,7 +1442,7 @@ class Alias(Task):
     def __init__(self, *args, **kwargs):
         super(Alias, self).__init__(*args, **kwargs)
         raise_task_error_if(
-            self.extends, self, "aliases cannot be extensions")
+            self.extends, self, "Aliases cannot be extensions")
 
     def is_runnable(self):
         return False
