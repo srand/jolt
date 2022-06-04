@@ -438,7 +438,7 @@ def tojson(filepath, data, ignore_errors=False, indent=2):
 
 def concat_attributes(attrib, postfix, prepend=False):
     def _decorate(cls):
-        _orig = getattr(cls, "_" + attrib)
+        _orig = getattr(cls, "_" + attrib, lambda self: [])
 
         def _get(self):
             orig = _orig(self)
