@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import errno
 import hashlib
 import os
 import sys
@@ -7,6 +8,10 @@ import time
 sys.path.append(".")
 
 from testsupport import JoltTest
+
+
+class TestException(Exception):
+    pass
 
 
 class ToolsApi(JoltTest):
@@ -743,3 +748,54 @@ class ToolsApi(JoltTest):
         self.assertEqual(requirement(">1.0").required(), version("1.1"))
         self.assertEqual(requirement(">=1.0").required(), version("1.0"))
         self.assertEqual(requirement("<=1.0").required(), version("1.0"))
+
+    def test_unshare(self):
+        uid = os.getuid()
+        gid = os.getgid()
+
+        with self.tools.unshare() as ns, ns:
+            self.assertEqual(os.geteuid(), 0)
+            self.assertEqual(os.getegid(), 0)
+            self.assertEqual(self.tools.run("id -u"), "0")
+            self.assertEqual(self.tools.run("id -g"), "0")
+            with self.tools.cwd(self.ws):
+                self.tools.write_file(self.tools.expand_path("file1"), "")
+                self.tools.write_file(self.tools.expand_path("file2"), "")
+                os.chown(self.tools.expand_path("file2"), 1, 1)
+        with self.tools.cwd(self.ws):
+            st = os.stat(self.tools.expand_path("file1"))
+            self.assertEqual(st.st_uid, uid)
+            self.assertEqual(st.st_gid, gid)
+            st = os.stat(self.tools.expand_path("file2"))
+            self.assertEqual(st.st_uid, 100000)
+            self.assertEqual(st.st_gid, 100000)
+
+        with self.tools.unshare(uidmap=[(0, uid, 1)], gidmap=[(0, gid, 1)]) as ns, ns:
+            self.assertEqual(os.geteuid(), 0)
+            self.assertEqual(os.getegid(), 0)
+            self.assertEqual(self.tools.run("id -u"), "0")
+            self.assertEqual(self.tools.run("id -g"), "0")
+            with self.tools.cwd(self.ws):
+                self.tools.write_file(self.tools.expand_path("file3"), "")
+                self.tools.write_file(self.tools.expand_path("file4"), "")
+                try:
+                    os.chown(self.tools.expand_path("file4"), 1, 1)
+                except OSError as e:
+                    if e.errno != errno.EINVAL:
+                        raise e
+        with self.tools.cwd(self.ws):
+            st = os.stat(self.tools.expand_path("file3"))
+            self.assertEqual(st.st_uid, uid)
+            self.assertEqual(st.st_gid, gid)
+
+        with self.tools.unshare(uid=uid, gid=gid) as ns, ns:
+            self.assertEqual(os.geteuid(), uid)
+            self.assertEqual(os.getegid(), gid)
+            self.assertEqual(self.tools.run("id -u"), str(uid))
+            self.assertEqual(self.tools.run("id -g"), str(gid))
+
+        try:
+            with self.tools.unshare() as ns, ns:
+                raise TestException()
+        except TestException:
+            pass

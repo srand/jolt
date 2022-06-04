@@ -381,6 +381,63 @@ class JinjaTaskContext(Context):
         return super(JinjaTaskContext, self).resolve_or_missing(key)
 
 
+class Namespace(object):
+    def __init__(self, child=False):
+        self.child = child
+
+    def __enter__(self, *args):
+        if not self.child:
+            raise NamespaceException()
+        return self
+
+    def __exit__(self, type, exc, tb):
+        if type == NamespaceException:
+            return True
+        return False
+
+
+class NamespaceException(Exception):
+    pass
+
+
+def _subid(id, login):
+    """ PIDs allowed to be mapped by a user. """
+    with open(f"/etc/sub{id}") as subid:
+        try:
+            for line in subid:
+                user, start, count = line.strip().split(":")
+                if login == user:
+                    return int(start), int(count)
+        except Exception:
+            pass
+        return None, None
+
+
+def _default_idmap(type, inner):
+    """ Creates a default mapping of uid/gid between namespaces based
+        on the requested inner uid/gid. As many ids as possible are mapped
+        starting at 0. Requested ids are always mapped. """
+    map = []
+    outer = os.geteuid()
+    start, count = _subid("uid", os.getlogin())
+    if start is None or count is None:
+        return map
+    if count <= 0:
+        return map
+    map.append((inner, outer, 1))
+    if count <= 1:
+        return map
+    if inner == 0:
+        map.append((inner + 1, start, count))
+    else:
+        map.append((0, start, min(inner - 1, count)))
+        start += min(inner - 1, count) + 1
+        count -= min(inner - 1, count) + 1
+        if count > 0:
+            map.append((inner + 1, start, count))
+    return map
+
+
 class Tools(object):
     """ A collection of useful tools.
 
@@ -1537,7 +1594,9 @@ class Tools(object):
         overlayopts = f"upperdir={overlaydir}/uppr,workdir={overlaydir}/work,lowerdir={chroot}"
 
         def unshare_chroot():
-            Tools._unshare()
+            uid = os.geteuid()
+            gid = os.geteuid()
+            self._unshare([(uid, uid, 1)], [(gid, gid, 1)])
 
             from ctypes import CDLL, c_char_p
             libc = CDLL("libc.so.6")
@@ -1610,36 +1669,104 @@ class Tools(object):
             self._chroot = old_chroot
             self._preexec_fn = old_preexec_fn
 
-    @staticmethod
-    def _unshare():
+    def _unshare(self, uidmap, gidmap):
         from ctypes import CDLL
         libc = CDLL("libc.so.6")
 
         CLONE_NEWNS = 0x00020000
         CLONE_NEWUSER = 0x10000000
 
-        uid = os.getuid()
-        gid = os.getgid()
+        uidmap = [str(id) for map in uidmap for id in map]
+        gidmap = [str(id) for map in gidmap for id in map]
+        newuidmap = self.which("newuidmap")
+        newgidmap = self.which("newgidmap")
 
+        sem = multiprocessing.Semaphore(0)
+        parent = os.getpid()
+        child = os.fork()
+        if child == 0:
+            sem.acquire()
+            pid = os.fork()
+            if pid == 0:
+                os.execve(newuidmap, ["newuidmap", str(parent)] + uidmap, {})
+            os.waitpid(pid, 0)
+            os.execve(newgidmap, ["newgidmap", str(parent)] + gidmap, {})
         assert libc.unshare(CLONE_NEWNS | CLONE_NEWUSER) == 0
+        sem.release()
+        os.waitpid(child, 0)
 
-        def map_ids(filename, ids):
-            with open(filename, 'w') as file_:
-                idmap = ""
-                for new_id, old_id, count in ids:
-                    idmap += f"{new_id} {old_id} {count}\n"
-                file_.write(idmap)
+    @contextmanager
+    def unshare(self, uid=0, gid=0, groups=[0], uidmap=None, gidmap=None):
+        """
+        Experimental: Create a Linux namespace.
 
-        def map_uids(uids):
-            return map_ids("/proc/self/uid_map", uids)
+        This method yields a new Linux namespace in which Python code may be executed.
+        By default, the current user is mapped to root inside the namespace and all
+        other users and groups are automatically mapped to the other user's configured
+        subuids and subgids.
 
-        def map_gids(gids):
-            with open("/proc/self/setgroups", "w") as f:
-                f.write("deny")
-            return map_ids("/proc/self/gid_map", gids)
+        The main use-case for namespaces is to fake the root user which may be useful
+        in a number of situations:
 
-        map_uids([(uid, uid, 1)])
-        map_gids([(gid, gid, 1)])
+          - to allow chroot() without beeing root
+          - to allow mount() without beeing root
+          - to preserve file ownership after tar file extraction
+          - etc...
+
+        Requires a Linux host.
+
+        Note that the fork() system call is used. Changes made to variables
+        will not persist after leaving the namespace.
+
+        Args:
+           uid (int): Requested uid inside the namespace. This is always mapped
+               to the uid of the caller.
+           gid (int): Requested gid inside the namespace. This is always mapped
+               to the gid of the caller.
+           uidmap (list): List of uids to map in the namespace. A list of tuples
+               is expected: (inner uid, outer id, number of ids to map).
+           gidmap (list): List of gids to map in the namespace. A list of tuples
+               is expected: (inner gid, outer id, number of ids to map).
+
+        Example:
+
+            .. code-block:: python
+
+              with tools.unshare() as ns, ns:
+                  # Inside namespace
+                  tools.run("whoami")  # "root"
+              # Back outside namespace, namespace destructed
+
+        """
+
+        gidmap = gidmap or _default_idmap("gid", gid)
+        uidmap = uidmap or _default_idmap("uid", uid)
+
+        msgq = multiprocessing.JoinableQueue()
+        pid = os.fork()
+        if pid == 0:
+            try:
+                self._unshare(uidmap, gidmap)
+                os.setuid(uid)
+                os.setgid(gid)
+                # if uid == 0 and gid == 0:
+                #     os.setgroups(groups)
+                yield Namespace(msgq)
+            except Exception as exc:
+                msgq.put(exc)
+            else:
+                msgq.put(None)
+            msgq.join()
+            os._exit(0)
+        try:
+            yield Namespace()
+        except NamespaceException:
+            pass
+        exc = msgq.get()
+        msgq.task_done()
+        os.waitpid(pid, 0)
+        if exc:
+            raise exc
 
     def upload(self, pathname, url, exceptions=True, auth=None, **kwargs):
         """
