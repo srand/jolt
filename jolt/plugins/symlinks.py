@@ -51,7 +51,7 @@ class SymlinkCliHooks(CliHook):
         yield
         try:
             path = fs.path.join(loader.get_workspacedir(), self._path)
-            fs.rmtree(path)
+            fs.rmtree(path, onerror=fs.onerror_warning)
         except (AssertionError, FileNotFoundError):
             pass
 

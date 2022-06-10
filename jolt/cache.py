@@ -1232,9 +1232,9 @@ class ArtifactCache(StorageProvider):
             fs.unlink(archive, ignore_errors=True)
         artifact._read_manifest()
 
-    def _fs_delete_artifact(self, identity, name):
-        fs.rmtree(self._fs_get_artifact_path(identity, name), ignore_errors=True)
-        fs.rmtree(self._fs_get_artifact_tmppath(identity, name), ignore_errors=True)
+    def _fs_delete_artifact(self, identity, name, onerror=None):
+        fs.rmtree(self._fs_get_artifact_path(identity, name), ignore_errors=True, onerror=onerror)
+        fs.rmtree(self._fs_get_artifact_tmppath(identity, name), ignore_errors=True, onerror=onerror)
         fs.unlink(fs.path.join(self.root, name), ignore_errors=True)
 
     def _fs_get_artifact_archivepath(self, identity, name):
@@ -1314,14 +1314,14 @@ class ArtifactCache(StorageProvider):
             finally:
                 lock.release()
 
-    def _discard(self, db, artifacts, if_expired):
+    def _discard(self, db, artifacts, if_expired, onerror=None):
         """ Discard list of artifacts. Cache lock must be held. """
         self._assert_cache_locked()
         evicted = 0
         for identity, name, _, used in artifacts:
             if not if_expired or self._fs_is_artifact_expired(identity, name, used):
                 self._db_delete_artifact(db, identity)
-                self._fs_delete_artifact(identity, name)
+                self._fs_delete_artifact(identity, name, onerror=onerror)
                 evicted += 1
                 log.debug("Evicted {}: {}", identity, name)
         return evicted == len(artifacts)
@@ -1522,13 +1522,16 @@ class ArtifactCache(StorageProvider):
                 if self._discard(db, [candidate], True):
                     evict_size -= candidate[2]
 
-    def discard(self, node, if_expired=False):
+    def discard(self, node, if_expired=False, onerror=None):
         with self._cache_lock(), self._db() as db:
             self._db_invalidate_locks(db)
             self._db_invalidate_references(db)
             self._fs_invalidate_pids(db)
             discarded = self._discard(
-                db, self._db_select_artifact_not_in_use(db, node.identity), if_expired)
+                db,
+                self._db_select_artifact_not_in_use(db, node.identity),
+                if_expired,
+                onerror=onerror)
             if discarded and hasattr(node, "_ArtifactCache__available"):
                 del node.__available
             return discarded
@@ -1577,12 +1580,16 @@ class ArtifactCache(StorageProvider):
                 del node.__available
         return self._fs_get_artifact(node)
 
-    def discard_all(self, if_expired=False):
+    def discard_all(self, if_expired=False, onerror=None):
         with self._cache_lock(), self._db() as db:
             self._db_invalidate_locks(db)
             self._db_invalidate_references(db)
             self._fs_invalidate_pids(db)
-            return self._discard(db, self._db_select_artifacts_not_in_use(db), if_expired)
+            return self._discard(
+                db,
+                self._db_select_artifacts_not_in_use(db),
+                if_expired,
+                onerror=onerror)
 
     def get_context(self, node):
         return Context(self, node)

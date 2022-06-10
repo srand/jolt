@@ -437,11 +437,11 @@ def clean(ctx, task, deps, expired):
         for task in tasks:
             task.clean(acache, expired)
     else:
-        acache.discard_all(expired)
+        acache.discard_all(expired, onerror=fs.onerror_warning)
         try:
             # May not be in a workspace when running the command
             t = tools.Tools()
-            t.rmtree(t.buildroot)
+            fs.rmtree(t.buildroot, onerror=fs.onerror_warning)
         except AssertionError:
             pass
 

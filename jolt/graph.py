@@ -320,10 +320,10 @@ class TaskProxy(object):
             self.warning("Pruned task was already pruned")
         hooks.task_pruned(self)
 
-    def clean(self, cache, expired):
+    def clean(self, cache, if_expired, onerror=None):
         with self.tools:
             self.task.clean(self.tools)
-            discarded = cache.discard(self, expired)
+            discarded = cache.discard(self, if_expired, onerror=fs.onerror_warning)
             if discarded:
                 log.debug("Discarded: {} ({})", self.short_qualified_name, self.identity[:8])
             else:

@@ -79,8 +79,17 @@ def move(src, dst):
     return shutil.move(src, dst)
 
 
-def rmtree(path, ignore_errors=False):
-    def onerror(func, path, exc_info):
+def onerror_warning(func, path, exc_info):
+    from jolt import log
+    if type(exc_info[1]) == OSError:
+        msg = exc_info[1].strerror
+    else:
+        msg = "Reason unknown"
+    log.warning("Could not remove file or directory: {} ({})", path, msg)
+
+
+def rmtree(path, ignore_errors=False, onerror=None):
+    def _onerror(func, path, exc_info):
         if os.path.isdir(path):
             try:
                 os.rmdir(path)
@@ -92,7 +101,7 @@ def rmtree(path, ignore_errors=False):
             _, exc, _ = exc_info
             raise exc
 
-    shutil.rmtree(path, onerror=onerror)
+    shutil.rmtree(path, onerror=onerror or _onerror)
 
 
 def unlink(path, ignore_errors=False, tree=False):
