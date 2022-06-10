@@ -567,3 +567,20 @@ class BuildCli(testsupport.JoltTest):
         r = self.build("b")
         self.assertBuild(r, "b")
 
+    def test_no_parameter(self):
+        """
+        --- tasks:
+        class A(Task):
+            pass
+
+        class B(Task):
+            requires = ["a"]
+        ---
+        """
+
+        with self.assertRaises(Exception):
+            r1 = self.jolt("build b:nope=1")
+        self.assertIn(self.lastLog(), "No such parameter")
+        with self.assertRaises(Exception):
+            r1 = self.jolt("build b -d a:nope=1")
+        self.assertIn(self.lastLog(), "No such parameter")

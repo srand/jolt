@@ -969,7 +969,7 @@ class TaskBase(object):
     def _set_default_parameters(cls, params):
         params = params or {}
         for key, value in params.items():
-            param = utils.getattr_safe(cls, key)
+            param = utils.getattr_safe(cls, key, None)
             if isinstance(param, Parameter):
                 param = copy.copy(param)
                 param.set_default(value)
