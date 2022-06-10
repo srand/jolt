@@ -1593,7 +1593,7 @@ class Tools(object):
             self.mkdir("uppr")
         overlayopts = f"upperdir={overlaydir}/uppr,workdir={overlaydir}/work,lowerdir={chroot}"
 
-        def unshare_chroot():
+        def unshare_chroot(overlayrootdir):
             uid = os.geteuid()
             gid = os.geteuid()
             self._unshare([(uid, uid, 1)], [(gid, gid, 1)])
@@ -1605,12 +1605,16 @@ class Tools(object):
             MS_REC = 16384
 
             def mount_overlay():
-                libc.mount(
+                return libc.mount(
                     c_char_p("overlay".encode("utf-8")),
                     c_char_p(overlayrootdir.encode("utf-8")),
                     c_char_p("overlay".encode("utf-8")),
                     0,
                     c_char_p(overlayopts.encode("utf-8"))) == 0
+
+            # If the overlay mount fails, just don't use one.
+            if not mount_overlay():
+                overlayrootdir = chroot
 
             def mount_bind(path):
                 if os.path.isdir(path):
@@ -1627,7 +1631,6 @@ class Tools(object):
                     MS_BIND | MS_REC,
                     None) == 0
 
-            mount_overlay()
             if mount_etc:
                 mount_bind("/etc/group")
                 mount_bind("/etc/hostname")
@@ -1654,7 +1657,7 @@ class Tools(object):
 
         def unshare_chroot_catch():
             try:
-                unshare_chroot()
+                unshare_chroot(overlayrootdir)
             except Exception as e:
                 log.exception(e)
                 raise e
