@@ -321,12 +321,12 @@ class TaskApi(JoltTest):
         """
         with self.assertRaises(Exception):
             r = self.jolt("build a --result a.joltxmanifest")
-        self.assertContains("a.joltxmanifest", "<message>AssertionError: True != False</message>")
-        self.assertContains("a.joltxmanifest", "<message>RuntimeError: Broken A</message>")
+        self.assertContains("a.joltxmanifest", "AssertionError: True != False")
+        self.assertContains("a.joltxmanifest", "RuntimeError: Broken A")
         with self.assertRaises(Exception):
             r = self.jolt("build b --result b.joltxmanifest")
-        self.assertContains("b.joltxmanifest", "<message>AssertionError: True != False</message>")
-        self.assertContains("b.joltxmanifest", "<message>RuntimeError: Broken B</message>")
+        self.assertContains("b.joltxmanifest", "AssertionError: True != False")
+        self.assertContains("b.joltxmanifest", "RuntimeError: Broken B")
 
     def test_weight(self):
         """

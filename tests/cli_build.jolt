@@ -580,7 +580,7 @@ class BuildCli(testsupport.JoltTest):
 
         with self.assertRaises(Exception):
             r1 = self.jolt("build b:nope=1")
-        self.assertIn(self.lastLog(), "No such parameter")
+        self.assertIn("No such parameter", self.lastLog())
         with self.assertRaises(Exception):
             r1 = self.jolt("build b -d a:nope=1")
-        self.assertIn(self.lastLog(), "No such parameter")
+        self.assertIn("No such parameter", self.lastLog())
