@@ -1681,7 +1681,13 @@ class Tools(object):
         uidmap = [str(id) for map in uidmap for id in map]
         gidmap = [str(id) for map in gidmap for id in map]
         newuidmap = self.which("newuidmap")
+        raise_task_error_if(
+            not newuidmap, self._task,
+            "No usable 'newuidmap' found in PATH")
         newgidmap = self.which("newgidmap")
+        raise_task_error_if(
+            not newgidmap, self._task,
+            "No usable 'newgidmap' found in PATH")
 
         sem = multiprocessing.Semaphore(0)
         parent = os.getpid()
@@ -1691,8 +1697,10 @@ class Tools(object):
             pid = os.fork()
             if pid == 0:
                 os.execve(newuidmap, ["newuidmap", str(parent)] + uidmap, {})
+                os._exit(1)
             os.waitpid(pid, 0)
             os.execve(newgidmap, ["newgidmap", str(parent)] + gidmap, {})
+            os._exit(1)
         assert libc.unshare(CLONE_NEWNS | CLONE_NEWUSER) == 0
         sem.release()
         os.waitpid(child, 0)
