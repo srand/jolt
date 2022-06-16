@@ -1,5 +1,6 @@
 import bz2
 import copy
+import getpass
 import gzip
 import lzma
 import subprocess
@@ -419,7 +420,7 @@ def _default_idmap(type, inner):
         starting at 0. Requested ids are always mapped. """
     map = []
     outer = os.geteuid()
-    start, count = _subid("uid", os.getlogin())
+    start, count = _subid("uid", getpass.getuser())
     if start is None or count is None:
         return map
     if count <= 0:
