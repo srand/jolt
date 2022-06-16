@@ -421,10 +421,8 @@ def _default_idmap(type, inner):
     map = []
     outer = os.geteuid()
     start, count = _subid("uid", getpass.getuser())
-    if start is None or count is None:
-        return map
-    if count <= 0:
-        return map
+    if start is None or count is None or count <= 0:
+        return [(inner, outer, 1)]
     map.append((inner, outer, 1))
     if count <= 1:
         return map
@@ -1745,6 +1743,13 @@ class Tools(object):
 
         gidmap = gidmap or _default_idmap("gid", gid)
         uidmap = uidmap or _default_idmap("uid", uid)
+
+        raise_task_error_if(
+            not gidmap, self._task,
+            "Invalid gid map: {}", gidmap)
+        raise_task_error_if(
+            not uidmap, self._task,
+            "Invalid uid map: {}", uidmap)
 
         msgq = multiprocessing.JoinableQueue()
         pid = os.fork()

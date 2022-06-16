@@ -799,3 +799,15 @@ class ToolsApi(JoltTest):
                 raise TestException()
         except TestException:
             pass
+
+        try:
+            with self.tools.unshare(gidmap=[]) as ns, ns:
+                pass
+        except JoltError as e:
+            assert "Invalid gid map" in str(e), e
+
+        try:
+            with self.tools.unshare(uidmap=[]) as ns, ns:
+                pass
+        except JoltError as e:
+            assert "Invalid uid map" in str(e), e
