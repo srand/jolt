@@ -57,6 +57,7 @@ class Executable(Task):
         super().__init__(*args, **kwargs)
         self.binary = self.expand(self.binary)
         self.publishdir = self.expand(self.publishdir)
+        golang  # Dummy reference
 
     def clean(self, tools):
         self.cachedir = tools.builddir("cache", incremental=True)
