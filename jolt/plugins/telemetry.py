@@ -1,5 +1,6 @@
 from socket import gethostname
 from requests.exceptions import RequestException
+from requests.api import post
 
 from jolt import config
 from jolt import log
@@ -41,7 +42,9 @@ class TelemetryHooks(TaskHook):
             "role": "client" if client else "worker",
             "event": event,
         }
-        from requests.api import post
+        if hasattr(task, "logstash"):
+            data["log"] = task.logstash
+
         r = post(self._uri, json=data)
         r.raise_for_status()
 
