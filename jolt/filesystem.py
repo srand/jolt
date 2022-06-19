@@ -85,7 +85,8 @@ def onerror_warning(func, path, exc_info):
         msg = exc_info[1].strerror
     else:
         msg = "Reason unknown"
-    log.warning("Could not remove file or directory: {} ({})", path, msg)
+    if os.path.exists(path):
+        log.warning("Could not remove file or directory: {} ({})", path, msg)
 
 
 def rmtree(path, ignore_errors=False, onerror=None):
