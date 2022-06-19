@@ -750,7 +750,8 @@ class attributes:
 
         Examples: "linux", "windows"
         """
-        cls.system = property(lambda t: platform.system().lower())
+        cls._system = Export(lambda t: platform.system().lower())
+        cls.system = property(lambda t: t._system.value)
         return cls
 
 
