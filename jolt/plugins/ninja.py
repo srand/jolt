@@ -1638,11 +1638,13 @@ if __name__ == "__main__":
                 if not rule.aggregate:
                     output = rule.output(self, source)
                     if output:
+                        writer.objects.extend(output)
                         sources.extend(zip(output, [rule] * len(output)))
             except KeyError:
                 rule_source_list[rule] = [(source, origin)]
                 output = rule.output(self, source)
                 if output:
+                    writer.objects.extend(output)
                     sources.extend(zip(output, [rule] * len(output)))
 
         # No more inputs/outputs to process, now emit all build rules
