@@ -1515,7 +1515,6 @@ class CXXProject(Task):
         self.sources = sources
 
     def _write_ninja_file(self, basedir, deps, tools, filename="build.ninja"):
-        self._write_ninja_cache(deps, tools)
         with open(fs.path.join(basedir, filename), "w") as fobj:
             writer = ninja.Writer(fobj)
             writer.depimports = [tools.expand_relpath(dep, self.outdir)
@@ -1526,6 +1525,9 @@ class CXXProject(Task):
             self._populate_inputs(writer, deps, tools)
             writer.close()
             return writer
+
+    def _prepare_ninja_cache(self, deps, tools):
+        """ Hooked from ninja-cache plugin """
 
     def _write_ninja_cache(self, deps, tools):
         """ Hooked from ninja-cache plugin """
@@ -1716,7 +1718,9 @@ if __name__ == "__main__":
         self.outdir = tools.builddir("ninja", self.incremental)
         self._expand_headers()
         self._expand_sources(deps, tools)
+        self._prepare_ninja_cache(deps, tools)
         self._writer = self._write_ninja_file(self.outdir, deps, tools)
+        self._write_ninja_cache(deps, tools)
         verbose = " -v" if log.is_verbose() else ""
         threads = config.get("jolt", "threads", tools.getenv("JOLT_THREADS", None))
         threads = " -j" + threads if threads else ""
@@ -1745,7 +1749,9 @@ if __name__ == "__main__":
         self._expand_headers()
         self._expand_sources(deps, tools)
         self.outdir = tools.builddir("ninja", self.incremental)
+        self._prepare_ninja_cache(deps, tools)
         writer = self._write_ninja_file(self.outdir, deps, tools)
+        self._write_ninja_cache(deps, tools)
         self._write_shell_file(self.outdir, deps, tools, writer)
         pathenv = self.outdir + os.pathsep + tools.getenv("PATH")
         with tools.cwd(self.outdir), tools.environ(PATH=pathenv):

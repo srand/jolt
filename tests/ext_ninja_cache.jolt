@@ -49,7 +49,51 @@ class NinjaCachePlugin(JoltTest):
             # Wait a while to make sure the file timestamp changes
             time.sleep(2)
             self.tools.write_file("test1.h", "int test1() {{return 2;}}")
-        r = self.jolt("build lib")
+        r = self.jolt("-v build lib")
 
         self.assertCompiled(r, "test.cpp")
-        self.assertNotIn("Reusing test.o", r)
+        self.assertNotIn("Reusing", r)
+
+    def test_reuse_with_header_in_sandbox(self):
+        """
+        --- config:
+        [ninja-cache]
+
+        --- file: api/test1.h
+        int test1() {{return 1;}}
+
+        --- file: test2.h
+        #include "test1.h"
+        int test2() {{return test1();}}
+
+        --- file: test.cpp
+        #include "test2.h"
+        int test() {{return test2();}}
+
+        --- tasks:
+        import jolt
+        @jolt.influence.files("api")
+        class Api(Task):
+            def publish(self, artifact, tools):
+                artifact.collect("api/test1.h")
+                artifact.cxxinfo.incpaths.append("api")
+
+        class Lib(CXXLibrary):
+            requires = ["api"]
+            headers = ["test*.h"]
+            sources = ["test.cpp"]
+        ---
+        """
+        self.jolt("build lib")
+
+        r = self.jolt("-vv build -f lib")
+        self.assertIn("Reusing lib.dir/test.cpp.o", r)
+
+        with self.tools.cwd(self.ws):
+            # Wait a while to make sure the file timestamp changes
+            time.sleep(2)
+            self.tools.write_file("api/test1.h", "int test1() {{return 2;}}")
+        r = self.jolt("-v build lib")
+
+        self.assertCompiled(r, "test.cpp")
+        self.assertNotIn("Reusing", r)
