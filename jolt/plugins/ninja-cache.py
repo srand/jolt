@@ -19,12 +19,12 @@ class CacheHooks(TaskHook):
         if not isinstance(task.task, ninja.CXXLibrary) or task.task.shared:
             return
         task.task.influence.append(StringInfluence("NinjaCache"))
+        task.task._prepare_ninja_cache = functools.partial(self.task_pre_ninja_file, task)
         task.task._write_ninja_cache = functools.partial(self.task_post_ninja_file, task)
 
-    def task_post_ninja_file(self, task, deps, tools):
+    def task_pre_ninja_file(self, task, deps, tools):
         if not isinstance(task.task, ninja.CXXLibrary) or task.task.shared:
             return
-
         cli = fs.path.join(fs.path.dirname(__file__), "ninjacli.py")
         disabled = config.getboolean("ninja-cache", "disable", False)
 
@@ -37,6 +37,8 @@ class CacheHooks(TaskHook):
         if log.is_verbose():
             tools.setenv("NINJACACHE_VERBOSE", "1")
 
+    def task_post_ninja_file(self, task, deps, tools):
+        disabled = config.getboolean("ninja-cache", "disable", False)
         if not disabled:
             objcache = ninjacli.Cache(tools.builddir("ninja", task.task.incremental))
             objcache.load_manifests(tools.getenv("JOLT_CACHEDIR"), tools.getenv("JOLT_CANONTASK"))
