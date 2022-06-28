@@ -331,7 +331,7 @@ class DockerLogin(Resource):
     def _password(self, tools):
         return str(self.passwd) or tools.getenv("DOCKER_PASSWD")
 
-    def acquire(self, artifact, deps, tools):
+    def acquire(self, artifact, deps, tools, owner):
         raise_task_error_if(not self._user(tools), self, "Username has not been configured")
         raise_task_error_if(not self._password(tools), self, "Password has not been configured")
 
@@ -339,7 +339,7 @@ class DockerLogin(Resource):
             tools.write_file("docker-credential", self._password(tools))
             tools.run("cat docker-credential | docker login -u {user} --password-stdin {server}", user=self._user(tools))
 
-    def release(self, artifact, deps, tools):
+    def release(self, artifact, deps, tools, owner):
         tools.run("docker logout {server}")
 
 
