@@ -87,7 +87,8 @@ class TelemetryHooks(TaskHook):
                 self.post(task, "finished", client=True)
 
 
-@TaskHookFactory.register
+# After logstash
+@TaskHookFactory.register_with_prio(20)
 class TelemetryFactory(TaskHookFactory):
     def create(self, env):
         if "telemetry" in config.plugins():
