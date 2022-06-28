@@ -33,8 +33,7 @@ class Golang(Download):
         artifact.paths.goroot = "go"
 
     def unpack(self, artifact, tools):
-        super().unpack(artifact, tools)
-        artifact.environ.GOROOT = artifact.paths.goroot
+        artifact.environ.GOROOT = str(artifact.paths.goroot)
 
 
 TaskRegistry.get().add_task_class(Golang)
