@@ -15,7 +15,8 @@ class DashboardHooks(telemetry.TelemetryHooks):
         super().__init__(plugin="dashboard", uri=uri + "/api/v1/tasks", local=False)
 
 
-@TaskHookFactory.register
+# After logstash
+@TaskHookFactory.register_with_prio(20)
 class DashboardFactory(TaskHookFactory):
     def create(self, env):
         return DashboardHooks()
