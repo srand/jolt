@@ -26,6 +26,7 @@ from jolt.influence import TaskClassSourceInfluence
 from jolt.influence import attribute as attribute_influence
 from jolt.influence import environ as environ_influence
 from jolt.influence import source as source_influence
+from jolt.influence import files as file_influence
 from jolt.manifest import _JoltTask
 from jolt.tools import Tools
 from jolt import colors
@@ -720,6 +721,51 @@ class attributes:
             setattr(cls, name, export)
             return cls
         return _decorate
+
+    def load(filepath):
+        """
+        Decorator which loads task class attributes from a file.
+
+        The loaded file is Python source file declaring a dictionary
+        with keys and values to be assigned to the task instance.
+
+        The file is automatically registered as task hash influence.
+
+        Example:
+
+        .. code-block:: python
+
+          @attributes.load("attributes-{os}.py")
+          class Print(Task):
+              os = Parameter()
+
+              def run(self, deps, tools):
+                  print("OS Author: ", self.os_author)
+
+        .. code-block:: python
+
+          # attributes-linux.py
+          {
+              "os_author": "Torvalds",
+          }
+
+        .. code-block:: bash
+
+          $ jolt build print:os=linux
+
+        """
+        def decorate(cls):
+            cls = file_influence(filepath)(cls)
+            old_init = cls.__init__
+
+            def new_init(self, *args, **kwargs):
+                old_init(self, *args, **kwargs)
+                for key, val in eval(self.tools.read_file(filepath)).items():
+                    setattr(self, key, val)
+
+            cls.__init__ = new_init
+            return cls
+        return decorate
 
     @staticmethod
     def method(alias, target, influence=True):

@@ -847,3 +847,27 @@ class TaskApi(JoltTest):
         ---
         '''
         self.build("c")
+
+    def test_load_attributes(self):
+        """
+        --- file: a.py
+        {{"attrib": "a"}}
+        --- file: b.py
+        {{"attrib": "b"}}
+        --- tasks:
+        @attributes.load("{{param}}.py")
+        class A(Task):
+            param = Parameter()
+            def run(self, deps, tools):
+                assert self.attrib == self.param
+        ---
+        """
+        r = self.build("a:param=a")
+        self.assertBuild(r, "a:param=a")
+        r = self.build("a:param=b")
+        self.assertBuild(r, "a:param=b")
+        with self.tools.cwd(self.ws):
+            self.tools.write_file("a.py", '{{"attrib": "c"}}')
+        with self.assertRaises(Exception):
+            self.build("a:param=a")
+
