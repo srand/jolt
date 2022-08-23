@@ -208,7 +208,11 @@ class JoltLoader(object):
 
     def load_plugin(self, filepath):
         plugin, ext = os.path.splitext(fs.path.basename(filepath))
-        SourceFileLoader("jolt.plugins." + plugin, filepath).load_module()
+        loader = SourceFileLoader("jolt.plugins." + plugin, filepath)
+        module = ModuleType(loader.name)
+        module.__file__ = filepath
+        loader.exec_module(module)
+        sys.modules[loader.name] = module
 
     def load_plugins(self):
         searchpath = config.get("jolt", "pluginpath")
