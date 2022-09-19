@@ -11,7 +11,7 @@ Our first example is a classic. Copy/paste the code below into a file called
 
 .. code-block:: python
 
-    from jolt import *
+    from jolt import Task
 
     class HelloWorld(Task):
         def run(self, deps, tools):
@@ -66,22 +66,10 @@ Tasks that don't produce output are not very useful. Let's rework our task
 to instead produce a file with the ``Hello world!`` message. We also shorten
 its name to ``hello``.
 
-.. code-block:: python
 
-    from jolt import *
-
-    class HelloWorld(Task):
-        """ Creates a text file with cheerful message """
-
-        name = "hello"
-
-        def run(self, deps, tools):
-            with tools.cwd(tools.builddir()):
-                tools.write_file("message.txt", "Hello world!")
-
-        def publish(self, artifact, tools):
-            with tools.cwd(tools.builddir()):
-                artifact.collect("*.txt")
+.. literalinclude:: ../examples/publishing_files/publishing_files.jolt
+  :language: python
+  :caption: examples/publishing_files/publishing_files.jolt
 
 The implementation of the task is now split into two methods,
 ``run`` and ``publish``.
@@ -135,20 +123,10 @@ an alternative recipient. We rename the class to reflect this change and
 we also add a parameter class attribute. The ``run`` method is changed to
 use the new parameter's value when writing the ``message.txt`` file.
 
-.. code-block:: python
 
-    class Hello(Task):
-        """ Creates a text file with a cheerful message """
-
-        recipient = Parameter(default="world", help="Name of greeting recipient.")
-
-        def run(self, deps, tools):
-            with tools.cwd(tools.builddir()):
-                tools.write_file("message.txt", "Hello {recipient}!")
-
-        def publish(self, artifact, tools):
-            with tools.cwd(tools.builddir()):
-                artifact.collect("*.txt")
+.. literalinclude:: ../examples/parameters/parameters.jolt
+  :language: python
+  :caption: examples/parameters/parameters.jolt
 
 
 By default, the produced message will still read ``Hello world!`` because the
@@ -167,19 +145,11 @@ To better illustrate the flexibility of the new parameterized task, let's add
 another task class, ``Print``, which prints the contents of the ``message.txt``
 file to the console. ``Print`` will declare a dependency on ``Hello``.
 
-.. code-block:: python
 
-    class Print(Task):
-        """ Prints a cheerful message """
+.. literalinclude:: ../examples/dependencies/parameters.jolt
+  :language: python
+  :caption: examples/dependencies/parameters.jolt
 
-        recipient = Parameter(default="world", help="Name of greeting recipient.")
-        requires = ["hello:recipient={recipient}"]
-        cacheable = False
-
-        def run(self, deps, tools):
-            hello = deps["hello:recipient={recipient}"]
-            with tools.cwd(hello.path):
-                print(tools.read_file("message.txt"))
 
 The output from this task is not ``cacheable``, forcing the task to be
 executed every time. It's dependency ``hello`` however, will only be
