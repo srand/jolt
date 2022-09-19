@@ -1,0 +1,510 @@
+#!/usr/bin/env python
+
+import sys
+import time
+sys.path.append(".")
+
+from jolt import utils
+from os import path
+from testsupport import JoltTest
+
+
+class PodmanExt(JoltTest):
+    name = "ext/podman"
+
+    def test_simple(self):
+        """
+        --- file: Dockerfile
+        FROM busybox:latest
+
+        --- tasks:
+        from jolt.plugins.podman import *
+
+        class Busybox(ContainerImage):
+            pass
+
+        ---
+        """
+
+        b = self.build("busybox")
+        a = self.artifacts(b)
+        self.assertExists(path.join(a[0], "busybox.tar"))
+
+    def test_podmanfile(self):
+        """
+        --- file: Testfile
+        FROM busybox:latest
+
+        --- tasks:
+        from jolt.plugins.podman import *
+
+        class Busybox(ContainerImage):
+            dockerfile = "Testfile"
+
+        ---
+        """
+
+        b = self.build("busybox")
+        a = self.artifacts(b)
+        self.assertExists(path.join(a[0], "busybox.tar"))
+
+    def test_podmanfile_as_source(self):
+        """
+        --- file: Testfile
+        FROM busybox:latest
+
+        --- tasks:
+        from jolt.plugins.podman import *
+
+        class Busybox(ContainerImage):
+            dockerfile = \"\"\"
+            FROM busybox:latest
+            CMD ["busybox"]
+            \"\"\"
+
+        ---
+        """
+
+        b = self.build("busybox")
+        a = self.artifacts(b)
+        self.assertExists(path.join(a[0], "busybox.tar"))
+
+    def test_output_directory(self):
+        """
+        --- file: Testfile
+        FROM busybox:latest
+        RUN touch test-file1 test-file2
+        RUN rm test-file1
+
+        --- tasks:
+        from jolt.plugins.podman import *
+
+        class Busybox(ContainerImage):
+            dockerfile = "Testfile"
+            output = "directory"
+        ---
+        """
+
+        b = self.build("busybox")
+        a = self.artifacts(b)
+        self.assertNotExists(path.join(a[0], "test-file1"))
+        self.assertExists(path.join(a[0], "test-file2"))
+
+    def test_imagefile(self):
+        """
+        --- file: Dockerfile
+        FROM busybox:latest
+
+        --- tasks:
+        from jolt.plugins.podman import *
+
+        class Busybox(ContainerImage):
+            imagefile = "image.tar"
+
+        ---
+        """
+
+        b = self.build("busybox")
+        a = self.artifacts(b)
+        self.assertExists(path.join(a[0], "image.tar"))
+
+    def test_output(self):
+        """
+        --- file: Dockerfile
+        FROM busybox:latest
+
+        --- tasks:
+        from jolt.plugins.podman import *
+
+        class BusyboxOciTar(ContainerImage):
+            name = "busybox/oci-archive"
+            output = "oci-archive"
+
+        class BusyboxOciDir(ContainerImage):
+            name = "busybox/oci-directory"
+            output = "oci-directory"
+
+        class BusyboxDockerTar(ContainerImage):
+            name = "busybox/docker-archive"
+            output = "docker-archive"
+
+        class BusyboxDir(ContainerImage):
+            name = "busybox/directory"
+            output = "directory"
+
+        class BusyboxTar(ContainerImage):
+            name = "busybox/archive"
+            output = "archive"
+
+        ---
+        """
+
+        b1 = self.build("busybox/oci-archive")
+        b2 = self.build("busybox/oci-directory")
+        b3 = self.build("busybox/docker-archive")
+        b4 = self.build("busybox/directory")
+        b5 = self.build("busybox/archive")
+        a1 = self.artifacts(b1)
+        a2 = self.artifacts(b2)
+        a3 = self.artifacts(b3)
+        a4 = self.artifacts(b4)
+        a5 = self.artifacts(b5)
+        f1 = path.join(a1[0], "busybox_oci_archive.tar")
+        f2 = path.join(a2[0], "oci-layout")
+        f3 = path.join(a3[0], "busybox_docker_archive.tar")
+        f4 = path.join(a4[0], "bin", "busybox")
+        f5 = path.join(a5[0], "busybox_archive.tar")
+        self.assertExists(f1)
+        self.assertExists(f2)
+        self.assertExists(f3)
+        self.assertExists(f4)
+        self.assertExists(f5)
+        self.assertIn("", self.tools.run("file {}", f1))
+        self.assertIn("", self.tools.run("file {}", f2))
+        self.assertIn("", self.tools.run("file {}", f3))
+        self.assertIn("", self.tools.run("file {}", f4))
+        self.assertIn("", self.tools.run("file {}", f5))
+
+    def test_tag(self):
+        """
+        --- file: Dockerfile
+        FROM busybox:latest
+
+        --- tasks:
+        from jolt.plugins.podman import *
+
+        class Busybox(ContainerImage):
+            tags = ["busybox:jolt", "busybox:latest-jolt"]
+
+        ---
+        """
+
+        b = self.build("busybox")
+        a = self.artifacts(b)
+        f = path.join(a[0], "busybox.tar")
+        self.assertExists(f)
+        try:
+            loaded = self.tools.run("podman image load -i {}", f)
+            self.assertIn("busybox:jolt", loaded)
+        finally:
+            utils.call_and_catch(self.tools.run, "podman image rm busybox:jolt")
+
+    def test_cleanup(self):
+        """
+        --- file: Dockerfile
+        FROM busybox:latest
+
+        --- tasks:
+        from jolt.plugins.podman import *
+
+        class Busybox(ContainerImage):
+            tags = ["busybox:jolt"]
+            cleanup = BooleanParameter()
+        ---
+        """
+
+        try:
+            b = self.build("busybox:cleanup=true")
+            self.assertBuild(b, "busybox:cleanup=true")
+            self.assertNotIn("busybox:jolt", self.tools.run("podman images"))
+
+            b = self.build("busybox:cleanup=false")
+            self.assertBuild(b, "busybox:cleanup=false")
+            self.assertNotIn("busybox:jolt", self.tools.run("podman images"))
+
+        finally:
+            self.tools.run("podman image rm -f busybox:jolt")
+
+    def test_autoload_used(self):
+        """
+        --- file: Dockerfile
+        FROM busybox:latest
+
+        --- tasks:
+        from jolt.plugins.podman import *
+
+        class Busybox(ContainerImage):
+            pass
+
+        class Consumer(Task):
+            requires = ["busybox"]
+
+            def run(self, deps, tools):
+                images = tools.run("podman image ls --format '{{{{{{{{.Repository}}}}}}}}:{{{{{{{{.Tag}}}}}}}}'")
+                assert deps["busybox"].strings.tag.get_value() in images, "image not properly loaded"
+        ---
+        """
+        self.build("consumer")
+
+    def test_autoload_not_used_when_imagefile_is_none(self):
+        """
+        --- file: Dockerfile
+        FROM busybox:latest
+
+        --- tasks:
+        from jolt.plugins.podman import *
+
+        class Busybox(ContainerImage):
+            imagefile = None
+
+            def run(self, d, t):
+                super().run(d, t)
+                t.run("podman rmi busybox:latest")
+
+        class Consumer(Task):
+            requires = ["busybox"]
+
+            def run(self, deps, tools):
+                images = tools.run("podman image ls --format '{{{{{{{{.Repository}}}}}}}}:{{{{{{{{.Tag}}}}}}}}'")
+                assert deps["busybox"].strings.tag.get_value() not in images, "image not properly loaded"
+        ---
+        """
+        self.build("consumer")
+        self.assertNotIn("busybox:latest", self.tools.run("podman image ls --format '{{{{.Repository}}}}:{{{{.Tag}}}}'"))
+
+    def test_autoload_not_used_when_autoload_is_false(self):
+        """
+        --- file: Dockerfile
+        FROM busybox:latest
+
+        --- tasks:
+        from jolt.plugins.podman import *
+
+        class Busybox(ContainerImage):
+            autoload = False
+
+            def run(self, d, t):
+                super().run(d, t)
+                t.run("podman rmi busybox:latest")
+
+        class Consumer(Task):
+            requires = ["busybox"]
+
+            def run(self, deps, tools):
+                images = tools.run("podman image ls --format '{{{{{{{{.Repository}}}}}}}}:{{{{{{{{.Tag}}}}}}}}'")
+                assert deps["busybox"].strings.tag.get_value() not in images, "image not properly loaded"
+        ---
+        """
+        self.build("consumer")
+        self.assertNotIn("busybox:latest", self.tools.run("podman image ls --format '{{{{.Repository}}}}:{{{{.Tag}}}}'"))
+
+    def test_artifact_pull_rmi(self):
+        """
+        --- tasks:
+        from jolt.plugins.podman import *
+
+        class Busybox(Task):
+            def publish(self, a, t):
+                a.podman.pull.append("busybox:latest")
+                a.podman.rmi.append("busybox:latest")
+
+        class Consumer(Task):
+            requires = ["busybox"]
+
+            def run(self, deps, tools):
+                images = tools.run("podman image ls --format '{{{{{{{{.Repository}}}}}}}}:{{{{{{{{.Tag}}}}}}}}'")
+                assert "busybox:latest" in images, "image not properly loaded"
+        ---
+        """
+        self.build("consumer")
+        self.assertNotIn("busybox:latest", self.tools.run("podman image ls --format '{{{{.Repository}}}}:{{{{.Tag}}}}'"))
+
+    def test_container_user(self):
+        """
+        --- tasks:
+        from jolt.plugins.podman import *
+
+        class A(Container):
+            image = "busybox:latest"
+            user = Parameter("root")
+
+        class ATest(Task):
+            requires = "a:user={{user}}"
+            user = Parameter("root")
+
+            def run(self, deps, tools):
+                self.id = deps[self.requires[0]].info["Id"]
+                assert tools.run("podman exec {{id}} whoami") == str(self.user)
+        ---
+        """
+        self.build("atest:user=root atest:user=nobody")
+
+    def test_container_environment(self):
+        """
+        --- tasks:
+        from jolt.plugins.podman import *
+
+        class A(Container):
+            image = "busybox:latest"
+            arg = Parameter()
+            environment = ["PARAM={{arg}}"]
+
+        class ATest(Task):
+            requires = "a:arg={{arg}}"
+            arg = Parameter()
+
+            def run(self, deps, tools):
+                self.id = deps[self.requires[0]].info["Id"]
+                assert tools.run("podman exec {{id}} sh -c 'echo $PARAM'") == str(self.arg)
+        ---
+        """
+        self.build("atest:arg=root atest:arg=nobody")
+
+    def test_container_privileged(self):
+        """
+        --- tasks:
+        from jolt.plugins.podman import *
+
+        class A(Container):
+            image = "busybox:latest"
+            privileged = BooleanParameter()
+            user = "root"
+
+        class ATest(Task):
+            requires = "a:privileged={{privileged}}"
+            privileged = BooleanParameter()
+
+            def run(self, deps, tools):
+                self.id = deps[self.requires[0]].info["Id"]
+                try:
+                    tools.run("podman exec {{id}} ip link add jolt0 type dummy")
+                except Exception:
+                    assert not self.privileged
+                else:
+                    assert self.privileged
+        ---
+        """
+        self.build("atest:privileged=true atest:privileged=false")
+
+    def test_container_labels(self):
+        """
+        --- tasks:
+        from jolt.plugins.podman import *
+
+        class A(Container):
+            image = "busybox:latest"
+            labels = ["jolt.identity={{identity}}"]
+
+        class ATest(Task):
+            requires = "a"
+
+            def run(self, deps, tools):
+                a = deps[self.requires[0]]
+                assert a.info["Config"]["Labels"]["jolt.identity"] == a.identity
+
+        ---
+        """
+        self.build("atest")
+
+    def test_container_entrypoint(self):
+        """
+        --- tasks:
+        from jolt.plugins.podman import *
+
+        class A(Container):
+            image = "busybox:latest"
+            entrypoint = "cat"
+
+        class ATest(Task):
+            requires = "a"
+
+            def run(self, deps, tools):
+                self.id = deps[self.requires[0]].info["Id"]
+                entry = tools.run("podman exec {{id}} cat /proc/1/cmdline")
+                assert "cat" in entry, f"Got '{{entry}}', expected 'cat'"
+
+        ---
+        """
+        self.build("atest")
+
+    def test_container_caps(self):
+        """
+        --- tasks:
+        from jolt.plugins.podman import *
+
+        class A(Container):
+            image = "busybox:latest"
+            cap_adds = ["ALL"]
+            cap_drops = ["NET_ADMIN"]
+            user = "root"
+
+        class ATest(Task):
+            requires = "a"
+
+            def run(self, deps, tools):
+                assert "CAP_NET_BROADCAST" in deps[self.requires[0]].info["HostConfig"]["CapAdd"]
+                assert "CAP_NET_ADMIN" not in deps[self.requires[0]].info["HostConfig"]["CapAdd"]
+        ---
+        """
+        self.build("atest")
+
+    def test_container_volumes(self):
+        """
+        --- file: a/a.txt
+        --- tasks:
+        from jolt.plugins.podman import *
+
+
+        class B(Task):
+            def publish(self, artifact, tools):
+                with tools.cwd(tools.builddir()):
+                    tools.write_file("b.txt", "")
+                    artifact.collect("b.txt")
+
+
+        class A(Container):
+            image = "busybox:latest"
+            requires = ["b"]
+            volumes = ["{{joltdir}}/a:/a"]
+            user = "root"
+
+
+        class ATest(Task):
+            requires = "a"
+
+            def run(self, deps, tools):
+                self.id = deps[self.requires[0]].info["Id"]
+                tools.run("podman exec {{id}} whoami")
+                tools.run("podman exec {{id}} cat {{joltdir}}/a/a.txt")
+                tools.run("podman exec {{id}} cat {{}}/b.txt", deps["b"].path)
+                tools.run("podman exec {{id}} cat /a/a.txt")
+
+        ---
+        """
+        self.build("atest")
+
+    def test_container_publish(self):
+        """
+        --- file: a/a.txt
+        --- tasks:
+        from jolt.plugins.podman import *
+
+
+        class Busybox(ContainerImage):
+            dockerfile = '''
+            FROM busybox:latest
+            EXPOSE 80
+            '''
+
+        class A(Container):
+            image = "busybox"
+            ports = True
+
+        class B(Container):
+            image = "busybox"
+            ports = ["80"]
+
+        class C(Container):
+            image = "busybox"
+            ports = ["8888:80"]
+
+        class ATest(Task):
+            requires = ["a", "b", "c"]
+
+            def run(self, deps, tools):
+                for req in self.requires:
+                    print(deps[req].info["NetworkSettings"]["Ports"]["80/tcp"])
+
+        ---
+        """
+        self.build("atest")
