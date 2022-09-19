@@ -1,0 +1,26 @@
+from jolt import *
+
+class Hello(Task):
+    """ Creates a text file with a cheerful message """
+
+    recipient = Parameter(default="world", help="Name of greeting recipient.")
+
+    def run(self, deps, tools):
+        with tools.cwd(tools.builddir()):
+            tools.write_file("message.txt", "Hello {recipient}!")
+
+    def publish(self, artifact, tools):
+        with tools.cwd(tools.builddir()):
+            artifact.collect("*.txt")
+
+class Print(Task):
+    """ Prints a cheerful message """
+
+    recipient = Parameter(default="world", help="Name of greeting recipient.")
+    requires = ["hello:recipient={recipient}"]
+    cacheable = False
+
+    def run(self, deps, tools):
+        hello = deps["hello:recipient={recipient}"]
+        with tools.cwd(hello.path):
+            print(tools.read_file("message.txt"))

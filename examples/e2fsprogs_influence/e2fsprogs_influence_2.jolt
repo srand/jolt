@@ -1,0 +1,30 @@
+from jolt import *
+from jolt import influence
+from jolt.plugins import git
+
+# Requires manual git clone first
+# git clone git://git.kernel.org/pub/scm/fs/ext2/e2fsprogs.git
+#
+# The webstatus requires an actual web service which is not included
+# in this example.
+
+
+# path/to/e2fsprogs
+@influence.files("e2fsprogs/*.c")
+@influence.environ("CFLAGS")
+@influence.weekly
+@influence.attribute("webstatus")
+class E2fsprogs_2(Task):
+    @property
+    def webstatus(self):
+        r = requests.get("http://statusindicator/")
+        return r.text
+
+    def run(self, deps, tools):
+        ac = tools.autotools()
+
+        # path/to/e2fsprogs
+        ac.configure("e2fsprogs")
+        ac.build()
+        ac.install()
+        self.report()

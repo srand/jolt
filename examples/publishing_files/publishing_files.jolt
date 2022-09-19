@@ -1,0 +1,14 @@
+from jolt import *
+
+class HelloWorld(Task):
+    """ Creates a text file with cheerful message """
+
+    name = "hello"
+
+    def run(self, deps, tools):
+        with tools.cwd(tools.builddir()):
+            tools.write_file("message.txt", "Hello world!")
+
+    def publish(self, artifact, tools):
+        with tools.cwd(tools.builddir()):
+            artifact.collect("*.txt")

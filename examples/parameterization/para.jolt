@@ -1,0 +1,18 @@
+from jolt import *
+from jolt.plugins.ninja import *
+
+@attributes.cxxflags("cxxflags_debug_{debug}")
+@attributes.macros("macros_debug_{debug}")
+class Message(CXXLibrary):
+    debug = BooleanParameter()
+    cxxflags_debug_true = ["-g", "-Og"]
+    macros_debug_true = ["DEBUG"]
+    cxxflags_debug_false = ["-O3"]
+    macros_debug_false = ["RELEASE"]
+    headers = ["lib/message.h"]
+    sources = ["lib/message.cpp"]
+
+class HelloWorld(CXXExecutable):
+    debug = BooleanParameter()
+    requires = ["message:debug={debug}"]
+    sources = ["program/main.cpp"]
