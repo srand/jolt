@@ -157,12 +157,19 @@ def symlink(src, dest, *args, **kwargs):
         os.symlink(src, dest, *args, **kwargs)
 
 
+def linkcopy(src, dst):
+    try:
+        os.link(src, dst)
+    except OSError:
+        shutil.copy(src, dst)
+
+
 def _copy_symlink(src, dst):
     if os.path.lexists(dst):
         unlink(dst, ignore_errors=True)
     if os.path.islink(src):
         return symlink(os.readlink(src), dst)
-    return shutil.copy(src, dst)
+    return linkcopy(src, dst)
 
 
 def _copy2_symlink(src, dst):
@@ -172,7 +179,7 @@ def _copy2_symlink(src, dst):
         symlink(os.readlink(src), dst)
         shutil.copystat(src, dst, follow_symlinks=False)
         return
-    return shutil.copy2(src, dst)
+    return linkcopy(src, dst)
 
 
 def copy(src, dst, symlinks=False, ignore=None, metadata=True):
@@ -184,7 +191,7 @@ def copy(src, dst, symlinks=False, ignore=None, metadata=True):
     if symlinks:
         copyfn = _copy2_symlink if metadata else _copy_symlink
     else:
-        copyfn = shutil.copy2 if metadata else shutil.copy
+        copyfn = linkcopy
 
     if symlinks and os.path.islink(src):
         return copyfn(src, dst)
