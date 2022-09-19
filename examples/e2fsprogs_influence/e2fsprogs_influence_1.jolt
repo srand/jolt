@@ -1,0 +1,16 @@
+from jolt import *
+from jolt.plugins import git
+
+# Requires manual git clone first
+# git clone git://git.kernel.org/pub/scm/fs/ext2/e2fsprogs.git
+
+# path/to/e2fsprogs
+@git.influence(path="e2fsprogs")
+class E2fsprogs_1(Task):
+    def run(self, deps, tools):
+        ac = tools.autotools()
+
+        # path/to/e2fsprogs
+        ac.configure("e2fsprogs")
+        ac.build()
+        ac.install()

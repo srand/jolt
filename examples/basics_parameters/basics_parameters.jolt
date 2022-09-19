@@ -1,0 +1,17 @@
+from jolt import *
+from jolt.plugins.ninja import *
+
+
+class Message(CXXLibrary):
+    recipient = Parameter(default="world", help="Name of greeting recipient.")
+    headers = ["lib/message.h"]
+    sources = ["lib/message.cpp"]
+
+    # \\ is needed for strings
+    macros = ['RECIPIENT=\\"{recipient}\\"']
+
+
+class HelloWorld(CXXExecutable):
+    recipient = Parameter(default="world", help="Name of greeting recipient.")
+    requires = ["message:recipient={recipient}"]
+    sources = ["program/main.cpp"]

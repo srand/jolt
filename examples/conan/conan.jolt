@@ -1,0 +1,13 @@
+from jolt import *
+from jolt.plugins.ninja import *
+from jolt.plugins.conan import *
+
+# Requires conan
+# pip install conan
+
+class Boost(Conan):
+    packages = ["boost/1.80.0"]
+
+class HelloWorld(CXXExecutable):
+    requires = ["boost"]
+    sources = ["src/main.cpp"]

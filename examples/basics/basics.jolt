@@ -1,0 +1,12 @@
+from jolt import *
+from jolt.plugins.ninja import *
+
+
+class Message(CXXLibrary):
+    headers = ["lib/message.h"]
+    sources = ["lib/message.cpp"]    
+
+
+class HelloWorld(CXXExecutable):
+    requires = ["message"]
+    sources = ["program/main.cpp"]
