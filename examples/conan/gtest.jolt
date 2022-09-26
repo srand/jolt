@@ -1,0 +1,30 @@
+from jolt import *
+from jolt.plugins.ninja import *
+from jolt.plugins.conan import *
+
+class GTest(Conan):
+    name = "gtest"
+    packages = ["gtest/cci.20210126"]
+    options = ["gtest:build_gmock=True",
+    "gtest:fPIC=True",
+    "gtest:hide_symbols=False",
+    "gtest:no_main=False",
+    "gtest:shared=False"]
+    settings = ["compiler.libcxx=libstdc++11"]
+
+class UnitTest(CXXExecutable):
+    name = "unittest"
+    requires = ["gtest"]
+    sources = ["test/unittest.cpp",
+                "test/test_mytest1.cpp",
+                "test/test_mytest2.cpp"]
+    cxxflags = ["-std=c++20", "-O0", "-Wall", "-g"]
+
+# To run the unittest after build.
+class UnitTestRun(Task):
+    name = "unittest/run"
+    requires = ["unittest"]
+    def run(self, deps, tools):
+        path_to_file = deps["unittest"].final_path + "/bin/" + deps["unittest"].get_name()
+        tools.run(path_to_file)
+
