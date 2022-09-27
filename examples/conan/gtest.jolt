@@ -25,6 +25,5 @@ class UnitTestRun(Task):
     name = "unittest/run"
     requires = ["unittest"]
     def run(self, deps, tools):
-        path_to_file = deps["unittest"].final_path + "/bin/" + deps["unittest"].get_name()
-        tools.run(path_to_file)
+        tools.run("unittest")
 
