@@ -3,9 +3,15 @@ import functools
 import getpass
 import keyring
 import os
-import pika
-from pika.exceptions import AMQPConnectionError
-from pika.adapters.utils.connection_workflow import AMQPConnectorStackTimeout
+try:
+    import pika
+    from pika.exceptions import AMQPConnectionError
+    from pika.adapters.utils.connection_workflow import AMQPConnectorStackTimeout
+except ImportError:
+    from jolt import log
+    log.error("AMQP plugin enabled but not installed. Install it with: pip install jolt[amqp]")
+    os._exit(1)
+
 import threading
 import time
 
