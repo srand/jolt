@@ -155,7 +155,13 @@ tasks. The report includes:
  - logs
 
 The plugin is enabled by adding a ``[allure]`` section in
-the Jolt configuration.
+the Jolt configuration. Its dependencies must also be
+installed separately:
+
+.. code-block:: bash
+
+  $ pip install jolt[allure]
+
 
 Available configuration keys:
 
@@ -189,7 +195,12 @@ To use this plugin, a networked artifact storage provider must also be
 configured to enable the workers to share artifacts between each other.
 
 The plugin is enabled by adding a ``[amqp]`` section in
-the Jolt configuration.
+the Jolt configuration. Its dependencies must also be
+installed separately:
+
+.. code-block:: bash
+
+  $ pip install jolt[amqp]
 
 These configuration keys exist:
 
