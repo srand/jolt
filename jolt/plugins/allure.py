@@ -8,16 +8,22 @@ from jolt.hooks import TaskHook, TaskHookFactory
 from jolt.loader import JoltLoader
 import time
 
-from allure_commons.logger import AllureFileLogger
-from allure_commons.lifecycle import AllureLifecycle
-from allure_commons.model2 import Attachment
-from allure_commons.model2 import Status
-from allure_commons.model2 import StatusDetails
-from allure_commons.model2 import Label
-from allure_commons.types import LabelType
-from allure_commons.utils import host_tag, thread_tag
-from allure_commons.utils import platform_label
-from allure_commons.utils import format_traceback
+try:
+    from allure_commons.logger import AllureFileLogger
+    from allure_commons.lifecycle import AllureLifecycle
+    from allure_commons.model2 import Attachment
+    from allure_commons.model2 import Status
+    from allure_commons.model2 import StatusDetails
+    from allure_commons.model2 import Label
+    from allure_commons.types import LabelType
+    from allure_commons.utils import host_tag, thread_tag
+    from allure_commons.utils import platform_label
+    from allure_commons.utils import format_traceback
+except ImportError:
+    import os
+    log.error("Allure plugin enabled but not installed. Install it with: pip install jolt[allure]")
+    os._exit(1)
+
 from contextlib import contextmanager
 import unittest as ut
 
