@@ -1,5 +1,6 @@
 import os
 import errno
+import functools
 import ntpath
 import pathlib
 import posixpath
@@ -169,29 +170,35 @@ def _copy_symlink(src, dst):
         unlink(dst, ignore_errors=True)
     if os.path.islink(src):
         return symlink(os.readlink(src), dst)
-    return linkcopy(src, dst)
+    return copyfn(src, dst)
 
 
-def _copy2_symlink(src, dst):
+def _copy2_symlink(src, dst, copyfn=None):
     if os.path.lexists(dst):
         unlink(dst, ignore_errors=True)
     if os.path.islink(src):
         symlink(os.readlink(src), dst)
         shutil.copystat(src, dst, follow_symlinks=False)
         return
-    return linkcopy(src, dst)
+    return copyfn(src, dst)
 
 
-def copy(src, dst, symlinks=False, ignore=None, metadata=True):
+def copy(src, dst, symlinks=False, hardlink=False, ignore=None, metadata=True):
     dstdir = os.path.dirname(dst)
     if not os.path.isdir(dstdir):
         unlink(dstdir, ignore_errors=True)
         makedirs(dstdir)
 
-    if symlinks:
-        copyfn = _copy2_symlink if metadata else _copy_symlink
-    else:
+    if hardlink:
         copyfn = linkcopy
+    else:
+        copyfn = shutil.copy2 if metadata else shutil.copy
+
+    if symlinks:
+        if metadata:
+            copyfn = functools.partial(_copy2_symlink, copyfn=copyfn)
+        else:
+            copyfn = functools.partial(_copy_symlink, copyfn=copyfn)
 
     if symlinks and os.path.islink(src):
         return copyfn(src, dst)
