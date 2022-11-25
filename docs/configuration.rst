@@ -25,6 +25,12 @@ Jolt
 
 The ``[jolt]`` config section contains global configuration.
 
+* ``cachedir = <path>``
+
+  Filesystem path to a directory where the Jolt artifact cache will reside.
+  By default, this path is ``~/.cache/jolt`` on Linux and
+  ``%LOCALAPPDATA%/Jolt`` on Windows.
+
 * ``cachesize = <size>``
 
   Maximum size of the local artifact cache. When this size is reached, Jolt
