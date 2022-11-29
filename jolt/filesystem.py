@@ -165,7 +165,7 @@ def linkcopy(src, dst):
         shutil.copy(src, dst)
 
 
-def _copy_symlink(src, dst):
+def _copy_symlink(src, dst, copyfn=None):
     if os.path.lexists(dst):
         unlink(dst, ignore_errors=True)
     if os.path.islink(src):
