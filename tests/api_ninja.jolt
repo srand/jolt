@@ -136,7 +136,7 @@ class NinjaApi(JoltTest):
         from jolt.plugins.conan import Conan
 
         class Flatbuffers(Conan):
-            packages = ["flatbuffers/2.0.0"]
+            packages = ["flatbuffers/2.0.8"]
 
         class Lib(CXXLibrary):
             fbflags = ["--scoped-enums"]
