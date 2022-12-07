@@ -396,6 +396,18 @@ These configuration keys exist:
   Keyring service identifier. Defaults to ``ftp``.
 
 
+GDB
+^^^
+
+The GDB plugin enables a new command, ``gdb``. When invoked, the command
+launches GDB with an executable from the specified task's artifact. It
+automatically configures the GDB sysroot based on environment variables
+set in the execution environment of the task.
+
+The plugin is enabled by adding a ``[gdb]`` section in
+the Jolt configuration. No additional dependencies have to be installed.
+
+
 Logstash (HTTP)
 ^^^^^^^^^^^^^^^
 
