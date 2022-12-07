@@ -83,6 +83,10 @@ class ConsoleFormatter(logging.Formatter):
     def enable_prefixes(self):
         self.always_prefix = True
 
+    def enable_gdb(self):
+        self.always_prefix = True
+        self.fmt_prefix = "~\"" + self.fmt_prefix + "\\n\""
+
     def format(self, record):
         try:
             msg = record.msg.format(*record.args)
@@ -285,7 +289,7 @@ def progress_log(desc, count, unit):
 def progress(desc, count, unit, estimates=True, debug=False):
     bar_format = '{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}]' \
                  if not estimates else None
-    if not debug and sys.stdout.isatty() and sys.stderr.isatty() and not is_verbose():
+    if not debug and is_interactive() and not is_verbose():
         p = tqdm.tqdm(total=count, unit=unit, unit_scale=True, bar_format=bar_format, dynamic_ncols=True)
         p.set_description("[   INFO] " + desc)
         return p
@@ -301,8 +305,26 @@ def set_worker():
     _console_formatter.enable_prefixes()
 
 
+def enable_gdb():
+    set_interactive(False)
+    _console_formatter.enable_gdb()
+
+
 def is_verbose():
     return _stdout.level <= VERBOSE
+
+
+_interactive = True
+
+
+def is_interactive():
+    global _interactive
+    return _interactive and sys.stdout.isatty() and sys.stderr.isatty()
+
+
+def set_interactive(value):
+    global _interactive
+    _interactive = value
 
 
 class _ThreadMapper(Filter):
