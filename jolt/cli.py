@@ -94,9 +94,10 @@ class PluginGroup(click.Group):
               help="Build as many tasks as possible, don't abort on first failure.")
 @click.option("-j", "--jobs", type=int, default=1, hidden=True,
               help="Number of tasks allowed to execute in parallel (1). ")
+@click.option("-h", "--help", is_flag=True, help="Show this message and exit.")
 @click.pass_context
 def cli(ctx, verbose, extra_verbose, config_file, debugger, profile,
-        force, salt, debug, network, local, keep_going, jobs):
+        force, salt, debug, network, local, keep_going, jobs, help):
     """
     A task execution tool.
 
@@ -131,6 +132,10 @@ def cli(ctx, verbose, extra_verbose, config_file, debugger, profile,
 
     if ctx.invoked_subcommand is None:
         build = ctx.command.get_command(ctx, "build")
+
+    if help:
+        print(ctx.get_help())
+        sys.exit(1)
 
     manifest = JoltManifest()
     utils.call_and_catch(manifest.parse)
