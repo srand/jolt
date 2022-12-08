@@ -1,21 +1,16 @@
 import click
-import json
 import os
 import sys
 import subprocess
 
 from jolt import cache
 from jolt import cli
-from jolt import config
 from jolt import filesystem as fs
 from jolt import graph
 from jolt import log
 from jolt import scheduler
-from jolt import utils
-from jolt import loader
 from jolt.error import raise_task_error_if
-from jolt.hooks import TaskHook, TaskHookFactory, TaskHookRegistry
-from jolt.influence import StringInfluence
+from jolt.hooks import TaskHookRegistry
 from jolt.options import JoltOptions
 from jolt.plugins import ninja
 from jolt.tasks import TaskRegistry, WorkspaceResource
@@ -129,7 +124,7 @@ def gdb(ctx, task, default, machine_interface, gdb_args):
             artifact.strings.executable.get_value() is None,
             goal, "No executable found in task artifact")
 
-        with acache.get_context(goal) as context:
+        with acache.get_context(goal):
             gdb = goal.tools.getenv("GDB", "gdb")
             cmd = [gdb]
             sysroot = goal.tools.getenv("SDKTARGETSYSROOT", goal.tools.getenv("SYSROOT"))
