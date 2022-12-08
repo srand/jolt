@@ -36,12 +36,13 @@ def get_task_artifacts(task, artifact=None):
     return artifact, [acache.get_artifact(dep) for dep in task.children]
 
 
-@cli.cli.command(name="gdb")
-@click.argument("task", type=str, nargs=-1, required=False, shell_complete=cli._autocomplete_tasks)
+@cli.cli.command(name="gdb", context_settings={"ignore_unknown_options": True})
+@click.argument("task", type=str, shell_complete=cli._autocomplete_tasks)
+@click.argument("gdb-args", type=str, nargs=-1, required=False)
 @click.option("-d", "--default", type=str, multiple=True, help="Override default parameter values.")
 @click.option("-mi", "--machine-interface", is_flag=True, help="Enable the machine interface for use within an IDE.")
 @click.pass_context
-def gdb(ctx, task, default, machine_interface):
+def gdb(ctx, task, default, machine_interface, gdb_args):
     """
     Launch gdb with an executable from a task artifact.
 
@@ -63,6 +64,9 @@ def gdb(ctx, task, default, machine_interface):
     launched from within an IDE to allow the IDE to parse and interpret
     output from GDB.
 
+    Additional user-defined arguments can be passed to GDB in GDB_ARGS
+    immediately following the task name.
+
     """
 
     if machine_interface:
@@ -81,7 +85,7 @@ def gdb(ctx, task, default, machine_interface):
         registry.set_default_parameters(params)
 
     gb = graph.GraphBuilder(registry, manifest, options, progress=True)
-    dag = gb.build(task)
+    dag = gb.build([task])
 
     try:
         with log.progress("Progress", dag.number_of_tasks(), " tasks", estimates=False, debug=False) as p:
@@ -138,6 +142,7 @@ def gdb(ctx, task, default, machine_interface):
             cmd += ["-ex", "set print thread-events off"]
             cmd += ["-ex", "handle SIG32 nostop noprint"]
             cmd += [os.path.join(artifact.path, str(artifact.strings.executable))]
+            cmd += gdb_args
 
             if isinstance(goal.task, ninja.CXXProject):
                 cwd = goal.tools.builddir("ninja", incremental=True)
