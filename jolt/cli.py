@@ -135,7 +135,7 @@ def cli(ctx, verbose, extra_verbose, config_file, debugger, profile,
 
     if help:
         print(ctx.get_help())
-        sys.exit(1)
+        sys.exit(0)
 
     manifest = JoltManifest()
     utils.call_and_catch(manifest.parse)
