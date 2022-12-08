@@ -58,4 +58,4 @@ def include(joltfile):
         JoltLoader.get()._load_file(filepath)
     except Exception as e:
         from jolt.error import raise_error
-        raise_error("failed to load '{0}': {1}", joltfile, str(e))
+        raise_error("Failed to load '{0}': {1}", joltfile, str(e))

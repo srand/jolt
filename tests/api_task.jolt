@@ -283,7 +283,7 @@ class TaskApi(JoltTest):
         ---
         """
         self.jolt("build c1")
-        with self.assertRaises(Exception, msg="no such dependency"):
+        with self.assertRaises(Exception, msg="No such dependency"):
             self.jolt("build c2")
 
         # Because B1 is not selfsustained, A becomes a transitive dependency of C1
@@ -294,7 +294,7 @@ class TaskApi(JoltTest):
 
         # Because B2 is selfsustained, A is not a transitive dependency of C2
         self.jolt("clean a")
-        with self.assertRaises(Exception, msg="no such dependency"):
+        with self.assertRaises(Exception, msg="No such dependency"):
             self.jolt("build -f c2")
         self.assertNoBuild(self.lastLog(), "a")
         self.assertBuild(self.lastLog(), "c2")
@@ -589,7 +589,7 @@ class TaskApi(JoltTest):
         ---
         """
         self.build("pass1 pass2 pass3 pass4")
-        with self.assertRaises(Exception, msg="no such dependency"):
+        with self.assertRaises(Exception, msg="No such dependency"):
             self.build("fail1")
 
     def test_always_influence(self):

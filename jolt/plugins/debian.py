@@ -23,7 +23,7 @@ class DebianAttributeSet(ArtifactAttributeSet):
     def create(self, name):
         if name == "chroot":
             return DebianListVariable(self._artifact, "chroot")
-        assert False, "no such debian attribute: {0}".format(name)
+        assert False, "No such debian attribute: {0}".format(name)
 
 
 @ArtifactAttributeSetProvider.Register

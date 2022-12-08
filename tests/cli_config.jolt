@@ -83,18 +83,18 @@ class ConfigCli(testsupport.JoltTest):
         self.assertIn("section.key = value", r)
         r = self.jolt("config -u section.key")
         self.assertIn("section.key = value", r)
-        with self.assertRaises(Exception, msg="no such key"):
+        with self.assertRaises(Exception, msg="No such key"):
             r = self.jolt("config -g section.key")
 
         # Verify delete
         self.jolt("config -d section.key")
-        with self.assertRaises(Exception, msg="no such key"):
+        with self.assertRaises(Exception, msg="No such key"):
             self.jolt("config section.key")
         self.jolt("config section.key value")
-        with self.assertRaises(Exception, msg="no such key"):
+        with self.assertRaises(Exception, msg="No such key"):
             self.jolt("config -dg section.key")
         self.jolt("config -du section.key")
-        with self.assertRaises(Exception, msg="no such key"):
+        with self.assertRaises(Exception, msg="No such key"):
             self.jolt("config section.key")
 
 
@@ -114,18 +114,18 @@ class ConfigCli(testsupport.JoltTest):
         self.assertIn("section.key = value", r)
         r = self.jolt("config -u section.key")
         self.assertIn("section.key = value", r)
-        with self.assertRaises(Exception, msg="no such key"):
+        with self.assertRaises(Exception, msg="No such key"):
             r = self.jolt("config -g section.key")
 
         # Verify delete
         self.jolt("config -d section.key")
-        with self.assertRaises(Exception, msg="no such key"):
+        with self.assertRaises(Exception, msg="No such key"):
             self.jolt("config section.key")
         self.jolt("config -u section.key value")
-        with self.assertRaises(Exception, msg="no such key"):
+        with self.assertRaises(Exception, msg="No such key"):
             self.jolt("config -dg section.key")
         self.jolt("config -du section.key")
-        with self.assertRaises(Exception, msg="no such key"):
+        with self.assertRaises(Exception, msg="No such key"):
             self.jolt("config section.key")
 
 
@@ -145,18 +145,18 @@ class ConfigCli(testsupport.JoltTest):
         self.assertIn("section.key = value", r)
         r = self.jolt("config -g section.key")
         self.assertIn("section.key = value", r)
-        with self.assertRaises(Exception, msg="no such key"):
+        with self.assertRaises(Exception, msg="No such key"):
             r = self.jolt("config -u section.key")
 
         # Verify delete
         self.jolt("config -d section.key")
-        with self.assertRaises(Exception, msg="no such key"):
+        with self.assertRaises(Exception, msg="No such key"):
             self.jolt("config section.key")
         self.jolt("config -g section.key value")
-        with self.assertRaises(Exception, msg="no such key"):
+        with self.assertRaises(Exception, msg="No such key"):
             self.jolt("config -du section.key")
         self.jolt("config -dg section.key")
-        with self.assertRaises(Exception, msg="no such key"):
+        with self.assertRaises(Exception, msg="No such key"):
             self.jolt("config section.key")
 
 
@@ -180,5 +180,5 @@ class ConfigCli(testsupport.JoltTest):
         self.assertIn("section.key = value1", r)
 
         self.jolt("config -dg section.key")
-        with self.assertRaises(Exception, msg="no such key"):
+        with self.assertRaises(Exception, msg="No such key"):
             self.jolt("config section.key")

@@ -61,7 +61,7 @@ class DockerAttributeSet(ArtifactAttributeSet):
             return DockerLoadListVariable(self._artifact, "load")
         if name == "rmi":
             return DockerRmiListVariable(self._artifact, "rmi")
-        assert False, "no such docker attribute: {0}".format(name)
+        assert False, "No such docker attribute: {0}".format(name)
 
 
 @ArtifactAttributeSetProvider.Register

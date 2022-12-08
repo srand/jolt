@@ -40,7 +40,7 @@ class CppInfo(ArtifactAttributeSet):
             return CppInfoDictVariable(self._artifact, "macros")
         if name == "sources":
             return CppInfoListVariable(self._artifact, "sources")
-        assert False, "no such cxxinfo attribute: {0}".format(name)
+        assert False, "No such cxxinfo attribute: {0}".format(name)
 
 
 @ArtifactAttributeSetProvider.Register

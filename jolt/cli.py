@@ -147,7 +147,7 @@ def cli(ctx, verbose, extra_verbose, config_file, debugger, profile,
         req = requirement(manifest.version)
         ver = version(__version__)
         raise_error_if(not req.satisfied(ver),
-                       "this project requires Jolt version {} (running {})",
+                       "This project requires Jolt version {} (running {})",
                        req, __version__)
 
     loader = JoltLoader.get()
@@ -378,7 +378,7 @@ def build(ctx, task, network, keep_going, default, local,
             log.error("List of failed tasks")
             for failed in dag.failed:
                 log.error("- {}", failed.log_name.strip("()"))
-            raise_error("no more tasks could be executed")
+            raise_error("No more tasks could be executed")
 
         for goal in goal_tasks:
             if acache.is_available_locally(goal):
@@ -534,7 +534,7 @@ def _config(ctx, list, delete, global_, user, key, value):
 
     def _print_key(section, opt):
         value = config.get(section, opt, alias=alias)
-        raise_error_if(value is None, "no such key: {}".format(key))
+        raise_error_if(value is None, "No such key: {}".format(key))
         print("{} = {}".format(key, value))
 
     def _print_section(section):
@@ -548,18 +548,18 @@ def _config(ctx, list, delete, global_, user, key, value):
                 print(section)
     elif delete:
         raise_error_if(config.delete(key, alias) <= 0,
-                       "no such key: {}", key)
+                       "No such key: {}", key)
         config.save()
     elif key:
         section, opt = config.split(key)
         if value:
-            raise_error_if(opt is None, "invalid configuration key: {}".format(key))
+            raise_error_if(opt is None, "Invalid configuration key: {}".format(key))
             config.set(section, opt, value, alias)
             try:
                 config.save()
             except Exception as e:
                 log.exception()
-                raise_error("failed to write configuration file: {}".format(e))
+                raise_error("Failed to write configuration file: {}".format(e))
         else:
             if opt:
                 _print_key(section, opt)
@@ -668,7 +668,7 @@ def freeze(ctx, task, default, output, remove):
     for available, task in available_in_cache:
         raise_task_error_if(
             not remove and not available, task,
-            "task artifact is not available in any cache, build it first")
+            "Task artifact is not available in any cache, build it first")
 
     for task in dag.tasks:
         if task.is_resource() or not task.is_cacheable():
@@ -723,7 +723,7 @@ def _list(ctx, task=None, all=False, reverse=None):
     except JoltError as e:
         raise e
     except Exception:
-        raise_error("an exception occurred during task dependency evaluation, see log for details")
+        raise_error("An exception occurred during task dependency evaluation, see log for details")
 
     task = reverse or task
     nodes = dag.select(
@@ -786,7 +786,7 @@ def inspect(ctx, task, influence=False, artifact=False, salt=None):
     task_cls_name, task_params = utils.parse_task_name(task_name)
     task_registry = TaskRegistry.get()
     task = task_registry.get_task_class(task_cls_name)
-    raise_task_error_if(not task, task_name, "no such task")
+    raise_task_error_if(not task, task_name, "No such task")
 
     from jolt import inspection
 
@@ -932,7 +932,7 @@ def _export(ctx, task):
         artifact = acache.get_artifact(task)
         raise_task_error_if(
             artifact.is_temporary(), task,
-            "Task artifact not found in local cache, build first")
+            "Task artifact not found in local cache, build it first")
 
         visitor = Export()
         cache.visit_artifact(task, artifact, visitor)

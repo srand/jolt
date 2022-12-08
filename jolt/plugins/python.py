@@ -73,7 +73,7 @@ class Python(ArtifactAttributeSet):
     def create(self, name):
         if name.lower() == "path":
             return PythonPathVariable(self._artifact, "PATH")
-        assert False, "no such python attribute: {0}".format(name)
+        assert False, "No such python attribute: {0}".format(name)
 
 
 @ArtifactAttributeSetProvider.Register

@@ -162,11 +162,11 @@ def getsize(section, key, default=None, alias=None):
     else:
         raise_error_if(
             len(value) != 2,
-            "config: size '{2}' invalid for '{0}.{1}', expected '<size> <unit>'", value, section, key)
+            "Config: size '{2}' invalid for '{0}.{1}', expected '<size> <unit>'", value, section, key)
         size, unit = value[0], value[1]
     raise_error_if(
         unit not in units,
-        "config: unit invalid for '{0}.{1}', expected [B,K,M,G,T]", section, key)
+        "Config: unit invalid for '{0}.{1}', expected [B,K,M,G,T]", section, key)
     return int(size) * units[unit]
 
 
@@ -223,9 +223,9 @@ def load_or_set(file_or_str):
         _config.load()
     else:
         key_value = file_or_str.split("=", 1)
-        raise_error_if(len(key_value) <= 1, "syntax error in configuration: '{}'".format(file_or_str))
+        raise_error_if(len(key_value) <= 1, "Syntax error in configuration: '{}'".format(file_or_str))
         section_key = key_value[0].split(".", 1)
-        raise_error_if(len(section_key) <= 1, "syntax error in configuration: '{}'".format(file_or_str))
+        raise_error_if(len(section_key) <= 1, "Syntax error in configuration: '{}'".format(file_or_str))
         _config.set(section_key[0], section_key[1], key_value[1], alias="cli")
 
 

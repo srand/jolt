@@ -240,7 +240,7 @@ class ArtifactListAttribute(ArtifactAttribute):
     def set_value(self, value, expand=True):
         if type(value) == str:
             value = value.split(":")
-        raise_error_if(type(value) != list, "illegal value assigned to artifact list attribute")
+        raise_error_if(type(value) != list, "Illegal value assigned to artifact list attribute")
         self._value = self._artifact.get_task().expand(value) if expand else value
 
     def get_value(self):
@@ -255,7 +255,7 @@ class ArtifactListAttribute(ArtifactAttribute):
     def extend(self, value):
         raise_error_if(
             type(value) != list,
-            "illegal type passed to {}.extend() - list expected".format(self._name))
+            "Illegal type passed to {}.extend() - list expected".format(self._name))
         self._value.extend(self._artifact.get_task().expand(value))
 
     def items(self):
@@ -481,7 +481,7 @@ class Artifact(object):
         pass
 
     def __getattr__(self, name):
-        raise_task_error(self._node, "attempt to access invalid artifact attribute '{0}'", name)
+        raise_task_error(self._node, "Attempt to access invalid artifact attribute '{0}'", name)
 
     def _write_manifest(self):
         content = {}
@@ -625,7 +625,7 @@ class Artifact(object):
         raise_task_error_if(
             not self.is_temporary(),
             self._node,
-            "can't collect files into an already published task artifact")
+            "Can't collect files into an already published task artifact")
 
         files = self.tools.expand_path(files)
         files = self.tools.glob(files)
@@ -694,7 +694,7 @@ class Artifact(object):
         raise_task_error_if(
             self.is_temporary(),
             self._node,
-            "can't copy files from an unpublished task artifact")
+            "Can't copy files from an unpublished task artifact")
 
         files = fs.path.join(self._path, files)
         files = self.tools.expand_path(files)
@@ -863,7 +863,7 @@ class Context(object):
         raise_task_error_if(
             key not in self._artifacts_index,
             self._node,
-            "no such dependency '{0}'", key)
+            "No such dependency '{0}'", key)
         return self._artifacts_index[key]
 
     def items(self):
@@ -1185,7 +1185,7 @@ class ArtifactCache(StorageProvider):
         except KeyboardInterrupt as e:
             raise e
         except Exception:
-            raise_error("failed to create cache directory '{0}'", self.root)
+            raise_error("Failed to create cache directory '{0}'", self.root)
 
     def _fs_get_artifact(self, node, tools=None):
         return Artifact(self, node, tools)
@@ -1206,14 +1206,14 @@ class ArtifactCache(StorageProvider):
 
         raise_task_error_if(
             artifact.is_temporary(), task,
-            "can't compress an unpublished task artifact")
+            "Can't compress an unpublished task artifact")
 
         try:
             task.tools.archive(artifact.path, archive)
         except KeyboardInterrupt as e:
             raise e
         except Exception:
-            raise_task_error(task, "failed to compress task artifact")
+            raise_task_error(task, "Failed to compress task artifact")
         try:
             yield
         finally:
@@ -1227,7 +1227,7 @@ class ArtifactCache(StorageProvider):
         except KeyboardInterrupt as e:
             raise e
         except Exception:
-            raise_task_error(task, "failed to extract task artifact archive")
+            raise_task_error(task, "Failed to extract task artifact archive")
         finally:
             fs.unlink(archive, ignore_errors=True)
         artifact._read_manifest()
@@ -1427,11 +1427,11 @@ class ArtifactCache(StorageProvider):
             return True
         raise_task_error_if(
             not self.is_available_locally(node), node,
-            "can't upload task artifact, no artifact present in the local cache")
+            "Can't upload task artifact, no artifact present in the local cache")
         with self.get_locked_artifact(node) if locked else self.get_artifact(node) as artifact:
             raise_task_error_if(
                 not artifact.is_uploadable(), node,
-                "artifact was modified locally by another process and can no longer be uploaded, try again")
+                "Artifact was modified locally by another process and can no longer be uploaded, try again")
             if self._storage_providers:
                 with self._fs_compress_artifact(artifact):
                     return all([provider.upload(node, force) for provider in self._storage_providers])
@@ -1464,7 +1464,7 @@ class ArtifactCache(StorageProvider):
             return True
         with self._thread_lock, self.get_locked_artifact(node) as artifact:
             if not self.is_available_locally(node):
-                raise_task_error(node, "locked artifact is missing in cache (forcibly removed?)")
+                raise_task_error(node, "Locked artifact is missing in cache (forcibly removed?)")
             if artifact.is_unpacked():
                 return True
 

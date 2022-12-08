@@ -81,7 +81,7 @@ class PodmanAttributeSet(ArtifactAttributeSet):
             return PodmanRmiListVariable(self._artifact, "rmi")
         if name == "tags":
             return PodmanListVariable(self._artifact, "tags")
-        assert False, "no such podman attribute: {0}".format(name)
+        assert False, "No such podman attribute: {0}".format(name)
 
 
 @ArtifactAttributeSetProvider.Register

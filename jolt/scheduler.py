@@ -405,7 +405,7 @@ class DownloadStrategy(ExecutionStrategy, PruneStrategy):
             return self.executors.create_skipper(task)
         if self.cache.download_enabled() and task.is_available_remotely(self.cache):
             return self.executors.create_downloader(task)
-        raise_task_error(task, "task must be built first")
+        raise_task_error(task, "Task must be built first")
 
     def should_prune_requirements(self, task):
         return False
