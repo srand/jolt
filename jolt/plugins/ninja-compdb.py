@@ -70,7 +70,7 @@ class CompDB(object):
             utils.call_and_catch(patch, command, "command", self.attribs.get("joltdir", joltdir()), joltdir())
             utils.call_and_catch(patch, command, "command", self.attribs.get("cachedir", config.get_cachedir()), config.get_cachedir())
             if sandboxes:
-                utils.call_and_catch(patch, command, "command", "sandbox-", "sandbox-reflect-")
+                utils.call_and_catch(patch, command, "command", "sandboxes/", "sandboxes-reflected/")
             utils.call_and_catch(patch, command, "directory", self.attribs.get("joltdir", joltdir()), joltdir())
 
     def merge(self, db):

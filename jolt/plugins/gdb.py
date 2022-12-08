@@ -27,7 +27,7 @@ def has_incpaths(artifact):
 
 def stage_artifacts(artifacts, tools):
     for artifact in filter(has_incpaths, artifacts):
-        tools.sandbox(artifact, incremental=True)
+        tools.sandbox(artifact, incremental=True, reflect=fs.has_symlinks())
 
 
 def get_task_artifacts(task, artifact=None):
@@ -65,7 +65,7 @@ def gdb(ctx, task, default, machine_interface, gdb_args):
     output from GDB.
 
     Additional user-defined arguments can be passed to GDB in GDB_ARGS
-    immediately following the task name.
+    immediately following the TASK name.
 
     """
 
@@ -136,6 +136,8 @@ def gdb(ctx, task, default, machine_interface, gdb_args):
             if sysroot:
                 cmd += ["-ex", "set sysroot " + sysroot]
                 cmd += ["-ex", "add-auto-load-safe-path " + sysroot]
+            if fs.has_symlinks():
+                cmd += ["-ex", "set substitute-path ../sandboxes/ ../sandboxes-reflected/"]
             if machine_interface:
                 cmd += ["-i=mi"]
             cmd += ["-ex", "set print asm-demangle"]

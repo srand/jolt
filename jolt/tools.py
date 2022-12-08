@@ -1422,9 +1422,9 @@ class Tools(object):
         suffix = utils.canonical(artifact.get_task().short_qualified_name)
 
         if reflect:
-            sandbox_name = "sandbox-reflect-" + suffix
+            sandbox_name = "sandboxes-reflected/" + suffix
         else:
-            sandbox_name = "sandbox-" + suffix
+            sandbox_name = "sandboxes/" + suffix
 
         path = self.builddir(sandbox_name, incremental=incremental, unique=False)
         if reflect:

@@ -802,7 +802,7 @@ class attributes:
 
 
 class TaskBase(object):
-    """ Task base class """
+    """ Task base class. """
 
     cacheable = True
     """ Whether the task produces an artifact or not. """
