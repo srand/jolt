@@ -6,7 +6,7 @@ import uuid
 import webbrowser
 from os import _exit, environ, getcwd
 
-from jolt.tasks import TaskRegistry, Parameter
+from jolt.tasks import Task, TaskRegistry, Parameter
 from jolt import scheduler
 from jolt import graph
 from jolt import cache
@@ -207,13 +207,15 @@ def _autocomplete_tasks(ctx, args, incomplete):
               help="Do download artifacts from remote storage")
 @click.option("--upload", is_flag=True, default=False,
               help="Do upload artifacts to remote storage")
+@click.option("--no-prune", is_flag=True, default=False,
+              help="Don't prune cached artifacts from the build graph. This option can be used to populate the local cache with remotely cached dependency artifacts.")
 @click.option("--worker", is_flag=True, default=False,
               help="Run with the worker build strategy", hidden=True)
 @click.pass_context
 @hooks.cli_build
 def build(ctx, task, network, keep_going, default, local,
           no_download, no_upload, download, upload, worker, force,
-          salt, copy, debug, result, jobs):
+          salt, copy, debug, result, jobs, no_prune):
     """
     Build task artifact.
 
@@ -328,8 +330,9 @@ def build(ctx, task, network, keep_going, default, local,
     gb = graph.GraphBuilder(registry, manifest, options, progress=True)
     dag = gb.build(task)
 
-    gp = graph.GraphPruner(strategy)
-    dag = gp.prune(dag)
+    if not no_prune:
+        gp = graph.GraphPruner(strategy)
+        dag = gp.prune(dag)
 
     goal_tasks = dag.goals
     goal_task_duration = 0
@@ -368,6 +371,10 @@ def build(ctx, task, network, keep_going, default, local,
                     goal_task_duration += task.duration_running.seconds
 
                 if not task.is_resource():
+                    if no_prune and task.task.unpack.__func__ is not Task.unpack:
+                        with acache.get_context(task):
+                            pass
+
                     progress.update(1)
 
                 if not keep_going and error is not None:
