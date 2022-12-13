@@ -125,8 +125,10 @@ class CompDBHooks(TaskHook):
             db.write()
             artifact.collect(dbpath, flatten=True)
 
-    def task_finished(self, task):
+    def task_finished_execution(self, task):
         if task.options.network or task.options.worker:
+            return
+        if not task.is_goal():
             return
         if isinstance(task.task, ninja.CXXProject):
             artifact, deps = get_task_artifacts(task)
@@ -138,8 +140,8 @@ class CompDBHooks(TaskHook):
             db.write(dbpath, force=True)
             stage_artifacts(deps + [artifact], task.tools)
 
-    def task_skipped(self, task):
-        self.task_finished(task)
+    def task_finished_download(self, task):
+        self.task_finished_execution(task)
 
 
 @TaskHookFactory.register
@@ -215,7 +217,7 @@ def compdb(ctx, task, default):
         artifact, deps = get_task_artifacts(goal)
         db = CompDB("all_compile_commands.json", artifact)
         db.read()
-        db.relocate(goal, sandboxes=True)
+        db.relocate(goal, sandboxes=fs.has_symlinks())
         outdir = goal.tools.builddir("compdb", incremental=True)
         dbpath = fs.path.join(outdir, "all_compile_commands.json")
         db.write(dbpath, force=True)
