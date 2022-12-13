@@ -73,6 +73,12 @@ class CompDB(object):
                 utils.call_and_catch(patch, command, "command", "sandboxes/", "sandboxes-reflected/")
             utils.call_and_catch(patch, command, "directory", self.attribs.get("joltdir", joltdir()), joltdir())
 
+    def remove_wrappers(self, task):
+        for command in self.commands:
+            for wrapper in [task.tools.getenv("CXXWRAP", ""), task.tools.getenv("CCWRAP", "")]:
+                if command["command"].startswith(wrapper):
+                    command["command"] = command["command"][len(wrapper):]
+
     def merge(self, db):
         self.commands.extend(db.commands)
 
@@ -111,6 +117,7 @@ class CompDBHooks(TaskHook):
         db = CompDB(artifact=artifact)
         db.read()
         db.annotate(task)
+        db.remove_wrappers(task)
         db.write()
 
         if isinstance(task.task, ninja.CXXProject):
