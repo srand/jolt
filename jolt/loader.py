@@ -63,7 +63,7 @@ class NativeRecipe(Recipe):
         generators = []
 
         for cls in classes[TaskGenerator]:
-            cls.joltdir = self.joltdir or os.path.dirname(self.path)
+            cls.joltdir = os.path.normpath(self.joltdir or os.path.dirname(self.path))
             generators.append(cls())
 
         for generator in generators:
@@ -72,7 +72,7 @@ class NativeRecipe(Recipe):
 
         for task in classes[Task]:
             task.name = task.name or task.__name__.lower()
-            task.joltdir = self.joltdir or os.path.dirname(self.path)
+            task.joltdir = os.path.normpath(self.joltdir or os.path.dirname(self.path))
             task.joltproject = self.project
             self.tasks.append(task)
 
@@ -241,7 +241,7 @@ class JoltLoader(object):
 
     def set_joltdir(self, value):
         if not self._path or len(value) < len(self._path):
-            self._path = value
+            self._path = os.path.normpath(value) if value is not None else None
 
 
 class RecipeExtension(ManifestExtension):
