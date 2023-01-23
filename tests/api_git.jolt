@@ -308,3 +308,66 @@ class GitApi(testsupport.JoltTest):
 
         r1 = self.build("b")
         self.assertBuild(r1, "b")
+
+    def test_worktrees(self):
+        """
+        --- tasks:
+        class A(Task):
+            requires = ["git:url=https://github.com/gideont/hello_world.git"]
+
+            def publish(self, artifact, tools):
+                size = len(tools.read_file("hello_world/README.md"))
+                with tools.cwd(tools.builddir()):
+                    tools.write_file("size.txt", str(size))
+                    artifact.collect("*.txt")
+
+        @git.influence("hello_world/README.md")
+        class B(Task):
+            def publish(self, artifact, tools):
+                size = len(tools.read_file("hello_world/README.md"))
+                with tools.cwd(tools.builddir()):
+                    tools.write_file("size.txt", str(size))
+                    artifact.collect("*.txt")
+        ---
+        """
+        with self.tools.cwd(self.ws):
+            self.tools.run("git clone --bare https://github.com/gideont/hello_world.git hello_world_bare.git")
+            with self.tools.cwd("hello_world_bare.git"):
+                self.tools.run("git worktree add ../hello_world")
+                self.tools.run("test -f ../hello_world/.git")
+
+        r1 = self.build("a")
+        self.assertBuild(r1, "a")
+        a1 = self.artifacts(r1)
+        with self.tools.cwd(a1[0]):
+            self.assertEqual("635", self.tools.read_file("size.txt"))
+
+        r1 = self.build("a")
+        self.assertNoBuild(r1, "a")
+
+        r1 = self.build("b")
+        self.assertBuild(r1, "b")
+        a1 = self.artifacts(r1)
+        with self.tools.cwd(a1[0]):
+            self.assertEqual("635", self.tools.read_file("size.txt"))
+
+        r1 = self.build("b")
+        self.assertNoBuild(r1, "b")
+
+        with self.tools.cwd(self.ws):
+            self.tools.append_file("hello_world/README.md", "test")
+
+        r1 = self.build("a")
+        self.assertBuild(r1, "a")
+        a1 = self.artifacts(r1)
+        with self.tools.cwd(a1[0]):
+            self.assertEqual("639", self.tools.read_file("size.txt"))
+
+        if self.network:
+            return
+
+        r1 = self.build("b")
+        self.assertBuild(r1, "b")
+        a1 = self.artifacts(r1)
+        with self.tools.cwd(a1[0]):
+            self.assertEqual("639", self.tools.read_file("size.txt"))
