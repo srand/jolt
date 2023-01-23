@@ -23,6 +23,7 @@ class GitRepository(object):
     def __init__(self, url, path, relpath, refspecs=None):
         self.path = path
         self.relpath = relpath
+        self.gitpath = None
         self.tools = Tools()
         self.url = url
         self.default_refspecs = [
@@ -35,25 +36,35 @@ class GitRepository(object):
         self._init_repo()
 
     def _init_repo(self):
-        self.repository = pygit2.Repository(self.path) if os.path.exists(self._git_folder()) else None
+        gitpath = os.path.join(self.path, ".git")
+        if os.path.isdir(os.path.join(self.path, ".git")):
+            self.gitpath = gitpath
+            self.repository = pygit2.Repository(self.gitpath)
+        elif os.path.exists(gitpath):
+            with self.tools.cwd(self.path):
+                path = self.tools.run("git rev-parse --git-dir", output=False)
+            self.gitpath = os.path.join(self.path, path)
+            self.repository = pygit2.Repository(self.gitpath)
+        else:
+            self.repository = None
 
     @utils.cached.instance
     def _git_folder(self):
-        return fs.path.join(self.path, ".git")
+        return self.gitpath
 
     @utils.cached.instance
     def _git_index(self):
-        return fs.path.join(self.path, ".git", "index")
+        return fs.path.join(self.gitpath, "index")
 
     @utils.cached.instance
     def _git_jolt_index(self):
-        return fs.path.join(self.path, ".git", "jolt-index")
+        return fs.path.join(self.gitpath, "jolt-index")
 
     def is_cloned(self):
-        return fs.path.exists(self._git_folder())
+        return self.gitpath is not None
 
     def is_indexed(self):
-        return fs.path.exists(self._git_index())
+        return self.is_cloned() and fs.path.exists(self._git_index())
 
     def clone(self):
         log.info("Cloning into {0}", self.path)
@@ -63,10 +74,10 @@ class GitRepository(object):
                                self.url, output_on_error=True)
         else:
             self.tools.run("git clone {0} {1}", self.url, self.path, output_on_error=True)
-        raise_error_if(
-            not fs.path.exists(self._git_folder()),
-            "git: failed to clone repository '{0}'", self.relpath)
         self._init_repo()
+        raise_error_if(
+            self.repository is None,
+            "git: failed to clone repository '{0}'", self.relpath)
 
     @utils.cached.instance
     def diff_unchecked(self):
@@ -87,8 +98,8 @@ class GitRepository(object):
         dlim = config.getsize("git", "maxdiffsize", "1M")
         raise_error_if(
             len(diff) > dlim,
-            "git patch for '{}' exceeds configured size limit of {} bytes - actual size {}"
-            .format(self.path, dlim, len(diff)))
+            "Repository '{}' has uncommitted changes. Size of patch exceeds configured transfer limit ({} > {} bytes)."
+            .format(self.relpath, len(diff), dlim))
         return diff
 
     def patch(self, patch):
@@ -241,7 +252,7 @@ class GitInfluenceProvider(FileInfluence):
     def _find_dotgit(self, path):
         ppath = None
         while path != ppath:
-            if fs.path.isdir(fs.path.join(path, ".git")):
+            if fs.path.exists(fs.path.join(path, ".git")):
                 return path
             ppath = path
             path = fs.path.dirname(path)
@@ -260,7 +271,6 @@ class GitInfluenceProvider(FileInfluence):
             return "{0}/{1}: N/A".format(git_rel, relpath)
         try:
             git = new_git(None, git_abs, git_rel)
-
             return "{0}/{1}: {2}".format(git_rel, relpath, git.tree_hash(path=relpath or "/"))
         except JoltCommandError as e:
             stderr = "\n".join(e.stderr)
