@@ -28,3 +28,29 @@ class DisplayCli(JoltTest):
         self.assertIn("all", r)
         self.assertIn("atask", r)
         self.assertIn("btask", r)
+
+    def test_prune(self):
+        """
+        --- tasks:
+        class A(Task):
+            pass
+
+        class B(Task):
+            requires = "a"
+
+        class C(Task):
+            requires = ["a", "b"]
+
+        class D(Task):
+            requires = ["b", "c"]
+        ---
+        """
+        r = self.jolt("display d --prune")
+        expect = """d
+├╴b
+│ └╴a
+└╴c
+  ├╴[a]
+  └╴[b]"""
+
+        self.assertIn(expect, r)
