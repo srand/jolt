@@ -576,10 +576,11 @@ def _config(ctx, list, delete, global_, user, key, value):
 
 @cli.command()
 @click.argument("task", type=str, nargs=-1, required=False, shell_complete=_autocomplete_tasks)
-@click.option("-r", "--reverse", type=str, help="Display consumers of REVERSE if TASK is executed.")
 @click.option("-c", "--cached", "show_cache", is_flag=True, help="Highlight cache presence with colors.")
+@click.option("-r", "--reverse", type=str, help="Display consumers of REVERSE if TASK is executed.")
+@click.option("-p", "--prune", "prune", is_flag=True, help="Do not repeat tasks. An already visited task's name is printed inside [square brackets] and its deps are omitted.")
 @click.pass_context
-def display(ctx, task, reverse=None, show_cache=False):
+def display(ctx, task, reverse=None, show_cache=False, prune=False):
     """
     Display a task and its dependencies visually.
 
@@ -604,6 +605,8 @@ def display(ctx, task, reverse=None, show_cache=False):
         tasklist = dag.requested_goals
 
     if dag.has_tasks():
+        processed = set()
+
         def _display(task, indent=0, last=None):
             header = ""
             if indent > 0:
@@ -624,10 +627,22 @@ def display(ctx, task, reverse=None, show_cache=False):
             else:
                 colorize = colors.green
 
-            print(header + colorize(task.short_qualified_name))
+            if prune and task.short_qualified_name in processed:
+                def prune_marker(n):
+                    return "[" + n + "]"
+            else:
+                def prune_marker(n):
+                    return n
+
+            print(header + colorize(prune_marker(task.short_qualified_name)))
             children = iterator(task)
-            for i in range(0, len(children)):
-                _display(children[i], indent + 1, last=(last or []) + [i + 1 != len(children)])
+            if not prune or task.short_qualified_name not in processed:
+                for i in range(0, len(children)):
+                    _display(children[i], indent + 1, last=(last or []) + [i + 1 != len(children)])
+
+            if prune:
+                processed.add(task.short_qualified_name)
+
         for task in tasklist:
             _display(task)
     else:
