@@ -657,6 +657,87 @@ def docs():
     webbrowser.open(config.get("jolt", "docs", "http://jolt.readthedocs.io/"))
 
 
+@cli.command()
+@click.argument("task", type=str, nargs=-1, required=True, shell_complete=_autocomplete_tasks)
+@click.option("-c", "--copy", type=click.Path(),
+              help="Copy artifact content to directory PATH.")
+@click.option("-ca", "--copy-all", type=click.Path(), help="Copy artifacts, including dependency artifacts, to directory PATH. Implies --deps.")
+@click.option("-d", "--deps", is_flag=True, help="Download dependencies.")
+@click.pass_context
+@hooks.cli_download
+def download(ctx, task, deps, copy, copy_all):
+    """
+    Download task artifacts from remote caches.
+
+    No attempt to build the artifact is made if it is not present
+    in configured remote caches.
+
+    Task dependencies may optionally be downloaded by passing the -d option.
+    """
+
+    raise_error_if(copy and copy_all, "--copy and --copy-all are mutually exclusive")
+    if copy_all:
+        deps = True
+
+    manifest = ctx.obj["manifest"]
+    options = JoltOptions()
+    acache = cache.ArtifactCache.get(options)
+    hooks.TaskHookRegistry.get(options)
+    executors = scheduler.ExecutorRegistry.get(options)
+    registry = TaskRegistry.get()
+    strategy = scheduler.DownloadStrategy(executors, acache)
+    queue = scheduler.TaskQueue(strategy)
+    gb = graph.GraphBuilder(registry, manifest, options, progress=True)
+    dag = gb.build(task)
+
+    if not deps:
+        for task in dag.tasks:
+            if not task.is_goal():
+                task.pruned()
+
+    all_tasks = dag.tasks
+    goal_tasks = dag.goals
+
+    try:
+        with log.progress("Progress", dag.number_of_tasks(), " tasks", estimates=False, debug=False) as p:
+            while dag.has_tasks():
+                leafs = dag.select(lambda graph, task: task.is_ready())
+
+                while leafs:
+                    task = leafs.pop()
+                    queue.submit(acache, task)
+
+                task, error = queue.wait()
+                p.update(1)
+
+        copy_tasks = goal_tasks if not copy_all else all_tasks
+        for goal in copy_tasks:
+            if acache.is_available_locally(goal):
+                with acache.get_artifact(goal) as artifact:
+                    if copy:
+                        log.info("Copying: {0}", artifact.path)
+                        artifact.copy("*", utils.as_dirpath(fs.path.join(workdir, click.format_filename(copy))), symlinks=True)
+                    elif copy_all:
+                        log.info("Copying: {0}", artifact.path)
+                        artifact.copy("*", utils.as_dirpath(fs.path.join(workdir, click.format_filename(copy_all))), symlinks=True)
+                    elif goal.is_goal():
+                        log.info("Location: {0}", artifact.path)
+
+    except KeyboardInterrupt:
+        print()
+        log.warning("Interrupted by user")
+        try:
+            queue.abort()
+            sys.exit(1)
+        except KeyboardInterrupt:
+            print()
+            log.warning("Interrupted again, exiting")
+            _exit(1)
+    except Exception as e:
+        log.set_interactive(True)
+        raise e
+
+
 @cli.command(hidden=True)
 @click.argument("task", type=str, nargs=-1, required=True)
 @click.option("-r", "--remove", is_flag=True, help="Remove tasks from existing manifest.")
