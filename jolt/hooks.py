@@ -218,6 +218,10 @@ class CliHook(object):
     def cli_clean(self, *args, **kwargs):
         yield
 
+    @contextmanager
+    def cli_download(self, *args, **kwargs):
+        yield
+
 
 class CliHookFactory(object):
     @staticmethod
@@ -249,6 +253,13 @@ class CliHookRegistry(object):
         with ExitStack() as stack:
             for ext in self.hooks:
                 stack.enter_context(ext.cli_clean(*args, **kwargs))
+            yield
+
+    @contextmanager
+    def cli_download(self, *args, **kwargs):
+        with ExitStack() as stack:
+            for ext in self.hooks:
+                stack.enter_context(ext.cli_download(*args, **kwargs))
             yield
 
 
@@ -340,5 +351,13 @@ def cli_clean(cmd):
     @functools.wraps(cmd)
     def decorator(*args, **kwargs):
         with CliHookRegistry.get().cli_clean():
+            return cmd(*args, **kwargs)
+    return decorator
+
+
+def cli_download(cmd):
+    @functools.wraps(cmd)
+    def decorator(*args, **kwargs):
+        with CliHookRegistry.get().cli_download():
             return cmd(*args, **kwargs)
     return decorator
