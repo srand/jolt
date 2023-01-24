@@ -449,19 +449,6 @@ dependencies.
 The plugin is enabled by adding a ``[ninja-compdb]`` section in
 the Jolt configuration. Ninja version >= 1.10.0 is required.
 
-
-Ninja Compilation Cache
-^^^^^^^^^^^^^^^^^^^^^^^
-
-This plugin enables a compilation cache allowing C/C++ object files
-to be reused from libraries residing in the artifact cache. Reuse
-is permitted if the source file, included headers and the compiler
-command line are unmodified since the object was built.
-
-The plugin is enabled by adding a ``[ninja-cache]`` section in
-the Jolt configuration.
-
-
 Selfdeploy
 ^^^^^^^^^^
 

@@ -19,10 +19,9 @@ class All(Alias):
         "ext/alias",
         "ext/autoweight",
         "ext/conan",
-        "ext/ninja-cache",
         "ext/ninja-compdb",
         "ext/symlinks",
         "int/utils",
-	"flake8",
-	"nfr",
+        "flake8",
+        "nfr",
     ]
