@@ -1526,12 +1526,6 @@ class CXXProject(Task):
             writer.close()
             return writer
 
-    def _prepare_ninja_cache(self, deps, tools):
-        """ Hooked from ninja-cache plugin """
-
-    def _write_ninja_cache(self, deps, tools):
-        """ Hooked from ninja-cache plugin """
-
     def _write_shell_file(self, basedir, deps, tools, writer):
         filepath = fs.path.join(basedir, "compile")
         with open(filepath, "w") as fobj:
@@ -1720,9 +1714,7 @@ if __name__ == "__main__":
         self.outdir = tools.builddir("ninja", self.incremental)
         self._expand_headers()
         self._expand_sources(deps, tools)
-        self._prepare_ninja_cache(deps, tools)
         self._writer = self._write_ninja_file(self.outdir, deps, tools)
-        self._write_ninja_cache(deps, tools)
         verbose = " -v" if log.is_verbose() else ""
         threads = config.get("jolt", "threads", tools.getenv("JOLT_THREADS", None))
         threads = " -j" + threads if threads else ""
