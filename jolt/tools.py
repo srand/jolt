@@ -1583,6 +1583,10 @@ class Tools(object):
         mount_cachedir = kwargs.get("mount_cachedir", True)
         mount_builddir = kwargs.get("mount_builddir", True)
         mount = kwargs.get("mount", [])
+        raise_task_error_if(
+            type(mount) != list,
+            self._task, "Expected a list as mount argument to Tools.chroot()")
+        mount = [self.expand(m) for m in mount]
 
         overlaydir = self.builddir("overlay")
         overlayrootdir = fs.path.join(overlaydir, "root")
