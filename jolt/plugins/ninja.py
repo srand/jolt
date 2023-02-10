@@ -1743,9 +1743,7 @@ if __name__ == "__main__":
         self._expand_headers()
         self._expand_sources(deps, tools)
         self.outdir = tools.builddir("ninja", self.incremental)
-        self._prepare_ninja_cache(deps, tools)
         writer = self._write_ninja_file(self.outdir, deps, tools)
-        self._write_ninja_cache(deps, tools)
         self._write_shell_file(self.outdir, deps, tools, writer)
         pathenv = self.outdir + os.pathsep + tools.getenv("PATH")
         with tools.cwd(self.outdir), tools.environ(PATH=pathenv):
