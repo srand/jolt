@@ -72,6 +72,9 @@ class TaskQueue(object):
     def in_progress(self, task):
         return task in self.futures.values()
 
+    def empty(self):
+        return len(self.futures) == 0
+
 
 class Executor(object):
     def __init__(self, factory):

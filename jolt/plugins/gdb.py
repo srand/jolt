@@ -86,7 +86,7 @@ def gdb(ctx, task, default, machine_interface, no_binary, gdb_args):
 
     try:
         with log.progress("Progress", dag.number_of_tasks(), " tasks", estimates=False, debug=False) as p:
-            while dag.has_tasks():
+            while dag.has_tasks() or not queue.empty():
                 leafs = dag.select(lambda graph, task: task.is_ready())
 
                 while leafs:

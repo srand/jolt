@@ -351,7 +351,7 @@ def build(ctx, task, network, keep_going, default, local,
             debug=debug)
 
         with progress:
-            while dag.has_tasks():
+            while dag.has_tasks() or not queue.empty():
                 # Find all tasks ready to be executed
                 leafs = dag.select(lambda graph, task: task.is_ready())
 
@@ -700,7 +700,7 @@ def download(ctx, task, deps, copy, copy_all):
 
     try:
         with log.progress("Progress", dag.number_of_tasks(), " tasks", estimates=False, debug=False) as p:
-            while dag.has_tasks():
+            while dag.has_tasks() or not queue.empty():
                 leafs = dag.select(lambda graph, task: task.is_ready())
 
                 while leafs:
