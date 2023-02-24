@@ -136,6 +136,20 @@ class GitApi(testsupport.JoltTest):
         r = self.build("exe")
         self.assertNoBuild(r, "exe")
 
+    def test_explicit_influence_on_path_with_ignored_files(self):
+        """
+        --- tasks:
+        @git.influence("a/new_dir")
+        class A(Task):
+            requires = ["git-src:url=https://github.com/gideont/hello_world.git,path=a"]
+        ---
+        """
+        self.build("a")
+        with self.tools.cwd(self.ws, "a"):
+            self.tools.mkdir("new_dir")
+            self.tools.write_file("test.o", "object")
+        self.build("a")
+
     def test_influence_copies(self):
         """
         --- tasks:

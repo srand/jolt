@@ -272,6 +272,8 @@ class GitInfluenceProvider(FileInfluence):
         try:
             git = new_git(None, git_abs, git_rel)
             return "{0}/{1}: {2}".format(git_rel, relpath, git.tree_hash(path=relpath or "/"))
+        except KeyError:
+            return "{0}/{1}: N/A".format(git_rel, relpath)
         except JoltCommandError as e:
             stderr = "\n".join(e.stderr)
             if "exists on disk, but not in" in stderr:
@@ -398,11 +400,16 @@ class Git(GitSrc):
         if not self._revision.is_imported:
             self.git.diff_unchecked()
         rev = self._get_revision()
-        if rev is not None:
-            return self.git.tree_hash(rev)
-        return "{0}: {1}".format(
-            self.git.relpath,
-            self.git.tree_hash())
+
+        try:
+            if rev is not None:
+                th = self.git.tree_hash(rev)
+            else:
+                th = self.git.tree_hash()
+        except KeyError:
+            th = "N/A"
+
+        return "{0}: {1}".format(self.git.relpath, th)
 
     def is_influenced_by(self, task, path):
         return path.startswith(self.abspath + fs.sep)
