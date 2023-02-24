@@ -36,8 +36,10 @@ def get_task_artifacts(task, artifact=None):
 @click.argument("gdb-args", type=str, nargs=-1, required=False)
 @click.option("-d", "--default", type=str, multiple=True, help="Override default parameter values.")
 @click.option("-mi", "--machine-interface", is_flag=True, help="Enable the machine interface for use within an IDE.")
+@click.option("-nb", "--no-binary", is_flag=True,
+              help="Don't load symbols from binary. Shortens startup time in IDEs where binaries are loaded through the machine interface.")
 @click.pass_context
-def gdb(ctx, task, default, machine_interface, gdb_args):
+def gdb(ctx, task, default, machine_interface, no_binary, gdb_args):
     """
     Launch gdb with an executable from a task artifact.
 
@@ -138,7 +140,8 @@ def gdb(ctx, task, default, machine_interface, gdb_args):
             cmd += ["-ex", "set print asm-demangle"]
             cmd += ["-ex", "set print thread-events off"]
             cmd += ["-ex", "handle SIG32 nostop noprint"]
-            cmd += [os.path.join(artifact.path, str(artifact.strings.executable))]
+            if not no_binary:
+                cmd += [os.path.join(artifact.path, str(artifact.strings.executable))]
             cmd += gdb_args
 
             if isinstance(goal.task, ninja.CXXProject):
