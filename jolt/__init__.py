@@ -4,6 +4,7 @@ from .tasks import Download
 from .tasks import EnvironExport
 from .tasks import Export
 from .tasks import ListParameter
+from .tasks import MultiTask
 from .tasks import Parameter
 from .tasks import Resource
 from .tasks import Script
@@ -30,6 +31,7 @@ __all__ = (
     "EnvironExport",
     "Export",
     "ListParameter",
+    "MultiTask",
     "Parameter",
     "Resource",
     "Script",

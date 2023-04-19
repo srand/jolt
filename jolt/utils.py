@@ -55,6 +55,8 @@ def decorate_prepend(func, extra_func):
 
 
 def as_list(t):
+    if t is None:
+        return []
     return [t] if type(t) == str or not is_iterable(t) else list(t)
 
 
@@ -212,6 +214,8 @@ class _SafeDict(object):
             value = call_and_catch(getattr, self.values.get("_instance", object()), key)
         if value is None:
             value = self._envget(key)
+        if type(value) == list:
+            value = " ".join(value)
         if value is not None:
             return value
         if self.errors:
@@ -227,6 +231,8 @@ class JoltFormatter(Formatter):
             return str(value).lower()
         elif conversion == "c":
             return value()
+        elif conversion == "j":
+            return " ".join(value)
         return super().convert_field(value, conversion)
 
 

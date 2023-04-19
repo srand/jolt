@@ -25,6 +25,12 @@ def as_dirpath(path):
     return path if path[-1] == sep else path + sep
 
 
+def as_canonpath(path):
+    if os.path.isabs(path):
+        path = os.path.join("root", os.path.relpath(path, "/"))
+    return path.replace("..", "__")
+
+
 def is_relative_to(pathname, rootdir):
     try:
         pathlib.Path(pathname).relative_to(pathlib.Path(rootdir))

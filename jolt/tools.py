@@ -21,6 +21,7 @@ from contextlib import contextmanager
 from psutil import NoSuchProcess, Process
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
+from jinja2.exceptions import TemplateError
 from jinja2.runtime import Context
 
 
@@ -1083,6 +1084,14 @@ class Tools(object):
         else:
             fs.mkdir(pathname)
 
+    def mkdirname(self, pathname, recursively=True):
+        """ Create parent directory. """
+
+        pathname = self.expand_path(pathname)
+        pathname = fs.path.dirname(pathname)
+        if pathname:
+            self.mkdir(pathname, recursively)
+
     def map_consecutive(self, callable, iterable):
         """ Same as ``map()``. """
         return utils.map_consecutive(callable, iterable)
@@ -1134,14 +1143,18 @@ class Tools(object):
             str: Renderered template data.
 
         """
-        env = Environment(
-            loader=FileSystemLoader(self.getcwd()),
-            autoescape=select_autoescape(),
-            trim_blocks=True,
-            lstrip_blocks=True)
-        env.context_class = JinjaTaskContext
-        tmpl = env.from_string(template)
-        return tmpl.render(task=self._task, tools=self, **kwargs)
+        try:
+            env = Environment(
+                loader=FileSystemLoader(self.getcwd()),
+                autoescape=select_autoescape(),
+                trim_blocks=True,
+                lstrip_blocks=True)
+            env.context_class = JinjaTaskContext
+            tmpl = env.from_string(template)
+            return tmpl.render(task=self._task, tools=self, **kwargs)
+        except TemplateError as e:
+            log.debug("Template error: {}", template)
+            raise_task_error(self._task, "Template error: {}", e)
 
     def render_file(self, template, **kwargs):
         """ Render a Jinja template file.
@@ -1155,14 +1168,18 @@ class Tools(object):
             str: Renderered template data.
 
         """
-        env = Environment(
-            loader=FileSystemLoader(self.getcwd()),
-            autoescape=select_autoescape(),
-            trim_blocks=True,
-            lstrip_blocks=True)
-        env.context_class = JinjaTaskContext
-        tmpl = env.get_template(self.expand(template))
-        return tmpl.render(task=self._task, tools=self, **kwargs)
+        try:
+            env = Environment(
+                loader=FileSystemLoader(self.getcwd()),
+                autoescape=select_autoescape(),
+                trim_blocks=True,
+                lstrip_blocks=True)
+            env.context_class = JinjaTaskContext
+            tmpl = env.get_template(self.expand(template))
+            return tmpl.render(task=self._task, tools=self, **kwargs)
+        except TemplateError as e:
+            log.debug("Template error: {}", template)
+            raise_task_error(self._task, "Template error: {}", e)
 
     def replace_in_file(self, pathname, search, replace):
         """ Replaces all occurrences of a substring in a file.
@@ -1824,6 +1841,46 @@ class Tools(object):
         pathname = self.expand_path(pathname)
         with open(pathname, "rb" if binary else "r") as f:
             return f.read()
+
+    def read_depfile(self, pathname):
+        """
+        Reads a Make dependency file.
+
+        Returns:
+            dict: Dictionary of files and their dependencies.
+        """
+        pathname = self.expand_path(pathname)
+        with open(pathname) as f:
+            data = f.read()
+
+        data = data.strip()
+        data = data.replace("\\\n", "")
+        data = data.splitlines()
+
+        deps = {}
+
+        for line in data:
+            # Skip empty lines and comments
+            if not line or line[0] == "#":
+                continue
+
+            parts = line.split(":", 1)
+            raise_error_if(len(parts) != 2, "Depfile parse error: '{}'", line)
+            outputs, inputs = parts[0], parts[1]
+            outputs, inputs = outputs.strip(), inputs.strip()
+            # Temporarily replace escaped spaces in names so that
+            # the list of dependencies can be split.
+            outputs, inputs = outputs.replace("\\ ", "\x00"), inputs.replace("\\ ", "\x00")
+
+            for output in outputs.split():
+                output = output.replace("\x00", " ")
+                for input in inputs.split():
+                    input = input.replace("\x00", " ")
+                    if output not in deps:
+                        deps[output] = []
+                    deps[output].append(input)
+
+        return deps
 
     def which(self, executable):
         """ Find executable in PATH.

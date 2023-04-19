@@ -1,9 +1,11 @@
 import base64
 from collections import OrderedDict
+from concurrent.futures import ThreadPoolExecutor, as_completed, Future
 from contextlib import contextmanager
 import copy
 import fnmatch
 import functools
+import hashlib
 import platform
 import subprocess
 from os import environ
@@ -1252,6 +1254,605 @@ class Task(TaskBase):
         Intentionally undocumented. Use at own risk.
         """
         yield ReportProxy(self, self._report)
+
+
+class SubTask(object):
+    def __init__(self, task):
+        self._deps = []
+        self._identity = []
+        self._influence = []
+        self._message = None
+        self._outputs = []
+        self._task = task
+        self._tools = Tools(task, task.joltdir)
+
+    def __str__(self):
+        if self.message:
+            return self.message
+        if self._outputs:
+            return " ".join(self._outputs)
+        return None
+
+    @property
+    def dependencies(self):
+        return self._deps
+
+    @functools.cached_property
+    def identity(self):
+        sha = hashlib.sha1()
+        for ident in self._identity:
+            sha.update(ident.encode())
+        for output in self._outputs:
+            sha.update(output.encode())
+        if self.message:
+            sha.update(self.message.encode())
+        return sha.hexdigest()
+
+    @functools.cached_property
+    def influence(self):
+        sha = hashlib.sha1()
+        for infl in self._influence:
+            if callable(infl):
+                sha.update(infl().encode())
+            else:
+                sha.update(infl.encode())
+        for dep in self._deps:
+            sha.update(dep.influence.encode())
+        return sha.hexdigest()
+
+    @functools.cached_property
+    def is_outdated(self):
+        try:
+            with self._tools.cwd(self._tools.builddir("subtasks", incremental=True)):
+                if self.influence != self._tools.read_file(self.identity):
+                    return True
+                for output in self.outputs:
+                    output = fs.as_canonpath(output)
+                    assert self._tools.read_file(output+".identity") == self.identity
+
+                # FIXME: Check hash content of output file
+                for output in self.outputs:
+                    if not fs.path.exists(fs.path.join(self._task.joltdir, output)):
+                        return True
+                for dep in self.dependencies:
+                    if dep.is_outdated:
+                        return True
+            return False
+        except Exception:
+            return True
+
+    def set_uptodate(self):
+        try:
+            del self.influence
+            del self.is_outdated
+        except AttributeError:
+            pass
+        with self._tools.cwd(self._tools.builddir("subtasks", incremental=True)):
+            self._tools.write_file(self.identity, self.influence)
+
+            for output in self.outputs:
+                output = fs.as_canonpath(output)
+                self._tools.mkdirname(output)
+                self._tools.write_file(output+".identity", self.identity)
+
+    def run(self):
+        pass
+
+    def add_dependency(self, dep):
+        deps = utils.as_list(dep)
+        subtasks = [self._task._add_input(dep) for dep in deps]
+        self._deps.extend(subtasks)
+
+    def add_identity(self, infl):
+        self._identity.append(infl)
+
+    def add_influence(self, infl):
+        self._influence.append(infl)
+
+    def add_influence_file(self, path):
+        self.add_influence(utils.filesha1(path))
+
+    def add_influence_depfile(self, path):
+        def depfile():
+            result = ""
+            deps = self._tools.read_depfile(fs.path.join(self._task.joltdir, path))
+            for output in self.outputs:
+                for input in deps.get(output, []):
+                    result += utils.filesha1(input)
+            return result
+        self.add_influence(depfile)
+
+    def add_output(self, output):
+        self.add_identity(output)
+        if type(output) == list:
+            self._outputs.extend(output)
+        else:
+            self._outputs.append(output)
+
+    @property
+    def message(self):
+        return self._message
+
+    def set_message(self, message):
+        self._message = message
+
+    @property
+    def outputs(self):
+        return self._outputs
+
+
+class Input(SubTask):
+    def __init__(self, task, input):
+        super().__init__(task)
+        self._outputs = [input]
+        self.add_influence_file(input)
+        self.set_uptodate()
+
+    @property
+    def message(self):
+        return f"[IN] {self._outputs[0]}"
+
+    def run(self):
+        raise_task_error(self._task, "Input file '{}' does not exist", self._outputs[0])
+
+
+class CommandSubtask(SubTask):
+    def __init__(self, task, command):
+        super().__init__(task)
+        self.add_identity(command)
+        self._command = command
+
+    def __str__(self):
+        s = super().__str__()
+        return s if s is not None and not log.is_verbose() else self._command
+
+    def run(self):
+        self._tools.run(self._command)
+
+
+class FunctionSubtask(SubTask):
+    def __init__(self, task, fn):
+        super().__init__(task)
+        self.add_identity(fn.__name__)
+        self.fn = fn
+
+    def run(self):
+        self.fn(self)
+
+
+class RenderSubtask(SubTask):
+    def __init__(self, task, template, **kwargs):
+        super().__init__(task)
+        self._data = self._tools.render(template, **kwargs)
+        self.add_identity(template)
+        self.add_influence(self._data)
+
+    def run(self):
+        for output in self.outputs:
+            self._tools.write_file(output, self._data, expand=False)
+
+
+class FileRenderSubtask(SubTask):
+    def __init__(self, task, path, **kwargs):
+        super().__init__(task)
+        self.add_identity(path)
+        self._path = path
+
+    def run(self):
+        data = self._tools.render_file(self._path)
+        for output in self.outputs:
+            self._tools.write_file(output, data, expand=False)
+
+
+class MultiTask(Task):
+    """
+    A task with subtasks that are executed in parallel with intermediate caching.
+
+    A MultiTask is useful for tasks with many subtasks that benefit from intermediate
+    caching, such as compilation tasks where multiple source files are compiled into
+    object files and then either linked into an executable or archived into a library.
+
+    Subtasks are executed in parallel and their output is cached locally in a build
+    directory. The output is not automatically shared with other Jolt clients, only
+    the files published by the MultiTask is shared. A subtask is only re-executed
+    if the influence one of its dependencies change.
+
+    Subtasks are defined in the MultiTask method generate() and they can be either
+    a shell command or a python function. Helper methods in the class allow
+    implementors to define outputs and inter-subtask dependencies.
+
+    Example:
+
+        .. code-block:: python
+
+          flags = ["-DDEBUG"]
+
+          def generate(self, deps, tools):
+              sources = ["a.cpp", "b.cpp", "c.cpp"]
+              objects = []
+
+              # Create compilation subtasks for each source file
+              for source in sources:
+                  object = self.command(
+                      "g++ {flags} -c {inputs} -o {outputs} ",
+                      inputs=[source],
+                      outputs=[source  +".o"])
+                  objects.append(object)
+
+              # Create linker subtask
+              executable = self.command(
+                  "g++ {inputs} -o {output}",
+                  inputs=objects,
+                  outputs=["executable"])
+
+    """
+
+    abstract = True
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._subtasks = []
+        self._subtasks_by_output = {}
+
+    def _add_subtask(self, subtask):
+        self._subtasks.append(subtask)
+
+        for output in subtask.outputs:
+            if output in self._subtasks_by_output:
+                othersubtask = self._subtasks_by_output
+                raise_task_error(
+                    self,
+                    "'{}' is generated by both '{}' and '{}'",
+                    output, subtask.command, othersubtask.command)
+            self._subtasks_by_output[output] = subtask
+
+        return subtask
+
+    def _find_subtask(self, output):
+        return self._subtasks_by_output.get(output)
+
+    def _add_input(self, input):
+        raise_task_error_if(not input, self, "Input is None")
+        if not isinstance(input, SubTask):
+            inputsubtask = self._find_subtask(input)
+            if inputsubtask:
+                return inputsubtask
+            inputsubtask = Input(self, input)
+        else:
+            inputsubtask = input
+        self._subtasks.append(inputsubtask)
+        self._subtasks_by_output[input] = inputsubtask
+        return inputsubtask
+
+    def _to_subtask_list(self, inputs):
+        inputs = utils.as_list(inputs)
+        return [self._add_input(input) for input in inputs]
+
+    def _to_output_files(self, subtasks):
+        subtasks = utils.as_list(subtasks)
+        outputs = []
+        for subtask in subtasks:
+            outputs.extend(subtask.outputs)
+        return outputs
+
+    def _to_input_subtasks(self, inputs, **kwargs):
+        inputs = utils.as_list(inputs)
+        subtasks = []
+        for input in inputs:
+            input = self.expand(input, **kwargs)
+            subtasks.append(self._add_input(input))
+        return subtasks
+
+    def command(self, command, inputs=None, outputs=None, message=None, mkdir=True, **kwargs):
+        """
+        Create shell command subtask.
+
+        The subtask executes the specified command. String format specifiers may be used and
+        are resolved primarily by kwargs and secondarily by task attributes.
+
+        Args:
+            inputs (str, list): files or subtasks that the command depends on.
+            outputs (str, list): list of files that the subtasks produces.
+            message (str): custom message that the subtask will print when executed.
+            mkdir (boolean): automatically create directories for outputs. If False,
+                the caller must ensure that the directories exist before the the subtask
+                is executed.
+            kwargs: additional keyword values used to format the command line string.
+
+        Returns:
+            Subtask object.
+
+        Example:
+
+            .. code-block:: python
+
+              executable = self.command(
+                  "g++ {inputs} -o {output}",
+                  inputs=["main.cpp"],
+                  outputs=["executable"])
+
+        """
+        inputs = self._to_input_subtasks(inputs, **kwargs)
+        inputfiles = self._to_output_files(inputs)
+
+        outputs = utils.as_list(outputs)
+        outputs = [self.expand(output, **kwargs) for output in outputs]
+        outputs = [fs.path.relpath(output) for output in outputs]
+
+        dirs = set()
+        if mkdir:
+            for output in outputs:
+                dirs.add(self.mkdirname(output, inputs=inputfiles, outputs=outputs, **kwargs))
+
+        command = self.expand(command, inputs=inputfiles, outputs=outputs, **kwargs)
+        subtask = CommandSubtask(self, command)
+
+        for dir in dirs:
+            subtask.add_dependency(dir)
+        for input in inputs:
+            subtask.add_dependency(input)
+        for output in outputs:
+            output = self.expand(output, inputs=inputfiles, outputs=outputs, **kwargs)
+            subtask.add_output(output)
+
+        if message:
+            subtask.set_message(self.expand(message, inputs=inputfiles, outputs=outputs, **kwargs))
+
+        self._add_subtask(subtask)
+
+        return subtask
+
+    def call(self, fn, outputs, **kwargs):
+        """
+        Create a Python function call subtask.
+
+        The subtask executes the specified Python function, passing the subtask as argument.
+
+        Args:
+            fn (func): Python function to execute.
+            outputs (str, list): list of files that the subtasks produces.
+            kwargs: additional keyword values used to format the output file paths.
+
+        Returns:
+            Subtask object.
+
+        Example:
+
+            .. code-block:: python
+
+              def mkdir(subtask):
+                  for output in subtask.outputs:
+                      self.tools.mkdir(output)
+
+              dirtask = self.call(mkdir, outputs=["newly/created/directory"])
+
+        """
+        subtask = FunctionSubtask(self, fn)
+        outputs = utils.as_list(outputs)
+        for output in outputs:
+            output = self.tools.expand_relpath(output, self.joltdir, outputs=outputs, **kwargs)
+            subtask.add_output(output)
+        self._add_subtask(subtask)
+        return subtask
+
+    def mkdir(self, path, *args, **kwargs):
+        """
+        Create a subtask that creates a directory.
+
+        Args:
+            path (str): Path to directory.
+            kwargs: additional keyword values used to format the directory path string.
+
+        Returns:
+            Subtask object.
+
+        Example:
+
+            .. code-block:: python
+
+              dirtask = self.mkdir("{outdir}/directory", outdir=tools.builddir())
+        """
+        path = self.expand(path, *args, **kwargs)
+        subtask = self._find_subtask(path)
+        if not subtask:
+            subtask = self.call(lambda subtask: self.tools.mkdir(path), [path])
+        return subtask
+
+    def mkdirname(self, path, *args, **kwargs):
+        """
+        Create a subtask that creates a parent directory.
+
+        Args:
+            path (str): Path for which the parent directory shall be created.
+            kwargs: additional keyword values used to format the directory path string.
+
+        Returns:
+            Subtask object.
+
+        Example:
+
+            .. code-block:: python
+
+              # Creates {outdir}/directory
+              dirtask = self.mkdir("{outdir}/directory/object.o", outdir=tools.builddir())
+
+        """
+        path = self.expand(path, *args, **kwargs)
+        path = fs.path.dirname(path)
+        return self.mkdir(path, *args, **kwargs)
+
+    def render(self, template, outputs, **kwargs):
+        """
+        Create a subtask that renders a Jinja template string to file.
+
+        Args:
+            template (str): Jinja template string.
+            outputs (str, list): list of files that the subtasks produces.
+            kwargs: additional keyword values used to render the template and output file paths.
+
+        Returns:
+            Subtask object.
+
+        Example:
+
+            .. code-block:: python
+
+              # Creates file.list with two lines containing "a.o" and "b.o"
+
+              template_task = self.render(
+                  "{% for line in lines %}{{ line }}\\n{% endfor %}",
+                  outputs=["file.list"],
+                  lines=["a.o", "b.o"])
+
+        """
+        outputs = utils.as_list(outputs)
+        subtask = RenderSubtask(self, template, **kwargs)
+        for output in outputs:
+            output = self.tools.expand_relpath(output, self.joltdir, outputs=outputs, **kwargs)
+            subtask.add_output(output)
+        self._add_subtask(subtask)
+        return subtask
+
+    def render_file(self, template, outputs, **kwargs):
+        """
+        Create a subtask that renders a Jinja template file to file.
+
+        Args:
+            template (str): Jinja template file path.
+            outputs (str, list): list of files that the subtasks produces.
+            kwargs: additional keyword values used to format the output file paths.
+
+        Returns:
+            Subtask object.
+
+        Example:
+
+            .. code-block:: python
+
+              # Render file.list.template into file.list
+              template_task = self.render_file("file.list.template", outputs=["file.list"])
+
+        """
+        template = self._to_subtask_list(template)
+        templatefiles = self._to_output_files(template)
+        raise_task_error_if(len(templatefiles) > 1, "Can only render one template at a time")
+
+        outputs = utils.as_list(outputs)
+        subtask = FileRenderSubtask(self, templatefiles[0], **kwargs)
+        for output in outputs:
+            output = self.tools.expand_relpath(output, outputs=outputs, **kwargs)
+            subtask.add_output(output)
+        for input in templatefiles:
+            subtask.add_dependency(input)
+        self._add_subtask(subtask)
+        return subtask
+
+    def generate(self, deps, tools):
+        """
+        Called to generate subtasks.
+
+        An implementer can override this method in order to create subtasks
+        that will later be executed during the :func:`~run` stage of the task.
+
+        Subtasks can be defined using either of these helper methods:
+
+          - :func:`~call`
+          - :func:`~command`
+          - :func:`~mkdir`
+          - :func:`~mkdirname`
+          - :func:`~render`
+          - :func:`~render_file`
+
+        """
+        pass
+
+    def run(self, deps, tools):
+        """
+        Executes subtasks defined in :func:`~generate`.
+
+        This method should typically not be overridden in subclasses.
+        """
+
+        self.generate(deps, tools)
+
+        log.debug("About to start executing these subtasks:")
+        for subtask in self._subtasks:
+            for subtaskout in subtask.outputs:
+                if not subtask.dependencies:
+                    log.debug("  {}", subtaskout)
+                for dep in subtask.dependencies:
+                    for depout in dep.outputs:
+                        log.debug("  {}: {}", subtaskout, depout)
+
+        subtasks = {}
+        deps = {}
+
+        # Build graph of inverse dependencies
+        for subtask in self._subtasks:
+            if subtask not in subtasks:
+                subtasks[subtask] = []
+                deps[subtask] = []
+            for dep in subtask.dependencies:
+                if dep not in deps:
+                    deps[dep] = []
+                deps[dep].append(subtask)
+                subtasks[subtask].append(dep)
+
+
+        # Prune up-to-date subtasks
+        for subtask in list(filter(lambda subtask: not subtask.is_outdated, subtasks.keys())):
+            del subtasks[subtask]
+            for dep in deps[subtask]:
+                subtasks[dep].remove(subtask)
+
+        subtaskindex = 0
+        subtaskcount = len(subtasks)
+
+        with ThreadPoolExecutor(max_workers=tools.cpu_count()) as pool:
+            futures = {}
+
+            while subtasks or futures:
+                completed = []
+                candidates = [subtask for subtask, deps in subtasks.items() if not deps]
+
+                if not candidates and not futures:
+                    break
+
+                for subtask in candidates:
+                    subtaskindex += 1
+                    del subtasks[subtask]
+                    if subtask.is_outdated:
+                        log.info("[{}/{}] {}", subtaskindex, subtaskcount, str(subtask))
+                        futures[pool.submit(subtask.run)] = subtask
+                    else:
+                        completed.append(subtask)
+
+                for future in as_completed(futures.keys()):
+                    subtask = futures[future]
+                    del futures[future]
+                    completed.append(subtask)
+
+                    try:
+                        future.result()
+                        subtask.set_uptodate()
+                    except Exception as e:
+                        for future in futures:
+                            future.cancel()
+                        raise e
+                    break
+
+                for subtask in completed:
+                    for dep in deps[subtask]:
+                        subtasks[dep].remove(subtask)
+
+            if subtasks:
+                log.debug("These remaining subtasks could not be started due to unresolved dependencies")
+                for subtask in subtasks:
+                    log.debug("  {}", str(subtask))
+                    for dep in subtask.dependencies:
+                        log.debug("   - {}", str(dep))
+
+            raise_task_error_if(subtasks, self, "Subtasks with unresolved dependencies could not be executed")
 
 
 class ErrorProxy(object):
