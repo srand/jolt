@@ -2,6 +2,7 @@ import atexit
 import click
 import subprocess
 import sys
+import datetime
 import uuid
 import webbrowser
 from os import _exit, environ, getcwd
@@ -327,6 +328,8 @@ def build(ctx, task, network, keep_going, default, local,
         for goal in task:
             registry.get_task(goal, manifest=manifest).taint = uuid.uuid4()
 
+    log.info("Started: {}", datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+
     gb = graph.GraphBuilder(registry, manifest, options, progress=True)
     dag = gb.build(task)
 
@@ -404,6 +407,7 @@ def build(ctx, task, network, keep_going, default, local,
             log.warning("Interrupted again, exiting")
             _exit(1)
     finally:
+        log.info("Ended: {}", datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
         log.info("Total execution time: {0} {1}",
                  str(duration),
                  str(queue.duration_acc) if network else '')
