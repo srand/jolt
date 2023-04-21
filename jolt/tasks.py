@@ -1,6 +1,6 @@
 import base64
 from collections import OrderedDict
-from concurrent.futures import ThreadPoolExecutor, as_completed, Future
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextlib import contextmanager
 import copy
 import fnmatch
@@ -1308,7 +1308,7 @@ class SubTask(object):
                     return True
                 for output in self.outputs:
                     output = fs.as_canonpath(output)
-                    assert self._tools.read_file(output+".identity") == self.identity
+                    assert self._tools.read_file(output + ".identity") == self.identity
 
                 # FIXME: Check hash content of output file
                 for output in self.outputs:
@@ -1333,7 +1333,7 @@ class SubTask(object):
             for output in self.outputs:
                 output = fs.as_canonpath(output)
                 self._tools.mkdirname(output)
-                self._tools.write_file(output+".identity", self.identity)
+                self._tools.write_file(output + ".identity", self.identity)
 
     def run(self):
         pass
@@ -1797,7 +1797,6 @@ class MultiTask(Task):
                     deps[dep] = []
                 deps[dep].append(subtask)
                 subtasks[subtask].append(dep)
-
 
         # Prune up-to-date subtasks
         for subtask in list(filter(lambda subtask: not subtask.is_outdated, subtasks.keys())):
