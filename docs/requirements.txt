@@ -3,6 +3,7 @@ colorama
 fasteners
 ninja-syntax
 psutil
-sphinx-click
-sphinx-rtd-theme
+sphinx<7.0
+sphinx_click
+sphinx_rtd_theme
 tqdm
