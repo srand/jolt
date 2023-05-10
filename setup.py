@@ -35,6 +35,7 @@ setup(
     name=name,
     cmdclass={"build_py": BuildCommand},
     version=__version__,
+    python_requires=">=3.8",
     description="A task executor",
     long_description=long_description,
     url="https://github.com/srand/jolt",
