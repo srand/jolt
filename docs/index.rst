@@ -17,5 +17,6 @@ plugins.
    quickstart
    guides
    configuration
+   cli
    reference
 
