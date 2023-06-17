@@ -209,6 +209,37 @@ class TaskApi(JoltTest):
         with self.assertRaises(Exception, msg="multiple tasks extended"):
             self.jolt("build extended")
 
+    def test_publish_files(self):
+        """
+        --- file: file.txt
+        --- file: dir1/file1.txt
+        --- file: dir2/file2.txt
+        --- tasks:
+        @attributes.publish_files("collect1")
+        @attributes.publish_files("collect2")
+        @influence.files("file.txt")
+        @influence.files("dir2")
+        class Example(Task):
+            collect1 = [
+                # Publish file.txt into artifact root
+                "file.txt",
+
+                # Publish file.txt into artifact dir/ directory
+                ("file.txt", "dir/"),
+            ]
+
+            collect2 = [
+                # Publish files from dir2/ into artifact root
+                {{"files": "file2.txt", "cwd": "dir2"}},
+            ]
+        ---
+        """
+        r = self.build("example")
+        a = self.artifacts(r)
+        self.assertExists(os.path.join(a[0], "file.txt"))
+        self.assertExists(os.path.join(a[0], "dir/file.txt"))
+        self.assertExists(os.path.join(a[0], "file2.txt"))
+
     def test_requires(self):
         """
         --- tasks:

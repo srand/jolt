@@ -724,6 +724,54 @@ class attributes:
             return cls
         return _decorate
 
+    @staticmethod
+    def publish_files(attrib):
+        """
+        Decorator adding a list attribute where file publication can be specified.
+
+        Each item in the list is a set of arguments passed directly to
+        :func:`jolt.Artifact.collect`. Tuples, dictionaries and strings are
+        accepted.
+
+        Example:
+
+        .. code-block:: python
+
+          @jolt.attributes.publish_files("collect")
+          class Example(Task):
+              collect = [
+                  # Publish file.txt into artifact root
+                  "file.txt",
+
+                  # Publish file.txt into artifact dir/ directory
+                  ("file.txt", "dir/"),
+
+                  # Publish files from dir/ into artifact root
+                  {"files": "*", "cwd": "dir"},
+              ]
+
+        """
+
+        def decorate(cls):
+            if not hasattr(cls, "__publish_files"):
+                old_pub = cls.publish
+
+                def publish(self, artifact, tools):
+                    old_pub(self, artifact, tools)
+                    for args in getattr(self, "__publish_files")():
+                        if type(args) == tuple:
+                            artifact.collect(*args)
+                        elif type(args) == dict:
+                            artifact.collect(**args)
+                        else:
+                            artifact.collect(args)
+
+                cls.publish = publish
+
+            return utils.concat_attributes("_publish_files", attrib)(cls)
+        return decorate
+
+    @staticmethod
     def load(filepath):
         """
         Decorator which loads task class attributes from a file.
