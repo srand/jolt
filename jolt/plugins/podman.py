@@ -12,9 +12,9 @@ from jolt.cache import ArtifactListAttribute
 from jolt.cache import ArtifactAttributeSet
 from jolt.cache import ArtifactAttributeSetProvider
 
+import contextlib
 import json
 from os import path
-
 from platform import system
 import tarfile
 
@@ -151,6 +151,9 @@ class Container(Resource):
 
     cap_drops = []
     """ A list of capabilities to remove from the container """
+
+    chroot = False
+    """ Use as chroot - resource consumers will execute all commands in container """
 
     entrypoint = None
     """ Container entrypoint """
@@ -298,7 +301,15 @@ class Container(Resource):
         artifact.container = self.container
         artifact.info = json.loads(info)[0]
 
+        if self.chroot:
+            self._context_stack = contextlib.ExitStack()
+            self._context_stack.enter_context(
+                owner.tools.runprefix(f"podman exec -i {artifact.container}"))
+
     def release(self, artifact, deps, tools, owner):
+        if self.chroot:
+            self._context_stack.close()
+
         self._info("Stopping container '{container}'")
         tools.run("podman stop {container}", output_on_error=True)
 

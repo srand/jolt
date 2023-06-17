@@ -396,6 +396,24 @@ class PodmanExt(JoltTest):
         """
         self.build("atest")
 
+    def test_container_chroot(self):
+        """
+        --- tasks:
+        from jolt.plugins.podman import *
+
+        class A(Container):
+            chroot = True
+            image = "busybox:latest"
+
+        class ATest(Task):
+            requires = "a"
+
+            def run(self, deps, tools):
+                tools.run("which busybox")
+        ---
+        """
+        self.build("atest")
+
     def test_container_entrypoint(self):
         """
         --- tasks:
