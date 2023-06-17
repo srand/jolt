@@ -1,7 +1,7 @@
 import base64
 from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from contextlib import contextmanager
+from contextlib import contextmanager, ExitStack
 import copy
 import fnmatch
 import functools
@@ -2117,6 +2117,60 @@ class WorkspaceResource(Resource):
         An implementor overrides this method in a subclass.
 
         """
+
+
+@attributes.requires("_image")
+class Chroot(Resource):
+    """
+    Resource to use task artifact or directory path as chroot in consumers.
+
+    Example:
+
+      .. code-block:: python
+
+        from jolt import Chroot, Task
+        from jolt.plugins.podman import ContainerImage
+
+        class SdkImage(ContainerImage):
+            dockerfile = \"\"\"
+            FROM debian:sid-slim
+            ARG DEBIAN_FRONTEND=noninteractive
+            RUN apt-get update && apt-get install -y --no-install-recommends gcc g++ && apt-get clean
+            \"\"\"
+            output = "directory"
+
+        class Sdk(Chroot):
+            chroot = "sdkimage"
+
+        class Compile(Task):
+            requires = ["sdk"]
+
+            def run(self, deps, tools):
+                tools.run("gcc -v")
+
+    """
+
+    chroot = None
+    """ Task name or directory path to use as chroot """
+
+    @property
+    def _image(self):
+        registry = TaskRegistry.get()
+        if registry.get_task_class(self.expand(self.chroot)):
+            return [self.chroot]
+        return []
+
+    def acquire(self, artifact, deps, tools, owner):
+        try:
+            rootfs = deps[self.chroot]
+        except Exception:
+            rootfs = tools.expand(self.image)
+        self._context_stack = ExitStack()
+        self._context_stack.enter_context(
+            owner.tools.chroot(rootfs))
+
+    def release(self, artifact, deps, tools, owner):
+        self._context_stack.close()
 
 
 class Alias(Task):

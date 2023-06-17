@@ -30,6 +30,16 @@ Artifact
 
 .. reference-artifact-end
 
+Chroot
+--------
+
+.. reference-chroot-start
+
+.. autoclass:: jolt.Chroot
+   :members: chroot
+
+.. reference-chroot-end
+
 Context
 --------
 
@@ -39,7 +49,6 @@ Context
    :members: items, __getitem__
 
 .. reference-context-end
-
 
 Decorators
 ----------

@@ -629,3 +629,5 @@ class ContainerImage(Task):
                 if self.output in ["directory", "oci-directory"]:
                     with tools.cwd("image.dir"):
                         artifact.collect("*", symlinks=True)
+                if self.output in ["directory"]:
+                    artifact.paths.rootfs = "."

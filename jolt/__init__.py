@@ -1,5 +1,6 @@
 from .tasks import Alias
 from .tasks import BooleanParameter
+from .tasks import Chroot
 from .tasks import Download
 from .tasks import EnvironExport
 from .tasks import Export
@@ -26,6 +27,7 @@ __all__ = (
     "Alias",
     "Artifact",
     "BooleanParameter",
+    "Chroot",
     "Context",
     "Download",
     "EnvironExport",
