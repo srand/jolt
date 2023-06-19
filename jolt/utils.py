@@ -444,14 +444,28 @@ def tojson(filepath, data, ignore_errors=False, indent=2):
 
 def concat_attributes(attrib, postfix, prepend=False):
     def _decorate(cls):
-        _orig = getattr(cls, "_" + attrib, lambda self: [])
+        _orig = getattr(cls, "_" + attrib, lambda self: getattr(self, attrib))
 
         def _get(self):
             orig = _orig(self)
-            if prepend:
-                return getattr(self, self.expand(postfix), type(orig)()) + orig
-            else:
-                return orig + getattr(self, self.expand(postfix), type(orig)())
+            appended = getattr(self, self.expand(postfix))
+
+            if orig is None:
+                orig = type(appended)()
+
+            assert type(orig) == type(appended), \
+                f"Cannot append attributes '{attrib}' and '{postfix}': mismatching type"
+
+            assert type(orig) == list or type(orig) == dict, \
+                f"Cannot append attributes '{attrib}' and '{postfix}': unsupported type '{type(orig)}'"
+
+            if type(orig) == dict:
+                value = orig | appended
+
+            if type(appended) == list:
+                value = orig + appended if not prepend else appended + orig
+
+            return value
 
         setattr(cls, "_" + attrib, _get)
         return cls
