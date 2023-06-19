@@ -444,11 +444,14 @@ def tojson(filepath, data, ignore_errors=False, indent=2):
 
 def concat_attributes(attrib, postfix, prepend=False):
     def _decorate(cls):
-        _orig = getattr(cls, "_" + attrib, lambda self: getattr(self, attrib))
+        _orig = getattr(cls, "_" + attrib, lambda self: getattr(self, attrib, None))
 
         def _get(self):
             orig = _orig(self)
-            appended = getattr(self, self.expand(postfix))
+            if attrib != postfix:
+                appended = getattr(self, self.expand(postfix), type(orig)() if orig is not None else [])
+            else:
+                appended = type(orig)() if orig is not None else []
 
             if orig is None:
                 orig = type(appended)()

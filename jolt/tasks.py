@@ -679,7 +679,7 @@ class attributes:
         return utils.concat_attributes("requires", attrib)
 
     @staticmethod
-    def attribute(alias, target, influence=True):
+    def attribute(alias, target, influence=True, default=False):
         """
         Decorates a task with an alias for another attribute.
 
@@ -689,12 +689,21 @@ class attributes:
                 Keywords are expanded.
             influence (boolean): Add value of target
                 attribute as influence of the task.
+            default (boolean): Return alias attribute if
+                target attribute does not exist. Value is
+                accessed through the alias attribute name
+                with a leading underscore, e.g. '_alias'.
 
         """
         def _decorate(cls):
             def _get(self):
+                if default:
+                    return getattr(self, self.expand(target), getattr(self, self.expand(alias)))
                 return getattr(self, self.expand(target))
-            setattr(cls, alias, property(_get))
+            if default:
+                setattr(cls, "_" + alias, property(_get))
+            else:
+                setattr(cls, alias, property(_get))
             if influence:
                 attribute_influence(target)(cls)
             return cls
