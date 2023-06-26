@@ -1555,7 +1555,7 @@ class Tools(object):
 
         """
         pathname = self.expand_path(pathname, *args, **kwargs)
-        return fs.unlink(pathname)
+        return fs.unlink(pathname, ignore_errors=kwargs.get("ignore_errors", False))
 
     @contextmanager
     def chroot(self, chroot, *args, **kwargs):
