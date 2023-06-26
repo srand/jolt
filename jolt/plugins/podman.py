@@ -606,7 +606,7 @@ class ContainerImage(Task):
             if self.cleanup:
                 self.info("Removing image from Podman")
                 for tag in self.tags:
-                    utils.call_and_catch(tools.run("podman image rm {}", tag))
+                    utils.call_and_catch(tools.run("podman rmi -f {}", tag))
 
     def publish(self, artifact, tools):
         artifact.strings.tag = tools.expand(self.tags[0])
