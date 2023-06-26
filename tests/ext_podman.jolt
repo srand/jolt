@@ -412,6 +412,10 @@ class PodmanExt(JoltTest):
                 tools.run("which busybox")
         ---
         """
+        try:
+            self.tools.run("unshare -rm uname")
+        except Exception:
+            self.skip("required privileges not held")
         self.build("atest")
 
     def test_container_entrypoint(self):
