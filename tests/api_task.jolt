@@ -852,11 +852,12 @@ class TaskApi(JoltTest):
     def test_resource_chroot(self):
         """
         --- tasks:
-        from jolt.plugins.podman import *
+        from jolt.plugins.docker import *
 
-        class Busybox(ContainerImage):
+        class Busybox(DockerImage):
             dockerfile = "FROM busybox:latest"
-            output = "directory"
+            extract = True
+            requires = ["docker/cli"]
 
         class Achroot(Chroot):
             name = "busybox/chroot"
