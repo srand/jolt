@@ -89,7 +89,7 @@ setup(
     extras_require={
         "allure": ["allure-python-commons"],
         "amqp": ["pika"],
-        "conan": ["conan"],
+        "conan": ["conan<2.0"],
         "dev": ["check-manifest"],
         "doc": ["sphinx-click", "sphinx-rtd-theme"],
         "test": ["coverage"],
