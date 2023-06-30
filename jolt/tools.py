@@ -12,6 +12,7 @@ if os.name != "nt":
     import termios
 import glob
 import multiprocessing
+import re
 import shutil
 import tarfile
 import zipfile
@@ -1181,13 +1182,16 @@ class Tools(object):
             log.debug("Template error: {}", template)
             raise_task_error(self._task, "Template error: {}", e)
 
-    def replace_in_file(self, pathname, search, replace):
+    def replace_in_file(self, pathname, search, replace, regex=False):
         """ Replaces all occurrences of a substring in a file.
 
         Args:
             pathname (str): Name/path of file to modify.
             search (str): Substring to be replaced.
             replace (str): Replacement substring.
+            regex (boolean): Interpret search parameter as
+                a regular expression matching the string to
+                be replaced.
 
         Example:
 
@@ -1204,13 +1208,16 @@ class Tools(object):
         try:
             with open(pathname, "rb") as f:
                 data = f.read()
-            data = data.replace(search.encode(), replace.encode())
+            if regex:
+                data = re.sub(search.encode(), replace.encode(), data)
+            else:
+                data = data.replace(search.encode(), replace.encode())
             with open(pathname, "wb") as f:
                 f.write(data)
         except KeyboardInterrupt as e:
             raise e
         except Exception:
-            raise_task_error(self._task, "failed to replace string in file '{0}'", pathname)
+            raise_task_error(self._task, "Failed to replace string in file '{0}'", pathname)
 
     def rmtree(self, pathname, *args, **kwargs):
         """Removes a directory tree from disk.
