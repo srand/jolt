@@ -821,6 +821,9 @@ class attributes:
                 old_init(self, *args, **kwargs)
                 for key, val in eval(self.tools.read_file(filepath)).items():
                     setattr(self, key, val)
+                    self.requires = utils.unique_list(
+                        utils.call_or_return_list(self, self.__class__._requires))
+                self.requires = self.expand(self.requires)
 
             cls.__init__ = new_init
             return cls
