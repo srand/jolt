@@ -155,8 +155,14 @@ class Parameter(object):
     def help(self):
         values = self._help_values()
         if values:
-            return "{} {}".format(self._help, values) if self._help else values
+                return f"{self._help} {values}"if self._help else values
+        elif self._default:
+            return f"{self._help} [default: {self._help_default}]" if self._help else f"[default: {self._help_default}]"
         return self._help or ""
+
+    @property
+    def _help_default(self):
+        return colors.bright(str(self._default))
 
     def _help_values(self, accepted=None):
         accepted = accepted or self._accepted_values or []
@@ -1917,6 +1923,10 @@ class MultiTask(Task):
 class ErrorProxy(object):
     def __init__(self, error):
         self._error = error
+
+    @property
+    def message(self):
+        return self._error.message
 
 
 class ReportProxy(object):
