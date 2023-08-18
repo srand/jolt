@@ -149,9 +149,13 @@ class TaskSourceInfluence(HashInfluenceProvider):
         if type(obj) == type:
             funcs = [utils.getattr_safe(mro, funcname, TaskSourceInfluence._default_func)
                      for mro in obj.mro()]
-        else:
+        elif callable(obj) and hasattr(obj, "__self__"):
             funcs = [utils.getattr_safe(mro, funcname, TaskSourceInfluence._default_func)
                      for mro in obj.__class__.mro()]
+        elif callable(obj):
+            funcs = [obj]
+        else:
+            funcs = []
 
         # Calculate sha1 sum for all functions
         shasum = hashlib.sha1()
