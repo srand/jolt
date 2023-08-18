@@ -396,9 +396,113 @@ class TaskApi(JoltTest):
         with self.assertRaises(Exception):
             self.build("neg:arg=true")
         self.build("neg:arg=false")
+        with self.assertRaises(Exception):
+            self.build("neg:arg=abc")
+        self.assertIn("Illegal value", self.lastLog())
 
+    def test_param_bool_bad_default(self):
+        """
+        --- tasks:
+        class Pos(Task):
+            arg = BooleanParameter("abc")
+        ---
+        """
+        with self.assertRaises(Exception):
+            self.build("pos")
+        self.assertIn("Illegal default value", self.lastLog())
 
-    def test_param_bool_regular(self):
+    def test_param_int(self):
+        """
+        --- tasks:
+        class Pos(Task):
+            arg = IntParameter()
+            def run(self, deps, tools):
+                assert self.arg, "unexpected value"
+
+        class Neg(Task):
+            arg = IntParameter()
+            def run(self, deps, tools):
+                assert not self.arg, "unexpected value"
+        ---
+        """
+        with self.assertRaises(Exception):
+            self.build("pos:arg=0")
+        self.build("pos:arg=1")
+        with self.assertRaises(Exception):
+            self.build("neg:arg=1")
+        self.build("neg:arg=0")
+        with self.assertRaises(Exception):
+            self.build("neg:arg=abc")
+        self.assertIn("Illegal value", self.lastLog())
+
+    def test_param_int_default(self):
+        """
+        --- tasks:
+        class Pos(Task):
+            arg = IntParameter(5)
+
+            def run(self, deps, tools):
+                assert self.arg == 5
+                assert str(self.arg) == "5"
+                assert self.arg != 4
+                assert self.arg != 6
+                assert self.arg > 4
+                assert not (self.arg > 5)
+                assert self.arg < 6
+                assert not (self.arg < 5)
+                assert self.arg >= 4
+                assert self.arg >= 5
+                assert not (self.arg >= 6)
+                assert self.arg <= 6
+                assert self.arg <= 5
+                assert not (self.arg <= 4)
+
+                assert self.arg + 1 == 6
+                assert self.arg - 1 == 4
+                assert self.arg * 2 == 10
+                assert self.arg ** 2 == 25
+                assert pow(self.arg, 5, 2) == 1
+                assert self.arg / 2 == 2.5
+                assert self.arg // 2 == 2
+                assert divmod(self.arg, 2) == (2, 1)
+                assert self.arg % 2 == 1
+                assert self.arg & 2 == 0
+                assert self.arg ^ 2 == 7
+                assert self.arg | 2 == 7
+                assert self.arg << 2 == 20
+                assert self.arg >> 2 == 1
+                assert -self.arg == -5
+                assert +self.arg == 5
+                assert abs(self.arg) == 5
+                assert ~self.arg == -6
+
+                assert 1 + self.arg == 6
+                assert 1 - self.arg == -4
+                assert 2 * self.arg == 10
+                assert 11 / self.arg == 2.2
+                assert 11 // self.arg == 2
+                assert 11 % self.arg == 1
+                assert 7 & self.arg == 5
+                assert 2 ^ self.arg == 7
+                assert 2 | self.arg == 7
+                assert 1 << self.arg == 32
+                assert 32 >> self.arg == 1
+        ---
+        """
+        self.build("pos")
+
+    def test_param_int_bad_default(self):
+        """
+        --- tasks:
+        class Pos(Task):
+            arg = IntParameter("abc")
+        ---
+        """
+        with self.assertRaises(Exception):
+            self.build("pos")
+        self.assertIn("Illegal default value", self.lastLog())
+
+    def test_param_regular(self):
         """
         --- tasks:
         class A(Task):

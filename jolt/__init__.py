@@ -4,6 +4,7 @@ from .tasks import Chroot
 from .tasks import Download
 from .tasks import EnvironExport
 from .tasks import Export
+from .tasks import IntParameter
 from .tasks import ListParameter
 from .tasks import MultiTask
 from .tasks import Parameter
@@ -32,6 +33,7 @@ __all__ = (
     "Download",
     "EnvironExport",
     "Export",
+    "IntParameter",
     "ListParameter",
     "MultiTask",
     "Parameter",

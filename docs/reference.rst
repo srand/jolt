@@ -95,9 +95,6 @@ Parameter
 .. reference-parameter-end
 
 
-BooleanParameter
-^^^^^^^^^^^^^^^^
-
 .. reference-booleanparameter-start
 
 .. autoclass:: jolt.BooleanParameter
@@ -106,8 +103,13 @@ BooleanParameter
 .. reference-booleanparameter-end
 
 
-ListParameter
-^^^^^^^^^^^^^
+.. reference-intparameter-start
+
+.. autoclass:: jolt.IntParameter
+   :members: __bool__, __int__, __init__, __str__, is_default, get_default, get_value, is_set, is_unset
+
+.. reference-intparameter-end
+
 
 .. reference-listparameter-start
 

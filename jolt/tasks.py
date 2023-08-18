@@ -96,6 +96,21 @@ class EnvironExport(Export):
         self._task.tools.setenv(self._envname, value)
 
 
+class ParameterValueError(JoltError):
+    """ Raised if an illegal value is assigned to a parameter """
+    def __init__(self, param, value):
+        if hasattr(param, "name"):
+            super().__init__(f"Illegal value '{value}' assigned to parameter '{param.name}'")
+        else:
+            super().__init__(f"Illegal default value '{value}' assigned to {type(param).__name__}")
+
+
+class ParameterImmutableError(JoltError):
+    """ Raised if an immutable (const=True) parameter is reassigned """
+    def __init__(self, param):
+        super().__init__(f"Cannot reassign immutable parameter '{param.name}'")
+
+
 class Parameter(object):
     """ Generic task parameter type. """
 
@@ -113,6 +128,7 @@ class Parameter(object):
         if "__param_list" not in owner.__dict__:
             setattr(owner, "__param_list", {})
         getattr(owner, "__param_list")[name] = self
+        self.name = name
 
     def __init__(self, default=None, values=None, required=True,
                  const=False, influence=True, help=None):
@@ -137,7 +153,7 @@ class Parameter(object):
                 associated task.
 
         Raises:
-            ValueError: If the parameter is assigned an illegal value.
+            ParameterValueError: If the parameter is assigned an illegal value.
 
         """
 
@@ -155,8 +171,8 @@ class Parameter(object):
     def help(self):
         values = self._help_values()
         if values:
-                return f"{self._help} {values}"if self._help else values
-        elif self._default:
+            return f"{self._help} {values}"if self._help else values
+        elif self._default is not None:
             return f"{self._help} [default: {self._help_default}]" if self._help else f"[default: {self._help_default}]"
         return self._help or ""
 
@@ -178,7 +194,7 @@ class Parameter(object):
 
     def _validate(self, value):
         if self._accepted_values is not None and value not in self._accepted_values:
-            raise ValueError(value)
+            raise ParameterValueError(self, value)
 
     def get_default(self):
         """ Get the default value of the parameter.
@@ -283,11 +299,11 @@ class Parameter(object):
             value (str): The new parameter value.
 
         Raises:
-            ValueError: If the parameter is assigned an illegal value.
+            ParameterValueError: If the parameter is assigned an illegal value.
         """
         self._validate(value)
         if self._const and value != self._default:
-            raise ValueError("immutable")
+            raise ParameterImmutableError(self)
         self._value = value
 
 
@@ -324,11 +340,11 @@ class BooleanParameter(Parameter):
                 will not influence the identity of the task artifact. The default is
                 True.
             help (str, optional): Documentation for the parameter.
-                This text is displayed when running the ``info`` command on the
+                This text is displayed when running the ``inspect`` command on the
                 associated task.
 
         Raises:
-            ValueError: If the parameter is assigned an illegal value.
+            ParameterValueError: If the parameter is assigned an illegal value.
 
         """
         default = str(default).lower() if default is not None else None
@@ -351,7 +367,7 @@ class BooleanParameter(Parameter):
                 False, True, "false, and "true", 0 and 1, "no" and "yes".
 
         Raises:
-            ValueError: If the parameter is assigned an illegal value.
+            ParameterValueError: If the parameter is assigned an illegal value.
         """
         value = str(value).lower()
         super(BooleanParameter, self).set_value(value)
@@ -407,6 +423,177 @@ class BooleanParameter(Parameter):
         return key[0] if self.is_true else key[1]
 
 
+class IntParameter(Parameter):
+    """
+    Integer task parameter.
+
+    Implements all regular unary and binary integer operators.
+
+    """
+
+    def __init__(self, default=None, values=None, required=True, const=False,
+                 influence=True, help=None):
+        """
+        Creates a new parameter.
+
+        Args:
+            default (int, optional): An optional default integer value.
+            values (list, optional): A list of accepted values. An
+                assertion is raised if an unlisted value is assigned to the parameter.
+            required (boolean, optional): If required, the parameter must be assigned
+                a value before the task can be executed. The default is ``True``.
+            const (boolean, optional): If const is True, the parameter is immutable
+                and cannot be assigned a non-default value. This is useful in
+                a class hierarchy where a subclass may want to impose restrictions
+                on a parent class parameter. The default is ``False``.
+            influence (boolean, optional): If influence is False, the parameter value
+                will not influence the identity of the task artifact. The default is
+                True.
+            help (str, optional): Documentation for the parameter.
+                This text is displayed when running the ``inspect`` command on the
+                associated task.
+
+        Raises:
+            ParameterValueError: If the parameter is assigned an illegal value.
+
+        """
+        try:
+            default = int(default) if default is not None else None
+        except ValueError:
+            raise ParameterValueError(self, default)
+        super().__init__(
+            default,
+            values,
+            required=required,
+            const=const,
+            influence=influence,
+            help=help)
+
+    def set_value(self, value):
+        """ Set the parameter value.
+
+        Args:
+            value (boolean): The new parameter value. Accepted values are:
+                False, True, "false, and "true", 0 and 1, "no" and "yes".
+
+        Raises:
+            ParameterValueError: If the parameter is assigned an illegal value.
+        """
+        try:
+            value = int(value)
+        except ValueError:
+            raise ParameterValueError(self, value)
+        super().set_value(value)
+
+    def __bool__(self):
+        """ Evaluates to False if the value is 0, True otherwise """
+        return self.get_value() != 0
+
+    def __int__(self):
+        """ Returns the integer parameter value """
+        return int(self.get_value())
+
+    def __lt__(self, other):
+        """ Less-than comparison with another integer value """
+        return int(self.get_value()) < int(other)
+
+    def __le__(self, other):
+        """ Less-or-equal comparison with another integer value """
+        return int(self.get_value()) <= int(other)
+
+    def __gt__(self, other):
+        """ Greater-than comparison with another integer value """
+        return int(self.get_value()) > int(other)
+
+    def __ge__(self, other):
+        """ Greater-or-equal comparison with another integer value """
+        return int(self.get_value()) >= int(other)
+
+    def __add__(self, other):
+        return int(self.get_value()).__add__(other)
+
+    def __sub__(self, other):
+        return int(self.get_value()).__sub__(other)
+
+    def __mul__(self, other):
+        return int(self.get_value()).__mul__(other)
+
+    def __truediv__(self, other):
+        return int(self.get_value()).__truediv__(other)
+
+    def __floordiv__(self, other):
+        return int(self.get_value()).__floordiv__(other)
+
+    def __mod__(self, other):
+        return int(self.get_value()).__mod__(other)
+
+    def __divmod__(self, other):
+        return int(self.get_value()).__divmod__(other)
+
+    def __pow__(self, other, modulo=None):
+        return int(self.get_value()).__pow__(other, modulo)
+
+    def __lshift__(self, other):
+        return int(self.get_value()).__lshift__(other)
+
+    def __rshift__(self, other):
+        return int(self.get_value()).__rshift__(other)
+
+    def __and__(self, other):
+        return int(self.get_value()).__and__(other)
+
+    def __xor__(self, other):
+        return int(self.get_value()).__xor__(other)
+
+    def __or__(self, other):
+        return int(self.get_value()).__or__(other)
+
+    def __radd__(self, other):
+        return int(self.get_value()).__radd__(other)
+
+    def __rsub__(self, other):
+        return int(self.get_value()).__rsub__(other)
+
+    def __rmul__(self, other):
+        return int(self.get_value()).__rmul__(other)
+
+    def __rtruediv__(self, other):
+        return int(self.get_value()).__rtruediv__(other)
+
+    def __rfloordiv__(self, other):
+        return int(self.get_value()).__rfloordiv__(other)
+
+    def __rmod__(self, other):
+        return int(self.get_value()).__rmod__(other)
+
+    def __rlshift__(self, other):
+        return int(self.get_value()).__rlshift__(other)
+
+    def __rrshift__(self, other):
+        return int(self.get_value()).__rrshift__(other)
+
+    def __rand__(self, other):
+        return int(self.get_value()).__rand__(other)
+
+    def __rxor__(self, other):
+        return int(self.get_value()).__rxor__(other)
+
+    def __ror__(self, other):
+        return int(self.get_value()).__ror__(other)
+
+    def __neg__(self):
+        return int(self.get_value()).__neg__()
+
+    def __pos__(self):
+        return int(self.get_value()).__pos__()
+
+    def __abs__(self):
+        return int(self.get_value()).__abs__()
+
+    def __invert__(self):
+        return int(self.get_value()).__invert__()
+
+
 class ListParameter(Parameter):
     """ List parameter type.
 
@@ -450,11 +637,11 @@ class ListParameter(Parameter):
                 will not influence the identity of the task artifact. The default is
                 True.
             help (str, optional): Documentation for the parameter.
-                This text is displayed when running the ``info`` command on the
+                This text is displayed when running the ``inspect`` command on the
                 associated task.
 
         Raises:
-            ValueError: If the parameter is assigned an illegal value.
+            ParameterValueError: If the parameter is assigned an illegal value.
 
         """
         super().__init__(*args, **kwargs)
@@ -466,7 +653,7 @@ class ListParameter(Parameter):
             value (str): A list of accepted values, separated by '+'.
 
         Raises:
-            ValueError: If the parameter is assigned an illegal value.
+            ParameterValueError: If the parameter is assigned an illegal value.
         """
         value = str(value).split("+") if type(value) == str else value
         value.sort()
@@ -476,7 +663,7 @@ class ListParameter(Parameter):
         if self._accepted_values is not None:
             for item in value:
                 if item not in self._accepted_values:
-                    raise ValueError(item)
+                    raise ParameterValueError(self, item)
 
     def get_value(self):
         return "+".join(self._value)
@@ -1071,11 +1258,8 @@ class TaskBase(object):
             if isinstance(param, Parameter):
                 try:
                     param.set_value(value)
-                except ValueError as e:
-                    raise_task_error(
-                        self,
-                        "Illegal value '{0}' assigned to parameter '{1}'",
-                        str(e), key)
+                except (ParameterValueError, ParameterImmutableError) as e:
+                    raise_task_error(self, str(e))
                 continue
             raise_task_error(self, "No such parameter '{0}'", key)
         self._assert_required_parameters_assigned()
