@@ -98,11 +98,13 @@ class EnvironExport(Export):
 
 class ParameterValueError(JoltError):
     """ Raised if an illegal value is assigned to a parameter """
-    def __init__(self, param, value):
+    def __init__(self, param, value, what=None, detail=None):
+        what = what + " " if what is not None else ""
+        detail = ", " + detail if detail is not None else ""
         if hasattr(param, "name"):
-            super().__init__(f"Illegal value '{value}' assigned to parameter '{param.name}'")
+            super().__init__(f"Illegal {what}value '{value}' assigned to parameter '{param.name}'{detail}")
         else:
-            super().__init__(f"Illegal default value '{value}' assigned to {type(param).__name__}")
+            super().__init__(f"Illegal {what}value '{value}' assigned to {type(param).__name__}{detail}")
 
 
 class ParameterImmutableError(JoltError):
@@ -164,8 +166,8 @@ class Parameter(object):
         self._const = const
         self._influence = influence
         self._help = help
-        if default:
-            self._validate(default)
+        if default is not None:
+            self._validate(default, "default")
 
     @property
     def help(self):
@@ -192,9 +194,9 @@ class Parameter(object):
         """ Returns the parameter value as a string """
         return str(self._value) if self._value is not None else ''
 
-    def _validate(self, value):
+    def _validate(self, value, what=None):
         if self._accepted_values is not None and value not in self._accepted_values:
-            raise ParameterValueError(self, value)
+            raise ParameterValueError(self, value, what=what)
 
     def get_default(self):
         """ Get the default value of the parameter.
@@ -431,13 +433,15 @@ class IntParameter(Parameter):
 
     """
 
-    def __init__(self, default=None, values=None, required=True, const=False,
+    def __init__(self, default=None, min=None, max=None, values=None, required=True, const=False,
                  influence=True, help=None):
         """
         Creates a new parameter.
 
         Args:
             default (int, optional): An optional default integer value.
+            min (int, optional): Minimum allowed value.
+            max (int, optional): Maximum allowed value.
             values (list, optional): A list of accepted values. An
                 assertion is raised if an unlisted value is assigned to the parameter.
             required (boolean, optional): If required, the parameter must be assigned
@@ -460,7 +464,18 @@ class IntParameter(Parameter):
         try:
             default = int(default) if default is not None else None
         except ValueError:
-            raise ParameterValueError(self, default)
+            raise ParameterValueError(self, default, what="default")
+
+        try:
+            self._min = int(min) if min is not None else None
+        except ValueError:
+            raise ParameterValueError(self, min, what="minimum")
+
+        try:
+            self._max = int(max) if max is not None else None
+        except ValueError:
+            raise ParameterValueError(self, max, what="maximum")
+
         super().__init__(
             default,
             values,
@@ -468,6 +483,13 @@ class IntParameter(Parameter):
             const=const,
             influence=influence,
             help=help)
+
+    def _validate(self, value, what=None):
+        if self._min is not None and value < self._min:
+            raise ParameterValueError(self, value, what=what, detail=f"less than minimum value '{self._min}'")
+        if self._max is not None and value > self._max:
+            raise ParameterValueError(self, value, what=what, detail=f"greater than maximum value '{self._max}'")
+        super()._validate(value, what)
 
     def set_value(self, value):
         """ Set the parameter value.
@@ -659,11 +681,11 @@ class ListParameter(Parameter):
         value.sort()
         super().set_value(value)
 
-    def _validate(self, value):
+    def _validate(self, value, what=None):
         if self._accepted_values is not None:
             for item in value:
                 if item not in self._accepted_values:
-                    raise ParameterValueError(self, item)
+                    raise ParameterValueError(self, item, what=what)
 
     def get_value(self):
         return "+".join(self._value)

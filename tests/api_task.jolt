@@ -502,6 +502,70 @@ class TaskApi(JoltTest):
             self.build("pos")
         self.assertIn("Illegal default value", self.lastLog())
 
+    def test_param_int_bad_min(self):
+        """
+        --- tasks:
+        class Pos(Task):
+            arg = IntParameter(min="abc")
+        ---
+        """
+        with self.assertRaises(Exception):
+            self.build("pos")
+        self.assertIn("Illegal minimum value", self.lastLog())
+
+    def test_param_int_bad_max(self):
+        """
+        --- tasks:
+        class Pos(Task):
+            arg = IntParameter(max="abc")
+        ---
+        """
+        with self.assertRaises(Exception):
+            self.build("pos")
+        self.assertIn("Illegal maximum value", self.lastLog())
+
+    def test_param_int_bad_default_min(self):
+        """
+        --- tasks:
+        class Pos(Task):
+            arg = IntParameter(0, min=1)
+        ---
+        """
+        with self.assertRaises(Exception):
+            self.build("pos")
+        self.assertIn("Illegal default value", self.lastLog())
+
+    def test_param_int_bad_default_max(self):
+        """
+        --- tasks:
+        class Pos(Task):
+            arg = IntParameter(0, max=-1)
+        ---
+        """
+        with self.assertRaises(Exception):
+            self.build("pos")
+        self.assertIn("Illegal default value", self.lastLog())
+
+    def test_param_int_min_max(self):
+        """
+        --- tasks:
+        class Pos(Task):
+            arg = IntParameter(min=10, max=20)
+        ---
+        """
+        with self.assertRaises(Exception):
+            self.build("pos:arg=9")
+        self.assertIn("Illegal value", self.lastLog())
+        self.assertIn("less than", self.lastLog())
+
+        self.build("pos:arg=10")
+        self.build("pos:arg=20")
+
+        with self.assertRaises(Exception):
+            self.build("pos:arg=21")
+        self.assertIn("Illegal value", self.lastLog())
+        self.assertIn("greater than", self.lastLog())
+
     def test_param_regular(self):
         """
         --- tasks:
