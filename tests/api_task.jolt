@@ -1042,6 +1042,68 @@ class TaskApi(JoltTest):
             self.skip("required privileges not held")
         self.build("atest")
 
+    def test_runner(self):
+        '''
+        --- tasks:
+
+        class Exe(Task):
+            def publish(self, artifact, tools):
+                with tools.cwd(tools.builddir()):
+                    tools.write_file("exe", "#!/bin/sh\\necho Hello $1")
+                    tools.chmod("exe", 0o555)
+                    artifact.collect("exe")
+                    artifact.strings.executable = "exe"
+
+        class Run(Runner):
+            args = ["{{who}}"]
+            requires = ["exe"]
+            shell = BooleanParameter(True)
+            who = Parameter()
+
+        ---
+        '''
+        r = self.build("run:who=world1")
+        self.assertIn("Hello world1", r)
+        r = self.build("run:who=world2,shell=false")
+        self.assertIn("Hello world2", r)
+
+    def test_runner_no_executable_found(self):
+        '''
+        --- tasks:
+
+        class Exe(Task):
+            pass
+
+        class Run(Runner):
+            requires = ["exe"]
+        ---
+        '''
+        with self.assertRaises(Exception):
+            r = self.build("run")
+        self.assertIn("No executable found", self.lastLog())
+
+    def test_runner_timeout(self):
+        '''
+        --- tasks:
+
+
+        class Exe(Task):
+            def publish(self, artifact, tools):
+                with tools.cwd(tools.builddir()):
+                    tools.write_file("exe", "#!/bin/sh\\nsleep 5")
+                    tools.chmod("exe", 0o555)
+                    artifact.collect("exe")
+                    artifact.strings.executable = "exe"
+
+        class Run(Runner):
+            requires = ["exe"]
+            timeout = 1
+        ---
+        '''
+        with self.assertRaises(Exception):
+            r = self.build("run")
+        self.assertIn("Command timeout", self.lastLog())
+
     def test_script(self):
         '''
         --- tasks:

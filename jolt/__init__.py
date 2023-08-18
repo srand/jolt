@@ -9,6 +9,7 @@ from .tasks import ListParameter
 from .tasks import MultiTask
 from .tasks import Parameter
 from .tasks import Resource
+from .tasks import Runner
 from .tasks import Script
 from .tasks import Task
 from .tasks import TaskGenerator
@@ -38,6 +39,7 @@ __all__ = (
     "MultiTask",
     "Parameter",
     "Resource",
+    "Runner",
     "Script",
     "Task",
     "TaskGenerator",

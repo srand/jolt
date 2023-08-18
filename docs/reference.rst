@@ -131,6 +131,18 @@ Resource
 .. reference-resource-end
 
 
+Runner
+------
+
+.. reference-runner-start
+
+.. autoclass:: jolt.tasks.Runner
+   :members: args, requires, shell
+   :show-inheritance:
+
+.. reference-runner-end
+
+
 Script
 ------
 
@@ -408,6 +420,19 @@ The Docker module registers and makes available these artifact metadata attribut
 .. reference-docker-artifact-end
 
 .. reference-docker-end
+
+
+
+Google Test
+-----------
+
+.. reference-gtest-start
+
+.. automodule:: jolt.plugins.googletest
+   :members: break_on_failure, brief, fail_fast, filter, json_report, junit_report, repeat, shuffle
+
+.. reference-gtest-end
+
 
 
 Ninja

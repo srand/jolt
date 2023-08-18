@@ -1442,6 +1442,13 @@ class Task(TaskBase):
         fmt = self.tools.expand(fmt, *args, **kwargs)
         log.error(fmt, *args, **kwargs)
 
+    def verbose(self, fmt, *args, **kwargs):
+        """
+        Log verbose information about the task.
+        """
+        fmt = self.tools.expand(fmt, *args, **kwargs)
+        log.verbose(fmt, *args, **kwargs)
+
     def clean(self, tools):
         """
         Cleans up resources and intermediate files created by the task.
@@ -2124,6 +2131,102 @@ class MultiTask(Task):
                         log.debug("   - {}", str(dep))
 
             raise_task_error_if(subtasks, self, "Subtasks with unresolved dependencies could not be executed")
+
+
+class Runner(Task):
+    """
+    A Runner task executes applications packaged by other tasks.
+
+    It is typically used to run test applications compiled and linked
+    by other tasks. The Runner finds the executable through the artifact
+    metadata string ``artifact.strings.executable`` which must be exported
+    by the consumed task artifact.
+
+    Example:
+
+      .. code-block:: python
+
+        from jolt import Runner, Task
+
+        class Exe(Task):
+            \"\"\" Publish a script printing 'Hello world' to stdout \"\"\"
+            def publish(self, artifact, tools):
+                with tools.cwd(tools.builddir()):
+                    # Create Hello world script
+                    tools.write_file("hello.sh", "#!/bin/sh\\necho Hello world")
+
+                    # Make it executable
+                    tools.chmod("hello.sh", 0o555)
+
+                    # Publish script in artifact
+                    artifact.collect("hello.sh")
+
+                    # Inform consuming Runner task about executable's name
+                    artifact.strings.executable = "hello.sh"
+
+        class Run(Runner):
+            \"\"\" Runs the 'Hello world' script \"\"\"
+            requires = ["exe"]
+
+    The Ninja CXXExecutable task class automatically sets the required artifact metadata.
+
+    Example:
+
+      .. code-block:: python
+
+        from jolt import Task
+        from jolt.plugins.ninja import CXXExecutable
+
+        class Exe(CXXExecutable):
+            \"\"\" Compiles and links the test application \"\"\"
+            sources = ["test.cpp"]
+
+        class Run(Runner):
+            \"\"\" Runs the test application \"\"\"
+            requires = ["exe"]
+
+    """
+
+    abstract = True
+
+    args = []
+    """
+    List of arguments to pass to executables.
+
+    The arguments are passed the same way to all executables if there
+    are multiple task requirements.
+    """
+
+    requires = []
+    """ List of tasks packaging executables to run. """
+
+    shell = True
+    """ Launch the executables through a shell. """
+
+    timeout = None
+    """ Time after which the executable will be terminated """
+
+    def run(self, deps, tools):
+        args = tools.expand(self.args)
+        timeout = int(self.timeout) if self.timeout is not None else None
+        found = False
+
+        for task, artifact in deps.items():
+            if not artifact.get_task().is_cacheable():
+                continue
+            if artifact.strings.executable.get_value() is None:
+                self.verbose("No executable found in task artifact for '{}'", task)
+                continue
+            with tools.cwd(artifact.path):
+                found = True
+                exe = tools.expand_path(str(artifact.strings.executable))
+                exe = [exe] + args
+                exe = " ".join(exe) if self.shell else exe
+                tools.run(exe, shell=bool(self.shell), timeout=timeout)
+
+        raise_task_error_if(
+            not found, self,
+            "No executable found in any requirement artifact")
 
 
 class ErrorProxy(object):
