@@ -1755,7 +1755,7 @@ if __name__ == "__main__":
         # GCC style errors
         report.add_regex_errors_with_file(
             "Compiler Error",
-            r"(?P<location>(?P<file>.*?):(?P<line>[0-9]+):(?P<col>[0-9]+)): (?P<message>.*)",
+            r"^(?P<location>(?P<file>.*?):(?P<line>[0-9]+):(?P<col>[0-9]+)): (?P<message>.*)",
             logbuffer,
             self.outdir,
             lambda err: not err["message"].startswith("note:"))
@@ -1763,18 +1763,18 @@ if __name__ == "__main__":
         # other compiler errors
         report.add_regex_errors_with_file(
             "Compiler Error",
-            r"(?P<location>(?P<file>.*?)\((?P<line>[0-9]+)\)): (?P<message>error: .*)",
+            r"^(?P<location>(?P<file>.*?)\((?P<line>[0-9]+)\)): (?P<message>error: .*)",
             logbuffer,
             self.outdir)
 
         # Linker errors
         report.add_regex_errors(
             "Linker Error",
-            r"(?P<location>(?P<file>.*?):(.*?)): (?P<message>(undefined reference|multiple definition).*)",
+            r"^(?P<location>(?P<file>.*?):(.*?)): (?P<message>(undefined reference|multiple definition).*)",
             logbuffer)
         report.add_regex_errors(
             "Linker Error",
-            r"(?P<location>ld): (error|warning): (?P<message>.*)",
+            r"^(?P<location>ld): (error|warning): (?P<message>.*)",
             logbuffer)
 
 

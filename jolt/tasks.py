@@ -2263,7 +2263,7 @@ class ReportProxy(object):
          - details  - futher error details
 
         """
-        for match in re.finditer(regex, logbuf):
+        for match in re.finditer(regex, logbuf, re.MULTILINE):
             error = match.groupdict()
             self.add_error(
                 type,
@@ -2285,7 +2285,7 @@ class ReportProxy(object):
         In case file is a relative path, reldir is the working directory.
         """
         errors_by_location = OrderedDict()
-        for match in re.finditer(regex, logbuf):
+        for match in re.finditer(regex, logbuf, re.MULTILINE):
             error = match.groupdict()
             if not filterfn(error):
                 continue
