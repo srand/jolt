@@ -1,0 +1,457 @@
+#!/usr/bin/env python
+
+import shutil
+import sys
+import time
+sys.path.append(".")
+
+from testsupport import JoltTest
+
+
+class GoogleTestApi(JoltTest):
+    name = "ext/googletest"
+
+    def test_break_on_failure(self):
+        """
+        --- file: test.cpp
+        #include <gmock/gmock.h>
+        #include <gtest/gtest.h>
+
+        TEST(Test, Fail) {{
+            EXPECT_EQ(1, 2);
+        }}
+
+        TEST(Test, Pass) {{
+            EXPECT_EQ(1, 1);
+        }}
+        --- tasks:
+        from jolt.plugins.conan import Conan
+        from jolt.plugins import googletest, ninja
+
+        class GTest(Conan):
+            packages = ["gtest/1.11.0"]
+            settings = ["compiler.libcxx=libstdc++11"]
+
+        class Test(ninja.CXXExecutable):
+            requires = ["gtest"]
+            sources = ["test.cpp"]
+
+        @googletest.break_on_failure(default=True)
+        class Runner(Runner):
+            requires = ["test"]
+        ---
+        """
+        with self.assertRaises(Exception):
+            r = self.build("runner")
+        self.assertIn("Trace/breakpoint trap", self.lastLog())
+
+    def test_break_on_failure_attr_param(self):
+        """
+        --- tasks:
+        from jolt.plugins import googletest
+
+        @googletest.break_on_failure(param=False)
+        class A(Task):
+            break_on_failure = True
+
+            def run(self, deps, tools):
+                assert tools.getenv("GTEST_BREAK_ON_FAILURE") == "1"
+
+        @googletest.break_on_failure(attr="break")
+        class B(Task):
+            def run(self, deps, tools):
+                assert tools.getenv("GTEST_BREAK_ON_FAILURE") == "1"
+
+        ---
+        """
+        with self.assertRaises(Exception):
+            self.build("a:break_on_failure=true")
+        self.assertIn("No such parameter", self.lastLog())
+        self.build("a")
+        self.build("b:break=true")
+
+    def test_brief(self):
+        """
+        --- file: test.cpp
+        #include <gmock/gmock.h>
+        #include <gtest/gtest.h>
+
+        TEST(Test, Pass) {{
+            EXPECT_EQ(1, 1);
+        }}
+
+        TEST(Test, Fail) {{
+            EXPECT_EQ(1, 2);
+        }}
+
+        --- tasks:
+        from jolt.plugins.conan import Conan
+        from jolt.plugins import googletest, ninja
+
+        class GTest(Conan):
+            packages = ["gtest/1.11.0"]
+            settings = ["compiler.libcxx=libstdc++11"]
+
+        class Test(ninja.CXXExecutable):
+            requires = ["gtest"]
+            sources = ["test.cpp"]
+
+        @googletest.brief(default=True)
+        class Runner(Runner):
+            requires = ["test"]
+        ---
+        """
+        with self.assertRaises(Exception):
+            self.build("runner")
+        self.assertNotIn("Test.Pass", self.lastLog())
+
+    def test_brief_attr_param(self):
+        """
+        --- tasks:
+        from jolt.plugins import googletest
+
+        @googletest.brief(param=False)
+        class A(Task):
+            brief = True
+
+            def run(self, deps, tools):
+                assert tools.getenv("GTEST_BRIEF") == "1"
+
+        @googletest.brief(attr="br")
+        class B(Task):
+            def run(self, deps, tools):
+                assert tools.getenv("GTEST_BRIEF") == "1"
+
+        ---
+        """
+        with self.assertRaises(Exception):
+            self.build("a:brief=true")
+        self.assertIn("No such parameter", self.lastLog())
+        self.build("a")
+        self.build("b:br=true")
+
+    def test_disabled(self):
+        """
+        --- tasks:
+        from jolt.plugins import googletest
+
+        @googletest.disabled(default=True)
+        class Runner(Task):
+            def run(self, deps, tools):
+                assert tools.getenv("GTEST_ALSO_RUN_DISABLED_TESTS") == "1"
+        ---
+        """
+        self.build("runner")
+
+    def test_disabled_attr_param(self):
+        """
+        --- tasks:
+        from jolt.plugins import googletest
+
+        @googletest.disabled(param=False)
+        class A(Task):
+            disabled = True
+
+            def run(self, deps, tools):
+                assert tools.getenv("GTEST_ALSO_RUN_DISABLED_TESTS") == "1"
+
+        @googletest.disabled(attr="dis")
+        class B(Task):
+            def run(self, deps, tools):
+                assert tools.getenv("GTEST_ALSO_RUN_DISABLED_TESTS") == "1"
+
+        ---
+        """
+        with self.assertRaises(Exception):
+            self.build("a:disabled=true")
+        self.assertIn("No such parameter", self.lastLog())
+        self.build("a")
+        self.build("b:dis=true")
+
+    def test_junit_report(self):
+        """
+        --- file: test.cpp
+        #include <gmock/gmock.h>
+        #include <gtest/gtest.h>
+
+        TEST(Test, Pass) {{
+            EXPECT_EQ(1, 1);
+        }}
+
+        TEST(Test, Fail) {{
+            EXPECT_EQ(1, 2);
+        }}
+
+        --- tasks:
+        from contextlib import contextmanager
+        from jolt.plugins.conan import Conan
+        from jolt.plugins import googletest, ninja
+
+        class GTest(Conan):
+            packages = ["gtest/1.10.0"]
+            settings = ["compiler.libcxx=libstdc++11"]
+
+        class Test(ninja.CXXExecutable):
+            requires = ["gtest"]
+            sources = ["test.cpp"]
+
+        @googletest.filter()
+        @googletest.junit_report()
+        class Runner(Runner):
+            requires = ["test"]
+
+            @contextmanager
+            def report(self):
+                with super().report() as report:
+                    yield report
+                    if "Fail" in str(self.filter):
+                        assert len(report.errors) == 1
+                        assert "Expected equality" in report.errors[0].message
+        ---
+        """
+        r = self.build("runner:filter=*Pass")
+        a = self.artifacts(r)
+        self.assertExistsInPath(a[0], "report/junit/report.xml")
+
+        with self.assertRaises(Exception):
+            r = self.build("runner:filter=*Fail")
+        self.assertNotIn("AssertionError", self.lastLog())
+
+    def test_json_report(self):
+        """
+        --- file: test.cpp
+        #include <gmock/gmock.h>
+        #include <gtest/gtest.h>
+
+        TEST(Test, Pass) {{
+            EXPECT_EQ(1, 1);
+        }}
+
+        TEST(Test, Fail) {{
+            EXPECT_EQ(1, 2);
+        }}
+
+        --- tasks:
+        from contextlib import contextmanager
+        from jolt.plugins.conan import Conan
+        from jolt.plugins import googletest, ninja
+
+        class GTest(Conan):
+            packages = ["gtest/1.10.0"]
+            settings = ["compiler.libcxx=libstdc++11"]
+
+        class Test(ninja.CXXExecutable):
+            requires = ["gtest"]
+            sources = ["test.cpp"]
+
+        @googletest.filter()
+        @googletest.json_report()
+        class Runner(Runner):
+            requires = ["test"]
+
+            @contextmanager
+            def report(self):
+                with super().report() as report:
+                    yield report
+                    if "Fail" in str(self.filter):
+                        assert len(report.errors) == 1
+                        assert "Expected equality" in report.errors[0].message
+        ---
+        """
+        r = self.build("runner:filter=*Pass")
+        a = self.artifacts(r)
+        self.assertExistsInPath(a[0], "report/json/report.json")
+
+        with self.assertRaises(Exception):
+            r = self.build("runner:filter=*Fail")
+        self.assertNotIn("AssertionError", self.lastLog())
+
+    def test_fail_fast(self):
+        """
+        --- file: test.cpp
+        #include <gmock/gmock.h>
+        #include <gtest/gtest.h>
+
+        TEST(Test, Fail) {{
+            EXPECT_EQ(1, 2);
+        }}
+
+        TEST(Test, Pass) {{
+            EXPECT_EQ(1, 1);
+        }}
+        --- tasks:
+        from jolt.plugins.conan import Conan
+        from jolt.plugins import googletest, ninja
+
+        class GTest(Conan):
+            packages = ["gtest/1.11.0"]
+            settings = ["compiler.libcxx=libstdc++11"]
+
+        class Test(ninja.CXXExecutable):
+            requires = ["gtest"]
+            sources = ["test.cpp"]
+
+        @googletest.fail_fast(default=True)
+        class Runner(Runner):
+            requires = ["test"]
+        ---
+        """
+        with self.assertRaises(Exception):
+            r = self.build("runner")
+        self.assertIn("[  SKIPPED ] Test.Pass", self.lastLog())
+
+    def test_fail_fast_attr_param(self):
+        """
+        --- tasks:
+        from jolt.plugins import googletest
+
+        @googletest.fail_fast(param=False)
+        class A(Task):
+            fail_fast = True
+
+            def run(self, deps, tools):
+                assert tools.getenv("GTEST_FAIL_FAST") == "1"
+
+        @googletest.fail_fast(attr="fail")
+        class B(Task):
+            def run(self, deps, tools):
+                assert tools.getenv("GTEST_FAIL_FAST") == "1"
+
+        ---
+        """
+        with self.assertRaises(Exception):
+            self.build("a:fail_fast=true")
+        self.assertIn("No such parameter", self.lastLog())
+        self.build("a")
+        self.build("b:fail=true")
+
+    def test_repeat(self):
+        """
+        --- file: test.cpp
+        #include <gmock/gmock.h>
+        #include <gtest/gtest.h>
+
+        TEST(Test, Pass) {{
+            EXPECT_EQ(1, 1);
+        }}
+
+        --- tasks:
+        from jolt.plugins.conan import Conan
+        from jolt.plugins import googletest, ninja
+
+        class GTest(Conan):
+            packages = ["gtest/1.11.0"]
+            settings = ["compiler.libcxx=libstdc++11"]
+
+        class Test(ninja.CXXExecutable):
+            requires = ["gtest"]
+            sources = ["test.cpp"]
+
+        @googletest.repeat()
+        class Runner(Runner):
+            requires = ["test"]
+        ---
+        """
+        r = self.build("runner:repeat=10")
+        self.assertIn("Repeating all tests (iteration 10)", r)
+
+    def test_repeat_attr_param(self):
+        """
+        --- tasks:
+        from jolt.plugins import googletest
+
+        @googletest.repeat(param=False)
+        class A(Task):
+            repeat = 7
+
+            def run(self, deps, tools):
+                assert tools.getenv("GTEST_REPEAT") == "7"
+
+        @googletest.repeat(attr="rep")
+        class B(Task):
+            def run(self, deps, tools):
+                assert tools.getenv("GTEST_REPEAT") == "7"
+
+        ---
+        """
+        with self.assertRaises(Exception):
+            self.build("a:repeat=7")
+        self.assertIn("No such parameter", self.lastLog())
+        self.build("a")
+        self.build("b:rep=7")
+
+    def test_seed(self):
+        """
+        --- tasks:
+        from jolt.plugins import googletest
+
+        @googletest.seed(default=True)
+        class Runner(Task):
+            def run(self, deps, tools):
+                assert tools.getenv("GTEST_RANDOM_SEED") == "1"
+        ---
+        """
+        self.build("runner")
+
+    def test_seed_attr_param(self):
+        """
+        --- tasks:
+        from jolt.plugins import googletest
+
+        @googletest.seed(param=False)
+        class A(Task):
+            seed = 7
+
+            def run(self, deps, tools):
+                assert tools.getenv("GTEST_RANDOM_SEED") == "7"
+
+        @googletest.seed(attr="seeeed")
+        class B(Task):
+            def run(self, deps, tools):
+                assert tools.getenv("GTEST_RANDOM_SEED") == "7"
+
+        ---
+        """
+        with self.assertRaises(Exception):
+            self.build("a:seed=7")
+        self.assertIn("No such parameter", self.lastLog())
+        self.build("a")
+        self.build("b:seeeed=7")
+
+    def test_shuffle(self):
+        """
+        --- tasks:
+        from jolt.plugins import googletest
+
+        @googletest.shuffle(default=True)
+        class Runner(Task):
+            def run(self, deps, tools):
+                assert tools.getenv("GTEST_SHUFFLE") == "1"
+        ---
+        """
+        self.build("runner")
+
+    def test_shuffle_attr_param(self):
+        """
+        --- tasks:
+        from jolt.plugins import googletest
+
+        @googletest.shuffle(param=False)
+        class A(Task):
+            shuffle = True
+
+            def run(self, deps, tools):
+                assert tools.getenv("GTEST_SHUFFLE") == "1"
+
+        @googletest.shuffle(attr="shuff")
+        class B(Task):
+            def run(self, deps, tools):
+                assert tools.getenv("GTEST_SHUFFLE") == "1"
+
+        ---
+        """
+        with self.assertRaises(Exception):
+            self.build("a:shuffle=true")
+        self.assertIn("No such parameter", self.lastLog())
+        self.build("a")
+        self.build("b:shuff=true")

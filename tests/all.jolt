@@ -19,6 +19,7 @@ class All(Alias):
         "ext/alias",
         "ext/autoweight",
         "ext/conan",
+        "ext/googletest",
         "ext/ninja-compdb",
         "ext/symlinks",
         "int/utils",

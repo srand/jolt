@@ -1,0 +1,15 @@
+from jolt.plugins.conan import Conan
+from jolt.plugins.googletest import GTestRunner
+from jolt.plugins.ninja import CXXExecutable
+
+class GTest(Conan):
+    packages = ["gtest/1.14.0"]
+    settings = ["compiler.libcxx=libstdc++11"]
+
+class Test(CXXExecutable):
+    requires = ["gtest"]
+    sources = ["test.cpp"]
+
+class Run(GTestRunner):
+    requires = ["test"]
+    shuffle = False

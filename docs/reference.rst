@@ -429,7 +429,10 @@ Google Test
 .. reference-gtest-start
 
 .. automodule:: jolt.plugins.googletest
-   :members: break_on_failure, brief, fail_fast, filter, json_report, junit_report, repeat, shuffle
+   :members: break_on_failure, brief, disabled, fail_fast, filter, json_report, junit_report, repeat, seed, shuffle
+
+.. autoclass:: jolt.plugins.googletest.GTestRunner
+   :members: break_on_failure, brief, disabled, fail_fast, filter, repeat, seed, shuffle
 
 .. reference-gtest-end
 

@@ -191,3 +191,6 @@ global_string("{test}")
     def assertContains(self, filename, data):
         with self.tools.cwd(self.ws):
             self.assertIn(data, self.tools.read_file(filename))
+
+    def assertExistsInPath(self, path, *args):
+        self.assertTrue(os.path.exists(fs.path.join(path, *args)))
