@@ -1760,18 +1760,20 @@ if __name__ == "__main__":
             self.outdir,
             lambda err: not err["message"].startswith("note:"))
 
-        # other compiler errors
+        # MSVC compiler errors
         report.add_regex_errors_with_file(
             "Compiler Error",
-            r"^(?P<location>(?P<file>.*?)\((?P<line>[0-9]+)\)): (?P<message>error: .*)",
+            r"^(?P<location>(?P<file>.*?)\((?P<line>[0-9]+)\)): (?P<message>(fatal )?error( C[0-9]*?): .*)",
             logbuffer,
             self.outdir)
 
-        # Linker errors
+        # Binutils/MSVC linker errors
         report.add_regex_errors(
             "Linker Error",
-            r"^(?P<location>(?P<file>.*?):(.*?)): (?P<message>(undefined reference|multiple definition).*)",
+            r"^(?P<location>(?P<file>.*?)(:.*?)?)( )?: (?P<message>(( fatal)?error LNK|warning LNK|undefined reference|multiple definition).*)",
             logbuffer)
+
+        # LLVM linker errors
         report.add_regex_errors(
             "Linker Error",
             r"^(?P<location>ld): (error|warning): (?P<message>.*)",
