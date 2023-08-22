@@ -61,7 +61,7 @@ class TaskAttributeInfluence(HashInfluenceProvider):
         value = getattr(task, tools.Tools(task).expand(self._attrib), "N/A")
         try:
             value = value.__get__(task)
-            if type(value) == list and self._sort:
+            if type(value) is list and self._sort:
                 value.sort()
         except AttributeError:
             pass
@@ -146,7 +146,7 @@ class TaskSourceInfluence(HashInfluenceProvider):
             pass
 
         # Collect all functions from the class hierarchy
-        if type(obj) == type:
+        if type(obj) is type:
             funcs = [utils.getattr_safe(mro, funcname, TaskSourceInfluence._default_func)
                      for mro in obj.mro()]
         elif callable(obj) and hasattr(obj, "__self__"):

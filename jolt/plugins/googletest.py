@@ -46,7 +46,7 @@ import json
 
 from jolt import BooleanParameter, IntParameter, Parameter, Runner
 from jolt import influence
-from jolt.error import raise_task_error_if
+from jolt.error import raise_task_error, raise_task_error_if
 from jolt.plugins import junit
 from jolt.utils import deprecated, ignore_exception
 

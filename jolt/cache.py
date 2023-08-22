@@ -238,23 +238,23 @@ class ArtifactListAttribute(ArtifactAttribute):
         return self._name
 
     def set_value(self, value, expand=True):
-        if type(value) == str:
+        if type(value) is str:
             value = value.split(":")
-        raise_error_if(type(value) != list, "Illegal value assigned to artifact list attribute")
+        raise_error_if(type(value) is not list, "Illegal value assigned to artifact list attribute")
         self._value = self._artifact.get_task().expand(value) if expand else value
 
     def get_value(self):
         return self._value
 
     def append(self, value):
-        if type(value) == list:
+        if type(value) is list:
             self._value.extend(self._artifact.get_task().expand(value))
         else:
             self._value.append(self._artifact.get_task().expand(value))
 
     def extend(self, value):
         raise_error_if(
-            type(value) != list,
+            type(value) is not list,
             "Illegal type passed to {}.extend() - list expected".format(self._name))
         self._value.extend(self._artifact.get_task().expand(value))
 

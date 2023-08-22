@@ -162,7 +162,7 @@ def _run(cmd, cwd, env, preexec_fn, *args, **kwargs):
         raise JoltCommandError(
             "Command {0}: {1}".format(
                 "timeout" if timedout else "failed",
-                " ".join(cmd) if type(cmd) == list else cmd.format(*args, **kwargs)),
+                " ".join(cmd) if type(cmd) is list else cmd.format(*args, **kwargs)),
             stdoutbuf, stderrbuf, p.returncode)
     return "\n".join(stdoutbuf) if output_rstrip else "".join(stdoutbuf)
 
@@ -656,7 +656,7 @@ class Tools(object):
             if not concat:
                 checksum = hashfn()
 
-        return result[-1] if concat or type(filelist) == str else result
+        return result[-1] if concat or type(filelist) is str else result
 
     def chmod(self, pathname, mode):
         """ Changes permissions of files and directories.
@@ -1357,7 +1357,7 @@ class Tools(object):
             except Exception:
                 pass
             if self._run_prefix:
-                if type(cmd) == list:
+                if type(cmd) is list:
                     cmd = self._run_prefix + cmd
                 else:
                     cmd = " ".join(self._run_prefix) + " " + cmd
@@ -1401,7 +1401,7 @@ class Tools(object):
 
         """
         cmdprefix = self.expand(cmdprefix, *args, **kwargs)
-        if type(cmdprefix) == str:
+        if type(cmdprefix) is str:
             cmdprefix = cmdprefix.split()
 
         old_prefix = copy.copy(self._run_prefix)
@@ -1588,7 +1588,7 @@ class Tools(object):
         """
         raise_error_if(platform.system() != "Linux", "Tools.chroot() is only supported on Linux")
 
-        if type(chroot) == cache.Artifact:
+        if type(chroot) is cache.Artifact:
             raise_task_error_if(
                 not str(chroot.paths.rootfs), self._task,
                 "No 'rootfs' path in artifact")
@@ -1608,7 +1608,7 @@ class Tools(object):
         mount_builddir = kwargs.get("mount_builddir", True)
         mount = kwargs.get("mount", [])
         raise_task_error_if(
-            type(mount) != list,
+            type(mount) is not list,
             self._task, "Expected a list as mount argument to Tools.chroot()")
         mount = [self.expand(m) for m in mount]
 

@@ -79,9 +79,9 @@ class ArtifactEvictionStrategyRegister(object):
         self.strategies[strategy.name] = strategy
 
     def find(self, expiration_data):
-        if type(expiration_data) == str:
+        if type(expiration_data) is str:
             return self.strategies.get(expiration_data, Immediately)()
-        if type(expiration_data) == dict:
+        if type(expiration_data) is dict:
             for strategy, data in expiration_data.items():
                 strategy = self.strategies.get(strategy)
                 return strategy(**data) if strategy else Immediately()

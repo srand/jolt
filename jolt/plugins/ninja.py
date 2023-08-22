@@ -287,7 +287,7 @@ class ProjectVariable(Variable):
 
     def create(self, project, writer, deps, tools):
         value = getattr(project, self._attrib or self.name, "")
-        if type(value) == list:
+        if type(value) is list:
             value = " ".join(value)
         writer.variable(self.name, str(value))
 

@@ -151,7 +151,7 @@ def getsize(section, key, default=None, alias=None):
     units = {"B": 1, "K": 1024, "M": 1024**2, "G": 1024**3, "T": 1024**4}
     value = get(section, key, default=None, alias=alias)
     if value is None:
-        if type(default) == int:
+        if type(default) is int:
             return default
         else:
             value = str(default)

@@ -27,9 +27,9 @@ locked = lock.locked
 
 def is_str(s):
     try:
-        return type(s) == str or type(s) == unicode
+        return type(s) is str or type(s) is unicode
     except NameError:
-        return type(s) == str
+        return type(s) is str
 
 
 def decode_str(s):
@@ -57,7 +57,7 @@ def decorate_prepend(func, extra_func):
 def as_list(t):
     if t is None:
         return []
-    return [t] if type(t) == str or not is_iterable(t) else list(t)
+    return [t] if type(t) is str or not is_iterable(t) else list(t)
 
 
 def is_iterable(x):
@@ -70,9 +70,9 @@ def is_iterable(x):
 
 
 def as_stable_string_list(o):
-    if type(o) == list or type(o) == tuple:
+    if type(o) is list or type(o) is tuple:
         return sorted([str(item) for item in o])
-    elif type(o) == dict:
+    elif type(o) is dict:
         return sorted(["{0}={1}".format(key, as_stable_string_list(val))
                        for key, val in o.items()])
     else:
@@ -80,7 +80,7 @@ def as_stable_string_list(o):
 
 
 def as_stable_tuple_list(o):
-    assert type(o) == dict, "as_stable_tuple_list: argument is not a dict"
+    assert type(o) is dict, "as_stable_tuple_list: argument is not a dict"
     list = [(key, value) for key, value in o.items()]
     return sorted(list, key=lambda x: x[0])
 
@@ -214,7 +214,7 @@ class _SafeDict(object):
             value = call_and_catch(getattr, self.values.get("_instance", object()), key)
         if value is None:
             value = self._envget(key)
-        if type(value) == list:
+        if type(value) is list:
             value = " ".join(value)
         if value is not None:
             return value
@@ -299,7 +299,7 @@ class duration_diff(object):
         if isinstance(dur, duration):
             now = duration()
             self._elapsed += dur.diff(now)._elapsed
-        if type(dur) == int:
+        if type(dur) is int:
             self._elapsed += dur
         return self
 
@@ -456,16 +456,16 @@ def concat_attributes(attrib, postfix, prepend=False):
             if orig is None:
                 orig = type(appended)()
 
-            assert type(orig) == type(appended), \
+            assert type(orig) is type(appended), \
                 f"Cannot append attributes '{attrib}' and '{postfix}': mismatching type"
 
-            assert type(orig) == list or type(orig) == dict, \
+            assert type(orig) is list or type(orig) is dict, \
                 f"Cannot append attributes '{attrib}' and '{postfix}': unsupported type '{type(orig)}'"
 
-            if type(orig) == dict:
+            if type(orig) is dict:
                 value = orig | appended
 
-            if type(appended) == list:
+            if type(appended) is list:
                 value = orig + appended if not prepend else appended + orig
 
             return value

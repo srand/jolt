@@ -88,7 +88,7 @@ def move(src, dst):
 
 def onerror_warning(func, path, exc_info):
     from jolt import log
-    if type(exc_info[1]) == OSError:
+    if type(exc_info[1]) is OSError:
         msg = exc_info[1].strerror
     else:
         msg = "Reason unknown"

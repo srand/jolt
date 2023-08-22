@@ -4,7 +4,7 @@ import re
 
 class version(object):
     def __init__(self, verstr):
-        if type(verstr) == str:
+        if type(verstr) is str:
             match = re.search(r"(?P<major>[\d]+)\.(?P<minor>[\d]+)(\.(?P<patch>[\d]+))?", verstr)
             if not match:
                 raise ValueError(verstr)
@@ -12,7 +12,7 @@ class version(object):
             self.major = int(values["major"])
             self.minor = int(values["minor"])
             self.patch = int(values["patch"]) if values["patch"] else None
-        elif type(verstr) == tuple:
+        elif type(verstr) is tuple:
             if len(verstr) < 2 or len(verstr) > 3:
                 raise ValueError(verstr)
             self.major = verstr[0]

@@ -199,7 +199,7 @@ class TaskHookRegistry(object):
 
     @contextmanager
     def task_run(self, task):
-        tasks = [task] if type(task) != list else task
+        tasks = [task] if type(task) is not list else task
         with ExitStack() as stack:
             for task in tasks:
                 if task.is_resource():

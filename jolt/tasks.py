@@ -677,7 +677,7 @@ class ListParameter(Parameter):
         Raises:
             ParameterValueError: If the parameter is assigned an illegal value.
         """
-        value = str(value).split("+") if type(value) == str else value
+        value = str(value).split("+") if type(value) is str else value
         value.sort()
         super().set_value(value)
 
@@ -748,7 +748,7 @@ class ListParameter(Parameter):
             [INFO] optimization is disabled (example)
 
         """
-        if type(key) == str:
+        if type(key) is str:
             key = key.split(",")
             if len(key) == 1:
                 true = key[0]
@@ -983,9 +983,9 @@ class attributes:
                 def publish(self, artifact, tools):
                     old_pub(self, artifact, tools)
                     for args in getattr(self, "__publish_files")():
-                        if type(args) == tuple:
+                        if type(args) is tuple:
                             artifact.collect(*args)
-                        elif type(args) == dict:
+                        elif type(args) is dict:
                             artifact.collect(**args)
                         else:
                             artifact.collect(args)
@@ -1392,7 +1392,7 @@ class TaskBase(object):
 
         try:
             kwargs["_instance"] = self
-            if type(string_or_list) == list:
+            if type(string_or_list) is list:
                 return [utils.expand(string, *args, **kwargs) for string in string_or_list]
             return utils.expand(string_or_list, *args, **kwargs)
         except KeyError as e:
@@ -1643,7 +1643,7 @@ class SubTask(object):
 
     def add_output(self, output):
         self.add_identity(output)
-        if type(output) == list:
+        if type(output) is list:
             self._outputs.extend(output)
         else:
             self._outputs.append(output)
@@ -2622,9 +2622,9 @@ class Download(Task):
     def publish(self, artifact, tools):
         with tools.cwd(self._extractdir):
             for files in self.collect:
-                if type(files) == tuple:
+                if type(files) is tuple:
                     artifact.collect(*files, symlinks=self.symlinks)
-                elif type(files) == dict:
+                elif type(files) is dict:
                     artifact.collect(**files, symlinks=self.symlinks)
                 else:
                     artifact.collect(files, symlinks=self.symlinks)
@@ -2716,9 +2716,9 @@ class Script(Task):
     def publish(self, artifact, tools):
         with tools.cwd(self.builddir):
             for files in self.collect:
-                if type(files) == tuple:
+                if type(files) is tuple:
                     artifact.collect(*files)
-                elif type(files) == dict:
+                elif type(files) is dict:
                     artifact.collect(**files)
                 else:
                     artifact.collect(files)
@@ -2851,7 +2851,7 @@ class Test(Task):
                    self.assertEqual(factor1*factor2, product)
 
         """
-        raise_error_if(type(args) != list, "Test.parameterized() expects a list as argument")
+        raise_error_if(type(args) is not list, "Test.parameterized() expects a list as argument")
 
         class partialmethod(functools.partialmethod):
             def __init__(self, index, func, *args):
