@@ -17,20 +17,22 @@
 
 deactivate-jolt() {
     # Common settings
-    if ! [ -z "${_OLD_PS1+_}" ] ; then
-        PS1="$_OLD_PS1"
-        export PS1
+    if [ -v "${_OLD_PS1+_}" ] ; then
+        export PS1="$_OLD_PS1"
         unset _OLD_PS1
+    elif [ -v "${_UNSET_PS1+_}" ]; then
+        unset PS1
     fi
 
 
 {% if ctx.environ %}
     # Restore all environment variables
     {% for key in ctx.environ %}
-    if ! [ -z "${_OLD_{{ key }}+_}" ] ; then
-        {{ key }}="$_OLD_{{ key }}"
-        export {{ key }}
+    if [ -v "${_OLD_{{ key }}+_}" ] ; then
+        export {{ key }}="$_OLD_{{ key }}"
         unset _OLD_{{ key }}
+    elif [ -v "${_UNSET_{{ key }}+_}" ]; then
+        unset {{ key }}
     fi
 
     {% endfor %}
@@ -53,7 +55,11 @@ export PS1="(jolt) $PS1"
 
 # Backup all environment variables
 {% for key in ctx.environ %}
+if [ -v "{{ key }}" ]; then
 _OLD_{{ key }}="${{ key }}"
+else
+_UNSET_{{ key }}="{{ key }}"
+fi
 {% endfor %}
 
 {% for task in ctx.tasks %}
