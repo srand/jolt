@@ -2480,6 +2480,7 @@ class Chroot(Resource):
                 tools.run("gcc -v")
 
     """
+    abstract = True
 
     chroot = None
     """ Task name or directory path to use as chroot """
