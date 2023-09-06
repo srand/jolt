@@ -638,7 +638,7 @@ class Artifact(object):
             self.files.append(self.tools.expand_relpath(src), dest)
             self.tools.copy(src, fs.path.join(self._temp, dest), symlinks=symlinks)
             log.verbose("Collected {0} -> {2}/{1}", src, dest, self._temp)
-            return
+            return [dest]
 
         # Expand directories into full file list if flatting a tree
         # Determine relative artifact destination paths
@@ -661,6 +661,8 @@ class Artifact(object):
                 self.files.append(self.tools.expand_relpath(srcpath), reldstpath)
                 self.tools.copy(srcpath, dstpath, symlinks=symlinks)
                 log.verbose("Collected {0} -> {1}", relsrcpath, reldstpath)
+
+        return reldestfiles
 
     def copy(self, files, dest, flatten=False, symlinks=False, cwd=None):
         """ Copy files from the artifact.

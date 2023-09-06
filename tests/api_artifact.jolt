@@ -15,28 +15,47 @@ class ArtifactApi(JoltTest):
         """
         --- file: dir1/file1.txt
         --- file: file2.txt
+        --- file: dir2/file3.txt
+        --- file: dir2/dir3/file4.txt
         --- tasks:
 
         @influence.files("**/*.txt")
         class File(Task):
             def publish(self, a, t):
-                a.collect("file2.txt")
-                a.collect("file2.txt", "file2_renamed.txt")
-                a.collect("file2.txt", "dir2/")
-                a.collect("file2.txt", "dir2/file2_renamed_2.txt")
+                r = a.collect("file2.txt")
+                assert r == ["file2.txt"]
+                r = a.collect("file2.txt", "file2_renamed.txt")
+                assert r == ["file2_renamed.txt"]
+                r = a.collect("file2.txt", "dir2/")
+                assert r == ["dir2/file2.txt"]
+                r = a.collect("file2.txt", "dir2/file2_renamed_2.txt")
+                assert r == ["dir2/file2_renamed_2.txt"]
 
         @influence.files("**/*.txt")
         class Dir(Task):
             def publish(self, a, t):
-                a.collect("dir1")
-                a.collect("dir1", "dir1_renamed")
-                a.collect("dir1", "dir2/")
-                a.collect("dir1", "dir2/dir1_renamed_2")
+                r = a.collect("dir1")
+                assert r == ["dir1"]
+                r = a.collect("dir1", "dir1_renamed")
+                assert r == ["dir1_renamed"]
+                r = a.collect("dir1", "dir2/")
+                assert r == ["dir2/dir1"]
+                r = a.collect("dir1", "dir2/dir1_renamed_2")
+                assert r == ["dir2/dir1_renamed_2"]
 
         @influence.files("**/*.txt")
         class Flattened(Task):
             def publish(self, a, t):
-                a.collect("dir1", flatten=True)
+                r = a.collect("dir1", flatten=True)
+                assert r == ["file1.txt"]
+
+        @influence.files("**/*.txt")
+        class Wildcard(Task):
+            def publish(self, a, t):
+                r = a.collect("*/*.txt", "norecurse/")
+                assert r == ["norecurse/dir1/file1.txt", "norecurse/dir2/file3.txt"]
+                r = a.collect("dir2/**/*.txt", "recurse/")
+                assert r == ["recurse/dir2/file3.txt", "recurse/dir2/dir3/file4.txt"], r
 
         ---
         """
@@ -57,6 +76,12 @@ class ArtifactApi(JoltTest):
         r = self.build("flattened")
         a = self.artifacts(r)
         self.assertExists(join(a[0], "file1.txt"))
+
+        r = self.build("wildcard")
+        a = self.artifacts(r)
+        self.assertExists(join(a[0], "norecurse", "dir1", "file1.txt"))
+        self.assertExists(join(a[0], "recurse", "dir2", "file3.txt"))
+        self.assertExists(join(a[0], "recurse", "dir2", "dir3", "file4.txt"))
 
     def test_copy(self):
         """
