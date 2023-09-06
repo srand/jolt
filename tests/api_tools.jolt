@@ -521,6 +521,28 @@ class ToolsApi(JoltTest):
             self.assertExists("extracted/test1.txt")
             self.assertNotExists("extracted/test2.txt")
 
+    def test_move(self):
+        """
+        --- file: dir1/test1.txt
+        --- file: dir2/test2.txt
+        ---
+        """
+        with self.tools.cwd(self.ws):
+            breakpoint()
+            self.tools.move("dir1/test1.txt", "dir1/test1_1.txt")
+            self.assertExists("dir1/test1_1.txt")
+
+            self.tools.move("dir1", "dir1_1")
+            self.assertExists("dir1_1/test1_1.txt")
+
+            self.tools.move("dir1_1/test1_1.txt", "dir2")
+            self.assertExists("dir1_1")
+            self.assertExists("dir2/test1_1.txt")
+
+            self.tools.move("dir2", "dir1_1")
+            self.assertExists("dir1_1/dir2/test1_1.txt")
+            self.assertExists("dir1_1/dir2/test2.txt")
+
     def test_read_depfile(self):
         """
         --- file: test.d

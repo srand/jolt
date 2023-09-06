@@ -909,6 +909,9 @@ class Tools(object):
             str: Expanded string.
         """
 
+        if type(pathname) is list:
+            return [self.expand_path(path) for path in pathname]
+
         path = fs.path.join(self.getcwd(), self.expand(pathname, *args, **kwargs))
         # Ensure to retain any trailing path separator which is used as
         # indicator of directory paths
@@ -1092,6 +1095,25 @@ class Tools(object):
         pathname = fs.path.dirname(pathname)
         if pathname:
             self.mkdir(pathname, recursively)
+
+    def move(self, src, dst):
+        """
+        Move/rename file.
+
+        Args:
+            src (str): Path to a file or directory to be moved.
+            dest (str): Destination path. If the destination is
+                an existing directory, then src is moved inside
+                that directory. If the destination already exists
+                but is not a directory, it may be overwritten.
+                If the destination is not on the same filesystem, the
+                source file or directory is copied to the destination
+                and then removed.
+        """
+
+        src = self.expand_path(src)
+        dst = self.expand_path(dst)
+        return shutil.move(src, dst)
 
     def map_consecutive(self, callable, iterable):
         """ Same as ``map()``. """
@@ -1667,7 +1689,8 @@ class Tools(object):
             if mount_home:
                 mount_bind("/home")
             if mount_joltdir and self._task:
-                mount_bind(self._task.joltdir)
+                from jolt.loader import get_workspacedir
+                mount_bind(get_workspacedir())
             if mount_cachedir:
                 mount_bind(config.get_cachedir())
             if mount_builddir:
