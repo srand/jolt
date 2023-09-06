@@ -1,0 +1,28 @@
+from jolt import Runner, Task
+from jolt.plugins import ninja
+
+
+class Exe(ninja.CXXExecutable):
+    """ Builds executable with code coverage instrumentation """
+    coverage = True
+    sources = ["main.cpp"]
+
+
+@ninja.attributes.coverage_data()
+class Run(Runner):
+    """ Runs executable and collects coverage data """
+    requires = ["exe"]
+
+
+@ninja.attributes.coverage_report_lcov()
+class LcovReport(Task):
+    """ Generates HTML report from code coverage data """
+    name = "report/lcov"
+    requires = ["run"]
+
+
+@ninja.attributes.coverage_report_gcov()
+class GcovReport(Task):
+    """ Generates gcov report from code coverage data """
+    name = "report/gcov"
+    requires = ["run"]

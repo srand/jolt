@@ -1,0 +1,158 @@
+#!/usr/bin/env python
+
+import os
+import sys
+import time
+sys.path.append(".")
+
+from testsupport import JoltTest
+
+
+class NinjaCoverageApi(JoltTest):
+    name = "api/ninja/coverage"
+
+    def assertCompiled(self, r, filename):
+        assert filename in r, f"{filename} was not compiled"
+
+    def assertNotCompiled(self, r, filename):
+        assert filename not in r, f"{filename} was compiled"
+
+    def _recipe(self):
+        return "import jolt\nfrom jolt.plugins.ninja import *\n" + super()._recipe()
+
+    def test_coverage_gcov(self):
+        """
+        --- file: lib.cpp
+        int lib(int argc) {{ if (argc >= 2) return 1; return 0; }}
+
+        --- file: exe.cpp
+        extern int lib(int);
+        int main(int argc, char *argv[]) {{ if (argc >= 2) return 1; return lib(argc); }}
+
+        --- tasks:
+        class Lib(CXXLibrary):
+            coverage = True
+            sources = ["lib.cpp"]
+
+        class Exe(CXXExecutable):
+            coverage = True
+            requires = ["lib"]
+            sources = ["exe.cpp"]
+
+        @attributes.coverage_data()
+        @attributes.coverage_report_gcov()
+        class ExeRunAndReport(Exe):
+            name = "linkrunreport"
+            def run(self, deps, tools):
+                super().run(deps, tools)
+                with tools.cwd(self.outdir):
+                    tools.run("./{{binary}}")
+
+        @attributes.coverage_data()
+        class Run(Runner):
+            requires = ["exe"]
+            selfsustained = True
+
+        @attributes.coverage_report_gcov(coverage_data=True)
+        class Report(Task):
+            requires = ["run"]
+
+        @attributes.coverage_data(publish=False)
+        @attributes.coverage_report_gcov()
+        class RunAndReport(Runner):
+            requires = ["exe"]
+            selfsustained = True
+        ---
+        """
+
+        def assertGcov(self, artifact):
+            """ Artifact should contain lib.cpp.gcov and exe.cpp.gcov """
+            self.assertExists(artifact, "report/gcov/lib.cpp.gcov")
+            self.assertDataInFile("function lib(int) called 1 returned 100% blocks executed 75%", artifact, "report/gcov/lib.cpp.gcov")
+            self.assertDataInFile("branch  0 taken 0%", artifact, "report/gcov/lib.cpp.gcov")
+            self.assertExists(artifact, "report/gcov/exe.cpp.gcov")
+            self.assertDataInFile("function main called 1 returned 100% blocks executed 80%", artifact, "report/gcov/exe.cpp.gcov")
+            self.assertDataInFile("branch  0 taken 0%", artifact, "report/gcov/exe.cpp.gcov")
+
+        r = self.build("report")
+        a = self.artifacts(r)
+        assertGcov(self, a[0])
+        self.assertExists(a[0], "cov")
+
+        r = self.build("runandreport")
+        a = self.artifacts(r)
+        assertGcov(self, a[0])
+        self.assertNotExists(a[0], "cov")
+
+        r = self.build("linkrunreport")
+        a = self.artifacts(r)
+        assertGcov(self, a[0])
+        self.assertExists(a[0], "cov")
+
+    def test_coverage_lcov(self):
+        """
+        --- file: lib.cpp
+        int lib(int argc) {{ if (argc >= 2) return 1; return 0; }}
+
+        --- file: exe.cpp
+        extern int lib(int);
+        int main(int argc, char *argv[]) {{ if (argc >= 2) return 1; return lib(argc); }}
+
+        --- tasks:
+        class Lib(CXXLibrary):
+            coverage = True
+            sources = ["lib.cpp"]
+
+        class Exe(CXXExecutable):
+            coverage = True
+            requires = ["lib"]
+            sources = ["exe.cpp"]
+
+        @attributes.coverage_data()
+        @attributes.coverage_report_lcov()
+        class ExeRunAndReport(Exe):
+            name = "linkrunreport"
+            def run(self, deps, tools):
+                super().run(deps, tools)
+                with tools.cwd(self.outdir):
+                    tools.run("./{{binary}}")
+
+        @attributes.coverage_data()
+        class Run(Runner):
+            requires = ["exe"]
+            selfsustained = True
+
+        @attributes.coverage_report_lcov(coverage_data=True)
+        class Report(Task):
+            name = "report"
+            requires = ["run"]
+
+        @attributes.coverage_data(publish=False)
+        @attributes.coverage_report_lcov()
+        class RunAndReport(Runner):
+            requires = ["exe"]
+            selfsustained = True
+        ---
+        """
+
+        def assertLcov(self, artifact):
+            """ Artifact should contain coverage.info and html report """
+            self.assertExists(artifact, "report/lcov/coverage.info")
+            self.assertDataInFile("SF:lib.cpp", artifact, "report/lcov/coverage.info")
+            self.assertDataInFile("SF:exe.cpp", artifact, "report/lcov/coverage.info")
+            self.assertExists(artifact, "report/html/index.html")
+
+        r = self.build("report")
+        a = self.artifacts(r)
+        assertLcov(self, a[0])
+        self.assertExistsInPath(a[0], "cov")
+
+        r = self.build("runandreport")
+        a = self.artifacts(r)
+        assertLcov(self, a[0])
+        self.assertNotExists(a[0], "cov")
+
+        r = self.build("linkrunreport")
+        a = self.artifacts(r)
+        assertLcov(self, a[0])
+        self.assertExists(a[0], "cov")

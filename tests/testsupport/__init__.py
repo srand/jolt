@@ -180,10 +180,12 @@ global_string("{test}")
             self.fail("{} was not downloaded".format(task))
 
     def assertExists(self, *args):
-        self.assertTrue(os.path.exists(fs.path.join(self.ws, *args)))
+        assert os.path.exists(fs.path.join(self.ws, *args)), \
+            "{} does not exist".format(fs.path.join(*args))
 
     def assertNotExists(self, *args):
-        self.assertFalse(os.path.exists(fs.path.join(self.ws, *args)))
+        assert not os.path.exists(fs.path.join(self.ws, *args)), \
+            "{} does exist".format(fs.path.join(*args))
 
     def assertIsDir(self, *args):
         self.assertTrue(os.path.isdir(fs.path.join(self.ws, *args)))
@@ -191,6 +193,10 @@ global_string("{test}")
     def assertContains(self, filename, data):
         with self.tools.cwd(self.ws):
             self.assertIn(data, self.tools.read_file(filename))
+
+    def assertDataInFile(self, data, *filename):
+        with self.tools.cwd(self.ws):
+            self.assertIn(data, self.tools.read_file(os.path.join(*filename)))
 
     def assertExistsInPath(self, path, *args):
         self.assertTrue(os.path.exists(fs.path.join(path, *args)))

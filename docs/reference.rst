@@ -31,7 +31,7 @@ Artifact
 .. reference-artifact-end
 
 Chroot
---------
+------
 
 .. reference-chroot-start
 
@@ -453,6 +453,7 @@ CXXExecutable
   .. autoattribute:: asflags
   .. autoattribute:: binary
   .. autoattribute:: cflags
+  .. autoattribute:: coverage
   .. autoattribute:: cxxflags
   .. autoattribute:: incpaths
   .. autoattribute:: incremental
@@ -481,6 +482,7 @@ CXXLibrary
   .. autoattribute:: asflags
   .. autoattribute:: binary
   .. autoattribute:: cflags
+  .. autoattribute:: coverage
   .. autoattribute:: cxxflags
   .. autoattribute:: headers
   .. autoattribute:: incpaths
@@ -509,7 +511,7 @@ Decorators
 .. reference-ninja-decorators-start
 
 .. autoclass:: jolt.plugins.ninja.attributes
-  :members: asflags, cflags, cxxflags, incpaths, ldflags, libpaths, libraries, macros, sources
+  :members: asflags, cflags, coverage_data, coverage_report_gcov, coverage_report_lcov, cxxflags, incpaths, ldflags, libpaths, libraries, macros, sources
 
 .. reference-ninja-decorators-end
 

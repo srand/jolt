@@ -240,23 +240,23 @@ Below is a skeleton example providing mutual exclusion:
         to = Parameter(help="Name of shared object")
 
         def acquire(self, artifact, deps, tools):
-	    # TODO: Implement locking
+            # TODO: Implement locking
             self.info("{to} is now locked")
 
         def release(self, artifact, deps, tools):
-	    # TODO: Implement unlocking
+            # TODO: Implement unlocking
             self.info("{to} is now unlocked")
 
 
     class RebootDevice(Task):
-	""" Reboots the specified test device """
+        """ Reboots the specified test device """
 
-	device = Parameter(help="Name of device to reboot")
+        device = Parameter(help="Name of device to reboot")
         requires = ["exclusivity:to={device}"]
-	cacheable = False
+        cacheable = False
 
-	def run(self, deps, tools):
-	    tools.run("ssh {device} reboot")
+        def run(self, deps, tools):
+            tools.run("ssh {device} reboot")
 
 Tests
 ------
@@ -429,9 +429,9 @@ To build the library and the program we use this Jolt recipe:
 
     class Message(CXXLibrary):
         recipient = Parameter(default="world", help="Name of greeting recipient.")
-	headers = ["lib/message.h"]
+        headers = ["lib/message.h"]
         sources = ["lib/message.cpp"]
-	macros = ['RECIPIENT="{recipient}"']
+        macros = ['RECIPIENT="{recipient}"']
 
 
     class HelloWorld(CXXExecutable):
@@ -455,14 +455,14 @@ of ``Message`` are equivalent.
     class Message(CXXLibrary):
         recipient = Parameter(default="world", help="Name of greeting recipient.")
         sources = ["lib/message.*"]
-	macros = ['RECIPIENT="{recipient}"']
+        macros = ['RECIPIENT="{recipient}"']
 
-	def publish(self, artifact, tools):
-	    with tools.cwd("{outdir}"):
-	        artifact.collect("*.a", "lib/")
-		artifact.cxxinfo.libpaths.append("lib")
-	    artifact.collect("lib/*.h", "include/")
-	    artifact.cxxinfo.incpaths.append("include")
+        def publish(self, artifact, tools):
+            with tools.cwd("{outdir}"):
+                artifact.collect("*.a", "lib/")
+            artifact.cxxinfo.libpaths.append("lib")
+            artifact.collect("lib/*.h", "include/")
+            artifact.cxxinfo.incpaths.append("include")
 
 
 The ``cxxinfo`` artifact metadata can be used with other build systems too,
@@ -492,9 +492,9 @@ and ``macros_debug_false`` attributes in the class.
     @ninja.attributes.cxxflags("cxxflags_debug_{debug}")
     @ninja.attributes.macros("macros_debug_{debug}")
     class Message(ninja.CXXLibrary):
-	debug = BooleanParameter()
-	cxxflags_debug_true = ["-g", "-Og"]
-	macros_debug_true = ["DEBUG"]
+        debug = BooleanParameter()
+        cxxflags_debug_true = ["-g", "-Og"]
+        macros_debug_true = ["DEBUG"]
         sources = ["lib/message.*"]
 
 
@@ -505,7 +505,7 @@ The next example includes source files conditionally.
 
     @ninja.attributes.sources("sources_{os}")
     class Message(ninja.CXXLibrary):
-	os = Parameter(values=["linux", "windows"])
+        os = Parameter(values=["linux", "windows"])
         sources = ["lib/*.cpp"]
         sources_linux = ["lib/posix/*.cpp"]
         sources_windows = ["lib/win32/*.cpp"]
@@ -609,7 +609,7 @@ that will be accessible to the rule.
     class MyQtProject(CXXExecutable):
         sources = ["myqtproject.h", "myqtproject.cpp"]
 
-	custom_cxxflags = EnvironmentVariable()
+        custom_cxxflags = EnvironmentVariable()
 
         cxx_rule = Rule(
             command="g++ $custom_cxxflags -o $out -c $in",
@@ -621,6 +621,28 @@ that will be accessible to the rule.
 
     $ CUSTOM_CXXFLAGS=-DDEBUG jolt build myqtproject
 
+
+Code Coverage
+~~~~~~~~~~~~~
+
+Ninja tasks have builtin support for code coverage instrumentation,
+data collection and reporting. By setting the ``coverage`` class
+attribute to ``True``, instrumentation is enabled and coverage data
+files will be generated when the executable is run. Currently, only
+GCC/Clang toolchains are supported, not MSVC.
+
+The coverage data can be automatically collected and processed into a
+plain-text or HTML reports with the help of task class decorators. The
+decorators rely on either `Gcov
+<https://gcc.gnu.org/onlinedocs/gcc/Gcov.html>`_ (plain-text) or `Lcov
+<https://github.com/linux-test-project/lcov>`_ (HTML) to carry out the
+work.
+
+Example:
+
+  .. literalinclude:: ../examples/code_coverage/coverage.jolt
+     :language: python
+     :caption: examples/code_coverage/coverage.jolt
 
 
 Toolchains
@@ -637,19 +659,19 @@ First, define a toolchain task:
 
     class Toolchain(Task):
         arch = Parameter("i386", values=["i386", "arm"])
-	host = Parameter(platform.system())
-	debug = BooleanParameter(False)
+        host = Parameter(platform.system())
+        debug = BooleanParameter(False)
 
-	def publish(self, artifact, tools):
-	    if self.arch.get_value() == "arm":
-		artifact.environ.CC = "arm-linux-gnueabi-gcc"
-	    if self.arch.get_value() == "i386":
-		artifact.environ.CC = "x86_64-linux-gnu-gcc -m32"
-	    if self.debug.is_true:
-	        artifact.cxxinfo.cflags.append("-g")
-	        artifact.cxxinfo.cflags.append("-Og")
-	    else:
-	        artifact.cxxinfo.cflags.append("-O2")
+        def publish(self, artifact, tools):
+            if self.arch.get_value() == "arm":
+                artifact.environ.CC = "arm-linux-gnueabi-gcc"
+            if self.arch.get_value() == "i386":
+                artifact.environ.CC = "x86_64-linux-gnu-gcc -m32"
+            if self.debug.is_true:
+                artifact.cxxinfo.cflags.append("-g")
+                artifact.cxxinfo.cflags.append("-Og")
+            else:
+                artifact.cxxinfo.cflags.append("-O2")
 
 
 Flags can also be exported as environment variables, ``CFLAGS``, ``CXXFLAGS``, etc.
