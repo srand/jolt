@@ -528,7 +528,6 @@ class ToolsApi(JoltTest):
         ---
         """
         with self.tools.cwd(self.ws):
-            breakpoint()
             self.tools.move("dir1/test1.txt", "dir1/test1_1.txt")
             self.assertExists("dir1/test1_1.txt")
 
