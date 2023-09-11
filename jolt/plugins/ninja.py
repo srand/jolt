@@ -413,6 +413,7 @@ class attributes:
                         tools.replace_in_file("coverage.info.abs", f"SF:{wsdir}/" + "{{cachedir}}/", f"SF:{cachedir}/")
 
                         if tools.file_size("coverage.info") <= 0:
+                            tools.unlink("coverage.info")
                             self.warning("No coverage data records available, skipping HTML report generation")
                             return
 
@@ -434,8 +435,8 @@ class attributes:
                 def publish_coverage_report_lcov_info(self, artifact, tools):
                     reportdir = tools.builddir("coverage-report-lcov")
                     with tools.cwd(reportdir):
-                        artifact.collect("coverage.info", "report/lcov/")
-                        artifact.paths.coverage_report_lcov = "report/lcov/coverage.info"
+                        if artifact.collect("coverage.info", "report/lcov/"):
+                            artifact.paths.coverage_report_lcov = "report/lcov/coverage.info"
 
                 def publish_coverage_report_lcov_html(self, artifact, tools):
                     htmldir = tools.builddir("coverage-report-lcov-html")
