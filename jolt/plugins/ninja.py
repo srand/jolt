@@ -1824,8 +1824,7 @@ class CXXProject(Task):
     """ Name of the target binary (defaults to canonical task name) """
 
     coverage = False
-    """
-    Enable code coverage instrumentation.
+    """Enable code coverage instrumentation.
 
     Only implemented for GCC/Clang toolchains.
 
@@ -1835,11 +1834,12 @@ class CXXProject(Task):
     task artifact. Upon running the executable, coverage data files are
     generated.
 
-    Use the :func:`coverage_data` decorator to automatically collect and
-    publish data files in tasks that run instrumented binaries. The
-    :func:`coverage_report_gcov" decorator can then be used to process
-    the notes and data files into human readable coverage information.
-    There is also a :func:`coverage_report_lcov` decorator that will
+    Use the :func:`attributes.coverage_data` decorator to
+    automatically collect and publish data files in tasks that run
+    instrumented binaries. The :func:`attributes.coverage_report_gcov`
+    decorator can then be used to process the notes and data files
+    into human readable coverage information.  There is also a
+    :func:`attributes.coverage_report_lcov` decorator that will
     generate and publish an HTML coverage report.
 
     Example:
