@@ -102,7 +102,7 @@ class attributes:
                     with tools.environ(GCOV_PREFIX=self.covdatadir):
                         yield
 
-                @functools.cache
+                @utils.cached.instance
                 def publish_coverage_data(self, artifact, tools):
                     if not publish:
                         return
@@ -219,7 +219,7 @@ class attributes:
                             tools.mkdirname(newfile)
                             tools.move(file, newfile)
 
-                @functools.cache
+                @utils.cached.instance
                 def publish_coverage_data(self, artifact, tools):
                     if not bool(getattr(self, "gcov_coverage_data", coverage_data)):
                         return
@@ -422,7 +422,7 @@ class attributes:
                         tools.run("genhtml {}/coverage.info.abs --output-directory {} --title '{short_qualified_name}' {}",
                                   reportdir, htmldir, " ".join(lcov_html_flags), output_on_error=True)
 
-                @functools.cache
+                @utils.cached.instance
                 def publish_coverage_data(self, artifact, tools):
                     if not bool(getattr(self, "lcov_coverage_data", coverage_data)):
                         return
