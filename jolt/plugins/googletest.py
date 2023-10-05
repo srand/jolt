@@ -473,6 +473,7 @@ def shuffle(default: bool = False, param: bool = True, attr: str = "shuffle"):
 @brief()
 @disabled()
 @fail_fast()
+@filter()
 @junit_report()
 @repeat()
 @seed()
