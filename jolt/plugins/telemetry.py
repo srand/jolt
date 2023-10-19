@@ -41,6 +41,7 @@ class TelemetryHooks(TaskHook):
             "hostname": gethostname(),
             "role": "client" if client else "worker",
             "event": event,
+            "routing_key": getattr(task.task, "routing_key", "default")
         }
         if hasattr(task, "logstash"):
             data["log"] = task.logstash
