@@ -77,7 +77,7 @@ class GitRepository(object):
         self._init_repo()
         raise_error_if(
             self.repository is None,
-            "git: failed to clone repository '{0}'", self.relpath)
+            "Failed to clone repository '{0}'", self.relpath)
 
     @utils.cached.instance
     def diff_unchecked(self):
@@ -137,7 +137,7 @@ class GitRepository(object):
                 try:
                     commit = self.repository.revparse_single(rev)
                 except Exception:
-                    raise_error("invalid git reference: {}", rev)
+                    raise_error("Invalid git reference: {}", rev)
             try:
                 return str(commit.id)
             except Exception:
@@ -217,7 +217,10 @@ class GitRepository(object):
                 return self.tools.run("git checkout -f {rev}", rev=rev, output=False)
             except Exception:
                 self.fetch()
-                return self.tools.run("git checkout -f {rev}", rev=rev, output_on_error=True)
+                try:
+                    return self.tools.run("git checkout -f {rev}", rev=rev, output_on_error=True)
+                except Exception:
+                    raise_error("Commit does not exist in remote for '{}': {}", self.relpath, rev)
         self._original_head = False
 
 
@@ -228,9 +231,9 @@ def new_git(url, path, relpath, refspecs=None):
     refspecs = utils.as_list(refspecs or [])
     try:
         git = _gits[path]
-        raise_error_if(git.url != url, "multiple git repositories required at {}", relpath)
+        raise_error_if(git.url != url, "Multiple git repositories required at {}", relpath)
         raise_error_if(git.refspecs != refspecs,
-                       "conflicting refspecs detected for git repository at  {}", relpath)
+                       "Conflicting refspecs detected for git repository at  {}", relpath)
         return git
     except Exception:
         git = _gits[path] = GitRepository(url, path, relpath, refspecs)
@@ -256,7 +259,7 @@ class GitInfluenceProvider(FileInfluence):
                 return path
             ppath = path
             path = fs.path.dirname(path)
-        raise_error("no git repository found at '{}'", self.path)
+        raise_error("No git repository found at '{}'", self.path)
 
     @utils.cached.instance
     def get_influence(self, task):
