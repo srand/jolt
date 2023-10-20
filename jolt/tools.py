@@ -1857,10 +1857,12 @@ class Tools(object):
         size = self.file_size(pathname)
         with log.progress("Uploading " + name, size, "B") as pbar, open(pathname, 'rb') as fileobj:
             log.verbose("{} -> {}", pathname, url)
+
             def read():
                 data = fileobj.read(4096)
                 pbar.update(len(data))
                 return data
+
             from requests.api import put
             response = put(url, data=iter(read, b''), auth=auth, **kwargs)
             raise_error_if(
