@@ -455,6 +455,7 @@ CXXExecutable
   .. autoattribute:: cflags
   .. autoattribute:: coverage
   .. autoattribute:: cxxflags
+  .. automethod:: debugshell
   .. autoattribute:: incpaths
   .. autoattribute:: incremental
   .. autoattribute:: ldflags
@@ -465,7 +466,6 @@ CXXExecutable
   .. automethod:: publish
   .. automethod:: run
   .. autoattribute:: selfsustained
-  .. automethod:: shell
   .. autoattribute:: sources
   .. autoattribute:: source_influence
   .. autoattribute:: strip

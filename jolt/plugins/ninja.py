@@ -2226,7 +2226,7 @@ if __name__ == "__main__":
             if artifact.collect("**/*.gcno", "cov/"):
                 artifact.paths.coverage_data = "cov"
 
-    def shell(self, deps, tools):
+    def debugshell(self, deps, tools):
         """
         Invoked to start a debug shell.
 
@@ -2249,7 +2249,7 @@ if __name__ == "__main__":
         with tools.cwd(self.outdir), tools.environ(PATH=pathenv):
             print()
             print("Use the 'compile' command to build individual compilation targets")
-            super(CXXProject, self).shell(deps, tools)
+            super().debugshell(deps, tools)
 
     def _report_errors(self, report, logbuffer):
         # GCC style errors

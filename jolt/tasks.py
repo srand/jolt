@@ -1512,7 +1512,7 @@ class Task(TaskBase):
         """
         raise NotImplementedError()
 
-    def shell(self, deps, tools):
+    def debugshell(self, deps, tools):
         """
         Invoked to start a debug shell.
 

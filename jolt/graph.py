@@ -364,7 +364,7 @@ class TaskProxy(object):
                                     hooks.task_prerun(self, context, self.tools)
                                     if self.is_goal() and self.options.debug:
                                         log.info("Entering debug shell")
-                                        self.task.shell(context, self.tools)
+                                        self.task.debugshell(context, self.tools)
                                     self.task.run(context, self.tools)
                                     hooks.task_postrun(self, context, self.tools)
 
