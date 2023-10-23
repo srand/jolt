@@ -2,6 +2,8 @@
 <xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
 
   <xsl:variable name="Failures" select="jolt-manifest/task[result='FAILED']"/>
+  <xsl:variable name="Unstable" select="jolt-manifest/task[result='UNSTABLE']"/>
+  <xsl:variable name="FailuresAndUnstable" select="jolt-manifest/task[result='UNSTABLE' or result='FAILED']"/>
   <xsl:variable name="Successful" select="jolt-manifest/task[result='SUCCESS']"/>
   <xsl:variable name="Tasks" select="jolt-manifest/task"/>
   <xsl:variable name="Goals" select="jolt-manifest/task[goal='true']"/>
@@ -57,7 +59,7 @@
                   <td width="25%" align="center" style="border-left: 1px solid #c0c0c0">
                     <table>
                       <tr><td width="100%" align="center">Failed</td></tr>
-                      <tr><td align="center"><h2><xsl:value-of select="count($Failures)"/></h2></td></tr>
+                      <tr><td align="center"><h2><xsl:value-of select="count($FailuresAndUnstable)"/></h2></td></tr>
                     </table>
                   </td>
                   <td width="25%" align="center" style="border-left: 1px solid #c0c0c0">
@@ -92,6 +94,13 @@
               <xsl:call-template name="gerrit-url" />
             </p>
           </xsl:when>
+          <xsl:when test="count($Unstable) > 0 and count($Failures) = 0">
+            <p>
+              This is an automated build report from Jolt. The build was successful, but unstable task failures were ignored.
+              <xsl:call-template name="jenkins-url" />
+              <xsl:call-template name="gerrit-url" />
+            </p>
+          </xsl:when>
           <xsl:otherwise>
             <p>
               This is an automated build report from Jolt. The build was successful.
@@ -101,9 +110,18 @@
           </xsl:otherwise>
         </xsl:choose>
 
-        <xsl:for-each select="$Failures">
+        <xsl:for-each select="$FailuresAndUnstable">
           <table width="100%" cellspacing="0" cellpadding="0" bgcolor="#f1f1f1">
-            <tr bgcolor="#f44336">
+            <xsl:element name="tr">
+              <xsl:choose>
+                <xsl:when test="result='FAILED'">
+                  <xsl:attribute name="bgcolor">#f44336<xsl:value-of select="logstash" /></xsl:attribute>
+                </xsl:when>
+                <xsl:otherwise>
+                  <xsl:attribute name="bgcolor">#FF7E00<xsl:value-of select="logstash" /></xsl:attribute>
+                </xsl:otherwise>
+              </xsl:choose>
+            </xsl:element>
               <td style="padding: 10px">
                 <table cellpadding="0" cellspacing="0">
                   <tr>
@@ -124,7 +142,8 @@
                   </tr>
                 </table>
               </td>
-            </tr>
+              <xsl:element name="tr"/>
+
             <xsl:for-each select="error">
               <tr>
                 <td>
@@ -150,6 +169,7 @@
                 <td style="padding: 0px; border-bottom: 2px solid #f44336;"></td>
               </tr>
             </xsl:for-each>
+
           </table>
           <br/>
         </xsl:for-each>

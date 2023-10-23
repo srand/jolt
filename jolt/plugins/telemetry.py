@@ -75,6 +75,9 @@ class TelemetryHooks(TaskHook):
             if self._network and self._failed:
                 self.post(task, "failed", client=True)
 
+    def task_unstable(self, task):
+        self.task_failed(task)
+
     def task_finished(self, task):
         if not self._finished:
             return

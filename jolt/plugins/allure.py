@@ -236,6 +236,9 @@ class AllureHooks(TaskHook):
     def task_failed(self, task):
         self._task_ended(task, Status.FAILED)
 
+    def task_unstable(self, task):
+        self.task_failed(task)
+
     def task_finished(self, task):
         self._task_ended(task, Status.PASSED)
 

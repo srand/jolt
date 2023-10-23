@@ -584,3 +584,26 @@ class BuildCli(testsupport.JoltTest):
         with self.assertRaises(Exception):
             r1 = self.jolt("build b -d a:nope=1")
         self.assertIn("No such parameter", self.lastLog())
+
+    def test_unstable(self):
+        """
+        --- tasks:
+        class Unstable(Task):
+            unstable = True
+
+            def run(self, deps, tools):
+                assert False, "unstable task"
+
+        class Stable(Task):
+            unstable = False
+
+        class All(Alias):
+            requires = ["stable", "unstable"]
+
+        class Fail(Task):
+            requires = ["unstable"]
+        ---
+        """
+        self.build("all")
+        with self.assertRaises(Exception):
+            self.build("fail")

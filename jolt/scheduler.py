@@ -111,7 +111,8 @@ class LocalExecutor(Executor):
         except Exception as e:
             log.exception()
             self.task.failed()
-            raise e
+            if not self.task.is_unstable:
+                raise e
         else:
             hooks.task_finished_execution(self.task)
             self.task.finished()

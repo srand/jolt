@@ -36,6 +36,9 @@ class TaskHook(object):
     def task_failed(self, task):
         pass
 
+    def task_unstable(self, task):
+        pass
+
     def task_pruned(self, task):
         pass
 
@@ -148,6 +151,12 @@ class TaskHookRegistry(object):
             return
         for ext in self.hooks:
             utils.call_and_catch_and_log(ext.task_failed, task)
+
+    def task_unstable(self, task):
+        if task.is_resource():
+            return
+        for ext in self.hooks:
+            utils.call_and_catch_and_log(ext.task_unstable, task)
 
     def task_pruned(self, task):
         if task.is_resource():
@@ -285,6 +294,10 @@ def task_started_upload(task):
 
 def task_failed(task):
     TaskHookRegistry.get().task_failed(task)
+
+
+def task_unstable(task):
+    TaskHookRegistry.get().task_unstable(task)
 
 
 def task_finished(task):

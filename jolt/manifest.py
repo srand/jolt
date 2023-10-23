@@ -195,6 +195,9 @@ class JoltManifest(ElementTree):
             return True
         return self.find("./task[result='FAILED']") is not None
 
+    def has_unstable(self):
+        return self.find("./task[result='UNSTABLE']") is not None
+
     def find_task(self, task):
         match = self.find("./task[@name='{0}']".format(task))
         if match is None:

@@ -38,6 +38,10 @@ class ReportHooks(TaskHook):
         with task.task.report() as report:
             self.finalize_report(report.manifest, task, "FAILED")
 
+    def task_unstable(self, task):
+        with task.task.report() as report:
+            self.finalize_report(report.manifest, task, "UNSTABLE")
+
     @contextmanager
     def task_run(self, task):
         try:

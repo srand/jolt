@@ -384,10 +384,12 @@ def build(ctx, task, network, keep_going, default, local,
                     queue.abort()
                     raise error
 
-        if dag.failed:
+        if dag.failed or dag.unstable:
             log.error("List of failed tasks")
-            for failed in dag.failed:
+            for failed in dag.failed + dag.unstable:
                 log.error("- {}", failed.log_name.strip("()"))
+
+        if dag.failed:
             raise_error("No more tasks could be executed")
 
         for goal in goal_tasks:

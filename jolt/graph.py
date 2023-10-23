@@ -94,6 +94,10 @@ class TaskProxy(object):
         return self.task._instance.value
 
     @property
+    def is_unstable(self):
+        return self.task.unstable
+
+    @property
     def weight(self):
         return self.task.weight
 
@@ -284,8 +288,16 @@ class TaskProxy(object):
         self.error("{0} failed after {1} {2}", what,
                    self.duration_running,
                    self.duration_queued.diff(self.duration_running))
-        self.graph.add_failed(self)
-        hooks.task_failed(self)
+        if self.is_unstable:
+            try:
+                self.graph.remove_node(self)
+            except KeyError:
+                self.warning("Pruned task was executed")
+            self.graph.add_unstable(self)
+            hooks.task_unstable(self)
+        else:
+            self.graph.add_failed(self)
+            hooks.task_failed(self)
 
     def passed(self, what="Execution"):
         hooks.task_passed(self)
@@ -337,10 +349,13 @@ class TaskProxy(object):
             for child in self.children:
                 if not child.has_artifact():
                     continue
+                raise_task_error_if(
+                    not child.is_completed() and child.is_unstable,
+                    self, "Task depends on failed task '{}'", child.short_qualified_name)
                 if not cache.is_available_locally(child):
                     raise_task_error_if(
                         not cache.download(child),
-                        child, "failed to download task artifact")
+                        child, "Failed to download task artifact")
 
             if not force_build:
                 available_locally = all(map(cache.is_available_locally, tasks))
@@ -412,6 +427,7 @@ class Graph(object):
     def __init__(self):
         self._mutex = RLock()
         self._failed = []
+        self._unstable = []
         self._children = OrderedDict()
         self._parents = OrderedDict()
 
@@ -484,6 +500,13 @@ class Graph(object):
 
     def add_failed(self, task):
         self._failed.append(task)
+
+    @property
+    def unstable(self):
+        return self._unstable
+
+    def add_unstable(self, task):
+        self._unstable.append(task)
 
     @property
     def tasks(self):

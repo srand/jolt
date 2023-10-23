@@ -56,7 +56,7 @@ class EmailHooks(CliHook):
             with open(self._artifact, "w") as f:
                 f.write(report.transform(self._stylesheet))
 
-        if report.has_failure():
+        if report.has_failure() or report.has_unstable():
             if not self._failure:
                 return
         else:

@@ -1422,6 +1422,13 @@ class Task(TaskBase):
     Abstract tasks can't be executed and won't be listed.
     """
 
+    unstable = False
+    """
+    An unstable task is allowed to fail without stopping or failing the entire build.
+
+    The unstable task is still reported as a failure at the end of the build.
+    """
+
     def __init__(self, parameters=None, **kwargs):
         super(Task, self).__init__(parameters, **kwargs)
 
