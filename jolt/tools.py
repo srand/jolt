@@ -1498,6 +1498,10 @@ class Tools(object):
             for relsrcpath, reldstpath in artifact.files.items():
                 srcpath = fs.path.normpath(fs.path.join(artifact.get_task().joltdir, relsrcpath))
                 dstpath = fs.path.normpath(fs.path.join(path, reldstpath))
+                if dstpath != fs.path.realpath(dstpath):
+                    log.debug("Cannot symlink '{} -> {}', parent directory already symlinked",
+                              srcpath, dstpath)
+                    continue
                 if fs.path.isdir(dstpath):
                     files = fs.scandir(srcpath)
                     for file in files:
