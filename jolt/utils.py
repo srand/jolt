@@ -507,3 +507,12 @@ def quote(value, char='"'):
 
 def option(prefix, value):
     return "{}{}".format(prefix, quote(value)) if value else ""
+
+
+def shorten(string, count=30):
+    if len(string) > count:
+        keep = int(count/2-1)
+        if keep <= 0:
+            keep = 1
+        return string[:keep] + "..." + string[-keep+1:]
+    return string

@@ -802,7 +802,7 @@ class Tools(object):
 
             name = fs.path.basename(pathname)
             size = int(response.headers.get('content-length', 0))
-            with log.progress("Downloading {0}".format(name), size, "B") as pbar:
+            with log.progress("Downloading {0}".format(utils.shorten(name)), size, "B") as pbar:
                 log.verbose("{} -> {}", url, pathname)
                 with open(pathname, 'wb') as out_file:
                     chunk_size = 4096
@@ -1859,7 +1859,8 @@ class Tools(object):
         pathname = self.expand_path(pathname)
         name = fs.path.basename(pathname)
         size = self.file_size(pathname)
-        with log.progress("Uploading " + name, size, "B") as pbar, open(pathname, 'rb') as fileobj:
+        with log.progress("Uploading " + utils.shorten(name), size, "B") as pbar, \
+             open(pathname, 'rb') as fileobj:
             log.verbose("{} -> {}", pathname, url)
 
             def read():
