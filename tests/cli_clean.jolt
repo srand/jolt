@@ -1,0 +1,42 @@
+#!/usr/bin/env python3
+
+import re
+import sys
+import time
+sys.path.append(".")
+
+from testsupport import JoltTest
+
+
+class CleanCli(JoltTest):
+    name = "cli/clean"
+
+    def test_session_artifacts(self):
+        """
+        --- file: test
+        --- tasks:
+        @attributes.artifact("session", session=True)
+        @influence.files("test")
+        class A(Task):
+            def publish_session(self, a, t):
+                pass
+        ---
+        """
+
+        # Build task twice with different identities
+        r = self.build("a")
+        a1 = self.artifacts(r)
+        self.assertEqual(2, len(a1))
+        with self.tools.cwd(self.ws):
+            self.tools.append_file("test", "data")
+        r = self.build("a")
+        a2 = self.artifacts(r)
+        self.assertEqual(2, len(a2))
+
+        # Clean task. Should remove the last persistent artifact
+        # and both session artifacts.
+        self.jolt("clean a")
+        self.assertExists(a1[0])
+        self.assertExists(a1[1])
+        self.assertNotExists(a2[0])
+        self.assertExists(a2[1])

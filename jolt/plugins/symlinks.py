@@ -1,5 +1,4 @@
 
-from jolt import cache
 from jolt import config
 from jolt import filesystem as fs
 from jolt import loader
@@ -23,16 +22,25 @@ class SymlinkTaskHooks(TaskHook):
         if not task.has_artifact():
             return
 
-        srcpath = cache.ArtifactCache.get().get_path(task)
-        destpath = fs.path.join(
-            loader.get_workspacedir(),
-            self._path,
-            utils.canonical(task.short_qualified_name))
+        for artifact in task.artifacts:
+            srcpath = artifact.final_path
+            if artifact.name == "main":
+                destpath = fs.path.join(
+                    loader.get_workspacedir(),
+                    self._path,
+                    utils.canonical(task.short_qualified_name),
+                )
+            else:
+                destpath = fs.path.join(
+                    loader.get_workspacedir(),
+                    self._path,
+                    artifact.name + "@" + utils.canonical(task.short_qualified_name),
+                )
 
-        if fs.path.exists(srcpath):
-            fs.unlink(destpath, ignore_errors=True)
-            fs.makedirs(fs.path.dirname(destpath))
-            fs.symlink(srcpath, destpath)
+            if fs.path.exists(srcpath):
+                fs.unlink(destpath, ignore_errors=True)
+                fs.makedirs(fs.path.dirname(destpath))
+                fs.symlink(srcpath, destpath)
 
     def task_pruned(self, task):
         self.task_finished(task)

@@ -12,6 +12,7 @@ class All(Alias):
         "api/test",
         "api/tools",
         "cli/build",
+        "cli/clean",
         "cli/config",
         "cli/display",
         "cli/export",

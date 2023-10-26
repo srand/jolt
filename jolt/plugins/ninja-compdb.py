@@ -92,10 +92,11 @@ def stage_artifacts(artifacts, tools):
         tools.sandbox(artifact, incremental=True, reflect=fs.has_symlinks())
 
 
-def get_task_artifacts(task, artifact=None):
-    acache = cache.ArtifactCache.get()
-    artifact = artifact or acache.get_artifact(task)
-    return artifact, [acache.get_artifact(dep) for dep in task.children]
+def get_task_artifacts(task):
+    artifacts = []
+    for dep in task.children:
+        artifacts.extend(dep.artifacts)
+    return task.artifacts[0], artifacts
 
 
 class CompDBHooks(TaskHook):
@@ -122,7 +123,7 @@ class CompDBHooks(TaskHook):
 
         if isinstance(task.task, ninja.CXXProject):
             dbpath = fs.path.join(task.task.outdir, "all_compile_commands.json")
-            _, deps = get_task_artifacts(task, artifact)
+            _, deps = get_task_artifacts(task)
             db = CompDB(dbpath)
             for dep in [artifact] + deps:
                 depdb = CompDB(artifact=dep)
@@ -191,7 +192,7 @@ def compdb(ctx, task, default):
     for params in default:
         registry.set_default_parameters(params)
 
-    gb = graph.GraphBuilder(registry, manifest, options, progress=True)
+    gb = graph.GraphBuilder(registry, acache, manifest, options, progress=True)
     dag = gb.build(task)
 
     try:

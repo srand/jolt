@@ -142,8 +142,16 @@ class InspectCli(JoltTest):
         class J(Task):
             requires = "g", "h"
 
+        @attributes.artifact("persist")
+        @attributes.artifact("session", session=True)
         class K(Task):
             requires = "i", "j"
+
+            def publish_persist(self, a, t):
+                pass
+
+            def publish_session(self, a, t):
+                pass
 
         ---
         """
@@ -151,9 +159,13 @@ class InspectCli(JoltTest):
         id1 = re.search("Identity[ ]*([^ ]*)", i1).group(1).strip()
         b1 = self.build("k")
         a1 = self.artifacts(b1)
-        print(id1, a1[0])
-        self.assertIn(id1, a1[0])
+        print(id1, a1)
+        self.assertIn("main@" + id1, a1[0])
+        self.assertIn("session@", a1[1])
+        self.assertIn("persist@" + id1, a1[2])
         i2 = self.jolt("inspect -a k")
         self.assertIn(id1, i2)
         self.assertIn("Location          "+a1[0], i2)
+        self.assertNotIn("session@", i2)
+        self.assertIn("Location          "+a1[2], i2)
         self.assertIn("Local             True", i2)

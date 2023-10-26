@@ -37,9 +37,9 @@ class AmqpWorker(Resource):
                 for file in tools.glob("{joltdir}/../docker/swarm/*"):
                     tools.copy(file, "./")
                 tools.replace_in_file("jolt.yaml", "jolt:latest",
-                                      tools.expand("jolt:{deps[jolt/image].identity}", deps=deps))
+                                      tools.expand("jolt:{deps[jolt/image].task.identity}", deps=deps))
                 tools.replace_in_file("jolt.yaml", "rabbitmq:latest",
-                                      tools.expand("rabbitmq:{deps[jolt/image].identity}", deps=deps))
+                                      tools.expand("rabbitmq:{deps[jolt/image].task.identity}", deps=deps))
                 tools.run("docker stack deploy -c jolt.yaml jolt_test", output_on_error=True)
                 tools.run("docker service scale jolt_test_worker=1", output_on_error=True)
                 config = tools.read_file("client.conf")

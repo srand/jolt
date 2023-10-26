@@ -12,6 +12,7 @@ class ReportHooks(TaskHook):
         report.name = task.qualified_name
         report.goal = str(task.is_goal()).lower()
         report.identity = task.identity
+        report.instance = task.instance
         report.result = result
         if task.duration_running:
             report.duration = str(task.duration_running.seconds)

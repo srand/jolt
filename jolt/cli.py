@@ -330,7 +330,7 @@ def build(ctx, task, network, keep_going, default, local,
 
     log.info("Started: {}", datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
 
-    gb = graph.GraphBuilder(registry, manifest, options, progress=True)
+    gb = graph.GraphBuilder(registry, acache, manifest, options, progress=True)
     dag = gb.build(task)
 
     if not no_prune:
@@ -392,12 +392,6 @@ def build(ctx, task, network, keep_going, default, local,
         if dag.failed:
             raise_error("No more tasks could be executed")
 
-        for goal in goal_tasks:
-            if acache.is_available_locally(goal):
-                with acache.get_artifact(goal) as artifact:
-                    log.info("Location: {0}", artifact.path)
-                    if copy:
-                        artifact.copy("*", utils.as_dirpath(fs.path.join(workdir, click.format_filename(copy))), symlinks=True)
     except KeyboardInterrupt:
         print()
         log.warning("Interrupted by user")
@@ -409,6 +403,14 @@ def build(ctx, task, network, keep_going, default, local,
             log.warning("Interrupted again, exiting")
             _exit(1)
     finally:
+        for task in dag.goals:
+            for artifact in task.artifacts:
+                if acache.is_available_locally(artifact):
+                    log.info("Location: {0}", artifact.path)
+                    if copy:
+                        dst = utils.as_dirpath(fs.path.join(workdir, click.format_filename(copy)))
+                        artifact.copy("*", dst, symlinks=True)
+
         log.info("Ended: {}", datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
         log.info("Total execution time: {0} {1}",
                  str(duration),
@@ -447,7 +449,7 @@ def clean(ctx, task, deps, expired):
     if task:
         task = [utils.stable_task_name(t) for t in task]
         registry = TaskRegistry.get()
-        dag = graph.GraphBuilder(registry, ctx.obj["manifest"]).build(task)
+        dag = graph.GraphBuilder(registry, acache, ctx.obj["manifest"]).build(task)
         if deps:
             tasks = dag.tasks
         else:
@@ -592,11 +594,10 @@ def display(ctx, task, reverse=None, show_cache=False, prune=False):
 
     """
     registry = TaskRegistry.get()
-    gb = graph.GraphBuilder(registry, ctx.obj["manifest"])
-    dag = gb.build(task, influence=show_cache)
-
     options = JoltOptions()
     acache = cache.ArtifactCache.get(options)
+    gb = graph.GraphBuilder(registry, acache, ctx.obj["manifest"])
+    dag = gb.build(task, influence=show_cache)
 
     if reverse:
         def iterator(task):
@@ -693,7 +694,7 @@ def download(ctx, task, deps, copy, copy_all):
     registry = TaskRegistry.get()
     strategy = scheduler.DownloadStrategy(executors, acache)
     queue = scheduler.TaskQueue(strategy)
-    gb = graph.GraphBuilder(registry, manifest, options, progress=True)
+    gb = graph.GraphBuilder(registry, acache, manifest, options, progress=True)
     dag = gb.build(task)
 
     if not deps:
@@ -718,8 +719,8 @@ def download(ctx, task, deps, copy, copy_all):
 
         copy_tasks = goal_tasks if not copy_all else all_tasks
         for goal in copy_tasks:
-            if acache.is_available_locally(goal):
-                with acache.get_artifact(goal) as artifact:
+            if goal.is_available_locally():
+                for artifact in goal.artifacts:
                     if copy:
                         log.info("Copying: {0}", artifact.path)
                         artifact.copy("*", utils.as_dirpath(fs.path.join(workdir, click.format_filename(copy))), symlinks=True)
@@ -766,7 +767,7 @@ def freeze(ctx, task, default, output, remove):
     for params in default:
         registry.set_default_parameters(params)
 
-    gb = graph.GraphBuilder(registry, manifest)
+    gb = graph.GraphBuilder(registry, acache, manifest)
     dag = gb.build(task)
 
     available_in_cache = [
@@ -815,6 +816,8 @@ def _list(ctx, task=None, all=False, reverse=None):
 
     raise_error_if(not task and reverse, "TASK required with --reverse")
 
+    options = JoltOptions()
+    acache = cache.ArtifactCache.get(options)
     registry = TaskRegistry.get()
 
     if not task:
@@ -828,7 +831,7 @@ def _list(ctx, task=None, all=False, reverse=None):
     reverse = [utils.stable_task_name(t) for t in utils.as_list(reverse or [])]
 
     try:
-        dag = graph.GraphBuilder(registry, ctx.obj["manifest"]).build(task, influence=False)
+        dag = graph.GraphBuilder(registry, acache, ctx.obj["manifest"]).build(task, influence=False)
     except JoltError as e:
         raise e
     except Exception:
@@ -946,7 +949,7 @@ def inspect(ctx, task, influence=False, artifact=False, salt=None):
 
     if artifact:
         acache = cache.ArtifactCache.get()
-        builder = graph.GraphBuilder(task_registry, manifest)
+        builder = graph.GraphBuilder(task_registry, acache, manifest)
         dag = builder.build([task.qualified_name])
         tasks = dag.select(lambda graph, node: node.task is task)
         assert len(tasks) == 1, "graph produced multiple tasks, one expected"
@@ -955,14 +958,14 @@ def inspect(ctx, task, influence=False, artifact=False, salt=None):
 
         print("  Cache")
         print("    Identity          {0}".format(proxy.identity))
-        if acache.is_available_locally(proxy):
-            with acache.get_artifact(proxy) as artifact:
+        if proxy.is_available_locally():
+            for artifact in filter(lambda a: not a.is_session(), proxy.artifacts):
                 print("    Location          {0}".format(artifact.path))
             print("    Local             True ({0})".format(
-                utils.as_human_size(acache.get_artifact(proxy).get_size())))
+                utils.as_human_size(sum([artifact.get_size() for artifact in proxy.artifacts]))))
         else:
             print("    Local             False")
-        print("    Remote            {0}".format(acache.is_available_remotely(proxy)))
+        print("    Remote            {0}".format(proxy.is_available_remotely()))
         print()
 
     if influence:
@@ -1010,7 +1013,7 @@ def _export(ctx, task):
     executors = scheduler.ExecutorRegistry.get()
     strategy = scheduler.LocalStrategy(executors, acache)
 
-    dag = graph.GraphBuilder(registry, ctx.obj["manifest"])
+    dag = graph.GraphBuilder(registry, acache, ctx.obj["manifest"])
     dag = dag.build(task)
 
     gp = graph.GraphPruner(strategy)
@@ -1038,14 +1041,14 @@ def _export(ctx, task):
     context = Context(tasks)
 
     for task in context.tasks:
-        artifact = acache.get_artifact(task)
-        raise_task_error_if(
-            artifact.is_temporary(), task,
-            "Task artifact not found in local cache, build it first")
+        for artifact in task.artifacts:
+            raise_task_error_if(
+                artifact.is_temporary(), task,
+                "Task artifact not found in local cache, build it first")
 
-        visitor = Export()
-        cache.visit_artifact(task, artifact, visitor)
-        context.add_export(task, visitor)
+            visitor = Export()
+            cache.visit_artifact(task, artifact, visitor)
+            context.add_export(task, visitor)
 
     script = utils.render(
         "export.sh.template",

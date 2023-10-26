@@ -214,3 +214,83 @@ class ArtifactApi(JoltTest):
         ---
         """
         self.build("b")
+
+    def test_multiple(self):
+        """
+        --- file: main.txt
+        Main
+        --- file: file.txt
+        File
+        --- tasks:
+        @attributes.artifact("files")
+        @influence.files("*.txt")
+        class A(Task):
+            def publish(self, a, t):
+                a.collect("main.txt")
+
+            def publish_files(self, a, t):
+                a.collect("file.txt")
+
+
+        class B(Task):
+            requires = ["c=a"]
+
+            def run(self, d, t):
+                with t.cwd(t.builddir()):
+                    d["a"].copy("main.txt", "main1.txt")
+                    d["main@a"].copy("main.txt", "main2.txt")
+                    d["files@a"].copy("file.txt", "file2.txt")
+                    d["files@c"].copy("file.txt", "file1.txt")
+
+            def publish(self, a, t):
+                with t.cwd(t.builddir()):
+                    a.collect("*")
+
+
+        @attributes.artifact("files and stuff!")
+        class Canonical(Task):
+            def publish_files_and_stuff_(self, a, t):
+                pass
+
+
+        @attributes.artifact("logs", session=True)
+        @influence.files("*.txt")
+        class Session(Task):
+            fail = BooleanParameter(False)
+
+            def run(self, deps, tools):
+                assert not self.fail
+
+            def publish_logs(self, a, t):
+                a.collect("file.txt")
+        ---
+        """
+        r = self.build("a")
+        a = self.artifacts(r)
+        self.assertExists(a[0], "main.txt")
+        self.assertExists(a[1], "file.txt")
+
+        r = self.build("b")
+        a = self.artifacts(r)
+        self.assertExists(a[0], "main1.txt")
+        self.assertExists(a[0], "main2.txt")
+        self.assertExists(a[0], "file1.txt")
+
+        # Test name of artifact
+        self.build("canonical")
+
+        # Test session artifacts
+        r = self.build("session")
+        a = self.artifacts(r)
+        self.assertEqual(2, len(a))
+        self.assertExists(a[1], "file.txt")
+        r = self.build("session")
+        a = self.artifacts(r)
+        self.assertNoBuild(r)
+        self.assertEqual(1, len(a))
+
+        with self.assertRaises(Exception):
+            self.build("session:fail=true")
+        a = self.artifacts(self.lastLog())
+        self.assertEqual(1, len(a))
+        self.assertExists(a[0], "file.txt")

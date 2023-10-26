@@ -880,18 +880,48 @@ class TaskGenerator(object):
 
 class attributes:
     @staticmethod
-    def requires(attrib):
-        """
-        Decorates a task with an alternative ``requires`` attribute.
+    def artifact(name, session=False):
+        """Decorator adding an additional artifact to a task.
 
-        The new attribute will be concatenated with the regular
-        ``requires`` attribute.
+        Jolt calls the new publish method `publish_<name>` with the
+        new artifact as argument. Non-alphanumeric characters in the
+        name are replaced with underscores (_). The new artifact is
+        consumable from another task by using the string format
+        `<artifact-name>@<task-name>` to index dependencies.  The
+        standard artifact is named `main`. See the example below.
+
+        If `session` is `True`, the new artifact will be a session
+        artifact that is only valid during a single Jolt invokation.
+        Session artifacts are published even if the task fails and may
+        be used to save logs and data for post-mortem analysis.
 
         Args:
-            attrib (str): Name of alternative attribute.
-                Keywords are expanded.
+          name (str): Name of artifact. Used as reference from
+              consuming tasks.
+          session (boolean, False): Session artifact.
+
+        Example:
+
+          .. literalinclude:: ../examples/artifacts/build.jolt
+            :language: python
+            :caption: examples/artifacts/build.jolt
+
         """
-        return utils.concat_attributes("requires", attrib)
+        name = utils.canonical(name)
+
+        def decorate(cls):
+            _old_artifacts = cls._artifacts
+
+            @functools.wraps(cls._artifacts)
+            def _artifacts(self, cache, node):
+                artifacts = _old_artifacts(self, cache, node)
+                artifacts += [cache.get_artifact(node, name, session=session)]
+                return artifacts
+
+            cls._artifacts = _artifacts
+            return cls
+
+        return decorate
 
     @staticmethod
     def attribute(alias, target, influence=True, default=False):
@@ -994,6 +1024,20 @@ class attributes:
 
             return utils.concat_attributes("_publish_files", attrib)(cls)
         return decorate
+
+    @staticmethod
+    def requires(attrib):
+        """
+        Decorates a task with an alternative ``requires`` attribute.
+
+        The new attribute will be concatenated with the regular
+        ``requires`` attribute.
+
+        Args:
+            attrib (str): Name of alternative attribute.
+                Keywords are expanded.
+        """
+        return utils.concat_attributes("requires", attrib)
 
     @staticmethod
     def load(filepath):
@@ -1246,6 +1290,9 @@ class TaskBase(object):
                     .format(attrib.name, self.qualified_name)
                 export.assign(attrib.value)
 
+    def _artifacts(self, cache, node):
+        return [cache.get_artifact(node, "main")]
+
     def _influence(self):
         return utils.as_list(self.__class__.influence)
 
@@ -1322,7 +1369,7 @@ class TaskBase(object):
             return _filter
 
         for _, dep in deps.items():
-            deptask = dep.get_task()
+            deptask = dep.task
             if isinstance(deptask, FileInfluence):
                 # Resource dependencies may cover the influence implicitly
                 deppath = self.tools.expand_path(str(deptask.path))
@@ -1484,6 +1531,9 @@ class Task(TaskBase):
         When using methods from the toolbox, task parameters, such
         as ``target`` above,  are automatically expanded to their values.
         """
+
+    def nopublish(self, artifact, tools):
+        raise NotImplementedError()
 
     def publish(self, artifact, tools):
         """
@@ -2219,7 +2269,7 @@ class Runner(Task):
         found = False
 
         for task, artifact in deps.items():
-            if not artifact.get_task().is_cacheable():
+            if not artifact.task.is_cacheable():
                 continue
             if artifact.strings.executable.get_value() is None:
                 self.verbose("No executable found in task artifact for '{}'", task)
@@ -3019,7 +3069,7 @@ class ResourceAttributeSetProvider(ArtifactAttributeSetProvider):
         pass
 
     def apply(self, task, artifact):
-        resource = artifact.get_task()
+        resource = artifact.task
         if isinstance(resource, Resource):
             from inspect import signature
 
@@ -3035,7 +3085,7 @@ class ResourceAttributeSetProvider(ArtifactAttributeSetProvider):
             acquire(*ba.args, **ba.kwargs)
 
     def unapply(self, task, artifact):
-        resource = artifact.get_task()
+        resource = artifact.task
         if isinstance(resource, Resource):
             from inspect import signature
 

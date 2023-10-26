@@ -244,7 +244,7 @@ class _CMake(object):
 
         with self.tools.cwd(self.builddir):
             self.tools.run(
-                "cmake {0} -B {1} -DCMAKE_INSTALL_PREFIX={2} {3} {4}",
+                "cmake {0} -B{1} -DCMAKE_INSTALL_PREFIX={2} {3} {4}",
                 sourcedir,
                 self.builddir,
                 self.installdir,
@@ -1466,7 +1466,7 @@ class Tools(object):
             type(artifact) is not cache.Artifact,
             "non-artifact passed as argument to Tools.sandbox()")
 
-        suffix = utils.canonical(artifact.get_task().short_qualified_name)
+        suffix = utils.canonical(artifact.task.short_qualified_name)
 
         if reflect:
             sandbox_name = "sandboxes-reflected/" + suffix
@@ -1496,7 +1496,7 @@ class Tools(object):
             fs.rmtree(path)
             fs.makedirs(path)
             for relsrcpath, reldstpath in artifact.files.items():
-                srcpath = fs.path.normpath(fs.path.join(artifact.get_task().joltdir, relsrcpath))
+                srcpath = fs.path.normpath(fs.path.join(artifact.task.joltdir, relsrcpath))
                 dstpath = fs.path.normpath(fs.path.join(path, reldstpath))
                 if dstpath != fs.path.realpath(dstpath):
                     log.debug("Cannot symlink '{} -> {}', parent directory already symlinked",
@@ -1511,7 +1511,7 @@ class Tools(object):
                     self.symlink(srcpath, dstpath)
 
                 # Restore missing srcfiles if they resided in a build directory
-                if srcpath.startswith(artifact.get_task().tools.buildroot) and \
+                if srcpath.startswith(artifact.tools.buildroot) and \
                    not fs.path.exists(srcpath):
                     fs.copy(fs.path.join(artifact.path, reldstpath), srcpath, symlinks=True)
             self.write_file(meta, artifact.path)

@@ -10,6 +10,7 @@ from threading import RLock
 import uuid
 
 from jolt import config
+from jolt import expires
 from jolt import filesystem as fs
 from jolt import influence
 from jolt import log
@@ -32,19 +33,19 @@ def locked(func):
 
 
 class StorageProvider(object):
-    def download(self, node, force=False):
+    def download(self, artifact, force=False):
         return False
 
     def download_enabled(self):
         return True
 
-    def upload(self, node, force=False):
+    def upload(self, artifact, force=False):
         return False
 
     def upload_enabled(self):
         return True
 
-    def location(self, node):
+    def location(self, artifact):
         return ''  # URL
 
 
@@ -213,7 +214,7 @@ class ArtifactStringAttribute(ArtifactAttribute):
         return self._name
 
     def set_value(self, value, expand=True):
-        self._value = self._artifact.get_task().expand(str(value)) if expand else str(value)
+        self._value = self._artifact.tools.expand(str(value)) if expand else str(value)
 
     def get_value(self):
         return self._value
@@ -241,22 +242,22 @@ class ArtifactListAttribute(ArtifactAttribute):
         if type(value) is str:
             value = value.split(":")
         raise_error_if(type(value) is not list, "Illegal value assigned to artifact list attribute")
-        self._value = self._artifact.get_task().expand(value) if expand else value
+        self._value = self._artifact.tools.expand(value) if expand else value
 
     def get_value(self):
         return self._value
 
     def append(self, value):
         if type(value) is list:
-            self._value.extend(self._artifact.get_task().expand(value))
+            self._value.extend(self._artifact.tools.expand(value))
         else:
-            self._value.append(self._artifact.get_task().expand(value))
+            self._value.append(self._artifact.tools.expand(value))
 
     def extend(self, value):
         raise_error_if(
             type(value) is not list,
             "Illegal type passed to {}.extend() - list expected".format(self._name))
-        self._value.extend(self._artifact.get_task().expand(value))
+        self._value.extend(self._artifact.tools.expand(value))
 
     def items(self):
         return list(self._value)
@@ -453,26 +454,32 @@ class Artifact(object):
                 artifact.strings.version = "1.2"
     """
 
-    def __init__(self, cache, node, tools=None):
+    def __init__(self, cache, node, name=None, tools=None, session=False):
         self._cache = cache
+        self._identity = node.identity if not session else node.instance
+        if name:
+            self._identity = name + "@" + self._identity
+        self._main = name == "main"
+        self._name = name or "main"
         self._node = node
+        self._task = node.task
         self._tools = tools or self._node.tools
-        self._path = cache._fs_get_artifact_path(node.identity, node.canonical_name)
-        self._temp = cache._fs_get_artifact_tmppath(node.identity, node.canonical_name)
-        self._archive = cache._fs_get_artifact_archivepath(node.identity, node.canonical_name)
-        self._lock_path = cache._fs_get_artifact_lockpath(node.identity)
+        self._path = cache._fs_get_artifact_path(self._identity, node.canonical_name)
+        self._temp = cache._fs_get_artifact_tmppath(self._identity, node.canonical_name)
+        self._archive = cache._fs_get_artifact_archivepath(self._identity, node.canonical_name)
+        self._lock_path = cache._fs_get_artifact_lockpath(self._identity)
+        self._session = session
         self._unpacked = False
         self._uploadable = True
         self._created = datetime.now()
         self._modified = datetime.now()
-        self._expires = node.task.expires
+        self._expires = node.task.expires if not session else expires.Immediately()
         self._size = 0
         self._influence = None
         ArtifactAttributeSetRegistry.create_all(self)
         self._valid = False
         self._temporary = False
-        self._read_manifest()
-        self._temporary = not self._valid
+        self.reload()
 
     def __enter__(self):
         return self
@@ -568,8 +575,24 @@ class Artifact(object):
     def unapply(self):
         pass
 
+    def is_main(self):
+        return self._main
+
+    def is_session(self):
+        return self._session
+
     def is_valid(self):
         return self._valid
+
+    def reload(self):
+        self._temporary = False
+        self._read_manifest()
+        self._temporary = not self._valid
+
+    @property
+    def name(self):
+        """ str: The name of the artifact. Default: 'main'. """
+        return self._name
 
     @property
     def path(self):
@@ -753,17 +776,11 @@ class Artifact(object):
     def get_size(self):
         return self._size
 
-    def get_task(self):
-        return self._node.task
-
-    def get_name(self):
-        return self._node.qualified_name
-
     def get_cache(self):
         return self._cache
 
-    def get_identity(self):
-        return self._node.identity
+    def get_task(self):
+        return self._node.task
 
     def is_temporary(self):
         return self._temporary
@@ -779,7 +796,11 @@ class Artifact(object):
 
     @property
     def identity(self):
-        return self._node.identity
+        return self._identity
+
+    @property
+    def task(self):
+        return self._node.task
 
 
 class Context(object):
@@ -805,11 +826,28 @@ class Context(object):
     def __enter__(self):
         try:
             for dep in reversed(self._node.children):
-                self._cache.unpack(dep)
-                with self._cache.get_artifact(dep, self._node.tools) as artifact:
-                    self._artifacts[dep.qualified_name] = artifact
-                    self._artifacts_index[dep.qualified_name] = artifact
-                    self._artifacts_index[dep.short_qualified_name] = artifact
+                for artifact in dep.artifacts:
+                    # Create clone with tools from this task
+                    artifact = self._cache.get_artifact(
+                        dep,
+                        name=artifact.name,
+                        session=artifact.is_session(),
+                        tools=self._node.tools,
+                    )
+
+                    # Don't include session artifacts that don't exist,
+                    # i.e. were no build has taken place due to presence
+                    # of the persistent artifacts.
+                    if artifact.is_session() and not self._cache.is_available_locally(artifact):
+                        continue
+
+                    self._cache.unpack(artifact)
+                    if artifact.name == "main":
+                        self._artifacts_index[dep.qualified_name] = artifact
+                        self._artifacts_index[dep.short_qualified_name] = artifact
+                    self._artifacts[artifact.name + "@" + dep.qualified_name] = artifact
+                    self._artifacts_index[artifact.name + "@" + dep.qualified_name] = artifact
+                    self._artifacts_index[artifact.name + "@" + dep.short_qualified_name] = artifact
                     artifact.apply()
                     ArtifactAttributeSetRegistry.apply_all(self._node.task, artifact)
             ArtifactAttributeSetRegistry.apply_all_deps(self._node.task, self)
@@ -848,25 +886,32 @@ class Context(object):
 
         """
 
-        key = self._node.task.expand(key)
+        key = self._node.tools.expand(key)
 
-        if key not in self._artifacts_index:
-            key = self._node.resolve_requirement_alias(key) or key
+        alias, artifact, task, params = utils.parse_aliased_task_name(key)
+        raise_task_error_if(alias, self._node, "Cannot define alias when indexing dependencies")
+        task_name = utils.format_task_name(task, params)
+        task_artifact_name = utils.format_task_name(task, params, artifact)
 
-        # Parameters may be unordered, sort them
-        key = utils.stable_task_name(key)
+        if task_name not in self._artifacts_index and \
+           task_artifact_name not in self._artifacts_index and not params:
+            key = self._node.resolve_requirement_alias(task_name)
+            if key:
+                _, _, task, params = utils.parse_aliased_task_name(key)
+                task_name = utils.format_task_name(task, params)
+                task_artifact_name = utils.format_task_name(task, params, artifact)
 
         # Parameters may be overspecified, resolve task
-        if key not in self._artifacts_index:
+        if task_artifact_name not in self._artifacts_index:
             from jolt.tasks import TaskRegistry
-            task = TaskRegistry.get().get_task(key)
-            key = task.short_qualified_name if task is not None else key
+            task_obj = TaskRegistry.get().get_task(task_name)
+            task_name = task_obj.short_qualified_name if task_obj is not None else task
+            task_artifact_name = task_name if not artifact else f"{artifact}@{task_name}"
 
-        raise_task_error_if(
-            key not in self._artifacts_index,
-            self._node,
-            "No such dependency '{0}'", key)
-        return self._artifacts_index[key]
+        if task_artifact_name not in self._artifacts_index:
+            raise KeyError("No such artifact dependency '{0}' ({1})".format(
+                task_artifact_name, self._node.short_qualified_name))
+        return self._artifacts_index[task_artifact_name]
 
     def items(self):
         """ List all requirements and their artifacts.
@@ -945,7 +990,8 @@ class ArtifactCache(StorageProvider):
 
     def __init__(self, options=None, pidprovider=None):
         self._options = options or JoltOptions()
-        self._remote_identity_cache = set()
+        self._local_presence_cache = set()
+        self._remote_presence_cache = set()
         self._storage_providers = [
             factory.create(self)
             for factory in ArtifactCache.storage_provider_factories]
@@ -1017,9 +1063,9 @@ class ArtifactCache(StorageProvider):
         cur.execute("CREATE TABLE IF NOT EXISTS artifact_lockrefs (identity text, pid text)")
         db.commit()
 
-    def _db_insert_artifact(self, db, identity, name, size):
+    def _db_insert_artifact(self, db, identity, task_name, size):
         cur = db.cursor()
-        cur.execute("INSERT INTO artifacts VALUES (?,?,?,?)", (identity, name, size, datetime.now()))
+        cur.execute("INSERT INTO artifacts VALUES (?,?,?,?)", (identity, task_name, size, datetime.now()))
         db.commit()
 
     def _db_update_artifact_size(self, db, identity, size):
@@ -1189,8 +1235,8 @@ class ArtifactCache(StorageProvider):
         except Exception:
             raise_error("Failed to create cache directory '{0}'", self.root)
 
-    def _fs_get_artifact(self, node, tools=None):
-        return Artifact(self, node, tools)
+    def _fs_get_artifact(self, node, name, tools=None, session=False):
+        return Artifact(self, node, name=name, tools=tools, session=session)
 
     def _fs_commit_artifact(self, artifact, uploadable):
         artifact._set_uploadable(uploadable)
@@ -1203,7 +1249,7 @@ class ArtifactCache(StorageProvider):
 
     @contextlib.contextmanager
     def _fs_compress_artifact(self, artifact):
-        task = artifact.get_task()
+        task = artifact.task
         archive = artifact.get_archive_path()
 
         raise_task_error_if(
@@ -1222,7 +1268,7 @@ class ArtifactCache(StorageProvider):
             fs.unlink(archive, ignore_errors=True)
 
     def _fs_decompress_artifact(self, artifact):
-        task = artifact.get_task()
+        task = artifact.task
         archive = artifact.get_archive_path()
         try:
             task.tools.extract(archive, artifact.temporary_path, ignore_owner=True)
@@ -1234,28 +1280,28 @@ class ArtifactCache(StorageProvider):
             fs.unlink(archive, ignore_errors=True)
         artifact._read_manifest()
 
-    def _fs_delete_artifact(self, identity, name, onerror=None):
-        fs.rmtree(self._fs_get_artifact_path(identity, name), ignore_errors=True, onerror=onerror)
-        fs.rmtree(self._fs_get_artifact_tmppath(identity, name), ignore_errors=True, onerror=onerror)
-        fs.unlink(fs.path.join(self.root, name), ignore_errors=True)
+    def _fs_delete_artifact(self, identity, task_name, onerror=None):
+        fs.rmtree(self._fs_get_artifact_path(identity, task_name), ignore_errors=True, onerror=onerror)
+        fs.rmtree(self._fs_get_artifact_tmppath(identity, task_name), ignore_errors=True, onerror=onerror)
+        fs.unlink(fs.path.join(self.root, task_name), ignore_errors=True)
 
-    def _fs_get_artifact_archivepath(self, identity, name):
-        return fs.get_archive(fs.path.join(self.root, name, identity))
+    def _fs_get_artifact_archivepath(self, identity, task_name):
+        return fs.get_archive(fs.path.join(self.root, task_name, identity))
 
     def _fs_get_artifact_lockpath(self, identity):
         return fs.path.join(self.root, "locks", identity + ".lock")
 
-    def _fs_get_artifact_tmppath(self, identity, name):
-        return fs.path.join(self.root, name, "." + identity)
+    def _fs_get_artifact_tmppath(self, identity, task_name):
+        return fs.path.join(self.root, task_name, "." + identity)
 
-    def _fs_get_artifact_path(self, identity, name):
-        return fs.path.join(self.root, name, identity)
+    def _fs_get_artifact_path(self, identity, task_name):
+        return fs.path.join(self.root, task_name, identity)
 
-    def _fs_get_artifact_manifest_path(self, identity, name):
-        return fs.path.join(self._fs_get_artifact_path(identity, name), ".manifest.json")
+    def _fs_get_artifact_manifest_path(self, identity, task_name):
+        return fs.path.join(self._fs_get_artifact_path(identity, task_name), ".manifest.json")
 
-    def _fs_get_artifact_manifest(self, identity, name):
-        path = self._fs_get_artifact_manifest_path(identity, name)
+    def _fs_get_artifact_manifest(self, identity, task_name):
+        path = self._fs_get_artifact_manifest_path(identity, task_name)
         with open(path) as manifest_file:
             return json.load(manifest_file, object_hook=json_deserializer)
 
@@ -1268,9 +1314,9 @@ class ArtifactCache(StorageProvider):
     def _fs_get_pid_file(self, pid):
         return fs.path.join(self.root, "pids", pid)
 
-    def _fs_is_artifact_expired(self, identity, name, last_used):
+    def _fs_is_artifact_expired(self, identity, task_name, last_used):
         try:
-            manifest = self._fs_get_artifact_manifest(identity, name)
+            manifest = self._fs_get_artifact_manifest(identity, task_name)
             manifest["used"] = last_used
             strategy = ArtifactEvictionStrategyRegister.get().find(
                 manifest.get("expires", "immediately"))
@@ -1320,19 +1366,19 @@ class ArtifactCache(StorageProvider):
         """ Discard list of artifacts. Cache lock must be held. """
         self._assert_cache_locked()
         evicted = 0
-        for identity, name, _, used in artifacts:
-            if not if_expired or self._fs_is_artifact_expired(identity, name, used):
+        for identity, task_name, _, used in artifacts:
+            if not if_expired or self._fs_is_artifact_expired(identity, task_name, used):
                 self._db_delete_artifact(db, identity)
-                self._fs_delete_artifact(identity, name, onerror=onerror)
+                self._fs_delete_artifact(identity, task_name, onerror=onerror)
                 evicted += 1
-                log.debug("Evicted {}: {}", identity, name)
+                log.debug("Evicted {}: {}", identity, task_name)
         return evicted == len(artifacts)
 
     ############################################################################
     # Public API
     ############################################################################
 
-    def is_available_locally(self, node):
+    def is_available_locally(self, artifact):
         """
         Check presence of task artifact in cache.
 
@@ -1340,51 +1386,41 @@ class ArtifactCache(StorageProvider):
         recorded for the running process to prevent eviction by other
         processes.
         """
-        if not node.task.is_cacheable():
+        if not artifact.task.is_cacheable():
             return False
 
         # Cache availability in node
         try:
-            return node.__available
-        except AttributeError:
+            assert artifact.identity in self._local_presence_cache
+        except AssertionError:
             pass
 
         with self._cache_lock(), self._db() as db:
-            if self._db_select_artifact(db, node.identity) or self._db_select_reference(db, node.identity):
-                with self._fs_get_artifact(node) as a:
-                    if a.is_temporary():
-                        self._db_delete_artifact(db, node.identity)
-                        return False
-                    self._db_insert_reference(db, node.identity)
-                node.__available = True
+            if self._db_select_artifact(db, artifact.identity) or self._db_select_reference(db, artifact.identity):
+                artifact.reload()
+                if artifact.is_temporary():
+                    self._db_delete_artifact(db, artifact.identity)
+                    return False
+                self._db_insert_reference(db, artifact.identity)
+                self._local_presence_cache.add(artifact.identity)
                 return True
         return False
 
-    def is_available_remotely(self, node):
+    def is_available_remotely(self, artifact):
         """
         Check presence of task artifact in external remote caches.
         """
-        if not node.task.is_cacheable():
-            return False
-        if node.identity in self._remote_identity_cache:
+        if artifact.identity in self._remote_presence_cache:
             return True
         for provider in self._storage_providers:
-            if provider.location(node):
-                self._remote_identity_cache.add(node.identity)
+            if provider.location(artifact):
+                self._remote_presence_cache.add(artifact.identity)
                 return True
         return False
 
-    def is_available(self, node):
+    def is_available(self, artifact):
         """ Check presence of task artifact in any cache, local or remote """
-        return self.is_available_locally(node) or self.is_available_remotely(node)
-
-    def is_unpacked(self, node):
-        with self.get_artifact(node) as artifact:
-            return artifact.is_unpacked()
-
-    def is_uploadable(self, node):
-        with self.get_artifact(node) as artifact:
-            return artifact.is_uploadable()
+        return self.is_available_locally(artifact) or self.is_available_remotely(artifact)
 
     def download_enabled(self):
         return self._options.download and \
@@ -1394,7 +1430,10 @@ class ArtifactCache(StorageProvider):
         return self._options.upload and \
             any([provider.upload_enabled() for provider in self._storage_providers])
 
-    def download(self, node, force=False):
+    def download_all(self, node, force=False):
+        pass
+
+    def download(self, artifact, force=False):
         """
         Downloads an artifact from a remote cache to the local cache.
 
@@ -1402,22 +1441,20 @@ class ArtifactCache(StorageProvider):
         """
         if not force and not self.download_enabled():
             return False
-        if not node.task.is_cacheable():
+        if not artifact.task.is_cacheable():
             return False
-        if not node.is_downloadable():
-            return True
-        with self.get_locked_artifact(node) as artifact:
-            if self.is_available_locally(node):
-                node.info("Download skipped, already in local cache")
+        with self.lock_artifact(artifact) as artifact:
+            if self.is_available_locally(artifact):
+                artifact.task.info("Download skipped, already in local cache ({name})")
                 return True
             for provider in self._storage_providers:
-                if provider.download(node, force):
+                if provider.download(artifact, force):
                     self._fs_decompress_artifact(artifact)
                     self.commit(artifact)
                     return True
         return len(self._storage_providers) == 0
 
-    def upload(self, node, force=False, locked=True):
+    def upload(self, artifact, force=False, locked=True):
         """
         Uploads an artifact from the local cache to all configured remote caches.
 
@@ -1425,30 +1462,28 @@ class ArtifactCache(StorageProvider):
         """
         if not force and not self.upload_enabled():
             return False
-        if not node.task.is_cacheable():
+        if not artifact.task.is_cacheable():
             return True
         raise_task_error_if(
-            not self.is_available_locally(node), node,
+            not self.is_available_locally(artifact), artifact.task,
             "Can't upload task artifact, no artifact present in the local cache")
-        with self.get_locked_artifact(node) if locked else self.get_artifact(node) as artifact:
+        with self.lock_artifact(artifact) if locked else artifact as artifact:
             raise_task_error_if(
-                not artifact.is_uploadable(), node,
+                not artifact.is_uploadable(), artifact.task,
                 "Artifact was modified locally by another process and can no longer be uploaded, try again")
             if self._storage_providers:
                 with self._fs_compress_artifact(artifact):
-                    return all([provider.upload(node, force) for provider in self._storage_providers])
+                    return all([provider.upload(artifact, force) for provider in self._storage_providers])
         return len(self._storage_providers) == 0
 
-    def location(self, node):
-        if not node.task.is_cacheable():
-            return ''
+    def location(self, artifact):
         for provider in self._storage_providers:
-            url = provider.location(node)
+            url = provider.location(artifact)
             if url:
                 return url
         return ''
 
-    def unpack(self, node):
+    def unpack(self, artifact):
         """
         Unpacks/relocates the task artifact to the local cache.
 
@@ -1460,13 +1495,13 @@ class ArtifactCache(StorageProvider):
 
         The artifact is interprocess locked during the operation.
         """
-        if not node.task.is_cacheable():
-            return False
-        if not node.is_unpackable():
+        if not artifact.is_unpackable():
             return True
-        with self._thread_lock, self.get_locked_artifact(node) as artifact:
-            if not self.is_available_locally(node):
-                raise_task_error(node, "Locked artifact is missing in cache (forcibly removed?)")
+        with self._thread_lock, self.lock_artifact(artifact) as artifact:
+            if not self.is_available_locally(artifact):
+                raise_task_error(
+                    artifact.task,
+                    "Locked artifact is missing in cache (forcibly removed?)")
             if artifact.is_unpacked():
                 return True
 
@@ -1475,12 +1510,12 @@ class ArtifactCache(StorageProvider):
             # get_locked_artifact() if left unused.
             fs.copy(artifact.path, artifact.temporary_path, symlinks=True)
 
-            task = artifact.get_task()
+            task = artifact.task
             with tools.Tools(task) as t:
                 try:
                     # Note: unpack() will run on the original
                     # artifact, not in the temporary copy.
-                    node.verbose("Unpacking")
+                    artifact.task.verbose("Unpacking ({name})")
                     artifact._set_unpacked()
                     task.unpack(artifact, t)
                     self.commit(artifact, uploadable=False)
@@ -1505,14 +1540,16 @@ class ArtifactCache(StorageProvider):
         take place if the resulting cache size exceeds the configured
         limit.
         """
-        if not artifact.get_task().is_cacheable():
+        if not artifact.task.is_cacheable():
             return
+
         with self._cache_lock(), self._db() as db:
             self._fs_commit_artifact(artifact, uploadable)
             with utils.ignore_exception():  # Possibly already exists in DB, e.g. unpacked
-                self._db_insert_artifact(db, artifact.get_task().identity, artifact.get_task().canonical_name, artifact.get_size())
-            self._db_update_artifact_size(db, artifact.get_task().identity, artifact.get_size())
-            self._db_insert_reference(db, artifact.get_task().identity)
+                self._db_insert_artifact(db, artifact.identity, artifact.task.canonical_name, artifact.get_size())
+            self._db_update_artifact_size(db, artifact.identity, artifact.get_size())
+            self._db_insert_reference(db, artifact.identity)
+            artifact.reload()
 
             evict_size = self._db_select_sum_artifact_size(db) - self._max_size
             if evict_size < 0:
@@ -1524,21 +1561,21 @@ class ArtifactCache(StorageProvider):
                 if self._discard(db, [candidate], True):
                     evict_size -= candidate[2]
 
-    def discard(self, node, if_expired=False, onerror=None):
+    def discard(self, artifact, if_expired=False, onerror=None):
         with self._cache_lock(), self._db() as db:
             self._db_invalidate_locks(db)
             self._db_invalidate_references(db)
             self._fs_invalidate_pids(db)
             discarded = self._discard(
                 db,
-                self._db_select_artifact_not_in_use(db, node.identity),
+                self._db_select_artifact_not_in_use(db, artifact.identity),
                 if_expired,
                 onerror=onerror)
-            if discarded and hasattr(node, "_ArtifactCache__available"):
-                del node.__available
+            if discarded:
+                self._local_presence_cache.discard(artifact.identity)
             return discarded
 
-    def _discard_wait(self, node):
+    def _discard_wait(self, artifact):
         """
         Discards an artifact without expiration consideration.
 
@@ -1552,13 +1589,13 @@ class ArtifactCache(StorageProvider):
             self._db_invalidate_locks(db)
             self._db_invalidate_references(db)
             self._fs_invalidate_pids(db)
-            artifacts = self._db_select_artifact(db, node.identity)
-            self._db_delete_artifact(db, node.identity, and_refs=False)
-            refpids = self._db_select_artifact_reference_pids(db, node.identity)
-            lockpids = self._db_select_artifact_lock_pids(db, node.identity)
+            artifacts = self._db_select_artifact(db, artifact.identity)
+            self._db_delete_artifact(db, artifact.identity, and_refs=False)
+            refpids = self._db_select_artifact_reference_pids(db, artifact.identity)
+            lockpids = self._db_select_artifact_lock_pids(db, artifact.identity)
 
         if len(refpids) > 1:
-            node.info("Artifact is temporarily in use, forced discard on hold")
+            artifact.task.info("Artifact is temporarily in use, forced discard on hold ({name})")
             for pid in refpids:
                 # Loop waiting for other processes to surrender the artifact
                 while True:
@@ -1574,13 +1611,13 @@ class ArtifactCache(StorageProvider):
                             break
                     except RuntimeError:
                         with self._cache_lock(), self._db() as db:
-                            lockpids = self._db_select_artifact_lock_pids(db, node.identity)
+                            lockpids = self._db_select_artifact_lock_pids(db, artifact.identity)
 
         with self._cache_lock(), self._db() as db:
             assert self._discard(db, artifacts, False), "Failed to discard artifact"
-            if hasattr(node, "_ArtifactCache__available"):
-                del node.__available
-        return self._fs_get_artifact(node)
+            self._local_presence_cache.discard(artifact.identity)
+            artifact.reload()
+        return artifact
 
     def discard_all(self, if_expired=False, onerror=None):
         with self._cache_lock(), self._db() as db:
@@ -1596,11 +1633,11 @@ class ArtifactCache(StorageProvider):
     def get_context(self, node):
         return Context(self, node)
 
-    def get_artifact(self, node, tools=None):
-        return self._fs_get_artifact(node, tools)
+    def get_artifact(self, node, name, tools=None, session=False):
+        return self._fs_get_artifact(node, name=name, tools=tools, session=session)
 
     @contextlib.contextmanager
-    def get_locked_artifact(self, node, discard=False):
+    def lock_artifact(self, artifact, discard=False):
         """
         Locks the task artifact.
 
@@ -1610,19 +1647,19 @@ class ArtifactCache(StorageProvider):
         """
         with self._cache_lock():
             with self._db() as db:
-                self._db_insert_lock(db, node.identity)
-                self._db_insert_reference(db, node.identity)
-            lock_path = self._fs_get_artifact_lockpath(node.identity)
+                self._db_insert_lock(db, artifact.identity)
+                self._db_insert_reference(db, artifact.identity)
+            lock_path = self._fs_get_artifact_lockpath(artifact.identity)
             lock = fasteners.InterProcessLock(lock_path)
             is_locked = lock.acquire(blocking=False)
         if not is_locked:
-            node.info("Artifact is temporarily locked by another process")
+            artifact.task.info("Artifact is temporarily locked by another process ({name})")
             lock.acquire()
 
         try:
-            artifact = self.get_artifact(node)
+            artifact.reload()
             if discard:
-                artifact = self._discard_wait(node)
+                artifact = self._discard_wait(artifact)
             if artifact.is_temporary():
                 fs.rmtree(artifact.temporary_path, ignore_errors=True)
                 fs.makedirs(artifact.temporary_path)
@@ -1634,11 +1671,8 @@ class ArtifactCache(StorageProvider):
             fs.rmtree(artifact.temporary_path, ignore_errors=True)
             with self._cache_lock():
                 with self._db() as db:
-                    self._db_delete_lock(db, node.identity)
+                    self._db_delete_lock(db, artifact.identity)
                 lock.release()
                 with self._db() as db:
-                    if self._db_select_lock_count(db, node.identity) == 0:
+                    if self._db_select_lock_count(db, artifact.identity) == 0:
                         fs.unlink(lock_path, ignore_errors=True)
-
-    def get_path(self, node):
-        return self._fs_get_artifact_path(node.identity, node.canonical_name)

@@ -1,0 +1,40 @@
+from jolt import Task, attributes
+
+
+@attributes.artifact("logs", session=True)
+class Producer(Task):
+    def run(self, deps, tools):
+        with tools.cwd(tools.builddir()):
+            tools.write_file("file.txt", "a text file")
+            tools.write_file("file.log", "a log file")
+
+    def publish(self, artifact, tools):
+        # Publish text files into main artifact
+        with tools.cwd(tools.builddir()):
+            artifact.collect("*.txt")
+
+    def publish_logs(self, artifact, tools):
+        # Publish logs into session artifact.
+        # The artifact is created and shared
+        # even if the task fails.
+        with tools.cwd(tools.builddir()):
+            artifact.collect("*.log")
+
+
+class Consumer(Task):
+    requires = ["producer"]
+
+    def run(self, deps, tools):
+        # Display file in main artifact
+        with tools.cwd(deps["main@producer"].path):
+            tools.run("cat *.txt")
+
+        # Display logs
+        try:
+            with tools.cwd(deps["logs@producer"].path):
+                tools.run("cat *.log")
+        except KeyError:
+            # KeyError is raised if the producer task
+            # didn't have to be executed due to caching.
+            # In that case, no session artifact exists.
+            print("No logs available")

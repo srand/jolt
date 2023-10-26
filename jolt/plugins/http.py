@@ -49,65 +49,61 @@ class Http(cache.StorageProvider):
 
         return HTTPBasicAuth(username, password)
 
-    def _get_url(self, node, artifact):
-        return "{uri}/{name}/{file}".format(
+    def _get_url(self, artifact):
+        return artifact.tools.expand(
+            "{uri}/{name}/{file}",
             uri=self._uri,
-            name=node.name,
             file=fs.path.basename(artifact.get_archive_path()))
 
     @utils.retried.on_exception((RequestException, JoltError))
-    def download(self, node, force=False):
+    def download(self, artifact, force=False):
         if self._disabled:
             return False
         if not self._download and not force:
             return False
-        with self._cache.get_artifact(node) as artifact:
-            url = self._get_url(node, artifact)
-            if node.tools.download(url, artifact.get_archive_path(), exceptions=False, timeout=TIMEOUT):
-                return True
-        return False
+        url = self._get_url(artifact)
+        return artifact.tools.download(
+            url,
+            artifact.get_archive_path(),
+            exceptions=False,
+            timeout=TIMEOUT)
 
     def download_enabled(self):
         return not self._disabled and self._download
 
     @utils.retried.on_exception((RequestException))
-    def upload(self, node, force=False):
+    def upload(self, artifact, force=False):
         if self._disabled:
             return True
         if not self._upload and not force:
             return True
-        with self._cache.get_artifact(node) as artifact:
-            url = self._get_url(node, artifact)
-            archive = artifact.get_archive()
-            return node.tools.upload(
-                archive, url,
-                exceptions=False,
-                auth=self._get_auth(),
-                timeout=TIMEOUT)
-        return False
+        url = self._get_url(artifact)
+        archive = artifact.get_archive()
+        return artifact.tools.upload(
+            archive, url,
+            exceptions=False,
+            auth=self._get_auth(),
+            timeout=TIMEOUT)
 
     def upload_enabled(self):
         return not self._disabled and self._upload
 
     @utils.retried.on_exception((RequestException))
-    def location(self, node):
+    def location(self, artifact):
         if self._disabled:
             return False
-        with self._cache.get_artifact(node) as artifact:
-            from requests.api import head
+        from requests.api import head
 
-            url = self._get_url(node, artifact)
-            try:
-                response = head(url, stream=True, timeout=TIMEOUT_HEAD)
-            except ConnectTimeout:
-                self._disabled = True
-                log.warning("[HTTP] failed to establish server connection, disabled")
-                return False
+        url = self._get_url(artifact)
+        try:
+            response = head(url, stream=True, timeout=TIMEOUT_HEAD)
+        except ConnectTimeout:
+            self._disabled = True
+            log.warning("[HTTP] failed to establish server connection, disabled")
+            return False
 
-            log.debug("[HTTP] Head: {0}", url)
-            log.debug("[HTTP] Response: {0}", response.status_code)
-            return url if response.status_code == 200 else ''
-        return False
+        log.debug("[HTTP] Head ({}): {}", response.status_code, url)
+        return url if response.status_code == 200 else ''
 
 
 @cache.RegisterStorage

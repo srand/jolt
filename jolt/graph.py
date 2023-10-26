@@ -1,4 +1,4 @@
-from contextlib import contextmanager
+from contextlib import contextmanager, ExitStack
 import copy
 import hashlib
 from os import getenv
@@ -19,9 +19,10 @@ from jolt.options import JoltOptions
 
 
 class TaskProxy(object):
-    def __init__(self, task, graph, options):
+    def __init__(self, task, graph, cache, options):
         self.task = task
         self.graph = graph
+        self.cache = cache
         self.options = options
 
         self.children = []
@@ -40,10 +41,16 @@ class TaskProxy(object):
         self._download = True
         self._local = False
         self._network = False
+        self._artifacts = []
+
         hooks.task_created(self)
 
     def __hash__(self):
         return id(self)
+
+    @property
+    def artifacts(self):
+        return self._artifacts
 
     @property
     def tools(self):
@@ -145,24 +152,32 @@ class TaskProxy(object):
             return self._extended_task.get_extended_task()
         return self
 
-    def deps_available_locally(self, cache):
+    def deps_available_locally(self):
         for c in self.children:
             if c.is_resource() or c.is_alias():
                 continue
-            if not c.is_available_locally(cache):
+            if not c.is_available_locally():
                 return False
         return True
 
     def is_alias(self):
         return isinstance(self.task, Alias)
 
-    def is_available_locally(self, cache):
-        tasks = [self] + self.extensions
-        return all(map(cache.is_available_locally, tasks))
+    def is_available_locally(self, extensions=True, skip_session=False):
+        dep_artifacts = []
+        if extensions:
+            for dep in self.extensions:
+                dep_artifacts += dep.artifacts
+        artifacts = filter(lambda a: not a.is_session(), self._artifacts + dep_artifacts)
+        return all(map(self.cache.is_available_locally, artifacts))
 
-    def is_available_remotely(self, cache):
-        tasks = [self] + self.extensions
-        return all(map(cache.is_available_remotely, tasks))
+    def is_available_remotely(self, extensions=True):
+        dep_artifacts = []
+        if extensions:
+            for dep in self.extensions:
+                dep_artifacts += dep.artifacts
+        artifacts = filter(lambda a: not a.is_session(), self._artifacts + dep_artifacts)
+        return all(map(self.cache.is_available_remotely, artifacts))
 
     def is_cacheable(self):
         return self.task.is_cacheable()
@@ -210,19 +225,57 @@ class TaskProxy(object):
     def is_unpackable(self):
         return self.task.unpack.__func__ is not Task.unpack
 
-    def is_unpacked(self, cache):
+    def is_unpacked(self):
         tasks = [self] + self.extensions
-        return any(map(cache.is_unpacked, tasks))
+        artifacts = []
+        for task in tasks:
+            artifacts.extend(task._artifacts)
+        return any(map(lambda artifact: artifact.is_unpacked(), artifacts))
 
-    def is_uploadable(self, cache):
+    def is_uploadable(self):
         tasks = [self] + self.extensions
-        return all(map(cache.is_uploadable, tasks))
+        artifacts = []
+        for task in tasks:
+            artifacts.extend(task._artifacts)
+        return all(map(lambda artifact: artifact.is_uploadable(), artifacts))
 
     def is_workspace_resource(self):
         return isinstance(self.task, WorkspaceResource)
 
+    @contextmanager
+    def lock_artifacts(self, discard=False):
+        artifacts = []
+        stack = ExitStack()
+        for artifact in self.artifacts:
+            lock = self.cache.lock_artifact(artifact, discard=discard)
+            artifacts.append(stack.enter_context(lock))
+        try:
+            yield artifacts
+        finally:
+            stack.close()
+
     def disable_download(self):
         self._download = False
+
+    def download(self, force=False, session_only=False, persistent_only=False):
+        if not self.is_downloadable():
+            return True
+        artifacts = self._artifacts
+        if session_only:
+            artifacts = filter(lambda a: a.is_session(), self._artifacts)
+        if persistent_only:
+            artifacts = filter(lambda a: not a.is_session(), self._artifacts)
+        return all([self.cache.download(artifact, force=force) for artifact in artifacts])
+
+    def upload(self, force=False, locked=False, session_only=False, persistent_only=False):
+        if not self.is_uploadable():
+            return False
+        artifacts = self._artifacts
+        if session_only:
+            artifacts = filter(lambda a: a.is_session(), self._artifacts)
+        if persistent_only:
+            artifacts = filter(lambda a: not a.is_session(), self._artifacts)
+        return all([self.cache.upload(artifact, force=force, locked=locked) for artifact in artifacts])
 
     def resolve_requirement_alias(self, name):
         return self.requirement_aliases.get(name)
@@ -265,6 +318,8 @@ class TaskProxy(object):
         self.descendants = list(self.descendants)
 
         self.task.influence += [TaskRequirementInfluence(n) for n in self.neighbors]
+        self.identity
+        self._artifacts = self.task._artifacts(self.cache, self)
 
         return self.identity
 
@@ -335,15 +390,15 @@ class TaskProxy(object):
     def clean(self, cache, if_expired, onerror=None):
         with self.tools:
             self.task.clean(self.tools)
-            discarded = cache.discard(self, if_expired, onerror=fs.onerror_warning)
-            if discarded:
-                log.debug("Discarded: {} ({})", self.short_qualified_name, self.identity[:8])
-            else:
-                log.debug(" Retained: {} ({})", self.short_qualified_name, self.identity[:8])
+            for artifact in self.artifacts:
+                discarded = cache.discard(artifact, if_expired, onerror=fs.onerror_warning)
+                if discarded:
+                    log.debug("Discarded: {} ({})", self.short_qualified_name, artifact.identity)
+                else:
+                    log.debug(" Retained: {} ({})", self.short_qualified_name, artifact.identity)
 
     def run(self, cache, force_upload=False, force_build=False):
         with self.tools:
-            tasks = [self] + self.extensions
             available_locally = available_remotely = False
 
             for child in self.children:
@@ -352,27 +407,26 @@ class TaskProxy(object):
                 raise_task_error_if(
                     not child.is_completed() and child.is_unstable,
                     self, "Task depends on failed task '{}'", child.short_qualified_name)
-                if not cache.is_available_locally(child):
+                if not child.is_available_locally(extensions=False):
                     raise_task_error_if(
-                        not cache.download(child),
+                        not child.download(),
                         child, "Failed to download task artifact")
 
             if not force_build:
-                available_locally = all(map(cache.is_available_locally, tasks))
+                available_locally = self.is_available_locally()
                 if available_locally and not force_upload:
                     return
-                available_remotely = cache.download_enabled() and \
-                    all(map(cache.is_available_remotely, tasks))
+                available_remotely = cache.download_enabled() and self.is_available_remotely()
                 if not available_locally and available_remotely:
-                    available_locally = cache.download(self)
+                    available_locally = self.download()
 
             if force_build or not available_locally:
                 with log.threadsink() as buildlog:
                     if self.task.is_runnable():
                         log.verbose("Host: {0}", getenv("HOSTNAME", "localhost"))
 
-                    with cache.get_locked_artifact(self, discard=force_build) as artifact:
-                        if not cache.is_available_locally(self) or self.has_extensions():
+                    with self.lock_artifacts(discard=force_build) as artifacts:
+                        if not self.is_available_locally() or self.has_extensions():
                             with cache.get_context(self) as context:
                                 self.running()
                                 with self.tools.cwd(self.task.joltdir):
@@ -380,18 +434,24 @@ class TaskProxy(object):
                                     if self.is_goal() and self.options.debug:
                                         log.info("Entering debug shell")
                                         self.task.debugshell(context, self.tools)
-                                    self.task.run(context, self.tools)
-                                    hooks.task_postrun(self, context, self.tools)
+                                    try:
+                                        self.task.run(context, self.tools)
+                                    finally:
+                                        hooks.task_postrun(self, context, self.tools)
+                                        # Publish session artifacts
+                                        with self.tools.cwd(self.task.joltdir):
+                                            for artifact in filter(lambda a: a.is_session(), artifacts):
+                                                self.publish(context, artifact)
+                                        raise_task_error_if(
+                                            not self.upload(force=force_upload, locked=False, session_only=True) and cache.upload_enabled(),
+                                            self, "Failed to upload task artifact")
 
-                                if not cache.is_available_locally(self):
+                                if not self.is_available_locally(extensions=False):
+                                    # Publish persistent artifacts
                                     with self.tools.cwd(self.task.joltdir):
-                                        hooks.task_prepublish(self, artifact, self.tools)
-                                        self.task.publish(artifact, self.tools)
-                                        self.task._verify_influence(context, artifact, self.tools)
-                                        hooks.task_postpublish(self, artifact, self.tools)
-                                    with open(fs.path.join(artifact.path, ".build.log"), "w") as f:
-                                        f.write(buildlog.getvalue())
-                                    cache.commit(artifact)
+                                        with self.tools.cwd(self.task.joltdir):
+                                            for artifact in filter(lambda a: not a.is_session(), artifacts):
+                                                self.publish(context, artifact, buildlog)
                                 else:
                                     self.info("Publication skipped, already in local cache")
                         else:
@@ -401,12 +461,12 @@ class TaskProxy(object):
                         # artifact may become unpack():ed before we have a chance to.
                         if force_upload or force_build or not available_remotely:
                             raise_task_error_if(
-                                not cache.upload(self, force=force_upload, locked=False) and cache.upload_enabled(),
-                                self, "failed to upload task artifact")
+                                not self.upload(force=force_upload, locked=False, persistent_only=True) and cache.upload_enabled(),
+                                self, "Failed to upload task artifact")
             elif force_upload or not available_remotely:
                 raise_task_error_if(
-                    not cache.upload(self, force=force_upload) and cache.upload_enabled(),
-                    self, "failed to upload task artifact")
+                    not self.upload(force=force_upload, persistent_only=True) and cache.upload_enabled(),
+                    self, "Failed to upload task artifact")
 
             for extension in self.extensions:
                 try:
@@ -418,6 +478,18 @@ class TaskProxy(object):
                     raise e
                 else:
                     extension.finished()
+
+    def publish(self, context, artifact, buildlog=None):
+        hooks.task_prepublish(self, artifact, self.tools)
+        publish = self.task.publish if artifact.is_main() else \
+            getattr(self.task, "publish_" + artifact.name)
+        publish(artifact, self.tools)
+        self.task._verify_influence(context, artifact, self.tools)
+        if artifact.is_main() and buildlog:
+            with open(fs.path.join(artifact.path, ".build.log"), "w") as f:
+                f.write(buildlog.getvalue())
+        hooks.task_postpublish(self, artifact, self.tools)
+        artifact.get_cache().commit(artifact)
 
     def report(self):
         return self.task.report()
@@ -554,7 +626,8 @@ class Graph(object):
 
 
 class GraphBuilder(object):
-    def __init__(self, registry, manifest, options=None, progress=False):
+    def __init__(self, registry, cache, manifest, options=None, progress=False):
+        self.cache = cache
         self.graph = Graph()
         self.nodes = {}
         self.registry = registry
@@ -570,7 +643,7 @@ class GraphBuilder(object):
             node = self.nodes.get(task.qualified_name, None)
             if node is not None:
                 return node
-            node = TaskProxy(task, self.graph, self.options)
+            node = TaskProxy(task, self.graph, self.cache, self.options)
             self.nodes[node.short_qualified_name] = node
             self.nodes[node.qualified_name] = node
             if self.options.salt:
@@ -593,7 +666,7 @@ class GraphBuilder(object):
             parent = node
 
         for requirement in node.task.requires:
-            alias, task, name = utils.parse_aliased_task_name(requirement)
+            alias, artifact, task, name = utils.parse_aliased_task_name(requirement)
             child = self._get_node(progress, utils.format_task_name(task, name))
             # Create direct edges from alias parents to alias children
             if child.is_alias():
@@ -650,6 +723,8 @@ class GraphBuilder(object):
                 for goal_alias in goal.neighbors:
                     goal_alias.set_goal()
                     self.graph.goals.append(goal_alias)
+
+        self.graph.all_nodes = [n for n in self.graph.nodes]
 
         return self.graph
 

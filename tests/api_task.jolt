@@ -926,7 +926,8 @@ class TaskApi(JoltTest):
             self.build("-j2 -k unpacker1 unpacker2")
         r = self.lastLog()
         self.assertIn("Execution finished", r)
-        self.assertNoArtifact(r)
+        a = self.artifacts(r)
+        self.assertEqual(1, len(a))
 
     def test_download(self):
         """

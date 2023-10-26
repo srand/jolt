@@ -125,6 +125,9 @@ global_string("{test}")
         network = "-n " if self.network else ""
         return self.jolt("-v build " + network + task, *args, **kwargs)
 
+    def fail(self, string):
+        raise AssertionError(string)
+
     def lastLog(self):
         return self._log
 

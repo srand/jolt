@@ -149,7 +149,7 @@ class Downloader(Executor):
             task.started("Download")
             hooks.task_started_download(task)
             raise_task_error_if(
-                not env.cache.download(task),
+                not task.download(persistent_only=True),
                 task, "Failed to download task artifact")
         except Exception as e:
             with task.task.report() as report:
@@ -179,7 +179,7 @@ class Uploader(Executor):
             task.started("Upload")
             hooks.task_started_upload(task)
             raise_task_error_if(
-                not env.cache.upload(task),
+                not task.upload(),
                 task, "Failed to upload task artifact")
         except Exception as e:
             with task.task.report() as report:
@@ -377,18 +377,18 @@ class LocalStrategy(ExecutionStrategy, PruneStrategy):
             return self.executors.create_skipper(task)
         if not task.is_cacheable():
             return self.executors.create_local(task)
-        if task.is_available_locally(self.cache):
+        if task.is_available_locally():
             return self.executors.create_skipper(task)
-        if self.cache.download_enabled() and task.is_available_remotely(self.cache):
+        if self.cache.download_enabled() and task.is_available_remotely():
             return self.executors.create_downloader(task)
         return self.executors.create_local(task)
 
     def should_prune_requirements(self, task):
         if task.is_alias() or not task.is_cacheable():
             return False
-        if task.is_available_locally(self.cache):
+        if task.is_available_locally():
             return True
-        if self.cache.download_enabled() and task.is_available_remotely(self.cache):
+        if self.cache.download_enabled() and task.is_available_remotely():
             return True
         return False
 
@@ -405,9 +405,9 @@ class DownloadStrategy(ExecutionStrategy, PruneStrategy):
             return self.executors.create_local(task)
         if not task.is_cacheable():
             return self.executors.create_skipper(task)
-        if task.is_available_locally(self.cache):
+        if task.is_available_locally():
             return self.executors.create_skipper(task)
-        if self.cache.download_enabled() and task.is_available_remotely(self.cache):
+        if self.cache.download_enabled() and task.is_available_remotely():
             return self.executors.create_downloader(task)
         raise_task_error(task, "Task must be built first")
 
@@ -425,7 +425,7 @@ class DistributedStrategy(ExecutionStrategy, PruneStrategy):
             return self.executors.create_skipper(task)
 
         if task.is_resource():
-            if task.deps_available_locally(self.cache):
+            if task.deps_available_locally():
                 return self.executors.create_local(task)
             else:
                 return self.executors.create_skipper(task)
@@ -442,16 +442,16 @@ class DistributedStrategy(ExecutionStrategy, PruneStrategy):
             if not extension.is_goal(with_extensions=False):
                 extension.disable_download()
 
-        remote = task.is_available_remotely(self.cache)
+        remote = task.is_available_remotely()
         if remote:
             if task.is_goal() and self.cache.download_enabled() and \
-               not task.is_available_locally(self.cache):
+               not task.is_available_locally():
                 return self.executors.create_downloader(task)
             return self.executors.create_skipper(task)
         else:
-            if task.is_available_locally(self.cache) and task.is_uploadable(self.cache):
+            if task.is_available_locally() and task.is_uploadable():
                 return self.executors.create_uploader(task)
-            if task.is_fast() and task.deps_available_locally(self.cache):
+            if task.is_fast() and task.deps_available_locally():
                 return self.executors.create_local(task)
 
         return self.executors.create_network(task)
@@ -459,7 +459,7 @@ class DistributedStrategy(ExecutionStrategy, PruneStrategy):
     def should_prune_requirements(self, task):
         if task.is_alias() or not task.is_cacheable():
             return False
-        if task.is_available_remotely(self.cache):
+        if task.is_available_remotely():
             return True
         return False
 
@@ -483,12 +483,12 @@ class WorkerStrategy(ExecutionStrategy, PruneStrategy):
         if not task.is_cacheable():
             return self.executors.create_local(task)
 
-        if task.is_available_locally(self.cache):
-            if task.is_goal() and not task.is_available_remotely(self.cache):
+        if task.is_available_locally():
+            if task.is_goal() and not task.is_available_remotely():
                 # Unpacked artifacts may become unpacked before we manage to upload.
                 # To keep the implementation simple we take the easy road and rebuild
                 # all artifacts that have not been unpacked, even if they are uploadable.
-                if task.is_unpacked(self.cache) and task.is_uploadable(self.cache):
+                if task.is_unpacked() and task.is_uploadable():
                     return self.executors.create_uploader(task)
                 else:
                     return self.executors.create_local(task, force=True)
@@ -497,7 +497,7 @@ class WorkerStrategy(ExecutionStrategy, PruneStrategy):
         if not self.cache.download_enabled():
             return self.executors.create_local(task)
 
-        if task.is_available_remotely(self.cache):
+        if task.is_available_remotely():
             return self.executors.create_downloader(task)
 
         return self.executors.create_local(task)
@@ -505,11 +505,11 @@ class WorkerStrategy(ExecutionStrategy, PruneStrategy):
     def should_prune_requirements(self, task):
         if task.is_alias() or not task.is_cacheable():
             return False
-        if task.is_available_locally(self.cache):
+        if task.is_available_locally():
             # Unpacked artifacts may become unpacked before we manage to upload.
             # To keep the implementation simple we take the easy road and rebuild
             # all artifacts that have not been unpacked, even if they are uploadable.
-            if task.is_unpacked(self.cache) and task.is_uploadable(self.cache):
+            if task.is_unpacked() and task.is_uploadable():
                 return True
         if not task.is_goal() and task.task.selfsustained:
             return True
@@ -524,6 +524,7 @@ class TaskIdentityExtension(ManifestExtension):
                 manifest_task = manifest.create_task()
                 manifest_task.name = child.qualified_name
             manifest_task.identity = child.identity
+            manifest_task.instance = child.instance
 
 
 ManifestExtensionRegistry.add(TaskIdentityExtension())

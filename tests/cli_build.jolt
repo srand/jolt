@@ -607,3 +607,60 @@ class BuildCli(testsupport.JoltTest):
         self.build("all")
         with self.assertRaises(Exception):
             self.build("fail")
+
+    def test_session_artifacts(self):
+        """
+        --- tasks:
+        @attributes.artifact("logs", session=True)
+        class Session(Task):
+            fail = BooleanParameter(False)
+
+            def run(self, deps, tools):
+                assert not self.fail
+
+            def publish_logs(self, a, t):
+                with t.cwd(t.builddir()):
+                    t.write_file("file.txt", "file")
+                    a.collect("file.txt")
+
+        class Consumer(Task):
+            requires = ["session"]
+
+            def run(self, deps, tools):
+                deps["main@session"]
+                try:
+                    deps["logs@session"]
+                except KeyError:
+                    pass
+                else:
+                    assert False, "Unexpected session artifact found"
+        ---
+        """
+        r = self.build("session")
+        a = self.artifacts(r)
+        self.assertEqual(2, len(a))
+        self.assertExists(a[1], "file.txt")
+
+        with self.assertRaises(Exception):
+            self.build("session:fail=true")
+        a = self.artifacts(self.lastLog())
+        if self.network_enabled:
+            # artifacts() will parse both the local and the worker's log.
+            self.assertEqual(2, len(a))
+        else:
+            self.assertEqual(1, len(a))
+        self.assertExists(a[-1], "file.txt")
+
+        # Trying to consume session artifact from a previous build shall fail
+        self.build("consumer")
+
+        # Download should not fail if no session artifact exists
+        r = self.build("session -s1 --no-download")
+        a = self.artifacts(r)
+        self.assertEqual(0, len(a))
+
+        r = self.build("session -s1")
+        a = self.artifacts(r)
+        self.assertEqual(1, len(a))
+
+

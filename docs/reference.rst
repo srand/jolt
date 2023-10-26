@@ -56,7 +56,7 @@ Decorators
 .. reference-decorators-start
 
 .. autoclass:: jolt.attributes
-   :members: attribute, environ, requires, system
+   :members: artifact, attribute, environ, load, requires, system
 
 .. reference-decorators-end
 

@@ -127,12 +127,13 @@ def call_and_catch_and_log(f, *args, **kwargs):
 
 
 def parse_aliased_task_name(name):
-    match = re.match(r"^((?P<alias>[^=:]+)=)?(?P<task>[^:]+)(:(?P<params>.*))?$", name)
+    match = re.match(r"^((?P<alias>[^=:]+)=)?((?P<artifact>[^@=:]+)@)?(?P<task>[^:]+)(:(?P<params>.*))?$", name)
     if not match:
         from jolt.error import raise_error
         raise_error("Illegal task name: {}", name)
     match = match.groupdict()
     alias = match["alias"]
+    artifact = match["artifact"]
     task = match["task"]
     params = match["params"] or {}
 
@@ -148,15 +149,17 @@ def parse_aliased_task_name(name):
 
         params = {key: value for key, value in map(_param, params) if key}
 
-    return alias, task, params
+    return alias, artifact, task, params
 
 
 def parse_task_name(name):
-    _, task, params = parse_aliased_task_name(name)
+    _, _, task, params = parse_aliased_task_name(name)
     return task, params
 
 
-def format_task_name(name, params):
+def format_task_name(name, params, artifact=None):
+    if artifact:
+        name = f"{artifact}@{name}"
     if not params:
         return name
 
@@ -511,8 +514,8 @@ def option(prefix, value):
 
 def shorten(string, count=30):
     if len(string) > count:
-        keep = int(count/2-1)
+        keep = int(count / 2 - 1)
         if keep <= 0:
             keep = 1
-        return string[:keep] + "..." + string[-keep+1:]
+        return string[:keep] + "..." + string[-keep + 1:]
     return string

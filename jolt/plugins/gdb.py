@@ -25,10 +25,11 @@ def stage_artifacts(artifacts, tools):
         tools.sandbox(artifact, incremental=True, reflect=fs.has_symlinks())
 
 
-def get_task_artifacts(task, artifact=None):
-    acache = cache.ArtifactCache.get()
-    artifact = artifact or acache.get_artifact(task)
-    return artifact, [acache.get_artifact(dep) for dep in task.children]
+def get_task_artifacts(task):
+    artifacts = []
+    for dep in task.children:
+        artifacts.extend(dep.artifacts)
+    return task.artifacts[0], artifacts
 
 
 @cli.cli.command(name="gdb", context_settings={"ignore_unknown_options": True})
@@ -81,7 +82,7 @@ def gdb(ctx, task, default, machine_interface, no_binary, gdb_args):
     for params in default:
         registry.set_default_parameters(params)
 
-    gb = graph.GraphBuilder(registry, manifest, options, progress=True)
+    gb = graph.GraphBuilder(registry, acache, manifest, options, progress=True)
     dag = gb.build([task])
 
     try:
@@ -119,11 +120,11 @@ def gdb(ctx, task, default, machine_interface, no_binary, gdb_args):
     assert len(dag.goals), "Too many tasks, can only debug one executable at a time"
 
     for goal in dag.goals:
-        artifact, deps = get_task_artifacts(goal)
-        stage_artifacts(deps + [artifact], goal.tools)
+        main, deps = get_task_artifacts(goal)
+        stage_artifacts([main] + deps, goal.tools)
 
         raise_task_error_if(
-            artifact.strings.executable.get_value() is None,
+            main.strings.executable.get_value() is None,
             goal, "No executable found in task artifact")
 
         with acache.get_context(goal):
@@ -141,7 +142,7 @@ def gdb(ctx, task, default, machine_interface, no_binary, gdb_args):
             cmd += ["-ex", "set print thread-events off"]
             cmd += ["-ex", "handle SIG32 nostop noprint"]
             if not no_binary:
-                cmd += [os.path.join(artifact.path, str(artifact.strings.executable))]
+                cmd += [os.path.join(main.path, str(main.strings.executable))]
             cmd += gdb_args
 
             if isinstance(goal.task, ninja.CXXProject):

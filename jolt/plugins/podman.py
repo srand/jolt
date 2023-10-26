@@ -31,7 +31,7 @@ class PodmanImportListVariable(PodmanListVariable):
             try:
                 tag = artifact.podman.tags[0]
             except IndexError:
-                tag = "{}:{}".format(artifact.get_task().canonical_name, artifact.identity)
+                tag = artifact.tools.expand("{canonical_name}:{identity}")
             task.tools.run(
                 "podman import {} {}",
                 fs.path.join(artifact.path, tar, tag), output_on_error=True)
