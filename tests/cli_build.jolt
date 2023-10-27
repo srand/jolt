@@ -657,7 +657,10 @@ class BuildCli(testsupport.JoltTest):
         # Download should not fail if no session artifact exists
         r = self.build("session -s1 --no-download")
         a = self.artifacts(r)
-        self.assertEqual(0, len(a))
+        if self.network_enabled:
+            self.assertEqual(0, len(a))
+        else:
+            self.assertEqual(2, len(a))
 
         r = self.build("session -s1")
         a = self.artifacts(r)
