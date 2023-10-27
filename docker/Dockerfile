@@ -1,7 +1,7 @@
-FROM python:3-slim
+FROM python:3.11-slim
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update
-RUN apt-get install -y --no-install-recommends git ninja-build uidmap
+RUN apt-get install -y --no-install-recommends git ninja-build uidmap python3-pygit2
 RUN apt-get clean
 RUN pip3 install virtualenv
 
