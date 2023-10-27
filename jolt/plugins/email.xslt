@@ -115,10 +115,10 @@
             <xsl:element name="tr">
               <xsl:choose>
                 <xsl:when test="result='FAILED'">
-                  <xsl:attribute name="bgcolor">#f44336<xsl:value-of select="logstash" /></xsl:attribute>
+                  <xsl:attribute name="bgcolor">#f44336</xsl:attribute>
                 </xsl:when>
                 <xsl:otherwise>
-                  <xsl:attribute name="bgcolor">#FF7E00<xsl:value-of select="logstash" /></xsl:attribute>
+                  <xsl:attribute name="bgcolor">#FF7E00</xsl:attribute>
                 </xsl:otherwise>
               </xsl:choose>
             </xsl:element>
