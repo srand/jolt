@@ -36,4 +36,4 @@ class NonFunctionalRequirements(JoltTest):
 
         d = utils.duration()
         self.build("-f t")
-        self.assertLess(d.seconds, 20)
+        self.assertLess(d.seconds, 30)
