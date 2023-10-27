@@ -403,7 +403,7 @@ def build(ctx, task, network, keep_going, default, local,
             log.warning("Interrupted again, exiting")
             _exit(1)
     finally:
-        for task in dag.goals:
+        for task in goal_tasks:
             for artifact in task.artifacts:
                 if acache.is_available_locally(artifact):
                     log.info("Location: {0}", artifact.path)
