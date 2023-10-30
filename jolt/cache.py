@@ -1,6 +1,6 @@
 import atexit
 import contextlib
-from collections import OrderedDict
+from collections import namedtuple, OrderedDict
 from datetime import datetime
 import fasteners
 import json
@@ -454,19 +454,22 @@ class Artifact(object):
                 artifact.strings.version = "1.2"
     """
 
-    def __init__(self, cache, node, name=None, tools=None, session=False):
+    def __init__(self, cache, node, name=None, identity=None, tools=None, session=False):
         self._cache = cache
-        self._identity = node.identity if not session else node.instance
+        if identity:
+            self._identity = identity
+        else:
+            self._identity = node.identity if not session else node.instance
         if name:
             self._identity = name + "@" + self._identity
         self._main = name == "main"
         self._name = name or "main"
         self._node = node
-        self._task = node.task
+        self._task = node.task if node else None
         self._tools = tools or self._node.tools
-        self._path = cache._fs_get_artifact_path(self._identity, node.canonical_name)
-        self._temp = cache._fs_get_artifact_tmppath(self._identity, node.canonical_name)
-        self._archive = cache._fs_get_artifact_archivepath(self._identity, node.canonical_name)
+        self._path = cache._fs_get_artifact_path(self._identity, node.canonical_name if node else name)
+        self._temp = cache._fs_get_artifact_tmppath(self._identity, node.canonical_name if node else name)
+        self._archive = cache._fs_get_artifact_archivepath(self._identity, node.canonical_name if node else name)
         self._lock_path = cache._fs_get_artifact_lockpath(self._identity)
         self._session = session
         self._unpacked = False
@@ -492,17 +495,21 @@ class Artifact(object):
 
     def _write_manifest(self):
         content = {}
-        content["task"] = self._node.name
         content["size"] = self._get_size()
         content["unpacked"] = self._unpacked
         content["uploadable"] = self._uploadable
-        content["identity"] = self._node.identity
-        content["requires"] = self._node.task.requires
-        content["parameters"] = self._node.task._get_parameters()
+        if self._node:
+            content["task"] = self._node.name
+            content["identity"] = self._node.identity
+            content["requires"] = self._node.task.requires
+            content["parameters"] = self._node.task._get_parameters()
+
         if self._influence is not None:
             content["influence"] = self._influence
-        else:
+        elif self._node:
             content["influence"] = influence.HashInfluenceRegistry.get().get_strings(self._node.task)
+        else:
+            content["influence"] = []
         content["created"] = self._created
         content["modified"] = datetime.now()
         content["expires"] = self._expires.value
@@ -786,6 +793,8 @@ class Artifact(object):
         return self._temporary
 
     def is_unpackable(self):
+        if not self._node:
+            return True
         return self._node.is_unpackable()
 
     def is_unpacked(self):
@@ -794,12 +803,20 @@ class Artifact(object):
     def is_uploadable(self):
         return self._uploadable
 
+    def is_cacheable(self):
+        if not self._node:
+            return True
+        return self.task.is_cacheable()
+
     @property
     def identity(self):
         return self._identity
 
     @property
     def task(self):
+        if not self._node:
+            Task = namedtuple('Point', ['name'])
+            return Task(name=self.name)
         return self._node.task
 
 
@@ -1257,7 +1274,7 @@ class ArtifactCache(StorageProvider):
             "Can't compress an unpublished task artifact")
 
         try:
-            task.tools.archive(artifact.path, archive)
+            artifact.tools.archive(artifact.path, archive)
         except KeyboardInterrupt as e:
             raise e
         except Exception:
@@ -1386,7 +1403,7 @@ class ArtifactCache(StorageProvider):
         recorded for the running process to prevent eviction by other
         processes.
         """
-        if not artifact.task.is_cacheable():
+        if not artifact.is_cacheable():
             return False
 
         # Cache availability in node
@@ -1441,7 +1458,7 @@ class ArtifactCache(StorageProvider):
         """
         if not force and not self.download_enabled():
             return False
-        if not artifact.task.is_cacheable():
+        if not artifact.is_cacheable():
             return False
         with self.lock_artifact(artifact) as artifact:
             if self.is_available_locally(artifact):
@@ -1462,7 +1479,7 @@ class ArtifactCache(StorageProvider):
         """
         if not force and not self.upload_enabled():
             return False
-        if not artifact.task.is_cacheable():
+        if not artifact.is_cacheable():
             return True
         raise_task_error_if(
             not self.is_available_locally(artifact), artifact.task,
@@ -1540,7 +1557,7 @@ class ArtifactCache(StorageProvider):
         take place if the resulting cache size exceeds the configured
         limit.
         """
-        if not artifact.task.is_cacheable():
+        if not artifact.is_cacheable():
             return
 
         with self._cache_lock(), self._db() as db:

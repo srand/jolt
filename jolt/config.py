@@ -37,10 +37,10 @@ class ConfigFile(ConfigParser):
             if not self.has_section("jolt"):
                 self.add_section("jolt")
 
-    def save(self):
-        if self._location is None:
+    def save(self, path=None):
+        if self._location is None and path is None:
             return
-        with open(self._location, 'w') as configfile:
+        with open(path or self._location, 'w') as configfile:
             super().write(configfile)
 
     def delete(self, section, key):
@@ -122,9 +122,9 @@ class Config(object):
         for config in self.configs():
             config.load()
 
-    def save(self):
-        for config in self.configs():
-            config.save()
+    def save(self, path=None):
+        for name, config in self._configs:
+            config.save(os.path.join(path, f"{name}.conf") if path else None)
 
 
 _config = Config()
@@ -229,8 +229,8 @@ def load_or_set(file_or_str):
         _config.set(section_key[0], section_key[1], key_value[1], alias="cli")
 
 
-def save():
-    _config.save()
+def save(path=None):
+    _config.save(path)
 
 
 def delete(key, alias=None):

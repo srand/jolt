@@ -1,11 +1,12 @@
+from os import _exit, environ, getcwd
 import atexit
 import click
+import datetime
+import platform
 import subprocess
 import sys
-import datetime
 import uuid
 import webbrowser
-from os import _exit, environ, getcwd
 
 from jolt.tasks import Task, TaskRegistry, Parameter
 from jolt import scheduler
@@ -122,7 +123,7 @@ def cli(ctx, verbose, extra_verbose, config_file, debugger, profile,
     global debug_enabled
     debug_enabled = debugger
 
-    if ctx.invoked_subcommand not in ["log"]:
+    if ctx.invoked_subcommand not in ["log", "report"]:
         log.start_file_log()
 
     log.verbose("Jolt command: {}", " ".join([fs.path.basename(sys.argv[0])] + sys.argv[1:]))
@@ -1063,3 +1064,82 @@ def _export(ctx, task):
         ctx=context)
 
     print(script)
+
+
+@cli.command(name="report")
+@click.pass_context
+@hooks.cli_report
+def _report(ctx):
+    """Create and publish a report with system information and logs.
+
+    The purpose of the report command is to aid troubleshooting by
+    providing users a method to quickly generate and share a report
+    with information about the environment and previous activity.
+
+    The report is uploaded to remote caches if configured, otherwise
+    a report archive is created in the current working directory.
+    """
+
+    options = JoltOptions()
+    acache = cache.ArtifactCache.get(options)
+
+    t = tools.Tools()
+
+    artifact = cache.Artifact(
+        acache,
+        None,
+        identity=str(uuid.uuid4()),
+        name="jolt",
+        session=True,
+        tools=t)
+
+    with t.tmpdir("report") as tmp, t.cwd(tmp.path):
+        log.info("Collecting environment")
+        env = ""
+        for key, val in environ.items():
+            env += f"{key} = {val}\n"
+        t.write_file("environ.txt", env)
+
+        log.info("Collecting configuration")
+        config.save(tmp.path)
+        artifact.collect("*.conf", "configs/")
+
+        log.info("Collecting platform information")
+        uname = platform.uname()
+        libc = " ".join(platform.libc_ver())
+        pyver = platform.python_version()
+        pyimpl = platform.python_implementation()
+        pfm = f"""System: {uname.system}
+Node: {uname.node}
+Release: {uname.release}
+Version: {uname.version}
+Machine: {uname.machine}
+Libc: {libc}
+Python: {pyimpl} {pyver}
+"""
+        t.write_file("platform.txt", pfm)
+
+        def collect_command(what, cmd):
+            try:
+                log.info("Collecting {}", what)
+                t.run(cmd, output=False)
+            except Exception:
+                pass
+
+        collect_command("pip modules", "pip list > packages-pip-txt")
+        if uname.system == "Linux":
+            collect_command("apt packages", "apt list --installed > packages-apt-txt")
+            artifact.collect("/etc/os-release", "os-release.txt")
+        artifact.collect("*.txt")
+
+    with t.cwd(log.logpath):
+        artifact.collect("*.log", "logs/")
+
+    acache.commit(artifact)
+    if acache.upload_enabled():
+        assert acache.upload(artifact)
+        url = acache.location(artifact)
+    else:
+        url = f"{artifact.identity}.tgz"
+        t.archive(artifact.path, url)
+    log.info("Location: {}", url)

@@ -942,8 +942,10 @@ class Tools(object):
             str: Expanded string.
         """
 
+        if not relpath:
+            relpath = self._task.joltdir if self._task else self.getcwd()
         pathname = self.expand(pathname, *args, **kwargs)
-        relpath = self.expand(relpath or self._task.joltdir, *args, **kwargs)
+        relpath = self.expand(relpath, *args, **kwargs)
         pathname = fs.path.join(self.getcwd(), pathname)
         # Ensure to retain any trailing path separator which is used as
         # indicator of directory paths

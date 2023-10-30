@@ -32,6 +32,7 @@ class DiskVolume(cache.StorageProvider):
         return artifact.tools.expand(
             "{path}/{name}/{file}",
             path=self._path,
+            name=artifact.task.name,
             file=fs.path.basename(artifact.get_archive_path()))
 
     def _get_temp(self, artifact):

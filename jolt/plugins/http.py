@@ -1,5 +1,6 @@
 from requests.auth import HTTPBasicAuth
 from requests.exceptions import ConnectTimeout, RequestException
+from urllib.parse import urlparse, urlunparse
 import keyring
 import getpass
 
@@ -53,6 +54,7 @@ class Http(cache.StorageProvider):
         return artifact.tools.expand(
             "{uri}/{name}/{file}",
             uri=self._uri,
+            name=artifact.task.name,
             file=fs.path.basename(artifact.get_archive_path()))
 
     @utils.retried.on_exception((RequestException, JoltError))
@@ -103,6 +105,7 @@ class Http(cache.StorageProvider):
             return False
 
         log.debug("[HTTP] Head ({}): {}", response.status_code, url)
+        url = urlunparse(urlparse(url))
         return url if response.status_code == 200 else ''
 
 

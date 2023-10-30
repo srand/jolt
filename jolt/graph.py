@@ -250,6 +250,7 @@ class TaskProxy(object):
             lock = self.cache.lock_artifact(artifact, discard=discard)
             artifacts.append(stack.enter_context(lock))
         try:
+            self._artifacts = artifacts
             yield artifacts
         finally:
             stack.close()
@@ -262,9 +263,11 @@ class TaskProxy(object):
             return True
         artifacts = self._artifacts
         if session_only:
-            artifacts = filter(lambda a: a.is_session(), self._artifacts)
+            artifacts = list(filter(lambda a: a.is_session(), self._artifacts))
         if persistent_only:
-            artifacts = filter(lambda a: not a.is_session(), self._artifacts)
+            artifacts = list(filter(lambda a: not a.is_session(), self._artifacts))
+        if not artifacts:
+            return True
         return all([self.cache.download(artifact, force=force) for artifact in artifacts])
 
     def upload(self, force=False, locked=False, session_only=False, persistent_only=False):
@@ -272,9 +275,11 @@ class TaskProxy(object):
             return False
         artifacts = self._artifacts
         if session_only:
-            artifacts = filter(lambda a: a.is_session(), self._artifacts)
+            artifacts = list(filter(lambda a: a.is_session(), self._artifacts))
         if persistent_only:
-            artifacts = filter(lambda a: not a.is_session(), self._artifacts)
+            artifacts = list(filter(lambda a: not a.is_session(), self._artifacts))
+        if not artifacts:
+            return True
         return all([self.cache.upload(artifact, force=force, locked=locked) for artifact in artifacts])
 
     def resolve_requirement_alias(self, name):
@@ -444,7 +449,7 @@ class TaskProxy(object):
                                                 self.publish(context, artifact)
                                         raise_task_error_if(
                                             not self.upload(force=force_upload, locked=False, session_only=True) and cache.upload_enabled(),
-                                            self, "Failed to upload task artifact")
+                                            self, "Failed to upload session artifact")
 
                                 if not self.is_available_locally(extensions=False):
                                     # Publish persistent artifacts

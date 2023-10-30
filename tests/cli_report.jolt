@@ -1,0 +1,17 @@
+#!/usr/bin/env python
+
+import re
+import sys
+import time
+sys.path.append(".")
+
+import testsupport
+
+
+class ReportCli(testsupport.JoltTest):
+    name = "cli/report"
+
+    def test_report(self):
+        r = self.jolt("report") + "\n"
+        a = self.artifacts(r)
+        self.assertEqual(1, len(a))
