@@ -1,4 +1,5 @@
 from __future__ import print_function
+import glob
 import os
 import re
 import sys
@@ -25,16 +26,15 @@ from jolt import filesystem as fs
 from jolt import colors
 
 
-default_path = fs.path.join(config.get_logpath(), "jolt.log")
-logfile = config.get("jolt", "logfile", default_path)
-logsize = config.getsize("jolt", "logsize", os.environ.get("JOLT_LOGSIZE", 10 * 1024 ** 2))  # 10MiB
-logcount = config.getint("jolt", "logcount", os.environ.get("JOLT_LOGCOUNT", 1))
+current_time = datetime.now().strftime("%Y-%m-%dT%H:%M:%S.%f")
+logpath = config.get_logpath()
+logfile = fs.path.join(logpath, f"{current_time}.log")
+logcount = config.getint("jolt", "logcount", os.environ.get("JOLT_LOGCOUNT", 100))
+logfiles = list(sorted(glob.glob(os.path.join(logpath, "*T*.log"))))
 
 dirpath = fs.path.dirname(logfile)
 if not fs.path.exists(dirpath):
     fs.makedirs(dirpath)
-with open(logfile, "a") as f:
-    f.write("--------------------------------------------------------------------------------\n")
 
 ################################################################################
 
@@ -162,14 +162,25 @@ _stderr.setFormatter(_console_formatter)
 _stderr.addFilter(Filter(lambda r: r.levelno >= ERROR))
 _stderr.addFilter(Filter(lambda r: r.levelno != EXCEPTION))
 
-_file = logging.handlers.RotatingFileHandler(logfile, maxBytes=logsize, backupCount=logcount)
-_file.setLevel(logging.DEBUG)
-_file_formatter = Formatter('{asctime} [{levelname:>7}] {message}')
-_file.setFormatter(_file_formatter)
-
 _logger.addHandler(_stdout)
 _logger.addHandler(_stderr)
-_logger.addHandler(_file)
+
+_file_formatter = Formatter('{asctime} [{levelname:>7}] {message}')
+
+
+def start_file_log():
+    global logfiles
+
+    if len(logfiles) >= logcount:
+        outdated = logfiles[:len(logfiles) - logcount + 1]
+        logfiles = logfiles[-logcount + 1:]
+        for file in outdated:
+            os.unlink(file)
+
+    _file = logging.FileHandler(logfile)
+    _file.setLevel(logging.DEBUG)
+    _file.setFormatter(_file_formatter)
+    _logger.addHandler(_file)
 
 
 def info(fmt, *args, **kwargs):

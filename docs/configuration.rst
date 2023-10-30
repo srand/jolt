@@ -59,10 +59,14 @@ The ``[jolt]`` config section contains global configuration.
   providers or not when building locally. The option has no effect on
   distributed network builds. The default value is ``true``.
 
-* ``log = <filepath>``
+* ``logcount = <integer>``
 
-  Location of Jolt's logfile. By default, the logfile is written in
-  ``$HOME/.jolt/jolt.log``.
+  Number of log files to keep. Default: 100.
+
+* ``logpath = <path>``
+
+  Location of Jolt's log files. By default, the logs are written to
+  ``$HOME/.jolt``.
 
 * ``upload = <boolean>``
 

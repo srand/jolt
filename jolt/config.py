@@ -187,7 +187,7 @@ def get_jolthome():
 
 
 def get_logpath():
-    return get_jolthome()
+    return get("jolt", "logpath", get_jolthome())
 
 
 def get_cachedir():

@@ -122,11 +122,14 @@ def cli(ctx, verbose, extra_verbose, config_file, debugger, profile,
     global debug_enabled
     debug_enabled = debugger
 
+    if ctx.invoked_subcommand not in ["log"]:
+        log.start_file_log()
+
     log.verbose("Jolt command: {}", " ".join([fs.path.basename(sys.argv[0])] + sys.argv[1:]))
     log.verbose("Jolt host: {}", environ.get("HOSTNAME", "localhost"))
     log.verbose("Jolt install path: {}", fs.path.dirname(__file__))
 
-    if ctx.invoked_subcommand in ["config"]:
+    if ctx.invoked_subcommand in ["config", "log"]:
         # Don't attempt to load any task recipes as they might require
         # plugins that are not yet configured.
         return
@@ -865,16 +868,21 @@ def _log(follow, delete):
     Display the Jolt log file.
 
     """
+    if not log.logfiles:
+        print("No logs exist")
+        return
+
     if follow:
-        subprocess.call("tail -f {0}".format(logfile), shell=True)
+        subprocess.call("tail -f {0}".format(log.logfiles[-1]), shell=True)
     elif delete:
-        fs.unlink(logfile)
+        for file in log.logfiles:
+            fs.unlink(file)
     else:
         t = tools.Tools()
         configured_pager = config.get("jolt", "pager", environ.get("PAGER", None))
         for pager in [configured_pager, "less", "more", "cat"]:
             if pager and t.which(pager):
-                return subprocess.call("{1} {0}".format(logfile, pager), shell=True)
+                return subprocess.call("{1} {0}".format(log.logfiles[-1], pager), shell=True)
         print(t.read_file(logfile))
 
 
