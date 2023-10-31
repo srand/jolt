@@ -21,5 +21,7 @@ Command Line
 	   :prog: jolt list
 .. click:: cli:_log
 	   :prog: jolt log
+.. click:: cli:_report
+	   :prog: jolt report
 
 .. reference-cli-end
