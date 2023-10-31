@@ -728,7 +728,8 @@ class AmqpExecutor(scheduler.NetworkExecutor):
                 and env.cache.download_enabled(),
                 extension, "Failed to download task artifact")
 
-        if manifest.result != "SUCCESS" or any(map(lambda task: task.result != "SUCCESS", manifest.tasks)):
+        if manifest.result != "SUCCESS" or \
+           any(map(lambda task: task.result not in ["SUCCESS", "SKIPPED", "UPLOADED"], manifest.tasks)):
             output = []
             if manifest.stdout:
                 output.extend(manifest.stdout.split("\n"))
