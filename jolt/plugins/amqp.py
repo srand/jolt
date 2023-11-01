@@ -729,7 +729,7 @@ class AmqpExecutor(scheduler.NetworkExecutor):
                 extension, "Failed to download task artifact")
 
         if manifest.result != "SUCCESS" or \
-           any(map(lambda task: task.result not in ["SUCCESS", "SKIPPED", "UPLOADED"], manifest.tasks)):
+           any(map(lambda task: task.result not in ["SUCCESS", "SKIPPED", "UPLOADED", "DOWNLOADED"], manifest.tasks)):
             output = []
             if manifest.stdout:
                 output.extend(manifest.stdout.split("\n"))
@@ -743,6 +743,7 @@ class AmqpExecutor(scheduler.NetworkExecutor):
                     if remote_report:
                         for error in remote_report.errors:
                             report.manifest.append(error)
+            log.debug(self.response)
             raise_error("[AMQP] Remote build failed")
 
         raise_task_error_if(
