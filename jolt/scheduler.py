@@ -478,7 +478,7 @@ class WorkerStrategy(ExecutionStrategy, PruneStrategy):
 
         raise_task_error_if(
             not self.cache.upload_enabled(), task,
-            "artifact upload must be enabled for workers, fix configuration")
+            "Artifact upload must be enabled for workers, fix configuration")
 
         if not task.is_cacheable():
             return self.executors.create_local(task)
@@ -499,6 +499,8 @@ class WorkerStrategy(ExecutionStrategy, PruneStrategy):
 
         if task.is_available_remotely():
             return self.executors.create_downloader(task)
+        elif not task.is_goal():
+            raise_task_error(task, "Task artifact removed from global cache, cannot continue")
 
         return self.executors.create_local(task)
 
