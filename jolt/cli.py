@@ -1083,33 +1083,33 @@ def _report(ctx):
     options = JoltOptions()
     acache = cache.ArtifactCache.get(options)
 
-    t = tools.Tools()
+    with tools.Tools() as t:
 
-    artifact = cache.Artifact(
-        acache,
-        None,
-        identity=str(uuid.uuid4()),
-        name="jolt",
-        session=True,
-        tools=t)
+        artifact = cache.Artifact(
+            acache,
+            None,
+            identity=str(uuid.uuid4()),
+            name="jolt",
+            session=True,
+            tools=t)
 
-    with t.tmpdir("report") as tmp, t.cwd(tmp.path):
-        log.info("Collecting environment")
-        env = ""
-        for key, val in environ.items():
-            env += f"{key} = {val}\n"
-        t.write_file("environ.txt", env)
+        with t.tmpdir("report") as tmp, t.cwd(tmp.path):
+            log.info("Collecting environment")
+            env = ""
+            for key, val in environ.items():
+                env += f"{key} = {val}\n"
+            t.write_file("environ.txt", env, expand=False)
 
-        log.info("Collecting configuration")
-        config.save(tmp.path)
-        artifact.collect("*.conf", "configs/")
+            log.info("Collecting configuration")
+            config.save(tmp.path)
+            artifact.collect("*.conf", "configs/")
 
-        log.info("Collecting platform information")
-        uname = platform.uname()
-        libc = " ".join(platform.libc_ver())
-        pyver = platform.python_version()
-        pyimpl = platform.python_implementation()
-        pfm = f"""System: {uname.system}
+            log.info("Collecting platform information")
+            uname = platform.uname()
+            libc = " ".join(platform.libc_ver())
+            pyver = platform.python_version()
+            pyimpl = platform.python_implementation()
+            pfm = f"""System: {uname.system}
 Node: {uname.node}
 Release: {uname.release}
 Version: {uname.version}
@@ -1117,29 +1117,30 @@ Machine: {uname.machine}
 Libc: {libc}
 Python: {pyimpl} {pyver}
 """
-        t.write_file("platform.txt", pfm)
+            t.write_file("platform.txt", pfm, expand=False)
 
-        def collect_command(what, cmd):
-            try:
-                log.info("Collecting {}", what)
-                t.run(cmd, output=False)
-            except Exception:
-                pass
+            def collect_command(what, cmd):
+                try:
+                    log.info("Collecting {}", what)
+                    t.run(cmd, output=False)
+                except Exception:
+                    pass
 
-        collect_command("pip modules", "pip list > packages-pip-txt")
-        if uname.system == "Linux":
-            collect_command("apt packages", "apt list --installed > packages-apt-txt")
-            artifact.collect("/etc/os-release", "os-release.txt")
-        artifact.collect("*.txt")
+            collect_command("pip modules", "pip list > packages-pip-txt")
+            if uname.system == "Linux":
+                collect_command("apt packages", "apt list --installed > packages-apt-txt")
+                artifact.collect("/etc/os-release", "os-release.txt")
+            artifact.collect("*.txt")
 
-    with t.cwd(log.logpath):
-        artifact.collect("*.log", "logs/")
+        with t.cwd(log.logpath):
+            artifact.collect("*.log", "logs/")
 
-    acache.commit(artifact)
-    if acache.upload_enabled():
-        assert acache.upload(artifact)
-        url = acache.location(artifact)
-    else:
-        url = f"{artifact.identity}.tgz"
-        t.archive(artifact.path, url)
-    log.info("Location: {}", url)
+        acache.commit(artifact)
+        if acache.upload_enabled():
+            assert acache.upload(artifact)
+            url = acache.location(artifact)
+        else:
+            url = f"{artifact.identity}.tgz"
+            t.archive(artifact.path, url)
+
+        log.info("Location: {}", url)
