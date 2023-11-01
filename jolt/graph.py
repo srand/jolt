@@ -232,11 +232,12 @@ class TaskProxy(object):
             artifacts.extend(task._artifacts)
         return any(map(lambda artifact: artifact.is_unpacked(), artifacts))
 
-    def is_uploadable(self):
+    def is_uploadable(self, artifacts=None):
         tasks = [self] + self.extensions
-        artifacts = []
-        for task in tasks:
-            artifacts.extend(task._artifacts)
+        if not artifacts:
+            artifacts = []
+            for task in tasks:
+                artifacts.extend(task._artifacts)
         return all(map(lambda artifact: artifact.is_uploadable(), artifacts))
 
     def is_workspace_resource(self):
@@ -271,8 +272,6 @@ class TaskProxy(object):
         return all([self.cache.download(artifact, force=force) for artifact in artifacts])
 
     def upload(self, force=False, locked=False, session_only=False, persistent_only=False):
-        if not self.is_uploadable():
-            return False
         artifacts = self._artifacts
         if session_only:
             artifacts = list(filter(lambda a: a.is_session(), self._artifacts))
@@ -280,6 +279,8 @@ class TaskProxy(object):
             artifacts = list(filter(lambda a: not a.is_session(), self._artifacts))
         if not artifacts:
             return True
+        if not self.is_uploadable(artifacts):
+            return False
         return all([self.cache.upload(artifact, force=force, locked=locked) for artifact in artifacts])
 
     def resolve_requirement_alias(self, name):
