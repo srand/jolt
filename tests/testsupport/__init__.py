@@ -115,7 +115,7 @@ global_string("{test}")
     def jolt(self, command, *args, **kwargs):
         with self.tools.cwd(self.ws):
             try:
-                self._log = self.tools.run("python -W error -m jolt -c test.conf -c net.conf " + command.format(*args, **kwargs))
+                self._log = self.tools.run("python -W error -m jolt -c test.conf -c net.conf " + command.format(*args, **kwargs), **kwargs)
                 return self._log
             except error.JoltCommandError as e:
                 self._log = "\n".join(e.stdout + e.stderr)

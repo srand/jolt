@@ -519,3 +519,15 @@ def shorten(string, count=30):
             keep = 1
         return string[:keep] + "..." + string[-keep + 1:]
     return string
+
+
+def prefix(value, pfx):
+    if type(value) is list:
+        return [pfx + item for item in value]
+    return pfx + value
+
+
+def suffix(value, sfx):
+    if type(value) is list:
+        return [item + sfx for item in value]
+    return value + sfx

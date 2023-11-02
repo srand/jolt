@@ -21,9 +21,10 @@ import hashlib
 from contextlib import contextmanager
 from psutil import NoSuchProcess, Process
 
-from jinja2 import Environment, FileSystemLoader, select_autoescape
+from jinja2 import Environment, FileSystemLoader
 from jinja2.exceptions import TemplateError
 from jinja2.runtime import Context
+from jinja2.utils import missing
 
 
 from jolt import cache
@@ -51,6 +52,7 @@ def _run(cmd, cwd, env, preexec_fn, *args, **kwargs):
     output_on_error = kwargs.get("output_on_error")
     output_rstrip = kwargs.get("output_rstrip", True)
     output_stdio = kwargs.get("output_stdio", False)
+    return_stderr = kwargs.get("return_stderr", False)
     output = output if output is not None else True
     output = False if output_on_error else output
     shell = kwargs.get("shell", True)
@@ -164,6 +166,9 @@ def _run(cmd, cwd, env, preexec_fn, *args, **kwargs):
                 "timeout" if timedout else "failed",
                 " ".join(cmd) if type(cmd) is list else cmd.format(*args, **kwargs)),
             stdoutbuf, stderrbuf, p.returncode)
+    if return_stderr:
+        return "\n".join(stdoutbuf) if output_rstrip else "".join(stdoutbuf), \
+            "\n".join(stderrbuf) if output_rstrip else "".join(stderrbuf)
     return "\n".join(stdoutbuf) if output_rstrip else "".join(stdoutbuf)
 
 
@@ -377,11 +382,18 @@ class JinjaTaskContext(Context):
     Attempts to resolves any missing keywords by looking up task class attributes.
     """
     def resolve_or_missing(self, key):
+        if key in self.vars:
+            return self.vars[key]
+
+        if key in self.parent:
+            return self.parent[key]
+
         if key != "task":
             task = self.get("task")
             if task and hasattr(task, key):
                 return getattr(task, key)
-        return super(JinjaTaskContext, self).resolve_or_missing(key)
+
+        return missing
 
 
 class Namespace(object):
@@ -623,8 +635,7 @@ class Tools(object):
     @property
     def buildroot(self):
         """ Return the root path of all build directories """
-        from jolt.loader import get_workspacedir
-        return fs.path.normpath(fs.path.join(get_workspacedir(), "build"))
+        return fs.path.normpath(fs.path.join(self.wsroot, "build"))
 
     def checksum_file(self, filelist, concat=False, hashfn=hashlib.sha1, filterfn=None):
         """ Calculate a checksum of one or multiple files.
@@ -1172,10 +1183,12 @@ class Tools(object):
         try:
             env = Environment(
                 loader=FileSystemLoader(self.getcwd()),
-                autoescape=select_autoescape(),
+                autoescape=False,
                 trim_blocks=True,
                 lstrip_blocks=True)
             env.context_class = JinjaTaskContext
+            env.filters["prefix"] = utils.prefix
+            env.filters["suffix"] = utils.suffix
             tmpl = env.from_string(template)
             return tmpl.render(task=self._task, tools=self, **kwargs)
         except TemplateError as e:
@@ -1197,7 +1210,7 @@ class Tools(object):
         try:
             env = Environment(
                 loader=FileSystemLoader(self.getcwd()),
-                autoescape=select_autoescape(),
+                autoescape=False,
                 trim_blocks=True,
                 lstrip_blocks=True)
             env.context_class = JinjaTaskContext
@@ -1963,3 +1976,9 @@ class Tools(object):
             content = self.expand(content, **kwargs)
         with open(pathname, "wb") as f:
             f.write(content.encode())
+
+    @property
+    def wsroot(self):
+        """ Return the root path of all build directories """
+        from jolt.loader import get_workspacedir
+        return fs.path.normpath(get_workspacedir())

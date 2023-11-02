@@ -485,6 +485,22 @@ class attributes:
         return utils.concat_attributes("cxxflags", attrib, prepend)
 
     @staticmethod
+    def headers(attrib, prepend=False):
+        """
+        Decorates a task with an alternative ``headers`` attribute.
+
+        The new attribute will be concatenated with the regular
+        ``headers`` attribute.
+
+        Args:
+            attrib (str): Name of alternative attribute.
+                Keywords are expanded.
+            prepend (boolean): Prepend the value of the alternative
+                attribute. Default: false (append).
+        """
+        return utils.concat_attributes("headers", attrib, prepend)
+
+    @staticmethod
     def incpaths(attrib, prepend=False):
         """
         Decorates a task with an alternative ``incpaths`` attribute.

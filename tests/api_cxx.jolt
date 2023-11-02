@@ -1,0 +1,832 @@
+#!/usr/bin/env python
+
+import os
+import sys
+import time
+sys.path.append(".")
+
+from testsupport import JoltTest
+
+
+class CxxApi(JoltTest):
+    name = "api/cxx"
+
+    def assertCompiled(self, r, filename):
+        assert filename in r, f"{filename} was not compiled"
+
+    def assertNotCompiled(self, r, filename):
+        assert filename not in r, f"{filename} was compiled"
+
+    def _recipe(self):
+        return "import jolt\nfrom jolt.plugins.cxx import Executable as CXXExecutable\nfrom jolt.plugins.cxx import Library as CXXLibrary\nfrom jolt.plugins.cxx import Compilation as CXXProject\n" + super()._recipe()
+
+    def test_asflags(self):
+        """
+        --- file: test.S
+        #if TESTMACRO != 1337
+        #error "Macro not set as expected"
+        #endif
+
+        .global main
+        main:
+
+        --- tasks:
+        class Lib(CXXLibrary):
+            arg = Parameter()
+            sources = ["test.S"]
+            asflags = ["-DTESTMACRO={{arg}}"]
+
+        class Exe(CXXExecutable):
+            arg = Parameter()
+            sources = ["test.S"]
+            asflags = ["-DTESTMACRO={{arg}}"]
+
+        ---
+        """
+        self.jolt("build lib:arg=1337 exe:arg=1337")
+
+
+    def test_binary(self):
+        """
+        --- file: test.cpp
+        int main() {{return 0;}}
+
+        --- tasks:
+        class Lib(CXXLibrary):
+            arg = Parameter()
+            binary = "{{arg}}"
+            sources = ["test.cpp"]
+
+        class Exe(CXXExecutable):
+            arg = Parameter()
+            binary = "{{arg}}"
+            sources = ["test.cpp"]
+
+        ---
+        """
+        r = self.jolt("build lib:arg=XYZ exe:arg=ZYX")
+        self.assertCompiled(r, "XYZ")
+        self.assertCompiled(r, "ZYX")
+
+
+    def test_cflags(self):
+        """
+        --- file: test.c
+        #if TESTMACRO != 1337
+        #error "Macro not set as expected"
+        #endif
+
+        int main() {{return 0;}}
+
+        --- tasks:
+        class Lib(CXXLibrary):
+            arg = Parameter()
+            sources = ["test.c"]
+            cflags = ["-DTESTMACRO={{arg}}"]
+
+        class Exe(CXXExecutable):
+            arg = Parameter()
+            sources = ["test.c"]
+            cflags = ["-DTESTMACRO={{arg}}"]
+
+        ---
+        """
+        self.jolt("build lib:arg=1337 exe:arg=1337")
+
+
+    def test_cxxflags(self):
+        """
+        --- file: test.cpp
+        #if TESTMACRO != 1337
+        #error "Macro not set as expected"
+        #endif
+
+        int main() {{return 0;}}
+
+        --- tasks:
+        class Lib(CXXLibrary):
+            arg = Parameter()
+            sources = ["test.cpp"]
+            cxxflags = ["-DTESTMACRO={{arg}}"]
+
+        class Exe(CXXExecutable):
+            arg = Parameter()
+            sources = ["test.cpp"]
+            cxxflags = ["-DTESTMACRO={{arg}}"]
+
+        ---
+        """
+        self.jolt("build lib:arg=1337 exe:arg=1337")
+
+
+    def test_flatbuffers(self):
+        """
+        --- file: flatbufs/weapon.fbs
+        namespace Test;
+
+        table Weapon {{
+           name:string;
+           damage:short;
+        }}
+
+        --- file: lib.cpp
+        #include "weapon_generated.h"
+
+        --- tasks:
+        from jolt.plugins.conan import Conan
+
+        class Flatbuffers(Conan):
+            packages = ["flatbuffers/2.0.8"]
+
+        class Lib(CXXLibrary):
+            fbflags = ["--scoped-enums"]
+            requires = ["flatbuffers"]
+            sources = [
+                "flatbufs/weapon.fbs",
+                "lib.cpp",
+            ]
+
+        ---
+        """
+        r = self.build("lib")
+
+
+    def test_headers(self):
+        """
+        --- file: test.h
+        #define TEST 0
+        --- file: test.cpp
+        #include "lib/test.h"
+        int main() {{return TEST;}}
+
+        --- tasks:
+        class Lib(CXXLibrary):
+            headers = ["test.h"]
+            publishapi = "include/lib/"
+
+            def publish(self, a, t):
+                super().publish(a, t)
+                a.cxxinfo.incpaths.append("include")
+
+        class Exe(CXXExecutable):
+            requires = "lib"
+            sources = ["test.cpp"]
+
+        ---
+        """
+        self.build("exe")
+
+
+    def test_incpaths(self):
+        """
+        --- file: inc/test.h
+
+        --- file: test.cpp
+        #include "test.h"
+        int main() {{return 0;}}
+
+        --- tasks:
+        class Lib(CXXLibrary):
+            arg = Parameter()
+            incpaths = ["{{arg}}"]
+            sources = ["{{arg}}/*.h", "test.cpp"]
+
+        class Exe(CXXExecutable):
+            arg = Parameter()
+            incpaths = ["{{arg}}"]
+            sources = ["{{arg}}/*.h", "test.cpp"]
+
+        ---
+        """
+        self.jolt("build lib:arg=inc exe:arg=inc")
+
+
+    def test_incpath_req_order(self):
+        """
+        --- file: test.h.a
+        #error "wrong header included"
+
+        --- file: test.h.b
+
+        --- file: test.cpp
+        #include "test.h"
+        int main() {{return 0;}}
+
+        --- tasks:
+        @jolt.influence.files("test.h.a")
+        class LibA(Task):
+            def publish(self, a, t):
+                a.collect("test.h.a", "test.h")
+                a.cxxinfo.incpaths.append(".")
+
+        @jolt.influence.files("test.h.b")
+        class LibB(Task):
+            requires = "liba"
+            def publish(self, a, t):
+                a.collect("test.h.b", "test.h")
+                a.cxxinfo.incpaths.append(".")
+
+        class Exe(CXXExecutable):
+            requires = ["libb"]
+            sources = ["test.cpp"]
+
+        ---
+        """
+        self.jolt("build exe")
+
+
+    def test_incpath_vs_req(self):
+        """
+        --- file: test.h.a
+        #error "wrong header included"
+
+        --- file: inc/test.h
+
+        --- file: test.cpp
+        #include "test.h"
+        int main() {{return 0;}}
+
+        --- tasks:
+        @jolt.influence.files("test.h.a")
+        class LibA(Task):
+            def publish(self, a, t):
+                a.collect("test.h.a", "test.h")
+                a.cxxinfo.incpaths.append(".")
+
+        @jolt.influence.files("inc/test.h")
+        class Exe(CXXExecutable):
+            incpaths = ["inc"]
+            requires = ["liba"]
+            sources = ["test.cpp"]
+
+        ---
+        """
+        self.jolt("build exe")
+
+
+    def test_influence_incpaths(self):
+        """
+        --- file: inc1/test1.h
+
+        --- file: inc2/test2.h
+
+        --- file: test.cpp
+        #include "test1.h"
+        #include "test2.h"
+        int main() {{return 0;}}
+
+        --- tasks:
+        @jolt.plugins.ninja.influence.incpaths()
+        class Lib(CXXLibrary):
+            incpaths = ["inc1", "inc2"]
+            sources = ["test.cpp"]
+        ---
+        """
+        r = self.build("lib")
+        self.assertBuild(r, "lib")
+        r = self.build("lib")
+        self.assertNoBuild(r, "lib")
+        with self.tools.cwd(self.ws, "inc1"):
+            self.tools.append_file("test1.h", "// Test")
+        r = self.build("lib")
+        self.assertBuild(r, "lib")
+        with self.tools.cwd(self.ws, "inc2"):
+            self.tools.append_file("test2.h", "// Test")
+        r = self.build("lib")
+        self.assertBuild(r, "lib")
+
+
+    def test_influence_missing(self):
+        """
+        --- file: inc/test.h
+
+        --- file: test.cpp
+        #include "test.h"
+        int main() {{return 0;}}
+
+        --- tasks:
+        @jolt.influence.files("inc/*.h")
+        class Api(Task):
+            def publish(self, artifact, tools):
+                artifact.collect("inc/*.h")
+                artifact.cxxinfo.incpaths.append("inc")
+
+        class Lib(CXXLibrary):
+            incpaths = ["inc"]
+            sources = ["test.cpp"]
+
+        class Exe(CXXExecutable):
+            incpaths = ["inc"]
+            sources = ["test.cpp"]
+
+        class Lib_req(CXXLibrary):
+            requires = ["api"]
+            sources = ["test.cpp"]
+
+        class Exe_req(CXXExecutable):
+            requires = ["api"]
+            sources = ["test.cpp"]
+        ---
+        """
+        with self.assertRaises(Exception, msg="influence missing"):
+            self.jolt("build lib")
+        with self.assertRaises(Exception, msg="influence missing"):
+            self.jolt("build exe")
+        self.jolt("build lib_req exe_req")
+
+
+    def test_ldflags(self):
+        """
+        --- file: base.h
+        int base();
+
+        --- file: base.cpp
+        int base() {{return 0;}}
+
+        --- file: main.cpp
+        #include "base.h"
+        int main() {{return base();}}
+
+        --- tasks:
+        class Base(CXXLibrary):
+            sources = ["base.*"]
+
+        class Lib(CXXLibrary):
+            arg1 = Parameter()
+            arg2 = Parameter()
+            shared = True
+            ldflags = ["-L{{arg1}}/lib"]
+            libraries = ["{{arg2}}"]
+            sources = ["base.h", "main.cpp"]
+
+        class Exe(CXXExecutable):
+            arg1 = Parameter()
+            arg2 = Parameter()
+            ldflags = ["-L{{arg1}}/lib"]
+            libraries = ["{{arg2}}"]
+            sources = ["base.h", "main.cpp"]
+
+        ---
+        """
+        r = self.jolt("build base")
+        a = self.artifacts(r)
+        self.jolt("build lib:arg1={p},arg2={l} exe:arg1={p},arg2={l}", p=a[0], l="base")
+
+
+    def test_libpaths_libraries(self):
+        """
+        --- file: base.h
+        int base();
+
+        --- file: base.cpp
+        int base() {{return 0;}}
+
+        --- file: main.cpp
+        #include "base.h"
+        int main() {{return base();}}
+
+        --- tasks:
+        class Base(CXXLibrary):
+            sources = ["base.*"]
+
+        class Lib(CXXLibrary):
+            arg1 = Parameter()
+            arg2 = Parameter()
+            shared = True
+            libpaths = ["{{arg1}}/lib"]
+            libraries = ["{{arg2}}"]
+            sources = ["base.h", "main.cpp"]
+
+        class Exe(CXXExecutable):
+            arg1 = Parameter()
+            arg2 = Parameter()
+            libpaths = ["{{arg1}}/lib"]
+            libraries = ["{{arg2}}"]
+            sources = ["base.h", "main.cpp"]
+
+        ---
+        """
+        r = self.jolt("build base")
+        a = self.artifacts(r)
+        self.jolt("build lib:arg1={p},arg2={l} exe:arg1={p},arg2={l}", p=a[0], l="base")
+
+
+    def test_library_as_source(self):
+        """
+        --- file: lib.cpp
+        int lib() {{return 0;}}
+
+        --- file: test.cpp
+        extern int lib();
+        int main() {{return lib();}}
+
+        --- tasks:
+        class Lib1(CXXLibrary):
+            sources = ["lib.cpp"]
+
+        class Lib2(CXXLibrary):
+            sources = ["test.cpp", "lib/liblib1.a"]
+
+        class Lib2Sh(CXXLibrary):
+            sources = ["test.cpp", "lib/liblib1.a"]
+            shared = True
+
+        class Exe(CXXExecutable):
+            requires = ["lib2"]
+
+        class Exesh(CXXExecutable):
+            requires = ["lib2sh"]
+
+        ---
+        """
+        self.build("lib1 -c .")
+        self.build("exe")
+        self.build("exesh")
+
+    def test_library_is_selfsustained(self):
+        """
+        --- file: lib.cpp
+        int lib() {{return 0;}}
+
+        --- file: test.cpp
+        extern int lib();
+        int main() {{return lib();}}
+
+        --- tasks:
+        class Lib1(CXXLibrary):
+            sources = ["lib.cpp"]
+
+        class Lib2(CXXLibrary):
+            requires = "lib1"
+            sources = ["test.cpp"]
+            selfsustained = True
+
+        class Lib2Sh(CXXLibrary):
+            requires = "lib1"
+            sources = ["test.cpp"]
+            shared = True
+            selfsustained = True
+
+        class Exe(CXXExecutable):
+            requires = ["lib2"]
+
+        class Exesh(CXXExecutable):
+            requires = ["lib2sh"]
+
+        ---
+        """
+        self.build("lib1 -c .")
+        self.build("exe")
+        self.build("exesh")
+        r = self.build("lib2")
+        a = self.artifacts(r)
+        self.assertIn("T lib()", self.tools.run("nm -C {}/lib/liblib2.a", a[0]))
+        r = self.build("lib2sh")
+        a = self.artifacts(r)
+        self.assertIn("_Z3libv", self.tools.run("readelf -s {}/lib/liblib2sh.so", a[0]))
+
+    def test_macros(self):
+        """
+        --- file: test.cpp
+        #if TESTMACRO != 1337
+        #error "Macro not set as expected"
+        #endif
+
+        int main() {{return 0;}}
+
+        --- tasks:
+        class Lib(CXXLibrary):
+            arg = Parameter()
+            sources = ["test.cpp"]
+            macros = ["TESTMACRO={{arg}}"]
+
+        class Exe(CXXExecutable):
+            arg = Parameter()
+            sources = ["test.cpp"]
+            macros = ["TESTMACRO={{arg}}"]
+
+        ---
+        """
+        self.jolt("build lib:arg=1337 exe:arg=1337")
+
+
+    def test_precompiled_headers(self):
+        """
+        --- file: src/main.cpp
+        #include "precompiled.pch"
+
+        int main() {{ std::cout << "Hello world" << std::endl; return 0;}}
+
+        --- file: include/precompiled.pch
+        #include <iostream>
+
+        --- tasks:
+        class Lib(CXXLibrary):
+            sources = ["include/precompiled.pch", "src/main.cpp"]
+            cxxflags = ["-H"]
+            incpaths = ["include"]
+
+        class Exe(CXXExecutable):
+            sources = ["include/precompiled.pch", "src/main.cpp"]
+            cxxflags = ["-H"]
+            incpaths = ["include"]
+
+        ---
+        """
+        r, e = self.jolt("-v build lib", return_stderr=True)
+        self.assertCompiled(r, "precompiled.pch")
+        self.assertCompiled(r, "main.cpp")
+        self.assertIn("! build/outputs-lib/precompiled.pch.gch", e)
+
+        r, e = self.jolt("-v build exe", return_stderr=True)
+        self.assertCompiled(r, "precompiled.pch")
+        self.assertCompiled(r, "main.cpp")
+        self.assertIn("! build/outputs-exe/precompiled.pch.gch", e)
+
+    def test_precompiled_header_multiple(self):
+        """
+        --- file: main.cpp
+        #include <iostream>
+        #include <sstream>
+        int main() {{ std::cout << "Hello world" << std::endl; return 0;}}
+
+        --- file: precompiled1.pch
+        #include <iostream>
+
+        --- file: precompiled2.pch
+        #include <sstream>
+
+        --- tasks:
+        class Lib(CXXLibrary):
+            sources = ["*.pch", "main.cpp"]
+            cxxflags = ["-H"]
+
+        class Exe(CXXExecutable):
+            sources = ["*.pch", "main.cpp"]
+            cxxflags = ["-H"]
+
+        ---
+        """
+        with self.assertRaises(Exception, msg="only one allowed"):
+            r = self.jolt("-v build lib")
+
+        with self.assertRaises(Exception, msg="only one allowed"):
+            r = self.jolt("-v build exe")
+
+
+    def test_protoc(self):
+        """
+        --- file: proto/person.proto
+        syntax = "proto2";
+
+        package tutorial;
+
+        message Person {{
+            optional string name = 1;
+        }}
+
+        --- file: dog.proto
+        syntax = "proto2";
+
+        package tutorial;
+
+        message Dog {{
+            optional string name = 1;
+        }}
+
+        --- file: lib.cpp
+        #include "dog.pb.h"
+        #include "person.pb.h"
+
+        --- tasks:
+        from jolt.plugins.conan import Conan
+
+        class Protobuf(Conan):
+            packages = ["protobuf/3.19.2"]
+
+        class Lib(CXXLibrary):
+            protoflags = ["--error_format=msvs"]
+            requires = ["protobuf"]
+            sources = [
+                "dog.proto",
+                "lib.cpp",
+                "proto/person.proto",
+            ]
+
+        ---
+        """
+        r = self.build("lib")
+        assert "--error_format" in r
+
+        # Check that depfile is working
+        with self.tools.cwd(self.ws):
+            self.tools.append_file("dog.proto", "// Foo")
+        r = self.build("lib")
+        self.assertCompiled(r, "dog.pb.cc")
+        self.assertNotCompiled(r, "person.pb.cc")
+
+    def test_protoc_from_artifact(self):
+        """
+        --- file: proto/person.proto
+        syntax = "proto2";
+
+        package tutorial;
+
+        message Person {{
+            optional string name = 1;
+        }}
+
+        --- file: lib.cpp
+        #include "person.pb.h"
+
+        --- tasks:
+        from jolt.plugins.conan import Conan
+
+        class Protobuf(Conan):
+            packages = ["protobuf/3.21.9"]
+
+        @jolt.influence.files("proto/*.proto")
+        class Proto(Task):
+            requires = ["protobuf"]
+            def publish(self, artifact, tools):
+                artifact.collect("proto/*.proto")
+
+        class Lib(CXXLibrary):
+            requires = ["proto"]
+            sources = ["lib.cpp"]
+
+            def run(self, deps, tools):
+                proto = tools.sandbox(deps["proto"])
+                self.sources.append(proto + "/proto/*.proto")
+                super().run(deps, tools)
+        ---
+        """
+        self.build("lib")
+
+    def test_protoc_with_generator_attr(self):
+        """
+        --- file: dog.proto
+        syntax = "proto2";
+
+        package tutorial;
+
+        message Dog {{
+            optional string name = 1;
+        }}
+
+        --- tasks:
+        from jolt.plugins.conan import Conan
+
+        class Protobuf(Conan):
+            packages = ["protobuf/3.21.9"]
+
+
+        class Pyth(CXXProject):
+            protogenerator = "python"
+            requires = ["protobuf"]
+            sources = [
+                "dog.proto",
+            ]
+
+            def publish(self, artifact, tools):
+                with tools.cwd(self.outdir):
+                    artifact.collect("**/*.py", flatten=True)
+        ---
+        """
+        r = self.build("pyth")
+        self.assertExists(self.artifacts(r)[0], "dog_pb2.py")
+
+
+    def test_publishdir(self):
+        """
+        --- file: test.cpp
+        int main() {{return 0;}}
+
+        --- tasks:
+        class Lib(CXXLibrary):
+            arg = Parameter()
+            publishdir = "{{arg}}/"
+            sources = ["test.cpp"]
+
+        class Exe(CXXExecutable):
+            arg = Parameter()
+            publishdir = "{{arg}}/"
+            sources = ["test.cpp"]
+
+        ---
+        """
+        r = self.jolt("-vv build lib:arg=xyz")
+        self.assertExists(self.artifacts(r)[0], "xyz", "liblib.a")
+
+        r = self.jolt("build exe:arg=zyx")
+        self.assertExists(self.artifacts(r)[0], "zyx", "exe")
+
+    def test_selfsustained_merge(self):
+        """
+        --- file: a.cpp
+        int main() {{return 0;}}
+
+        --- tasks:
+        class Lib(CXXLibrary):
+            sources = ["*.cpp"]
+
+        class Merged(CXXLibrary):
+            requires = ["lib"]
+            selfsustained = True
+
+        ---
+        """
+        r = self.jolt("build merged")
+
+        # Add one source file
+        with self.tools.cwd(self.ws):
+            self.tools.write_file("b.cpp", "#include <stdlib.h>")
+        self.jolt("build merged")
+
+        # Remove the new source file
+        with self.tools.cwd(self.ws):
+            self.tools.run("rm b.cpp")
+        self.tools.rmtree(self.artifacts(r)[0])
+
+        # Rebuild original library, verify that the new source file is not included
+        r = self.jolt("build merged")
+        r = self.tools.run("ar t {}/lib/libmerged.a", self.artifacts(r)[0])
+        self.assertNotIn("b.o", r)
+
+    def test_sources(self):
+        """
+        --- file: main.cpp
+        int main() {{return 0;}}
+
+        --- tasks:
+        class Lib(CXXLibrary):
+            arg = Parameter()
+            sources = ["{{arg}}.cpp"]
+
+        class Exe(CXXExecutable):
+            arg = Parameter()
+            sources = ["{{arg}}.cpp"]
+
+        ---
+        """
+        r = self.jolt("build lib:arg=main")
+        self.assertCompiled(r, "main.cpp")
+
+        self.jolt("build exe:arg=main")
+        self.assertCompiled(r, "main.cpp")
+
+        self.jolt("build lib:arg=*")
+        self.assertCompiled(r, "main.cpp")
+
+        self.jolt("build exe:arg=*")
+        self.assertCompiled(r, "main.cpp")
+
+    def test_sources_from_artifact(self):
+        """
+        --- file: main.cpp
+        int main() {{return 0;}}
+
+        --- tasks:
+        @jolt.influence.files("main.cpp")
+        class Sources(Task):
+            def publish(self, artifact, tools):
+                artifact.collect("main.cpp")
+                artifact.cxxinfo.sources.append("*.cpp")
+
+        class Exe(CXXExecutable):
+            requires = ["sources"]
+
+        ---
+        """
+        r = self.jolt("build exe")
+        self.assertCompiled(r, "main.cpp")
+
+    def test_relink_on_change(self):
+        """
+        --- file: lib.cpp
+        int func() {{return 0;}}
+
+        --- file: main.cpp
+        int func();
+        int main() {{return func();}}
+
+        --- tasks:
+        class Lib(CXXLibrary):
+            sources = ["lib.cpp"]
+
+        class Exe(CXXExecutable):
+            requires = "lib"
+            sources = ["main.cpp"]
+
+        class Run(Task):
+            requires = ["exe"]
+
+            def run(self, deps, tools):
+                tools.run("exe")
+        ---
+        """
+        self.build("run")
+        with self.tools.cwd(self.ws):
+            self.tools.write_file("lib.cpp", "int func() {{return 1;}}")
+        with self.assertRaises(Exception):
+            self.build("run")
