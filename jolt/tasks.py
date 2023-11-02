@@ -1740,7 +1740,7 @@ class CommandSubtask(SubTask):
 
     def __str__(self):
         s = super().__str__()
-        return s if s is not None and not log.is_verbose() else self._command
+        return s if s is not None and not log.is_verbose() else self._tools.expand(self._command)
 
     def run(self):
         self._tools.run(self._command)
@@ -1827,11 +1827,11 @@ class MultiTask(Task):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._subtasks = []
+        self._subtasks = set()
         self._subtasks_by_output = {}
 
     def _add_subtask(self, subtask):
-        self._subtasks.append(subtask)
+        self._subtasks.add(subtask)
 
         for output in subtask.outputs:
             if output in self._subtasks_by_output:
@@ -1856,19 +1856,22 @@ class MultiTask(Task):
             inputsubtask = Input(self, input)
         else:
             inputsubtask = input
-        self._subtasks.append(inputsubtask)
+        self._subtasks.add(inputsubtask)
         self._subtasks_by_output[input] = inputsubtask
         return inputsubtask
 
     def _to_subtask_list(self, inputs):
         inputs = utils.as_list(inputs)
-        return [self._add_input(input) for input in inputs]
+        return list(set([self._add_input(input) for input in inputs]))
 
     def _to_output_files(self, subtasks):
         subtasks = utils.as_list(subtasks)
         outputs = []
         for subtask in subtasks:
-            outputs.extend(subtask.outputs)
+            if isinstance(subtask, SubTask):
+                outputs.extend(subtask.outputs)
+            else:
+                outputs.append(subtask)
         return outputs
 
     def _to_input_subtasks(self, inputs, **kwargs):
@@ -1908,7 +1911,7 @@ class MultiTask(Task):
                   outputs=["executable"])
 
         """
-        inputs = self._to_input_subtasks(inputs, **kwargs)
+        input_jobs = self._to_input_subtasks(inputs, **kwargs)
         inputfiles = self._to_output_files(inputs)
 
         outputs = utils.as_list(outputs)
@@ -1925,7 +1928,7 @@ class MultiTask(Task):
 
         for dir in dirs:
             subtask.add_dependency(dir)
-        for input in inputs:
+        for input in input_jobs:
             subtask.add_dependency(input)
         for output in outputs:
             output = self.expand(output, inputs=inputfiles, outputs=outputs, **kwargs)
@@ -2127,6 +2130,7 @@ class MultiTask(Task):
         for subtask in self._subtasks:
             if subtask not in subtasks:
                 subtasks[subtask] = []
+            if subtask not in deps:
                 deps[subtask] = []
             for dep in subtask.dependencies:
                 if dep not in deps:
@@ -2136,9 +2140,14 @@ class MultiTask(Task):
 
         # Prune up-to-date subtasks
         for subtask in list(filter(lambda subtask: not subtask.is_outdated, subtasks.keys())):
+            log.debug("Pruning {}", subtask)
             del subtasks[subtask]
             for dep in deps[subtask]:
-                subtasks[dep].remove(subtask)
+                try:
+                    subtasks[dep].remove(subtask)
+                except KeyError:
+                    pass
+
 
         subtaskindex = 0
         subtaskcount = len(subtasks)
