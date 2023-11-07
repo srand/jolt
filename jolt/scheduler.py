@@ -179,7 +179,7 @@ class Uploader(Executor):
             task.started("Upload")
             hooks.task_started_upload(task)
             raise_task_error_if(
-                not task.upload(),
+                not task.upload(persistent_only=True),
                 task, "Failed to upload task artifact")
         except Exception as e:
             with task.task.report() as report:
