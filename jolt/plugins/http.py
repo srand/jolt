@@ -1,3 +1,4 @@
+from requests import Session
 from requests.auth import HTTPBasicAuth
 from requests.exceptions import ConnectTimeout, RequestException
 from urllib.parse import urlparse, urlunparse
@@ -29,6 +30,7 @@ class Http(cache.StorageProvider):
         self._upload = config.getboolean(NAME, "upload", True)
         self._download = config.getboolean(NAME, "download", True)
         self._disabled = False
+        self._session = Session()
 
     def _get_auth(self):
         service = config.get(NAME, "keyring.service")
@@ -94,11 +96,10 @@ class Http(cache.StorageProvider):
     def location(self, artifact):
         if self._disabled:
             return False
-        from requests.api import head
 
         url = self._get_url(artifact)
         try:
-            response = head(url, stream=True, timeout=TIMEOUT_HEAD)
+            response = self._session.head(url, stream=True, timeout=TIMEOUT_HEAD, auth=self._get_auth())
         except ConnectTimeout:
             self._disabled = True
             log.warning("[HTTP] failed to establish server connection, disabled")
