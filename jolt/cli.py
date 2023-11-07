@@ -1126,9 +1126,9 @@ Python: {pyimpl} {pyver}
                 except Exception:
                     pass
 
-            collect_command("pip modules", "pip list > packages-pip-txt")
+            collect_command("pip modules", "pip list > packages-pip.txt")
             if uname.system == "Linux":
-                collect_command("apt packages", "apt list --installed > packages-apt-txt")
+                collect_command("apt packages", "apt list --installed > packages-apt.txt")
                 artifact.collect("/etc/os-release", "os-release.txt")
             artifact.collect("*.txt")
 
