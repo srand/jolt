@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import json
 import re
 import sys
 import time
@@ -538,18 +539,41 @@ class BuildCli(testsupport.JoltTest):
         --- tasks:
         class A(Task):
             def unpack(self, artifact, tools):
-                pass
+                self.info("Running unpack!")
+
+        class B(Task):
+            requires = ["a"]
         ---
         """
         if not self.network:
             self.skipTest("network build required")
 
-        r = self.build("a")
+        r = self.build("b")
         self.assertBuild(r, "a")
-        self.jolt("clean a")
-        self.tools.run("docker run --rm -i -v jolt_test_cache-http:/cache -w /cache busybox:latest find -delete")
-        r = self.build("a")
-        self.assertBuild(r, "a")
+        self.assertBuild(r, "b")
+
+        for i in [0, 1]:
+            self.jolt("clean a b")
+            self.tools.run("docker run --rm -i -v jolt_test_cache-http:/cache -w /cache busybox:latest find -delete")
+            r = self.build("a b")
+            self.assertBuild(r, "a")
+            self.assertBuild(r, "b")
+
+            a = self.artifacts(r)
+
+            with self.tools.cwd(a[0]):
+                log = self.tools.read_file(".build.log")
+                self.assertIn("Evicted", log)
+
+                manifest = self.tools.read_file(".manifest.json")
+                manifest = json.loads(manifest)
+                print(manifest)
+                self.assertTrue(manifest["uploadable"])
+                self.assertFalse(manifest["unpacked"])
+
+            with self.tools.cwd(a[1]):
+                log = self.tools.read_file(".build.log")
+                self.assertIn("Running unpack!", log)
 
     def test_uncacheable(self):
         """

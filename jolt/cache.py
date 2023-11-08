@@ -465,23 +465,14 @@ class Artifact(object):
         self._main = name == "main"
         self._name = name or "main"
         self._node = node
+        self._session = session
         self._task = node.task if node else None
         self._tools = tools or self._node.tools
         self._path = cache._fs_get_artifact_path(self._identity, node.canonical_name if node else name)
         self._temp = cache._fs_get_artifact_tmppath(self._identity, node.canonical_name if node else name)
         self._archive = cache._fs_get_artifact_archivepath(self._identity, node.canonical_name if node else name)
         self._lock_path = cache._fs_get_artifact_lockpath(self._identity)
-        self._session = session
-        self._unpacked = False
-        self._uploadable = True
-        self._created = datetime.now()
-        self._modified = datetime.now()
-        self._expires = node.task.expires if not session else expires.Immediately()
-        self._size = 0
-        self._influence = None
         ArtifactAttributeSetRegistry.create_all(self)
-        self._valid = False
-        self._temporary = False
         self.reload()
 
     def __enter__(self):
@@ -592,6 +583,14 @@ class Artifact(object):
         return self._valid
 
     def reload(self):
+        self._unpacked = False
+        self._uploadable = True
+        self._created = datetime.now()
+        self._modified = datetime.now()
+        self._expires = self._task.expires if not self._session else expires.Immediately()
+        self._size = 0
+        self._influence = None
+        self._valid = False
         self._temporary = False
         self._read_manifest()
         self._temporary = not self._valid
