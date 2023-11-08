@@ -353,6 +353,18 @@ def protobuf():
                 kwargs["outputs"] = kwargs.pop("outputs", outputs)
                 return self._compile_proto(inputs, **kwargs)
 
+            def compile_proto_python_grpc(self, inputs, **kwargs):
+                depfile = "{outdir_rel}/{in_base}_pb2_grpc.py.d"
+                outputs = [
+                    "{outdir_rel}/{in_base}_pb2_grpc.py",
+                ]
+                kwargs["protoc"] = kwargs.pop("protoc", "python -m grpc_tools.protoc")
+                kwargs["command"] = kwargs.pop("command", self.proto_cmd)
+                kwargs["depfile"] = kwargs.pop("depfile", depfile)
+                kwargs["generator"] = kwargs.pop("generator", "grpc_python")
+                kwargs["outputs"] = kwargs.pop("outputs", outputs)
+                return self._compile_proto(inputs, **kwargs)
+
             def _compile_proto(self, inputs, **kwargs):
                 jobs = []
 
@@ -382,11 +394,13 @@ def protobuf():
                 if not protobufs:
                     return super().compile(sources, **kwargs)
 
-                generator = kwargs.get("protogenerator", getattr(self, "protogenerator"))
-                proto_fn = getattr(self, "compile_proto_" + generator, None)
-                raise_task_error_if(not proto_fn, self, "Protobuf generator '{}' is not supported", generator)
-                proto_job = proto_fn(protobufs, **kwargs)
-                proto_sources = self._to_output_files(proto_job)
+                proto_sources = []
+                generators = utils.as_list(kwargs.get("protogenerator", getattr(self, "protogenerator", [])))
+                for generator in generators:
+                    proto_fn = getattr(self, "compile_proto_" + generator, None)
+                    raise_task_error_if(not proto_fn, self, "Protobuf generator '{}' is not supported", generator)
+                    proto_job = proto_fn(protobufs, **kwargs)
+                    proto_sources += self._to_output_files(proto_job)
                 proto_outputs = self.compile(proto_sources, **kwargs)
 
                 outputs = self.compile(sources, **kwargs)
