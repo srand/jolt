@@ -713,7 +713,8 @@ class AmqpExecutor(scheduler.NetworkExecutor):
         # Download session artifacts
         mftask = manifest.find_task(self.task.qualified_name)
         raise_task_error_if(
-            self.task.has_artifact() \
+            mftask.result not in ["DOWNLOADED", "SKIPPED", "UPLOADED"] \
+            and self.task.has_artifact() \
             and mftask and mftask.instance == self.task.instance \
             and not self.task.download(session_only=True) \
             and env.cache.download_enabled(),
@@ -722,7 +723,8 @@ class AmqpExecutor(scheduler.NetworkExecutor):
         for extension in self.task.extensions:
             mftask = manifest.find_task(extension.qualified_name)
             raise_task_error_if(
-                extension.has_artifact() \
+                mftask.result not in ["DOWNLOADED", "SKIPPED", "UPLOADED"] \
+                and extension.has_artifact() \
                 and mftask and mftask.instance == extension.instance \
                 and not extension.download(session_only=True) \
                 and env.cache.download_enabled(),
