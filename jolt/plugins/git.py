@@ -133,7 +133,7 @@ class GitRepository(object):
             try:
                 commit = self.repository.revparse_single(rev)
             except KeyError:
-                self.fetch()
+                self.fetch(commit=rev)
                 try:
                     commit = self.repository.revparse_single(rev)
                 except Exception:
@@ -201,22 +201,26 @@ class GitRepository(object):
         with self.tools.cwd(self.path):
             return self.tools.run("git reset --hard", output_on_error=True)
 
-    def fetch(self):
+    def fetch(self, commit=None):
+        if not self.is_valid_sha(commit):
+            commit = None
+
         refspec = " ".join(self.default_refspecs + self.refspecs)
         with self.tools.cwd(self.path):
-            log.info("Fetching {0} from {1}", refspec or 'commits', self.url)
-            self.tools.run("git fetch {url} {refspec}",
-                           url=self.url,
-                           refspec=refspec or '',
-                           output_on_error=True)
+            log.info("Fetching {0} from {1}", commit or refspec or 'commits', self.url)
+            self.tools.run(
+                "git fetch {url} {what}",
+                url=self.url,
+                what=commit or refspec or '',
+                output_on_error=True)
 
-    def checkout(self, rev):
+    def checkout(self, rev, commit=None):
         log.info("Checking out {0} in {1}", rev, self.path)
         with self.tools.cwd(self.path):
             try:
                 return self.tools.run("git checkout -f {rev}", rev=rev, output=False)
             except Exception:
-                self.fetch()
+                self.fetch(commit=commit)
                 try:
                     return self.tools.run("git checkout -f {rev}", rev=rev, output_on_error=True)
                 except Exception:
@@ -351,10 +355,13 @@ class GitSrc(WorkspaceResource, FileInfluence):
             self._acquire_ws()
 
     def _acquire_ws(self):
+        commit = None
         if not self.git.is_cloned():
             self.git.clone()
         if not self._revision.is_imported:
             self.git.diff_unchecked()
+        else:
+            commit = self._revision.value
         rev = self._get_revision()
         if rev is not None:
             raise_task_error_if(
@@ -363,7 +370,7 @@ class GitSrc(WorkspaceResource, FileInfluence):
             # Should be safe to do this now
             rev = self.git.rev_parse(rev)
             if not self.git.is_head(rev) or self._revision.is_imported:
-                self.git.checkout(rev)
+                self.git.checkout(rev, commit=commit)
                 self.git.clean()
                 self.git.patch(self._diff.value)
 
