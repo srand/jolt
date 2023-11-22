@@ -710,27 +710,25 @@ class AmqpExecutor(scheduler.NetworkExecutor):
 
         self.task.running(utils.duration() - float(manifest.duration))
 
+        log.debug(self.response)
+
         # Download session artifacts
         mftask = manifest.find_task(self.task.qualified_name)
-        raise_task_error_if(
-            mftask \
-            and mftask.result not in ["DOWNLOADED", "SKIPPED", "UPLOADED"] \
-            and self.task.has_artifact() \
-            and mftask.instance == self.task.instance \
-            and not self.task.download(session_only=True) \
-            and env.cache.download_enabled(),
-            self.task, "Failed to download task artifact")
+        if mftask and mftask.result not in ["DOWNLOADED", "SKIPPED", "UPLOADED"] \
+           and self.task.has_artifact() \
+           and mftask.instance == self.task.instance \
+           and not self.task.download(session_only=True) \
+           and env.cache.download_enabled():
+            self.task.warning("Failed to download session artifact")
 
         for extension in self.task.extensions:
             mftask = manifest.find_task(extension.qualified_name)
-            raise_task_error_if(
-                mftask \
-                and mftask.result not in ["DOWNLOADED", "SKIPPED", "UPLOADED"] \
-                and extension.has_artifact() \
-                and mftask.instance == extension.instance \
-                and not extension.download(session_only=True) \
-                and env.cache.download_enabled(),
-                extension, "Failed to download task artifact")
+            if mftask and mftask.result not in ["DOWNLOADED", "SKIPPED", "UPLOADED"] \
+               and extension.has_artifact() \
+               and mftask.instance == extension.instance \
+               and not extension.download(session_only=True) \
+               and env.cache.download_enabled():
+                extension.warning("Failed to download session artifact")
 
         if manifest.result != "SUCCESS" or \
            any(map(lambda task: task.result not in ["DOWNLOADED", "SKIPPED", "SUCCESS", "UPLOADED"], manifest.tasks)):
@@ -747,7 +745,6 @@ class AmqpExecutor(scheduler.NetworkExecutor):
                     if remote_report:
                         for error in remote_report.errors:
                             report.manifest.append(error)
-            log.debug(self.response)
             raise_error("[AMQP] Remote build failed")
 
         raise_task_error_if(

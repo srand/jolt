@@ -691,3 +691,27 @@ class BuildCli(testsupport.JoltTest):
         self.assertEqual(1, len(a))
 
 
+    def test_session_artifact_with_resource_failure(self):
+        """
+        --- tasks:
+        class R(Resource):
+            def acquire(self, deps, artifact, tools):
+                assert False
+
+        @attributes.artifact("result", session=True)
+        class A(Task):
+            requires = ["r"]
+
+            def publish_result(self, artifact, tools):
+                pass
+        ---
+        """
+        if not self.network_enabled:
+            self.skipTest("Network build required")
+
+        with self.assertRaises(Exception):
+            self.build("a")
+        r = self.lastLog()
+        self.assertIn("Failed to download session artifact", r)
+        self.assertIn("AssertionError: assert False", r)
+
