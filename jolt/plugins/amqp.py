@@ -710,8 +710,6 @@ class AmqpExecutor(scheduler.NetworkExecutor):
 
         self.task.running(utils.duration() - float(manifest.duration))
 
-        log.debug(self.response)
-
         # Download session artifacts
         mftask = manifest.find_task(self.task.qualified_name)
         if mftask and mftask.result not in ["DOWNLOADED", "SKIPPED", "UPLOADED"] \
