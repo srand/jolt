@@ -202,7 +202,7 @@ class GitRepository(object):
             return self.tools.run("git reset --hard", output_on_error=True)
 
     def fetch(self, commit=None):
-        if not self.is_valid_sha(commit):
+        if commit and not self.is_valid_sha(commit):
             commit = None
 
         refspec = " ".join(self.default_refspecs + self.refspecs)
