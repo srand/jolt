@@ -270,7 +270,7 @@ def protobuf():
             abstract = True
 
             protoc = "protoc"
-            proto_cmd = "{protoc} -I{in_path} {{(incpaths_imported+incpaths)|prefix('-I')|join(' ')}} {protoflags} --dependency_out={depfile} --{generator}_out={outdir_rel}{% if generator_plugin %} --plugin=protoc-gen-{generator}={generator_plugin}{% endif %} {inputs}"
+            proto_cmd = "{protoc} {{(incpaths_imported+incpaths)|prefix('-I')|join(' ')}} {protoflags} --dependency_out={depfile} --{generator}_out={outdir_rel}{% if generator_plugin %} --plugin=protoc-gen-{generator}={generator_plugin}{% endif %} {inputs}"
             protoflags = []
             protogenerator = "cpp"
 
