@@ -16,6 +16,7 @@ from jolt import influence
 from jolt import log
 from jolt import tools
 from jolt import utils
+from jolt import tasks
 from jolt.options import JoltOptions
 from jolt.error import raise_error, raise_error_if
 from jolt.error import raise_task_error, raise_task_error_if
@@ -788,6 +789,9 @@ class Artifact(object):
     def get_task(self):
         return self._node.task
 
+    def get_node(self):
+        return self._node
+
     def is_temporary(self):
         return self._temporary
 
@@ -858,6 +862,7 @@ class Context(object):
                         continue
 
                     self._cache.unpack(artifact)
+
                     if artifact.name == "main":
                         self._artifacts_index[dep.qualified_name] = artifact
                         self._artifacts_index[dep.short_qualified_name] = artifact
@@ -1244,6 +1249,7 @@ class ArtifactCache(StorageProvider):
 
     def _fs_create_cachedir(self):
         self.root = config.get_cachedir()
+        log.verbose("Jolt cache path: {}", self.root)
         try:
             fs.makedirs(self.root)
         except KeyboardInterrupt as e:
@@ -1531,16 +1537,20 @@ class ArtifactCache(StorageProvider):
                 try:
                     # Note: unpack() will run on the original
                     # artifact, not in the temporary copy.
-                    artifact.task.verbose("Unpacking ({name})")
+                    if task.unpack.__func__ is not tasks.Task.unpack:
+                        task.info("Unpack started {}", artifact.get_node().log_name)
                     artifact._set_unpacked()
                     task.unpack(artifact, t)
                     self.commit(artifact, uploadable=False)
+
                 except NotImplementedError:
                     self.commit(artifact)
+
                 except Exception as e:
                     # Restore the temporary copy
                     fs.rmtree(artifact.path, ignore_errors=True)
                     fs.rename(artifact.temporary_path, artifact.path)
+                    artifact.task.error("Unpack failed {}", artifact.get_node().log_name)
                     raise e
         return True
 
