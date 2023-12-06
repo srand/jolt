@@ -1630,6 +1630,14 @@ class Tools(object):
         """
         raise_error_if(platform.system() != "Linux", "Tools.chroot() is only supported on Linux")
 
+        raise_task_error_if(
+            not self.which("newuidmap"), self._task,
+            "No usable 'newuidmap' found in PATH")
+
+        raise_task_error_if(
+            not self.which("newgidmap"), self._task,
+            "No usable 'newgidmap' found in PATH")
+
         if type(chroot) is cache.Artifact:
             raise_task_error_if(
                 not str(chroot.paths.rootfs), self._task,
@@ -1640,6 +1648,8 @@ class Tools(object):
         raise_task_error_if(
             not fs.path.exists(chroot) or not fs.path.isdir(chroot),
             self._task, "failed to change root to '{0}'", chroot)
+
+        bind = []
 
         mount_dev = kwargs.get("mount_dev", True)
         mount_etc = kwargs.get("mount_etc", True)
@@ -1654,93 +1664,46 @@ class Tools(object):
             self._task, "Expected a list as mount argument to Tools.chroot()")
         mount = [self.expand(m) for m in mount]
 
-        overlaydir = self.builddir("overlay")
-        overlayrootdir = fs.path.join(overlaydir, "root")
-        with self.cwd(overlaydir):
-            self.mkdir("root")
-            self.mkdir("work")
-            self.mkdir("uppr")
-        overlayopts = f"upperdir={overlaydir}/uppr,workdir={overlaydir}/work,lowerdir={chroot}"
+        if mount_etc:
+            bind.append("/etc/group")
+            bind.append("/etc/hostname")
+            bind.append("/etc/hosts")
+            bind.append("/etc/passwd")
+            bind.append("/etc/resolv.conf")
 
-        def unshare_chroot(overlayrootdir):
-            uid = os.geteuid()
-            gid = os.getguid()
-            self._unshare([(uid, uid, 1)], [(gid, gid, 1)])
+        if mount_home:
+            bind.append("/home")
 
-            from ctypes import CDLL, c_char_p
-            libc = CDLL("libc.so.6")
+        if mount_joltdir and self._task:
+            from jolt.loader import get_workspacedir
+            bind.append(get_workspacedir())
 
-            MS_BIND = 4096
-            MS_REC = 16384
+        if mount_cachedir:
+            bind.append(config.get_cachedir())
 
-            def mount_overlay():
-                return libc.mount(
-                    c_char_p("overlay".encode("utf-8")),
-                    c_char_p(overlayrootdir.encode("utf-8")),
-                    c_char_p("overlay".encode("utf-8")),
-                    0,
-                    c_char_p(overlayopts.encode("utf-8"))) == 0
+        if mount_builddir:
+            bind.append(self.buildroot)
 
-            # If the overlay mount fails, just don't use one.
-            if not mount_overlay():
-                overlayrootdir = chroot
+        if mount:
+            for m in mount:
+                bind.append(m)
 
-            def mount_bind(path):
-                if os.path.isdir(path):
-                    os.makedirs(overlayrootdir + path, exist_ok=True)
-                else:
-                    os.makedirs(os.path.dirname(overlayrootdir + path), exist_ok=True)
-                    if not os.path.exists(overlayrootdir + path):
-                        with open(overlayrootdir + path, "a"):
-                            pass
-                assert libc.mount(
-                    c_char_p(path.encode("utf-8")),
-                    c_char_p((overlayrootdir + path).encode("utf-8")),
-                    None,
-                    MS_BIND | MS_REC,
-                    None) == 0
+        if mount_dev:
+            bind.append("/dev")
 
-            if mount_etc:
-                mount_bind("/etc/group")
-                mount_bind("/etc/hostname")
-                mount_bind("/etc/hosts")
-                mount_bind("/etc/passwd")
-                mount_bind("/etc/resolv.conf")
-            if mount_home:
-                mount_bind("/home")
-            if mount_joltdir and self._task:
-                from jolt.loader import get_workspacedir
-                mount_bind(get_workspacedir())
-            if mount_cachedir:
-                mount_bind(config.get_cachedir())
-            if mount_builddir:
-                mount_bind(self.buildroot)
-            if mount:
-                for m in mount:
-                    mount_bind(m)
-            if mount_dev:
-                mount_bind("/dev")
-            if mount_proc:
-                mount_bind("/proc")
-            os.chroot(overlayrootdir)
-            os.chdir(self.getcwd())
+        if mount_proc:
+            bind.append("/proc")
 
-        def unshare_chroot_catch():
+        unshare = os.path.join(os.path.dirname(__file__), "chroot.py")
+        with self.runprefix(
+                "{} {} -b {} -c {} -- ",
+                sys.executable, unshare, " ".join(bind), chroot):
+            old_chroot = self._chroot
+            self._chroot = chroot
             try:
-                unshare_chroot(overlayrootdir)
-            except Exception as e:
-                log.exception(e)
-                raise e
-
-        old_chroot = self._chroot
-        old_preexec_fn = self._preexec_fn
-        self._chroot = chroot
-        self._preexec_fn = unshare_chroot_catch
-        try:
-            yield self._chroot
-        finally:
-            self._chroot = old_chroot
-            self._preexec_fn = old_preexec_fn
+                yield
+            finally:
+                self._chroot = old_chroot
 
     def _unshare(self, uidmap, gidmap):
         from ctypes import CDLL
@@ -1755,6 +1718,7 @@ class Tools(object):
         raise_task_error_if(
             not newuidmap, self._task,
             "No usable 'newuidmap' found in PATH")
+
         newgidmap = self.which("newgidmap")
         raise_task_error_if(
             not newgidmap, self._task,
@@ -1829,6 +1793,12 @@ class Tools(object):
         raise_task_error_if(
             not uidmap, self._task,
             "Invalid uid map: {}", uidmap)
+        raise_task_error_if(
+            not self.which("newuidmap"), self._task,
+            "No usable 'newuidmap' found in PATH")
+        raise_task_error_if(
+            not self.which("newgidmap"), self._task,
+            "No usable 'newgidmap' found in PATH")
 
         msgq = multiprocessing.JoinableQueue()
         pid = os.fork()
