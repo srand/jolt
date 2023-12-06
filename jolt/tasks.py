@@ -3107,7 +3107,20 @@ class ResourceAttributeSetProvider(ArtifactAttributeSetProvider):
             except Exception:
                 ba = sig.bind_partial(artifact, deps, resource.tools)
                 acquire = utils.deprecated(resource.acquire)
-            acquire(*ba.args, **ba.kwargs)
+            if not isinstance(resource, WorkspaceResource):
+                ts = utils.duration()
+                log.info(colors.blue("Resource acquisition started ({})"),
+                         resource.short_qualified_name)
+            try:
+                acquire(*ba.args, **ba.kwargs)
+                if not isinstance(resource, WorkspaceResource):
+                    log.info(colors.green("Resource acquisition finished after {} ({})"),
+                             ts, resource.short_qualified_name)
+            except Exception as e:
+                if not isinstance(resource, WorkspaceResource):
+                    log.error("Resource acquisition failed after {} ({})",
+                              ts, resource.short_qualified_name)
+                raise e
 
     def unapply(self, task, artifact):
         resource = artifact.task
@@ -3122,5 +3135,18 @@ class ResourceAttributeSetProvider(ArtifactAttributeSetProvider):
             except Exception:
                 ba = sig.bind_partial(artifact, deps, resource.tools)
                 release = utils.deprecated(resource.release)
-            release(*ba.args, **ba.kwargs)
+            if not isinstance(resource, WorkspaceResource):
+                ts = utils.duration()
+                log.info(colors.blue("Resource release started ({})"),
+                         resource.short_qualified_name)
+            try:
+                release(*ba.args, **ba.kwargs)
+                if not isinstance(resource, WorkspaceResource):
+                    log.info(colors.green("Resource release finished after {} ({})"),
+                             ts, resource.short_qualified_name)
+            except Exception as e:
+                if not isinstance(resource, WorkspaceResource):
+                    log.error("Resource release failed after {} ({})",
+                              ts, resource.short_qualified_name)
+                raise e
             deps.__exit__(None, None, None)
