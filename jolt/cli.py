@@ -202,6 +202,9 @@ def _autocomplete_tasks(ctx, args, incomplete):
 @click.option("-l", "--local", is_flag=True, default=False, help="Disable remote cache access.")
 @click.option("-n", "--network", is_flag=True, default=False, help="Distribute tasks to network workers.")
 @click.option("-s", "--salt", type=str, help="Add salt as hash influence for all tasks in dependency tree.", metavar="SALT")
+@click.option("-m", "--mute", is_flag=True, help="Reduce log verbosity to exclude stdout.")
+@click.option("-v", "--verbose", is_flag=True, help="Verbose output.")
+@click.option("-vv", "--extra-verbose", is_flag=True, help="Extra verbose output.")
 @click.option("--result", type=click.Path(), hidden=True,
               help="Write result manifest to this file.")
 @click.option("--no-download", is_flag=True, default=False,
@@ -220,7 +223,8 @@ def _autocomplete_tasks(ctx, args, incomplete):
 @hooks.cli_build
 def build(ctx, task, network, keep_going, default, local,
           no_download, no_upload, download, upload, worker, force,
-          salt, copy, debug, result, jobs, no_prune):
+          salt, copy, debug, result, jobs, no_prune, verbose, extra_verbose,
+          mute):
     """
     Build task artifact.
 
@@ -263,6 +267,13 @@ def build(ctx, task, network, keep_going, default, local,
 
     raise_error_if(no_upload and upload,
                    "The --upload and --no-upload flags are mutually exclusive")
+
+    if verbose:
+        log.set_level(log.VERBOSE)
+    elif extra_verbose:
+        log.set_level(log.DEBUG)
+    elif mute:
+        log.set_level(log.INFO)
 
     duration = utils.duration()
 
@@ -344,7 +355,8 @@ def build(ctx, task, network, keep_going, default, local,
     goal_tasks = dag.goals
     goal_task_duration = 0
 
-    queue = scheduler.TaskQueue(strategy)
+    session = executors.create_session(dag) if options.network else {}
+    queue = scheduler.TaskQueue(strategy, acache, session)
 
     try:
         if not dag.has_tasks():
@@ -367,7 +379,7 @@ def build(ctx, task, network, keep_going, default, local,
 
                 while leafs:
                     task = leafs.pop()
-                    queue.submit(acache, task)
+                    queue.submit(task)
 
                 task, error = queue.wait()
 
@@ -697,7 +709,7 @@ def download(ctx, task, deps, copy, copy_all):
     executors = scheduler.ExecutorRegistry.get(options)
     registry = TaskRegistry.get()
     strategy = scheduler.DownloadStrategy(executors, acache)
-    queue = scheduler.TaskQueue(strategy)
+    queue = scheduler.TaskQueue(strategy, acache, {})
     gb = graph.GraphBuilder(registry, acache, manifest, options, progress=True)
     dag = gb.build(task)
 
@@ -716,7 +728,7 @@ def download(ctx, task, deps, copy, copy_all):
 
                 while leafs:
                     task = leafs.pop()
-                    queue.submit(acache, task)
+                    queue.submit(task)
 
                 task, error = queue.wait()
                 p.update(1)

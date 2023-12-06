@@ -14,7 +14,7 @@ from jolt.plugins import docker
 @influence.files("../docker/Dockerfile.*")
 @influence.files("../docker/swarm/*")
 class JoltAmqp(Task):
-    name = "jolt/image"
+    name = "jolt/amqp/image"
 
     requires = ["docker/cli"]
 
@@ -29,23 +29,28 @@ class AmqpWorker(Resource):
 
     storage = Parameter()
 
-    requires = ["jolt/image"]
+    requires = ["jolt/amqp/image"]
 
     def acquire(self, artifact, deps, tools, owner):
         try:
             with tools.cwd(tools.builddir()):
                 for file in tools.glob("{joltdir}/../docker/swarm/*"):
                     tools.copy(file, "./")
-                tools.replace_in_file("jolt.yaml", "jolt:latest",
-                                      tools.expand("jolt:{deps[jolt/image].task.identity}", deps=deps))
-                tools.replace_in_file("jolt.yaml", "rabbitmq:latest",
-                                      tools.expand("rabbitmq:{deps[jolt/image].task.identity}", deps=deps))
-                tools.run("docker stack deploy -c jolt.yaml jolt_test", output_on_error=True)
+                tools.replace_in_file(
+                    "jolt-amqp.yaml",
+                    "jolt:latest",
+                    tools.expand("jolt:{deps[jolt/amqp/image].task.identity}", deps=deps))
+                tools.replace_in_file(
+                    "jolt-amqp.yaml",
+                    "rabbitmq:latest",
+                    tools.expand("rabbitmq:{deps[jolt/amqp/image].task.identity}", deps=deps))
+                tools.run("docker stack deploy -c jolt-amqp.yaml jolt_test", output_on_error=True)
                 tools.run("docker service scale jolt_test_worker=1", output_on_error=True)
-                config = tools.read_file("client.conf")
+                config = tools.read_file("client-amqp.conf")
                 config = config.replace("localhost", os.getenv("DOCKER_PUBLIC_IP", "localhost"))
                 artifact.strings.config = config
-            for i in range(0, 20):
+                artifact.strings.plugin = "amqp"
+            for i in range(0, 30):
                 try:
                     assert "Queue bound" in tools.run("docker service logs jolt_test_worker", output=False)
                     break

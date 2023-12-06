@@ -1,3 +1,5 @@
+.. _configuration:
+
 Configuration
 ==============
 
@@ -99,6 +101,29 @@ The ``[jolt]`` config section contains global configuration.
   local machine. The environment variable ``JOLT_PARALLEL_TASKS`` can also
   be used as well as the ``-j/--jobs`` build command option.
   The default value is 1.
+
+
+Scheduler
+---------
+
+The ``[scheduler]`` section configures remote task scheduling.
+A remote scheduler accepts task execution requests from the Jolt client
+and distributes them to workers. Logs, artifacts and results are collected
+from the workers and returned to the client in real-time
+
+Tasks can be assigned a priority. The scheduler will always attempt to
+execute tasks with the highest priority first, if there is an eligible
+worker available. If no worker is available, the task is queued until
+one becomes available. The scheduler will also attempt to execute tasks
+in the order they were submitted, but this is not guaranteed. In some cases,
+competing builds with fewer remaining tasks may be prioritized.
+
+Available configuration keys:
+
+* ``host`` - Hostname or address of the scheduler service. Default: jolt-scheduler.
+* ``port`` - Port number of the scheduler service. Default: 9090.
+* ``priority`` - The base priority of the tasks submitted to the scheduler.
+  Default: 0. Any number is allowed, both positive and negative.
 
 
 Network

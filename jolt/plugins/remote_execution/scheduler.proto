@@ -1,0 +1,90 @@
+syntax = "proto3";
+
+option go_package = "pkg/protocol";
+
+import "jolt/common.proto";
+
+// A build request.
+message BuildRequest {
+    // The build environment.
+    // Jolt client version, recipes, workspace resources,
+    // task identities, etc.
+    BuildEnvironment environment = 1;
+
+    // Build priority.
+    // A higher number means higher priority.
+    int32 priority = 2;
+}
+
+// A build response.
+message BuildUpdate {
+    // Status of the build: accepted, rejected, etc.
+    BuildStatus status = 1;
+
+    // A scheduler identifier for the build.
+    // May be used in calls to e.g. CancelBuild.
+    string build_id = 2;
+}
+
+// Cancel build request.
+message CancelBuildRequest {
+    // Identifier of the build to cancel.
+    // See BuildResponse.id.
+    string build_id = 1;
+}
+
+message CancelBuildResponse {
+    // Status of the build after the cancel request.
+    BuildStatus status = 1;
+}
+
+// A task execution request.
+// Sent by clients to the scheduler.
+// The client must ensure that all task dependencies have
+// already executed before scheduling a task.
+message TaskRequest {
+    // The build request that the task belongs to.
+    string build_id = 1;
+
+    // The identity of the task to execute.
+    string task_id = 2;
+}
+
+// The allocated worker
+message WorkerAllocation {
+    // Worker id
+    string id = 1;
+}
+
+// An update on the progress of an executing task.
+message TaskUpdate {
+    // The original task execution request.
+    TaskRequest request = 1;
+
+    // The current status of the task.
+    TaskStatus status = 2;
+
+    // The worker that is assigned to execute the task.
+    WorkerAllocation worker = 3;
+
+    // Log lines output by the task, if any.
+    repeated LogLine loglines = 4;
+
+    // Errors reported by the task
+    repeated TaskError errors = 5;
+}
+
+// The scheduler service
+service Scheduler {
+    // Create a new build in the scheduler.
+    // The build is not started until tasks are scheduled.
+    rpc ScheduleBuild(BuildRequest) returns (stream BuildUpdate);
+
+    // Cancel a build.
+    rpc CancelBuild(CancelBuildRequest) returns (CancelBuildResponse);
+
+    // Schedule a task to be executed.
+    // The scheduler will assign the task to a free worker
+    // and updates will be sent back once the task is running.
+    rpc ScheduleTask(TaskRequest) returns (stream TaskUpdate);
+}

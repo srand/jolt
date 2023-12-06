@@ -11,28 +11,32 @@ from jolt.tasks import TaskRegistry
 from jolt.plugins.allure import Test
 
 
-def enable_network_testing(cls, storage_providers=None):
+def enable_network_testing(cls, storage_providers=None, schedulers=None):
     if os.getenv("JOLT_NO_NETWORK_TESTS"):
         return cls
     class Gen(TaskGenerator):
         def generate(self):
             classes = []
-            for provider in storage_providers or ["http"]:
-                class Net(cls):
-                    network = True
-                    network_enabled = True
-                    name = cls.name + "/" + provider
-                    requires = ["jolt/amqp/deployment:storage=" + provider]
-                    storage = provider
 
-                    def __init__(self, *args, **kwargs):
-                        super().__init__(*args, **kwargs)
-                        self.network = True
-                        self.network_enabled = True
+            for scheduler in schedulers or ["", "amqp/"]:
+                for cache in storage_providers or ["http"]:
+                    class Net(cls):
+                        name = cls.name + "/" + scheduler + cache
+                        requires = [f"deployment=jolt/{scheduler}deployment:storage={cache}"]
 
-                classes.append(Net)
-            cls.requires = [c.name for c in classes]
-            return classes + [cls]
+                        network = True
+                        network_enabled = True
+                        network_plugin = "{}".format(scheduler.rstrip("/"))
+                        storage = f"{cache}"
+
+                    classes.append(Net)
+
+            class All(Alias):
+                name = cls.name
+                requires = [c.name for c in classes] + [f"{cls.name}/local"]
+
+            cls.name = f"{cls.name}/local"
+            return classes + [cls, All]
     return Gen
 
 
@@ -56,10 +60,10 @@ def skip_if_network(method):
 class JoltTest(Test):
     abstract = True
 
-    def __init__(self, *args, **kwargs):
-        super(JoltTest, self).__init__(*args, **kwargs)
-        self.network = False
-        self.network_enabled = False
+    network = False
+    network_enabled = False
+    network_plugin = None
+    storage = None
 
     def _files(self):
         if not self._testMethodDoc:
@@ -80,7 +84,7 @@ class JoltTest(Test):
         return common + "\n".join([l[8:] for l in lines.splitlines()])
 
     def _network_config(self):
-        return self.deps["jolt/amqp/deployment:storage="+self.storage].strings.config.get_value() \
+        return self.deps["deployment"].strings.config.get_value() \
             if self.network_enabled else ""
 
     def setup(self, deps, tools):
@@ -115,7 +119,9 @@ global_string("{test}")
     def jolt(self, command, *args, **kwargs):
         with self.tools.cwd(self.ws):
             try:
-                self._log = self.tools.run("python -W error -m jolt -c test.conf -c net.conf " + command.format(*args, **kwargs), **kwargs)
+                # FIXME
+                # self._log = self.tools.run("python -W error -m jolt -c test.conf -c net.conf " + command.format(*args, **kwargs), **kwargs)
+                self._log = self.tools.run("python -m jolt -c test.conf -c net.conf " + command.format(*args, **kwargs), **kwargs)
                 return self._log
             except error.JoltCommandError as e:
                 self._log = "\n".join(e.stdout + e.stderr)
@@ -123,7 +129,7 @@ global_string("{test}")
 
     def build(self, task, *args, **kwargs):
         network = "-n " if self.network else ""
-        return self.jolt("-v build " + network + task, *args, **kwargs)
+        return self.jolt("-vv build " + network + task, *args, **kwargs)
 
     def fail(self, string):
         raise AssertionError(string)
@@ -133,7 +139,7 @@ global_string("{test}")
 
     def tasks(self, output, remote=False, local=False):
         if local:
-            return re.findall("Execution started.*?\((.*) [^ ]*\)", output)
+            return list(filter(lambda t: t != "jolt", re.findall("INFO] Execution started.*?\((.*) [^ ]*\)", output)))
         if remote:
             return re.findall("Remote execution started.*?\((.*) [^ ]*\)", output)
         return re.findall("xecution started.*?\((.*) [^ ]*\)", output)

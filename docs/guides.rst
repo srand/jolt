@@ -1,31 +1,335 @@
+User-guide
+==========
+
+.. _container_images:
+
+Container Images
+----------------
+
+The Jolt container images are available on `Docker Hub <https://hub.docker.com/r/robrt>`_.
+
+Dashboard
+~~~~~~~~~
+
+The Jolt dashboard is a web application where users can monitor the build cluster in
+real time. It is designed to be deployed as a container on a node in the build cluster.
+
+No configuration of the dashboard is required.
+
+The dashboard image is named ``robrt/jolt/dashboard``. It uses Debian as a base image.
 
 
-Distributed Builds
-==================
+Jolt
+~~~~
 
-To support distributed and incremental task execution in a build cluster, two things are typically needed:
+The Jolt client is the command line tool that executes tasks and optionally interacts
+with a scheduler in a build cluster. It is available as a container image, but is
+typically installed as a standalone application on the user's machine.
 
- - a centralized file server where resulting task artifacts can be stored
-
- - workers executing tasks and uploading the artifacts to the file server
-
-Task recipies may also have to be adapted to work in a network build environment. In particular, all task dependencies such as tools and source code repositories should be explicitly declared to allow the task to run anywhere. The more explicit the better. Your workers should be capabable of handling any workload. With proper dependency management they can provision the correct environment for any task on demand.
+The image is named ``robrt/jolt``. It uses Debian as a base image.
 
 
-Deploying with Docker Swarm
----------------------------
+Scheduler
+~~~~~~~~~
 
-Docker's Swarm mode is an easy to use container orchestration tool which can be used to deploy and manage a cluster of Jolt workers. In this example, the Jolt AMQP plugin is used to facilitate communication between Jolt clients and workers. The workers are deployed using the standard Jolt Docker container available in Docker Hub. RabbitMQ has been chosen as the AMQP message broker and Nginx serves as the centralized HTTP artifact cache. The Docker compose file for this setup looks like this:
+The scheduler is the central component of a build cluster. It is responsible for
+distributing tasks to workers and relaying results back to clients. The current
+scheduler implementation uses a priority queue in which builds are ordered by
+priority and then by the number of queued tasks remaining to be executed in the build.
+
+The scheduler image is named ``robrt/jolt/scheduler``. It uses Debian as a base image.
+
+  .. list-table::
+    :widths: 20 80
+    :header-rows: 1
+    :class: tight-table
+
+    * - Environment Variable
+      - Description
+
+    * - ``JOLT_CACHE_URI``
+      - | The URI of the HTTP cache service from which the scheduler may fetch Jolt clients.
+          Normally, this is not used and the scheduler instead installs the same version of
+          the client from the public Python package index. However, for development
+          purposes it is possible to deploy the source of the running client to the cache
+          and have the scheduler fetch it from there.
+
+        | The format is ``<scheme>://<host>:<port>`` where accepted schemes are:
+
+        - ``tcp`` for both IPv4 and IPv6 connections
+        - ``tcp4`` for only IPv4 connections
+        - ``tcp6`` for only IPv6 connections
+
+        | The default is ``tcp://cache.``.
+
+    * - ``JOLT_CACHE_SIZE``
+      - | The maximum size of the local cache in bytes.
+
+        | The default is ``1000000000`` (1 GB).
+
+    * - ``JOLT_CACHE_PATH``
+      - | The path to the local cache directory.
+
+        | The default is ``/var/cache/jolt``.
+
+    * - ``JOLT_CACHE_CLEANUP``
+      - | The interval in seconds between cache cleanups.
+
+        | The default is ``3600`` (1 hour).
+
+    * - ``JOLT_CACHE_CLEANUP_AGE``
+      - | The maximum age of a cached artifact in seconds.
+
+        | The default is ``604800`` (1 week).
+
+    * - ``JOLT_CACHE_CLEANUP_SIZE``
+      - | The maximum size of the local cache in bytes.
+
+        | The default is ``1000000000`` (1 GB).
+
+    * - ``JOLT_CACHE_CLEANUP_INTERVAL``
+      - | The interval in seconds between cache cleanups.
+
+        | The default is ``3600`` (1 hour).
+
+    * - ``JOLT_CACHE_CLEANUP_THREADS``
+      - | The number of threads to use for cache cleanups.
+
+        | The default is ``1``.
+
+    * - ``JOLT_CACHE_CLEANUP_LOG``
+      -
+
+The Jolt scheduler image is named ``robrt/jolt/scheduler``.
+It uses Debian as a base image.
+
+  .. list-table::
+    :widths: 20 80
+    :header-rows: 1
+    :class: tight-table
+
+    * - Environment Variable
+      - Description
+
+    * - ``JOLT_SCHEDULER_LISTEN``
+      - | A space separated list of URIs defining where the scheduler will accept connections from clients and workers.
+
+        | The format is ``<scheme>://<host>:<port>`` where accepted schemes are:
+
+        - ``tcp`` for both IPv4 and IPv6 connections
+        - ``tcp4`` for only IPv4 connections
+        - ``tcp6`` for only IPv6 connections
+
+        | The default is ``tcp://:9090`` which will listen on all interfaces on port 9090.
+
+
+Worker
+~~~~~~~~~
+
+The worker is responsible for executing tasks as instructed by the scheduler. It
+is designed to be deployed as a container on a node in the build cluster. The
+worker will automatically enlist with the scheduler and start executing tasks.
+Multiple workers can be deployed on the same node and share the same local
+artifact cache.
+
+The Jolt worker image is named ``robrt/jolt/worker``. It uses Debian as a base image
+and includes the extra packages:
+
+  - build-essential
+  - git
+  - ninja-build
+
+
+The following volume mount points can be configured:
+
+  .. list-table::
+    :widths: 20 80
+    :header-rows: 1
+    :class: tight-table
+
+    * - Volume Path
+      - Description
+
+    * - ``/etc/jolt/worker.yaml``
+      - | The configuration file for the worker.
+
+        | A configuration file may be used instead of environment variables.
+          It uses the same key names as the environment variables, but without
+          the ``JOLT_`` prefix and with lowercase letters.
+
+    * - ``/data/cache``
+      - | The directory where the local Jolt artifact cache is kept.
+
+        | The cache may be shared between multiple workers on the same node.
+
+    * - ``/data/ws``
+      - | The working directory where tasks are executed.
+
+        | This is where source code and intermediate build files are stored.
+          The working directory is unique to each worker and should not be
+          shared between workers.
+
+        | It is recommended to use a fast SSD for the working directory.
+
+    * - ``$HOME/.config/jolt/config``
+      - | The configuration file for the Jolt client that executes tasks
+          on the worker as instructed by the scheduler.
+
+        | See :ref:`configuration` for details.
+
+
+The following environment variables can be used to configure the worker:
+
+  .. list-table::
+    :widths: 20 80
+    :header-rows: 1
+    :class: tight-table
+
+    * - Environment Variable
+      - Description
+
+    * - ``JOLT_CACHE_URI``
+      - | The URI of the HTTP cache service from which the worker may fetch Jolt clients.
+          Normally, this is not used and the worker instead installs the same version of
+          the client from the public Python package index. However, for development
+          purposes it is possible to deploy the source of the running client to the cache
+          and have the worker fetch it from there.
+
+        | The format is ``<scheme>://<host>:<port>`` where accepted schemes are:
+
+        - ``tcp`` for both IPv4 and IPv6 connections
+        - ``tcp4`` for only IPv4 connections
+        - ``tcp6`` for only IPv6 connections
+
+        | The default is ``tcp://cache.``.
+
+    * - ``JOLT_PLATFORM``
+      - | A list of platform properties that the worker will advertise to the scheduler.
+
+        | The properties are used by the scheduler to select workers that are capable of
+          executing a task. For example, a task may require a worker with a specific
+          operating system or CPU architecture.
+
+        | The format is ``<key>=<value>`` where the key is the name of the property and
+          the value is its value. Multiple properties can be specified by separating them
+          with a comma or space.
+
+        | A set of default properties are always advertised:
+
+          - ``node.os``: The name of the operating system
+          - ``node.arch``: The name of the CPU architecture
+          - ``node.cpus``: The number of CPUs
+          - ``node.id``: A unique identifier for the node on which the worker is running
+          - ``worker.hostname``: The hostname of the worker.
+
+        | Example: ``label=compilation,label=unittesting``
+
+    * - ``JOLT_SCHEDULER_URI``
+      - | The URIs of the scheduler to which the worker will connect and enlist.
+
+        | See ``JOLT_CACHE_URI`` for format. The default is ``tcp://scheduler.:9090``.
+
+
+The worker can also be configured through a configuration file at ``/etc/jolt/worker.yaml``.
+The file uses the same key names as the environment variables, but without the ``JOLT_``
+prefix and with lowercase letters.
+
+  .. list-table::
+    :widths: 20 80
+    :header-rows: 1
+    :class: tight-table
+
+    * - Configuration Variable
+      - Description
+
+    * - ``cache_uri``
+      - | See ``JOLT_CACHE_URI``.
+
+
+    * - ``platform``
+      - | See ``JOLT_PLATFORM``.
+
+    * - ``scheduler_uri``
+      - | See ``JOLT_SCHEDULER_URI``.
+
+Example:
+
+  .. code:: yaml
+
+    # /etc/jolt/worker.yaml
+    cache_uri: "tcp://cache.:80"
+    platform:
+      - "label=compilation"
+      - "label=unittesting"
+    scheduler_uri: "tcp://scheduler.:9090"
+
+
+Deploying a Build Cluster
+-------------------------
+
+Jolt is designed to be deployed as a set of containers. To deploy a build
+cluster you typically use a container orchestration environment such as
+`Kubernetes <https://kubernetes.io/>`_ or
+`Docker Swarm <https://docs.docker.com/engine/swarm/>`_.
+See their respective documentation for installation instructions.
+
+The different components of the build cluster are:
+
+    - The Jolt scheduler, which is responsible for build and task scheduling.
+    - The Jolt worker, which executes tasks as instructed by the scheduler.
+    - The artifact cache, which is a HTTP server used to cache build artifacts.
+    - The Jolt dashboard, which is a web application used to monitor the build cluster.
+
+Each of the components is deployed as a separate container. Information about the
+images and their configuration environment variables can be found in
+:ref:`container_images`
+
+
+Adapting Task Definitions
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Task classes may have to be adapted to work in a distributed execution environment.
+For example, Jolt will by default not transfer any workspace files to a worker.
+Such dependencies, typically source repositories, must be listed as task requirements.
+See the Jolt test suite for examples of how to do this.
+
+Another common issue is that workers don't have the required tools installed.
+Those tools should to be packaged by Jolt tasks and listed as requirements in order
+to be automatically provisioned on the workers. They can also be installed manually
+in the worker container image, but this is not recommended as it makes administration
+of the build cluster more difficult, especially when multiple different versions
+of the same tool are required.
+
+Docker Swarm
+~~~~~~~~~~~~
+
+Docker Swarm is an easy to use container orchestration tool which can be used
+to deploy and manage the Jolt build cluster. The below Docker stack yaml file
+will deploy a scheduler and two workers, as well as an artifact cache served
+by `Nginx`.
 
   .. literalinclude:: ../docker/swarm/jolt.yaml
     :language: yaml
 
-The two Jolt workers are configured through the ``worker.conf`` file:
+The Jolt workers are configured in the ``worker.conf`` file:
 
   .. literalinclude:: ../docker/swarm/worker.conf
-    :language: yaml
+    :language: conf
 
-This configuration enables the AMQP and HTTP plugins. The hidden Jolt ``amqp-worker`` command enabled by the AMQP plugin will connect to the configured message broker and start processing execution requests. The HTTP plugin will store the resulting artifacts on the configured HTTP server. Jolt clients can then download these artifacts to the local host. In the example, a simple local Docker volume is used as server storage for the artifacts. In a real deployment, you probably want to use something else.
+The file configures the URIs of the scheduler service and the HTTP cache.
+In the example, local Docker volumes are used as storage for artifacts.
+In a real deployment, persistent volumes are recommended. The administrator
+should also configure the maximum size allowed for the local cache in each
+node with the ``jolt.cachesize`` configuration key. If multiple workers are
+deployed on the same node, the local cache may be shared between them in the
+same directory. Fast SSD storage is recommended for the local cache and the
+worker workspace.
+
+
+The Nginx HTTP cache is configured in the ``nginx.conf`` file:
+
+  .. literalinclude:: ../docker/swarm/nginx.conf
+    :language: nginx
 
 To deploy the system into a swarm, run:
 
@@ -35,48 +339,39 @@ To deploy the system into a swarm, run:
 
 You can then scale up the the number of workers to a number suitable for your swarm:
 
-
   .. code:: bash
 
     $ docker service scale jolt_worker=10
 
-Scaling is possible even with tasks in progress as long as they don't cause any side effects. If a task is interrupted because the worker is terminated, RabbitMQ will redeliver the execution request to another worker.
+Scaling is possible even with tasks in progress as long as they don't cause any side
+effects. If a task is interrupted because the worker is terminated, the scheduler will
+redeliver the task execution request to another worker.
 
-The newly deployed swarm of Jolt workers is utilized by configuring the Jolt client as follows:
+The newly deployed build cluster is utilized by configuring the Jolt client
+as follows:
 
   .. literalinclude:: ../docker/swarm/client.conf
-    :language: yaml
+    :language: conf
 
 These configuration keys can also be set from command line:
 
   .. code:: bash
 
-    $ jolt config amqp.host localhost
-    $ jolt config http.uri http://localhost/
+    $ jolt config scheduler.host localhost.
+    $ jolt config http.uri http://localhost./
 
-If your local machine is not part of the swarm you will need to replace ``localhost`` with the IP-address of one of the swarm nodes.
+If your local machine is not part of the swarm you will need to replace
+``localhost`` with the IP-address of one of the nodes in the swarm or, preferably, a load
+balancing hostname.
 
-To schedule a task in the swarm, pass the --network flag to the build command:
+To execute a task in the swarm, pass the ``-n/--network`` flag to the build command:
 
   .. code:: bash
 
-    $ jolt build --network <task>
+    $ jolt build -n <task>
 
 Alternatively, if you are using a separate configuration file:
 
   .. code:: bash
 
     $ jolt -c client.conf build --network <task>
-
-
-Adapting Task Definitions
--------------------------
-
-Task classes may have to be adapted to work in a distributed execution environment.
-For example, Jolt will by default not transfer any workspace files to a worker.
-Such dependencies, typically source repositories, must be listed as task requirements.
-
-Another common issue is that workers don't have the required tools installed. Those tools
-have to be packaged by Jolt tasks and listed as requirements in order to be
-automatically provisioned on the workers.
-

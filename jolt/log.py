@@ -3,6 +3,7 @@ import glob
 import os
 import re
 import sys
+import time
 import tqdm
 if os.name == "nt":
     # FIXME: Workaround to make tqdm behave correctly on Windows
@@ -24,6 +25,7 @@ from jolt import config
 from jolt.error import JoltError
 from jolt import filesystem as fs
 from jolt import colors
+from jolt import common_pb2 as common_pb
 
 
 current_time = datetime.now().strftime("%Y-%m-%dT%H:%M:%S.%f")
@@ -38,19 +40,24 @@ if not fs.path.exists(dirpath):
 
 ################################################################################
 
-ERROR = logging.ERROR
-WARNING = logging.WARNING
-INFO = logging.INFO
-VERBOSE = 15
-DEBUG = logging.DEBUG
-EXCEPTION = logging.DEBUG + 1
-STDOUT = logging.INFO + 1
-STDERR = logging.ERROR + 1
+ERROR = common_pb.LogLevel.ERROR
+WARNING = common_pb.LogLevel.WARNING
+INFO = common_pb.LogLevel.INFO
+VERBOSE = common_pb.LogLevel.VERBOSE
+DEBUG = common_pb.LogLevel.DEBUG
+EXCEPTION = common_pb.LogLevel.EXCEPTION
+STDOUT = common_pb.LogLevel.STDOUT
+STDERR = common_pb.LogLevel.STDERR
 SILENCE = STDERR + 1
+
 logging.addLevelName(VERBOSE, "VERBOSE")
 logging.addLevelName(STDOUT, "STDOUT")
 logging.addLevelName(STDERR, "STDERR")
 logging.addLevelName(EXCEPTION, "EXCEPT")
+logging.addLevelName(WARNING, "WARNING")
+logging.addLevelName(INFO, "INFO")
+logging.addLevelName(ERROR, "ERROR")
+logging.addLevelName(DEBUG, "DEBUG")
 
 logging.raiseExceptions = False
 
@@ -141,7 +148,7 @@ _root.setLevel(logging.CRITICAL)
 
 # create jolt logger
 _logger = logging.getLogger('jolt')
-_logger.setLevel(logging.DEBUG)
+_logger.setLevel(DEBUG)
 
 _console_formatter = ConsoleFormatter('[{levelname:>7}] {message}', '{message}')
 
@@ -149,7 +156,6 @@ if sys.stdout.isatty() and sys.stderr.isatty():
     _stdout = logging.StreamHandler(TqdmStream(sys.stdout))
 else:
     _stdout = logging.StreamHandler(sys.stdout)
-_stdout.setLevel(INFO)
 _stdout.setFormatter(_console_formatter)
 _stdout.addFilter(Filter(lambda r: r.levelno < ERROR))
 
@@ -157,7 +163,6 @@ if sys.stdout.isatty() and sys.stderr.isatty():
     _stderr = logging.StreamHandler(TqdmStream(sys.stdout))
 else:
     _stderr = logging.StreamHandler(sys.stderr)
-_stderr.setLevel(INFO)
 _stderr.setFormatter(_console_formatter)
 _stderr.addFilter(Filter(lambda r: r.levelno >= ERROR))
 _stderr.addFilter(Filter(lambda r: r.levelno != EXCEPTION))
@@ -178,17 +183,34 @@ def start_file_log():
             os.unlink(file)
 
     _file = logging.FileHandler(logfile)
-    _file.setLevel(logging.DEBUG)
+    _file.setLevel(DEBUG)
     _file.setFormatter(_file_formatter)
     _logger.addHandler(_file)
 
 
+def log(level, message, created=None, context=None, prefix=False):
+    created = created or time.time()
+    message = f"[{context}] {message}" if context else message
+    record = logging.LogRecord(
+        name="log",
+        level=level,
+        pathname=__file__,
+        lineno=0,
+        msg=message,
+        args={},
+        exc_info=None,
+    )
+    record.created = created
+    record.prefix = prefix
+    _logger.handle(record)
+
+
 def info(fmt, *args, **kwargs):
-    _logger.info(fmt, *args, **kwargs)
+    _logger.log(INFO, fmt, *args, **kwargs)
 
 
 def warning(fmt, *args, **kwargs):
-    _logger.warning(fmt, *args, **kwargs)
+    _logger.log(WARNING, fmt, *args, **kwargs)
 
 
 def verbose(fmt, *args, **kwargs):
@@ -196,11 +218,11 @@ def verbose(fmt, *args, **kwargs):
 
 
 def debug(fmt, *args, **kwargs):
-    _logger.debug(fmt, *args, **kwargs)
+    _logger.log(DEBUG, fmt, *args, **kwargs)
 
 
 def error(fmt, *args, **kwargs):
-    _logger.error(fmt, *args, **kwargs)
+    _logger.log(ERROR, fmt, *args, **kwargs)
 
 
 def stdout(line, **kwargs):
@@ -215,36 +237,45 @@ def stderr(line, **kwargs):
     _logger.log(STDERR, line, extra=kwargs)
 
 
+def format_exception_msg(exc):
+    te = traceback.TracebackException.from_exception(exc)
+
+    if isinstance(exc, JoltError):
+        return str(exc)
+
+    elif isinstance(exc, SyntaxError):
+        filename = fs.path.relpath(
+            te.filename,
+            fs.path.commonprefix([os.getcwd(), te.filename]))
+        return "SyntaxError: {} ({}, line {})".format(
+            te.text.strip(),
+            filename,
+            te.lineno)
+
+    else:
+        filename = fs.path.relpath(
+            te.stack[-1].filename,
+            fs.path.commonprefix([os.getcwd(), te.stack[-1].filename]))
+        return "{}: {} ({}, line {}, in {})".format(
+            type(exc).__name__,
+            str(exc) or te.stack[-1].line,
+            filename,
+            te.stack[-1].lineno,
+            te.stack[-1].name)
+
+
 def exception(exc=None):
     if exc:
-        te = traceback.TracebackException.from_exception(exc)
-        if isinstance(exc, JoltError):
-            _logger.error("{}", str(exc))
-        elif isinstance(exc, SyntaxError):
-            filename = fs.path.relpath(
-                te.filename,
-                fs.path.commonprefix([os.getcwd(), te.filename]))
-            _logger.error("SyntaxError: {} ({}, line {})",
-                          te.text.strip(),
-                          filename,
-                          te.lineno)
-        else:
-            filename = fs.path.relpath(
-                te.stack[-1].filename,
-                fs.path.commonprefix([os.getcwd(), te.stack[-1].filename]))
-            _logger.error("{}: {} ({}, line {}, in {})",
-                          type(exc).__name__,
-                          str(exc) or te.stack[-1].line,
-                          filename,
-                          te.stack[-1].lineno,
-                          te.stack[-1].name)
+        _logger.error(format_exception_msg(exc))
         backtrace = traceback.format_exc().splitlines()
     else:
         backtrace = traceback.format_exc().splitlines()
+
     for line in backtrace:
         line = line.replace("{", "{{")
         line = line.replace("}", "}}")
-        _logger.log(EXCEPTION, line.strip())
+        line = line.strip()
+        _logger.log(EXCEPTION, line)
 
 
 def transfer(line, context):
@@ -253,6 +284,8 @@ def transfer(line, context):
     outline2 = context + line
     if line.startswith("[  ERROR]"):
         error(outline1)
+    elif line.startswith("[WARNING]"):
+        warning(outline1)
     elif line.startswith("[VERBOSE]"):
         verbose(outline1)
     elif line.startswith("[  DEBUG]"):
@@ -307,9 +340,19 @@ def progress(desc, count, unit, estimates=True, debug=False):
     return progress_log(desc, count, unit)
 
 
+_level = INFO
+
+
 def set_level(level):
+    global _level
+    _level = level
     _stdout.setLevel(level)
     _stderr.setLevel(level)
+
+
+def get_level():
+    global _level
+    return _level
 
 
 def set_worker():
@@ -373,6 +416,15 @@ def threadsink(level=DEBUG):
 
 
 @contextmanager
+def handler(h):
+    _logger.addHandler(h)
+    try:
+        yield
+    finally:
+        _logger.removeHandler(h)
+
+
+@contextmanager
 def map_thread(thread_from, thread_to):
     tid = thread_from.ident
     _thread_map.map(tid, thread_to.ident)
@@ -407,3 +459,6 @@ class _LogStream(object):
 @contextmanager
 def stream():
     yield _LogStream()
+
+
+set_level(STDOUT)

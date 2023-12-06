@@ -1,0 +1,60 @@
+#!/usr/bin/env python
+
+import os
+import time
+
+from jolt import *
+from jolt.plugins import docker
+
+
+class Worker(Resource):
+    name = "jolt/deployment"
+
+    storage = Parameter()
+
+    requires = ["jolt/scheduler", "jolt/worker"]
+
+    def acquire(self, artifact, deps, tools, owner):
+        try:
+            with tools.cwd(tools.builddir()):
+                for file in tools.glob("{joltdir}/../docker/swarm/*"):
+                    tools.copy(file, "./")
+                tools.replace_in_file(
+                    "jolt.yaml", "robrt/jolt/scheduler:latest",
+                    tools.expand("robrt/jolt/scheduler:{deps[jolt/scheduler].task.identity}", deps=deps))
+                tools.replace_in_file(
+                    "jolt.yaml", "robrt/jolt/worker:latest",
+                    tools.expand("robrt/jolt/worker:{deps[jolt/worker].task.identity}", deps=deps))
+                tools.run("docker stack deploy -c jolt.yaml jolt_test", output_on_error=True)
+                tools.run("docker service scale jolt_test_worker=1", output_on_error=True)
+                config = tools.read_file("client.conf")
+                config += "\n[selfdeploy]\nfloating = true\n"
+                config = config.replace("localhost", os.getenv("DOCKER_PUBLIC_IP", "localhost"))
+                artifact.strings.config = config
+                artifact.strings.plugin = "remote"
+            for i in range(0, 20):
+                try:
+                    assert "Connected to scheduler" in \
+                        tools.run("docker service logs jolt_test_worker", output=False)
+                    break
+                except:
+                    time.sleep(1)
+                    continue
+            assert "Connected to scheduler" in tools.run("docker service logs jolt_test_worker", output=False)
+            artifact.active = True
+        except Exception as e:
+            if os.getenv("CI"):
+                artifact.active = False
+            else:
+                raise e
+
+    def release(self, artifact, deps, tools, owner):
+        if artifact.active:
+            tools.run("docker stack rm jolt_test")
+            for i in range(0, 20):
+                try:
+                    tools.run("docker volume rm jolt_test_cache-http jolt_test_cache-node", output=False)
+                    break
+                except:
+                    time.sleep(1)
+                    continue

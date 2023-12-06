@@ -1,4 +1,5 @@
 from configparser import ConfigParser, NoOptionError, NoSectionError
+from urllib.parse import urlparse
 import os
 
 from jolt import filesystem as fs
@@ -177,6 +178,11 @@ def getfloat(section, key, default=None, alias=None):
 def getboolean(section, key, default=None, alias=None):
     value = get(section, key, default=default, alias=alias)
     return value is not None and str(value).lower() in ["true", "yes", "on", "1"]
+
+
+def geturi(section, key, default=None, alias=None):
+    value = get(section, key, default=default, alias=alias)
+    return urlparse(value)
 
 
 def get_jolthome():

@@ -590,15 +590,18 @@ def whitelist(pathname):
 class StringInfluence(HashInfluenceProvider):
     name = "String"
 
-    def __init__(self, value):
+    def __init__(self, value, selfdeploy=False):
         self.value = value
+        self.selfdeploy = selfdeploy
 
     def get_influence(self, task):
+        if not self.selfdeploy and task.name in ["jolt"]:
+            return "jolt"
         return self.value
 
 
-def global_string(string):
-    HashInfluenceRegistry.get().register(StringInfluence(string))
+def global_string(string, selfdeploy=False):
+    HashInfluenceRegistry.get().register(StringInfluence(string, selfdeploy=selfdeploy))
 
 
 class VersionInfluence(HashInfluenceProvider):

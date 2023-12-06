@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+option go_package = "pkg/protocol";
+
+import "google/protobuf/empty.proto";
+import "jolt/plugins/remote_execution/scheduler.proto";
+
+message ListBuildsRequest {}
+
+message ListBuildsResponse {
+    message Build {
+        string id = 1;
+    }
+
+    repeated Build builds = 1;
+}
+
+message ListWorkersRequest {}
+message ListWorkersResponse {}
+
+// This service is not yet implemented.
+service Administration {
+    rpc CancelBuild(CancelBuildRequest) returns (CancelBuildResponse);
+    rpc ListBuilds(ListBuildsRequest) returns (ListBuildsResponse);
+    rpc ListWorkers(ListWorkersRequest) returns (ListWorkersResponse);
+    rpc Reschedule(google.protobuf.Empty) returns (google.protobuf.Empty);
+}

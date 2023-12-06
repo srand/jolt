@@ -1,19 +1,21 @@
-from jolt.tasks import Task, TaskRegistry
+from jolt import config
+from jolt import filesystem as fs
+from jolt import influence
+from jolt import log
+from jolt import common_pb2 as common_pb
+from jolt import utils
+from jolt import version
 from jolt.cache import ArtifactCache
-from jolt.graph import GraphBuilder
 from jolt.error import raise_error_if
+from jolt.graph import GraphBuilder
+from jolt.loader import JoltLoader
 from jolt.manifest import JoltManifest
 from jolt.scheduler import JoltEnvironment
 from jolt.scheduler import LocalExecutor
 from jolt.scheduler import LocalExecutorFactory
 from jolt.scheduler import NetworkExecutorExtension
 from jolt.scheduler import NetworkExecutorExtensionFactory
-from jolt.loader import JoltLoader
-from jolt import config
-from jolt import filesystem as fs
-from jolt import influence
-from jolt import log
-from jolt import utils
+from jolt.tasks import Task, TaskRegistry
 
 
 log.verbose("[SelfDeploy] Loaded")
@@ -27,6 +29,8 @@ _path = fs.path.dirname(_path)
 @influence.files(fs.path.join(_path, "**", "*.sh"))
 @influence.files(fs.path.join(_path, "**", "*.xslt"))
 @influence.files(fs.path.join(_path, "**", "*.template"))
+@influence.attribute("dependencies")
+@influence.attribute("extra_dependencies")
 class Jolt(Task):
     name = "jolt"
 
@@ -52,11 +56,7 @@ class Jolt(Task):
 
     @property
     def extra_dependencies(self):
-        req = config.get("selfdeploy", "requires", "")
-        return req.split() if req else []
-
-    def info(self, fmt, *args, **kwargs):
-        log.verbose(fmt, *args, **kwargs)
+        return get_extra_dependencies()
 
     @property
     def dependencies(self):
@@ -71,42 +71,7 @@ class Jolt(Task):
         no version pinning will be performed. Instead, workers will install
         Jolt with its default loose version requirements.
         """
-        def get_installed_distributions():
-            try:
-                from pip._internal.metadata import get_environment
-            except ImportError:
-                from pip._internal.utils import misc
-                return {
-                    dist.project_name.lower(): dist
-                    for dist in misc.get_installed_distributions()
-                }
-            else:
-                dists = get_environment(None).iter_installed_distributions()
-                return {dist._dist.project_name.lower(): dist._dist for dist in dists}
-
-        dists = get_installed_distributions()
-        reqs = ["jolt"] + [dep.lower() for dep in self.extra_dependencies]
-        pkgs = {}
-
-        while reqs:
-            req = reqs.pop()
-
-            dist = dists.get(req)
-            if dist is None:
-                self.info("[SelfDeploy] Dependency not found: {}", req)
-                req = req.partition("=")[0].partition("<")[0].partition(">")[0]
-                pkgs[req] = req
-                continue
-
-            for dep in dist.requires():
-                name = dep.project_name.lower()
-                if name not in pkgs:
-                    reqs.append(name)
-
-            pkgs[req] = f"{dist.project_name}=={dist.version}"
-
-        del pkgs["jolt"]
-        return pkgs.values()
+        return get_dependencies(["jolt"] + self.extra_dependencies)
 
     def publish(self, artifact, tools):
         with tools.cwd(tools.builddir()):
@@ -135,30 +100,100 @@ class Jolt(Task):
 
 class SelfDeployExtension(NetworkExecutorExtension):
     @utils.cached.instance
-    def get_parameters(self, task):
-        registry = TaskRegistry()
-        registry.add_task_class(Jolt)
-        acache = ArtifactCache.get()
-        env = JoltEnvironment(cache=acache)
-        gb = GraphBuilder(registry, acache, JoltManifest())
-        dag = gb.build(["jolt"])
-        task = dag.select(lambda graph, task: True)
-        assert len(task) == 1, "too many selfdeploy tasks found"
-        task = task[0]
-        if not task.is_available_remotely():
-            factory = LocalExecutorFactory()
-            executor = LocalExecutor(factory, task, force_upload=True)
-            executor.run(env)
-        jolt_url = acache.location(task.artifacts[0])
-        raise_error_if(not jolt_url, "failed to deploy jolt to a remote cache")
-        return {
-            "jolt_url": jolt_url,
-            "jolt_identity": task.identity[:8],
-            "jolt_requires": config.get("selfdeploy", "requires", "")
-        }
+    def get_parameters(self, _):
+        client = get_client()
+        params = {}
+        if client.identity:
+            params["jolt_identity"] = client.identity
+        if client.url:
+            params["jolt_url"] = client.url
+        return params
 
 
 @NetworkExecutorExtensionFactory.Register
 class SelfDeployExtensionFactory(NetworkExecutorExtensionFactory):
     def create(self):
         return SelfDeployExtension()
+
+
+@utils.cached.method
+def get_dependencies(packages=None):
+    reqs = packages or ["jolt"]
+    pkgs = {}
+
+    while reqs:
+        req = reqs.pop()
+        name = req.partition("=")[0].partition("<")[0].partition(">")[0]
+
+        dist = dists.get(name)
+        if dist is None:
+            log.info("[SelfDeploy] Dependency not found: {}", req)
+            pkgs[req] = req
+            continue
+
+        for dep in dist.requires():
+            name = dep.project_name.lower()
+            if name not in pkgs:
+                reqs.append(name)
+
+        pkgs[req] = f"{dist.project_name}=={dist.version}"
+
+    try:
+        del pkgs["jolt"]
+    except KeyError:
+        pass
+
+    return list(sorted(pkgs.values()))
+
+
+@utils.cached.method
+def get_extra_dependencies():
+    req = config.get("selfdeploy", "requires", "")
+    return req.split() if req else []
+
+
+@utils.cached.method
+def publish_artifact():
+    registry = TaskRegistry()
+    registry.add_task_class(Jolt)
+    acache = ArtifactCache.get()
+    env = JoltEnvironment(cache=acache)
+    gb = GraphBuilder(registry, acache, JoltManifest())
+    dag = gb.build(["jolt"])
+    task = dag.select(lambda graph, task: True)
+    assert len(task) == 1, "Too many selfdeploy tasks found"
+    task = task[0]
+    if not task.is_available_remotely():
+        factory = LocalExecutorFactory()
+        executor = LocalExecutor(factory, task, force_upload=True)
+        executor.run(env)
+    jolt_url = acache.location(task.artifacts[0])
+    raise_error_if(not jolt_url, "Failed to deploy jolt to a remote cache")
+    cacheUrl = config.get("http", "uri")
+    substituteUrl = config.get("selfdeploy", "baseUri")
+    if cacheUrl and substituteUrl:
+        return task.identity, jolt_url.replace(cacheUrl, substituteUrl)
+    return jolt_url
+
+
+def get_floating_version():
+    identity, url = publish_artifact()
+    return common_pb.Client(
+        identity=identity,
+        url=url,
+        version=version.__version__,
+    )
+
+
+def get_pinned_version():
+    return common_pb.Client(
+        requirements=get_extra_dependencies(),
+        version=version.__version__,
+    )
+
+
+def get_client():
+    floating = config.getboolean("selfdeploy", "floating", False)
+    if floating:
+        return get_floating_version()
+    return get_pinned_version()

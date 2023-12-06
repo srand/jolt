@@ -1,0 +1,32 @@
+FROM golang:1.21-bookworm as tools
+ARG DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install -y \
+    protobuf-compiler-grpc \
+    protobuf-compiler \
+    protoc-gen-go \
+    protoc-gen-go-grpc
+
+FROM debian:bookworm-slim as base
+ARG DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    git \
+    libxml2-dev \
+    libxslt-dev \
+    ninja-build \
+    procps \
+    python3-dev \
+    python3-pip \
+    python3-virtualenv
+
+FROM tools as build
+ADD . /usr/src
+WORKDIR /usr/src/scheduler
+RUN go generate ./...
+RUN go build -ldflags '-s -w' ./cmd/worker
+
+FROM base
+COPY --from=build /usr/src/scheduler/worker /opt/jolt/worker
+RUN mkdir -p /data/cache /data/ws
+WORKDIR /data/ws
+ENTRYPOINT ["/opt/jolt/worker", "-v"]

@@ -5,4 +5,4 @@ class Flake8(Task):
     def run(self, deps, tools):
         with tools.cwd(".."):
             tools.run("pip install flake8")
-            tools.run("flake8 --ignore=E501,E502 jolt")
+            tools.run("flake8 --exclude '*pb2*' --ignore=E501,E502 jolt")

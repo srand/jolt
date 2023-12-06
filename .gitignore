@@ -6,3 +6,4 @@ dist/
 *.joltc
 *.egg-info
 *~
+.vscode

@@ -1,0 +1,21 @@
+FROM golang:1.21-bookworm as base
+
+FROM base as tools
+ARG DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install -y \
+    protobuf-compiler-grpc \
+    protobuf-compiler \
+    protoc-gen-go \
+    protoc-gen-go-grpc
+
+FROM tools as build
+ADD . /usr/src
+WORKDIR /usr/src/scheduler
+RUN go generate ./...
+RUN go build -ldflags '-s -w' ./cmd/scheduler
+
+FROM debian:bookworm-slim
+COPY --from=build /usr/src/scheduler/scheduler /opt/jolt/scheduler
+RUN mkdir /data
+WORKDIR /data
+ENTRYPOINT ["/opt/jolt/scheduler", "-v"]

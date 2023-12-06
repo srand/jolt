@@ -23,7 +23,7 @@ class Http(cache.StorageProvider):
     def __init__(self, cache):
         super(Http, self).__init__()
         self._cache = cache
-        self._uri = config.get(NAME, "uri")
+        self._uri = config.get(NAME, "uri", "http://cache.")
         raise_error_if(not self._uri, "HTTP URI not configured")
         if self._uri[-1] != "/":
             self._uri += "/"

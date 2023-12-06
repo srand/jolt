@@ -187,7 +187,7 @@ def compdb(ctx, task, default):
     executors = scheduler.ExecutorRegistry.get(options)
     registry = TaskRegistry.get()
     strategy = scheduler.DownloadStrategy(executors, acache)
-    queue = scheduler.TaskQueue(strategy)
+    queue = scheduler.TaskQueue(strategy, acache, {})
 
     for params in default:
         registry.set_default_parameters(params)
@@ -205,7 +205,7 @@ def compdb(ctx, task, default):
 
                 while leafs:
                     task = leafs.pop()
-                    queue.submit(acache, task)
+                    queue.submit(task)
 
                 task, error = queue.wait()
                 p.update(1)

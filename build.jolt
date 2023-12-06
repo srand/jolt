@@ -1,7 +1,7 @@
 from jolt import Alias, BooleanParameter, Parameter, Task, TaskGenerator, Tools
 from jolt import attributes, influence
 from jolt import __version__
-from jolt.plugins import docker, git, selfdeploy
+from jolt.plugins import cxx, docker, git, selfdeploy
 
 from os import getenv
 
@@ -44,6 +44,36 @@ class RabbitImage(docker.DockerImage):
     requires_push_true = ["docker/login"]
     tags = ["robrt/rabbitmq:latest", "robrt/rabbitmq:{version}"]
     version = Parameter("3.9")
+
+
+@influence.files("{dockerfile}")
+@attributes.requires("requires_push_{push}")
+@git.influence("scheduler")
+class SchedulerImage(docker.DockerImage):
+    name = "jolt/scheduler"
+    dockerfile = "docker/Dockerfile.scheduler"
+    push = BooleanParameter(False)
+    requires = ["docker/cli"]
+    requires_push_true = ["docker/login"]
+    version = Parameter(__version__, influence=False)
+    tags = [
+        "robrt/jolt/scheduler:{identity}",
+        "robrt/jolt/scheduler:latest",
+        "robrt/jolt/scheduler:{version}",
+    ]
+
+
+@influence.files("{dockerfile}")
+@attributes.requires("requires_push_{push}")
+@git.influence("scheduler")
+class WorkerImage(SchedulerImage):
+    name = "jolt/worker"
+    dockerfile = "docker/Dockerfile.worker"
+    tags = [
+        "robrt/jolt/worker:{identity}",
+        "robrt/jolt/worker:latest",
+        "robrt/jolt/worker:{version}",
+    ]
 
 
 @influence.files("**/*.py")
@@ -126,14 +156,45 @@ class JoltDebianPackage(docker.DockerImage):
         super().run(deps, tools)
 
 
+class ProtobufTools(docker.DockerImage):
+    name = "jolt/protobuf-tools"
+    dockerfile = "FROM alpine:3.18\nRUN apk add protobuf-dev protoc py3-pip && pip install grpcio-tools"
+    extract = True
+    imagefile = None
+
+
+@git.influence("protocol")
+class GenerateProtobufs(cxx.Compilation):
+    name = "jolt/protobufs"
+    incpaths = ["."]
+    requires = ["tools=jolt/protobuf-tools"]
+    sources = [
+        "jolt/common.proto",
+        "jolt/plugins/remote_execution/administration.proto",
+        "jolt/plugins/remote_execution/scheduler.proto",
+        "jolt/plugins/remote_execution/worker.proto",
+    ]
+    protogenerator = ["python", "python_grpc"]
+
+    def run(self, deps, tools):
+        with tools.chroot(deps["tools"]):
+            super().run(deps, tools)
+
+    def publish(self, artifact, tools):
+        with tools.cwd(self.outdir):
+            artifact.collect("**/*.py")
+
+
 class Default(Alias):
     push = BooleanParameter(False)
 
     requires = [
+        "jolt/docker/pypi:release={push}",
         "jolt/image:push={push}",
         "jolt/pypi:release={push}",
-        "jolt/docker/pypi:release={push}",
         "jolt/rabbitmq:push={push}",
+        "jolt/scheduler:push={push}",
+        "jolt/worker:push={push}",
     ]
 
 

@@ -1,0 +1,263 @@
+syntax = "proto3";
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "pkg/protocol";
+
+enum LogLevel {
+    // Used for exception callstacks
+    EXCEPTION = 0;
+
+    // Debug information that is not of interest to most users.
+    DEBUG = 1;
+
+    // Extra information that is of interest to some users.
+    VERBOSE = 2;
+
+    // Standard output from an executed command.
+    STDOUT = 3;
+
+    // Normal information that is of interest to most users.
+    INFO = 4;
+
+    // An error that may be of interest to a user.
+    WARNING = 5;
+
+    // An error that is of interest to most users.
+    ERROR = 6;
+
+    // Standard error output from an executed command.
+    STDERR = 7;
+}
+
+// Representation of a single log line produced by a task.
+message LogLine {
+    // Log level
+    LogLevel level = 1;
+
+    // Time at which the log line was created (UTC)
+    google.protobuf.Timestamp time = 2;
+
+    // The context in which the log line was created.
+    // This is typically the identity of the task that emitted the log.
+    string context = 3;
+
+    // The log message
+    string message = 4;
+}
+
+// Key/value property
+message Property {
+    string key = 1;
+    string value = 2;
+}
+
+// Worker platform properties (os, architecture, labels, etc).
+message Platform {
+    repeated Property properties = 1;
+}
+
+message Task {
+    // Name of the task, without any parameters
+    string name = 1;
+
+    // SHA1 identity (influence)
+    string identity = 2;
+
+    // UUID, unique for one invokation of the task.
+    string instance = 3;
+
+    // Arbitrary data added to influence idenitity.
+    string taint = 4;
+
+    // Properties that should be assigned to the task
+    // Example use-cases are exported environment variables,
+    // git commit sha, patches and other jolt.Export values.
+    repeated Property properties = 5;
+
+    // Task platform requirements.
+    // The task may request a specific type of workers by
+    // specifying platform properties, such as:
+    //  - node.os=linux
+    //  - node.arch=amd64
+    Platform platform = 6;
+}
+
+// Representation of an error occuring in a task.
+message TaskError {
+    // The type of error.
+    // Typical values are "Exception", "Error", "Compiler Error", etc.
+    string type = 1;
+
+    // File and line where error was reported.
+    string location = 2;
+
+    // A short message describing the error.
+    string message = 3;
+
+    // A long message describing the error.
+    // Typically callstacks or command outout.
+    string details = 4;
+}
+
+// Details about a file.
+message File {
+    // Path to the file within the workspace.
+    string path = 1;
+
+    // The SHA1 digest of the file content.
+    string digest = 2;
+
+    // The content of the file.
+    string content = 3;
+
+    // TODO: Mode bits?
+}
+
+// A Jolt manifest project item.
+message Project {
+    // System module path.
+    message SystemPath {
+        // Path to directory.
+        string path = 1;
+    }
+
+    // A workspace resource
+    message Resource {
+        // Name of the resource task, including parameters.
+        string name = 1;
+
+        // Alias to be created for the resource.
+        string alias = 2;
+    }
+
+    // Task recipe to be loaded.
+    message Recipe {
+        // Path to the file.
+        string path = 1;
+
+        // Workdir for loaded tasks.
+        string workdir = 3;
+    }
+
+    // Name of project.
+    string name = 1;
+
+    // Paths to add to the system path.
+    repeated SystemPath paths = 2;
+
+    // List of project task recipes.
+    repeated Recipe recipes = 3;
+
+    // List of workspace resources.
+    repeated Resource resources = 4;
+}
+
+message Workspace {
+    // Root of the workspace.
+    string rootdir = 1;
+
+    // Path to cache directory.
+    string cachedir = 2;
+
+    // List of files to be materialized in the workspace.
+    repeated File files = 3;
+
+    // List of projects to load tasks from.
+    repeated Project projects = 4;
+}
+
+// Description of the Jolt client that initiated the build.
+message Client {
+    // Version (x.y.z)
+    string version = 1;
+
+    // Filesystem merkle tree digest for the client application
+    // Currently not used.
+    string tree = 2;
+
+    // Artifact identity. Valid if a URL is specified.
+    string identity = 3;
+
+    // URL where client application may be downloaded
+    string url = 4;
+
+    // List of Python package requirements
+    // Each item may include a version specifier, e.g:
+    //  - "pytest>=6"
+    //  - "requests==2.28.0"
+    repeated string requirements = 5;
+}
+
+// Full description of a build.
+// Shall include everything that is needed to deterministically
+// distribute and reproduce the build.
+message BuildEnvironment {
+    // Information about the Jolt client that initiated the build.
+    Client client = 1;
+
+    // Information about the workspace that must be materialized
+    // before any task execution can take place.
+    Workspace workspace = 2;
+
+    // Configuration parameters (--config params.key=value).
+    repeated Property parameters = 3;
+
+    // Overridden default task parameters.
+    repeated string task_default_parameters = 4;
+
+    // Map of tasks indexed by task SHA1 identity.
+    map<string, Task> tasks = 5;
+
+    // Requested log level for the build.
+    LogLevel loglevel = 6;
+}
+
+enum BuildStatus {
+    // The build was accepted
+    BUILD_ACCEPTED = 0;
+
+    // The build was rejected
+    BUILD_REJECTED = 1;
+
+    // The build has been completed
+    BUILD_COMPLETED = 3;
+
+    // The build was cancelled
+    BUILD_CANCELLED = 4;
+}
+
+enum TaskStatus {
+    // The task is waiting to be executed.
+    TASK_QUEUED = 0;
+
+    // The task is currently running.
+    TASK_RUNNING = 1;
+
+    // The task execution was unsuccessful.
+    TASK_FAILED = 2;
+
+    // The task execution was successful.
+    TASK_PASSED = 3;
+
+    // The task failed, but the user is ok with failures.
+    TASK_UNSTABLE = 4;
+
+    // The task artifact was found in a remote cache and was downloaded
+    // to the worker's local cache. No execution took place.
+    TASK_DOWNLOADED = 5;
+
+    // The task artifact was found in the worker's local cache and
+    // got uploaded to a remote cache. No execution took place.
+    TASK_UPLOADED = 6;
+
+    // The task artifact was found in the cache and execution was skipped.
+    TASK_SKIPPED = 7;
+
+    // Execution was cancelled.
+    TASK_CANCELLED = 8;
+
+    // External circumstances prevented the task from running,
+    // for example if the worker failed to deploy the Jolt client.
+    TASK_ERROR = 9;
+}

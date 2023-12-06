@@ -901,12 +901,9 @@ class TaskApi(JoltTest):
                 with t.cwd(d["unpackme"].path):
                     assert t.read_file("unpacked") == "yes"
 
-        class Unpacker2(Task):
+        class Unpacker2(Unpacker1):
+            name = "unpacker2"
             requires = "unpackme"
-
-            def run(self, d, t):
-                with t.cwd(d["unpackme"].path):
-                    assert t.read_file("unpacked") == "yes"
         ---
         """
         r = self.build("unpackme")

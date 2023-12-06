@@ -1,0 +1,88 @@
+syntax = "proto3";
+
+option go_package = "pkg/protocol";
+
+import "jolt/common.proto";
+import "jolt/plugins/remote_execution/scheduler.proto";
+
+// Requests sent from scheduler to workers
+message WorkerRequest {
+    enum Action {
+        // Deploy and start executor.
+        BUILD = 0;
+
+        // Cancel build gracefully.
+        // Sends interrupt signal to executor.
+        CANCEL_BUILD = 1;
+
+        // Terminate executor.
+        TERMINATE = 2;
+    }
+
+    // The worker action requested by the scheduler.
+    Action action = 1;
+
+    // The build that is concerned.
+    BuildRequest build = 2;
+
+    // Id of the worker to which this is sent
+    string worker_id = 3;
+
+    // Id of the build that is concerned
+    string build_id = 4;
+}
+
+// Updates sent from workers to scheduler
+message WorkerUpdate {
+    enum Status {
+        // The worker is coming online and
+        // registers itself to receive tasks.
+        ENLISTING = 0;
+
+        // The worker is going offline.
+        DELISTING = 1;
+
+        // The build executor process has terminated gracefully.
+        BUILD_ENDED = 2;
+
+        // The build executor could not be installed.
+        // Typically means that pip install has failed.
+        DEPLOY_FAILED = 3;
+
+        // The build executor terminated with non-zero exit status.
+        EXECUTOR_FAILED = 4;
+    }
+
+    // Current status of the worker.
+    Status status = 1;
+
+    // The worker's platform properties.
+    // These properties are used by the scheduler to select
+    // tasks that are compatible with this worker, e.g.
+    // node.os == Linux, node.arch == arm, etc.
+    Platform platform = 2;
+
+    // Failure details
+    WorkerError error = 3;
+}
+
+// Representation of a worker error
+message WorkerError {
+    // Short error message
+    string message = 1;
+
+    // Error details, such as logs or callstack
+    string details = 2;
+}
+
+// The scheduler interface for workers and executors.
+// Workers prepare the build environment by deploying and
+// running executors (Jolt clients) to execute tasks.
+service Worker {
+    // Called by a worker to get build instructions.
+    rpc GetInstructions(stream WorkerUpdate) returns (stream WorkerRequest);
+
+    // Called by an executor (Jolt client) to get task execution requests.
+    // Task updates, including status and logs are sent back to the scheduler.
+    rpc GetTasks(stream TaskUpdate) returns (stream TaskRequest);
+}

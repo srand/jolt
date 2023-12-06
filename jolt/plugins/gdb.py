@@ -77,7 +77,7 @@ def gdb(ctx, task, default, machine_interface, no_binary, gdb_args):
     executors = scheduler.ExecutorRegistry.get(options)
     registry = TaskRegistry.get()
     strategy = scheduler.DownloadStrategy(executors, acache)
-    queue = scheduler.TaskQueue(strategy)
+    queue = scheduler.TaskQueue(strategy, acache, {})
 
     for params in default:
         registry.set_default_parameters(params)
@@ -92,7 +92,7 @@ def gdb(ctx, task, default, machine_interface, no_binary, gdb_args):
 
                 while leafs:
                     task = leafs.pop()
-                    queue.submit(acache, task)
+                    queue.submit(task)
 
                 task, error = queue.wait()
 

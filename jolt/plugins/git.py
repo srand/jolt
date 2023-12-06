@@ -254,7 +254,7 @@ class GitInfluenceProvider(FileInfluence):
     name = "Git"
 
     def __init__(self, path):
-        super(GitInfluenceProvider, self).__init__(path)
+        super().__init__(path)
         self.path = path.rstrip(fs.sep)
         self.name = GitInfluenceProvider.name
 
@@ -330,7 +330,7 @@ class GitSrc(WorkspaceResource, FileInfluence):
     _diff = Export(value=lambda t: t.git.diff(), encoded=True)
 
     def __init__(self, *args, **kwargs):
-        super(GitSrc, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.joltdir = JoltLoader.get().joltdir
         self.relpath = str(self.path) or self._get_name()
         self.abspath = fs.path.join(self.joltdir, self.relpath)
@@ -406,7 +406,7 @@ class Git(GitSrc):
     _diff = Export(value=lambda t: t.git.diff(), encoded=True)
 
     def __init__(self, *args, **kwargs):
-        super(Git, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.influence.append(self)
 
     @utils.cached.instance
