@@ -1,9 +1,5 @@
 version: "3.5"
 services:
-  amqp:
-    image: rabbitmq:latest
-    ports:
-      - "5672:5672"
   cache:
     image: nginx:latest
     deploy:
@@ -19,14 +15,17 @@ services:
     image: robrt/jolt-dashboard:latest
     ports:
       - "80:80"
+  scheduler:
+    image: robrt/jolt/scheduler:latest
+    ports:
+      - "9090:9090"
   worker:
-    image: robrt/jolt:latest
+    image: robrt/jolt/worker:latest
     deploy:
       replicas: 2
-    command: ["-c", "/opt/jolt/worker.conf", "amqp-worker"]
     configs:
       - source: worker.conf
-        target: /opt/jolt/worker.conf
+        target: /root/.config/jolt/config
     volumes:
       - cache-node:/root/.cache/jolt
 configs:

@@ -547,12 +547,12 @@ class Tools(object):
         elif filename.endswith(".tar"):
             fmt = "tar"
         elif filename.endswith(".tar.gz"):
-            if shutil.which("tar") and shutil.which("pigz"):
+            if self.which("tar") and self.which("pigz"):
                 self.run("tar -I pigz -cf {} -C {} .", filename, pathname)
                 return filename
             fmt = "targz"
         elif filename.endswith(".tgz"):
-            if shutil.which("tar") and shutil.which("pigz"):
+            if self.which("tar") and self.which("pigz"):
                 self.run("tar -I pigz -cf {} -C {} .", filename, pathname)
                 return filename
             fmt = "targz"
@@ -708,7 +708,7 @@ class Tools(object):
                     for block in iter(lambda: infp.read(0x10000), b''):
                         outfp.write(block)
         elif ext == "gz":
-            if shutil.which("pigz"):
+            if self.which("pigz"):
                 return self.run("pigz -p {} {}", self.thread_count(), src)
             with open(src, 'rb') as infp:
                 with gzip.open(dst, 'wb') as outfp:
@@ -998,7 +998,7 @@ class Tools(object):
                     else:
                         tar.extractall(filepath)
             elif filename.endswith(".tar.gz") or filename.endswith(".tgz"):
-                if shutil.which("tar") and shutil.which("pigz"):
+                if self.which("tar") and self.which("pigz"):
                     self.run("tar -I pigz {} -xf {} -C {} {}",
                              ignore_owner_tar, filename, filepath,
                              " ".join(files) if files else "")
@@ -1917,9 +1917,11 @@ class Tools(object):
         """
         executable = self.expand(executable)
         path = self._env.get("PATH")
+
         if self._chroot:
             path = fs.pathsep.join(
                 [self._chroot + p for p in path.split(fs.pathsep)]) + fs.pathsep + path
+
         result = shutil.which(executable, path=path)
         if result and self._chroot and result.startswith(self._chroot):
             result = result[len(self._chroot):]

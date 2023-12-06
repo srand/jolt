@@ -344,7 +344,8 @@ def build(ctx, task, network, keep_going, default, local,
     goal_tasks = dag.goals
     goal_task_duration = 0
 
-    queue = scheduler.TaskQueue(strategy)
+    session = executors.create_session(dag) if options.network else {}
+    queue = scheduler.TaskQueue(strategy, acache, session)
 
     try:
         if not dag.has_tasks():
@@ -367,7 +368,7 @@ def build(ctx, task, network, keep_going, default, local,
 
                 while leafs:
                     task = leafs.pop()
-                    queue.submit(acache, task)
+                    queue.submit(task)
 
                 task, error = queue.wait()
 
@@ -697,7 +698,7 @@ def download(ctx, task, deps, copy, copy_all):
     executors = scheduler.ExecutorRegistry.get(options)
     registry = TaskRegistry.get()
     strategy = scheduler.DownloadStrategy(executors, acache)
-    queue = scheduler.TaskQueue(strategy)
+    queue = scheduler.TaskQueue(strategy, acache, {})
     gb = graph.GraphBuilder(registry, acache, manifest, options, progress=True)
     dag = gb.build(task)
 
@@ -716,7 +717,7 @@ def download(ctx, task, deps, copy, copy_all):
 
                 while leafs:
                     task = leafs.pop()
-                    queue.submit(acache, task)
+                    queue.submit(task)
 
                 task, error = queue.wait()
                 p.update(1)

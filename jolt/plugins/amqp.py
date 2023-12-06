@@ -658,7 +658,7 @@ class AmqpExecutor(scheduler.NetworkExecutor):
         self.task = task
 
     def _create_manifest(self):
-        manifest = JoltManifest.export(self.task)
+        manifest = JoltManifest.export([self.task] + self.task.extensions + self.task.descendants)
         build = manifest.create_build()
 
         tasks = [self.task.qualified_name]
@@ -688,9 +688,9 @@ class AmqpExecutor(scheduler.NetworkExecutor):
 
         log.debug("[AMQP] Queued {0}", self.task.short_qualified_name)
 
-        self.task.running()
+        self.task.running_execution(remote=True)
         for extension in self.task.extensions:
-            extension.running()
+            extension.running_execution(remote=True)
 
         while self.response is None:
             try:
@@ -708,7 +708,7 @@ class AmqpExecutor(scheduler.NetworkExecutor):
         with raise_task_error_on_exception(self.task, "failed to parse build result manifest"):
             manifest.parsestring(self.response)
 
-        self.task.running(utils.duration() - float(manifest.duration))
+        self.task.running(when=utils.duration() - float(manifest.duration), what=None)
 
         # Download session artifacts
         mftask = manifest.find_task(self.task.qualified_name)
@@ -805,34 +805,36 @@ class AmqpExecutor(scheduler.NetworkExecutor):
 
     def run(self, env):
         try:
-            self.task.started(TYPE)
-            hooks.task_started_execution(self.task)
+            self.task.queued()
             for extension in self.task.extensions:
-                extension.started(TYPE)
-                hooks.task_started_execution(extension)
+                extension.queued()
+
             with hooks.task_run([self.task] + self.task.extensions):
                 self._run(env)
+
             for extension in self.task.extensions:
-                hooks.task_finished_execution(extension)
-                extension.finished(TYPE)
-            hooks.task_finished_execution(self.task)
-            self.task.finished(TYPE)
+                extension.finished_execution(remote=True)
+            self.task.finished_execution(remote=True)
+
         except (ConnectionError, AMQPConnectionError):
             log.exception()
             for extension in self.task.extensions:
-                extension.failed(TYPE)
-            self.task.failed(TYPE)
+                extension.failed_execution(remote=True)
+            self.task.failed_execution(remote=True)
             raise_error("Lost connection to AMQP server")
+
         except Exception as e:
             log.exception()
             for extension in self.task.extensions:
-                extension.failed(TYPE)
-            self.task.failed(TYPE)
+                extension.failed_execution(remote=True)
+            self.task.failed_execution(remote=True)
             if not self.task.is_unstable:
                 raise e
+
         finally:
             if self.connection is not None:
                 utils.call_and_catch(self.connection.close)
+
         return self.task
 
 
@@ -847,8 +849,11 @@ class AmqpExecutorFactory(scheduler.NetworkExecutorFactory):
     def options(self):
         return self._options
 
-    def create(self, task):
+    def create(self, session, task):
         return AmqpExecutor(self, task)
+
+    def create_session(self, graph):
+        return None
 
 
 log.verbose("[AMQP] Loaded")

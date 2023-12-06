@@ -1,2 +1,7 @@
 <?xml version="1.0" ?>
-<jolt-manifest workspace="." version=">=0.9.64" />
+<jolt-manifest workspace="." version=">=0.9.150">
+  <project name="jolt">
+    <recipe src="../build.jolt" joltdir=".." />
+  </project>
+
+</jolt-manifest>

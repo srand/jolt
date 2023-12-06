@@ -40,6 +40,14 @@ class _JoltProjectModule(SubElement):
     def __init__(self, elem=None):
         super(_JoltProjectModule, self).__init__('module', elem=elem)
 
+    @property
+    def path(self):
+        return self.src
+
+    @path.setter
+    def path(self, value):
+        self.src = value
+
 
 @Attribute('name')
 class _JoltProjectResource(SubElement):
@@ -248,10 +256,18 @@ class ManifestExtensionRegistry(object):
         for extension, _ in ManifestExtensionRegistry.extensions:
             extension.import_manifest(manifest)
 
+    @staticmethod
+    def import_protobuf(pb):
+        for extension, _ in ManifestExtensionRegistry.extensions:
+            extension.import_protobuf(pb)
+
 
 class ManifestExtension(object):
     def export_manifest(self, manifest, task):
         pass
 
     def import_manifest(self, manifest):
+        pass
+
+    def import_protobuf(self, pb):
         pass

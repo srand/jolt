@@ -8,6 +8,9 @@ class TaskHook(object):
     def task_created(self, task):
         pass
 
+    def task_queued(self, task):
+        pass
+
     def task_started(self, task):
         pass
 
@@ -97,6 +100,10 @@ class TaskHookRegistry(object):
     def task_created(self, task):
         for ext in self.hooks:
             utils.call_and_catch_and_log(ext.task_created, task)
+
+    def task_queued(self, task):
+        for ext in self.hooks:
+            utils.call_and_catch_and_log(ext.task_queued, task)
 
     def task_started(self, task):
         if task.is_resource():
@@ -285,6 +292,10 @@ class CliHookRegistry(object):
 
 def task_created(task):
     TaskHookRegistry.get().task_created(task)
+
+
+def task_queued(task):
+    TaskHookRegistry.get().task_queued(task)
 
 
 def task_started(task):

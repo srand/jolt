@@ -351,7 +351,7 @@ class BooleanParameter(Parameter):
 
         """
         default = str(default).lower() if default is not None else None
-        super(BooleanParameter, self).__init__(
+        super().__init__(
             default,
             values=["false", "true", "0", "1", "no", "yes"],
             required=required,
@@ -373,7 +373,7 @@ class BooleanParameter(Parameter):
             ParameterValueError: If the parameter is assigned an illegal value.
         """
         value = str(value).lower()
-        super(BooleanParameter, self).set_value(value)
+        super().set_value(value)
 
     @property
     def is_true(self):
@@ -790,7 +790,7 @@ class TaskRegistry(object):
     def get_task_classes(self):
         return list(self.tasks.values())
 
-    def get_task(self, name, extra_params=None, manifest=None):
+    def get_task(self, name, extra_params=None, manifest=None, buildenv=None):
         name, params = utils.parse_task_name(name)
         params.update(extra_params or {})
         full_name = utils.format_task_name(name, params)
@@ -801,7 +801,7 @@ class TaskRegistry(object):
 
         cls = self.tasks.get(name)
         if cls:
-            task = cls(parameters=params, manifest=manifest)
+            task = cls(parameters=params, manifest=manifest, buildenv=buildenv)
             task = self.instances.get(task.qualified_name, task)
             self.instances[task.qualified_name] = task
             self.instances[full_name] = task
@@ -1112,6 +1112,20 @@ class attributes:
         return _decorate
 
     @staticmethod
+    def platform(cls):
+        """
+        Decorates a task with an alternative ``platform`` attribute.
+
+        The new attribute will be concatenated with the regular
+        ``platform`` attribute.
+
+        Args:
+            attrib (str): Name of alternative attribute.
+                Keywords are expanded.
+        """
+        return utils.concat_attributes("platform", attrib)
+
+    @staticmethod
     def system(cls):
         """
         Decorates a task with a property returning the operating system name.
@@ -1208,6 +1222,31 @@ class TaskBase(object):
     name = None
     """ Name of the task. Derived from class name if not set. """
 
+    platform = {}
+    """
+    Dictionary of task platform requirements.
+
+    Platform requirements control where tasks are allowed to execute.
+    Multiple requirement key/values may be specified in which case all
+    must be fulfilled in order for the task to be schedulable on a node.
+
+    The following builtin requirement labels exist:
+
+      - node.arch ["arm", "amd64"]
+      - node.os ["linux", "windows"]
+
+    Example:
+
+      .. code-block:: python
+
+        class Hello(Task):
+            # This task must run on Linux.
+            platform = {
+                "node.os": "linux",
+            }
+
+    """
+
     requires = []
     """ List of dependencies to other tasks. """
 
@@ -1254,7 +1293,7 @@ class TaskBase(object):
     execution requests, the instance ID won't be.
     """
 
-    def __init__(self, parameters=None, manifest=None, **kwargs):
+    def __init__(self, parameters=None, manifest=None, buildenv=None, **kwargs):
         self._identity = None
         self._report = _JoltTask()
         self.name = self.__class__.name
@@ -1275,6 +1314,7 @@ class TaskBase(object):
         self.selfsustained = utils.call_or_return(self, self.__class__._selfsustained)
         self.tools = Tools(self, self.joltdir)
         self._apply_manifest(manifest)
+        self._apply_protobuf(buildenv)
         self.requires = self.expand(self.requires)
 
     def _apply_manifest(self, manifest):
@@ -1290,6 +1330,23 @@ class TaskBase(object):
                     "'{0}' is not an exportable attribute of task '{1}'"\
                     .format(attrib.name, self.qualified_name)
                 export.assign(attrib.value)
+
+    def _apply_protobuf(self, buildenv):
+        if buildenv is None:
+            return
+        task = buildenv.tasks.get(self.short_qualified_name)
+        if not task:
+            return
+        if task.identity:
+            self.identity = task.identity
+        if task.taint:
+            self.taint = task.taint
+        for prop in task.properties:
+            export = utils.getattr_safe(self, prop.key)
+            assert isinstance(export, Export), \
+                "'{0}' is not an exportable attribute of task '{1}'"\
+                .format(prop.key, self.qualified_name)
+            export.assign(prop.value)
 
     def _artifacts(self, cache, node):
         return [cache.get_artifact(node, "main")]
@@ -1478,7 +1535,7 @@ class Task(TaskBase):
     """
 
     def __init__(self, parameters=None, **kwargs):
-        super(Task, self).__init__(parameters, **kwargs)
+        super().__init__(parameters, **kwargs)
 
     def info(self, fmt, *args, **kwargs):
         """
@@ -2316,6 +2373,18 @@ class ErrorProxy(object):
         self._error = error
 
     @property
+    def type(self):
+        return self._error.type
+
+    @property
+    def details(self):
+        return self._error.details
+
+    @property
+    def location(self):
+        return self._error.location
+
+    @property
     def message(self):
         return self._error.message
 
@@ -2399,13 +2468,14 @@ class ReportProxy(object):
 
         """
         tb = traceback.format_exception(type(exc), value=exc, tb=exc.__traceback__)
+
         installdir = fs.path.dirname(__file__)
         if any(map(lambda frame: installdir not in frame, tb[1:-1])):
             while len(tb) > 2 and installdir in tb[1]:
                 del tb[1]
         loc = re.findall("\"(.*?\", line [0-9]+, in .*?)\n", tb[1])
         location = location or (loc[0] if loc and len(loc) > 0 else "")
-        message = str(exc)
+        message = log.format_exception_msg(exc)
         if isinstance(exc, JoltCommandError):
             details = "\n".join(exc.stderr)
         elif isinstance(exc, JoltError):
@@ -2446,7 +2516,7 @@ class Resource(Task):
     """ An abstract resource class indended to be subclassed. """
 
     def __init__(self, *args, **kwargs):
-        super(Resource, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     def is_runnable(self):
         return False
@@ -2507,7 +2577,7 @@ class WorkspaceResource(Resource):
     """
 
     def __init__(self, *args, **kwargs):
-        super(WorkspaceResource, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         raise_task_error_if(len(self.requires) > 0, self,
                             "Workspace resource is not allowed to have requirements")
 
@@ -3107,11 +3177,12 @@ class ResourceAttributeSetProvider(ArtifactAttributeSetProvider):
             except Exception:
                 ba = sig.bind_partial(artifact, deps, resource.tools)
                 acquire = utils.deprecated(resource.acquire)
-            if not isinstance(resource, WorkspaceResource):
-                ts = utils.duration()
-                log.info(colors.blue("Resource acquisition started ({})"),
-                         resource.short_qualified_name)
+
             try:
+                if not isinstance(resource, WorkspaceResource):
+                    ts = utils.duration()
+                    log.info(colors.blue("Resource acquisition started ({})"),
+                             resource.short_qualified_name)
                 acquire(*ba.args, **ba.kwargs)
                 if not isinstance(resource, WorkspaceResource):
                     log.info(colors.green("Resource acquisition finished after {} ({})"),
@@ -3135,11 +3206,12 @@ class ResourceAttributeSetProvider(ArtifactAttributeSetProvider):
             except Exception:
                 ba = sig.bind_partial(artifact, deps, resource.tools)
                 release = utils.deprecated(resource.release)
-            if not isinstance(resource, WorkspaceResource):
-                ts = utils.duration()
-                log.info(colors.blue("Resource release started ({})"),
-                         resource.short_qualified_name)
+
             try:
+                if not isinstance(resource, WorkspaceResource):
+                    ts = utils.duration()
+                    log.info(colors.blue("Resource release started ({})"),
+                             resource.short_qualified_name)
                 release(*ba.args, **ba.kwargs)
                 if not isinstance(resource, WorkspaceResource):
                     log.info(colors.green("Resource release finished after {} ({})"),

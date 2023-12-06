@@ -16,7 +16,7 @@ class GerritSrc(git.GitSrc):
 
     def __init__(self, *args, **kwargs):
         refspec1 = '+refs/changes/*:refs/remotes/origin/changes/*'
-        super(GerritSrc, self).__init__(*args, refspecs=[refspec1], **kwargs)
+        super().__init__(*args, refspecs=[refspec1], **kwargs)
 
 
 class Gerrit(git.Git):
@@ -28,7 +28,7 @@ class Gerrit(git.Git):
 
     def __init__(self, *args, **kwargs):
         refspec1 = '+refs/changes/*:refs/remotes/origin/changes/*'
-        super(Gerrit, self).__init__(*args, refspecs=[refspec1], **kwargs)
+        super().__init__(*args, refspecs=[refspec1], **kwargs)
 
 
 TaskRegistry.get().add_task_class(GerritSrc)

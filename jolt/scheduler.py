@@ -1,7 +1,9 @@
 from concurrent.futures import ThreadPoolExecutor, as_completed, Future
+import copy
 import os
 import queue
 
+from jolt import common_pb2 as common_pb
 from jolt import config
 from jolt import hooks
 from jolt import log
@@ -22,18 +24,20 @@ class JoltEnvironment(object):
 
 
 class TaskQueue(object):
-    def __init__(self, strategy):
+    def __init__(self, strategy, cache, session):
         self.futures = {}
         self.strategy = strategy
+        self.cache = cache
+        self.session = session
         self.duration_acc = utils.duration_diff(0)
         self._aborted = False
 
-    def submit(self, cache, task):
+    def submit(self, task):
         if self._aborted:
             return None
 
-        env = JoltEnvironment(cache=cache)
-        executor = self.strategy.create_executor(task)
+        env = JoltEnvironment(cache=self.cache)
+        executor = self.strategy.create_executor(self.session, task)
         raise_task_error_if(
             not executor, task,
             "no executor can execute the task; "
@@ -41,12 +45,12 @@ class TaskQueue(object):
 
         task.set_in_progress()
         future = executor.submit(env)
-        self.futures[future] = task
+        self.futures[future] = executor
         return future
 
     def wait(self):
         for future in as_completed(self.futures):
-            task = self.futures[future]
+            task = self.futures[future].task
             try:
                 future.result()
             except Exception as error:
@@ -60,7 +64,8 @@ class TaskQueue(object):
 
     def abort(self):
         self._aborted = True
-        for future, task in self.futures.items():
+        for future, executor in self.futures.items():
+            executor.cancel()
             future.cancel()
         if len(self.futures):
             log.info("Waiting for tasks to finish, please be patient")
@@ -79,9 +84,13 @@ class TaskQueue(object):
 class Executor(object):
     def __init__(self, factory):
         self.factory = factory
+        self._status = None
 
     def submit(self, env):
         return self.factory.submit(self, env)
+
+    def cancel(self):
+        pass
 
     def is_aborted(self):
         return self.factory.is_aborted()
@@ -92,31 +101,40 @@ class Executor(object):
 
 class LocalExecutor(Executor):
     def __init__(self, factory, task, force_upload=False, force_build=False):
-        super(LocalExecutor, self).__init__(factory)
+        super().__init__(factory)
         self.task = task
         self.force_build = force_build
         self.force_upload = force_upload
 
-    def run(self, env):
+    def _run(self, env, task):
         if self.is_aborted():
             return
         try:
-            self.task.started()
-            hooks.task_started_execution(self.task)
-            with hooks.task_run(self.task):
+            with hooks.task_run(task):
                 self.task.run(
                     env.cache,
                     force_build=self.force_build,
                     force_upload=self.force_upload)
+
         except Exception as e:
             log.exception()
-            self.task.failed()
-            if not self.task.is_unstable:
+            if not task.is_unstable:
                 raise e
-        else:
-            hooks.task_finished_execution(self.task)
-            self.task.finished()
-        return self.task
+
+        return task
+
+    def get_all_extensions(self, task):
+        extensions = copy.copy(task.extensions)
+        for ext in extensions:
+            extensions.extend(self.get_all_extensions(ext))
+        return extensions
+
+    def run(self, env):
+        tasks = [self.task] + self.get_all_extensions(self.task)
+        for task in tasks:
+            task.queued()
+
+        self._run(env, self.task)
 
 
 class NetworkExecutor(Executor):
@@ -125,7 +143,7 @@ class NetworkExecutor(Executor):
 
 class SkipTask(Executor):
     def __init__(self, factory, task, *args, **kwargs):
-        super(SkipTask, self).__init__(factory, *args, **kwargs)
+        super().__init__(factory, *args, **kwargs)
         self.task = task
 
     def run(self, env):
@@ -137,7 +155,7 @@ class SkipTask(Executor):
 
 class Downloader(Executor):
     def __init__(self, factory, task, *args, **kwargs):
-        super(Downloader, self).__init__(factory, *args, **kwargs)
+        super().__init__(factory, *args, **kwargs)
         self.task = task
 
     def _download(self, env, task):
@@ -146,19 +164,17 @@ class Downloader(Executor):
         if not task.is_downloadable():
             return
         try:
-            task.started("Download")
-            hooks.task_started_download(task)
+            task.started_download()
             raise_task_error_if(
                 not task.download(persistent_only=True),
                 task, "Failed to download task artifact")
         except Exception as e:
             with task.task.report() as report:
                 report.add_exception(e)
-            task.failed("Download")
+            task.failed_download()
             raise e
         else:
-            hooks.task_finished_download(task)
-            task.finished("Download")
+            task.finished_download()
 
     def run(self, env):
         self._download(env, self.task)
@@ -169,26 +185,24 @@ class Downloader(Executor):
 
 class Uploader(Executor):
     def __init__(self, factory, task, *args, **kwargs):
-        super(Uploader, self).__init__(factory, *args, **kwargs)
+        super().__init__(factory, *args, **kwargs)
         self.task = task
 
     def _upload(self, env, task):
         if self.is_aborted():
             return
         try:
-            task.started("Upload")
-            hooks.task_started_upload(task)
+            task.started_upload()
             raise_task_error_if(
                 not task.upload(persistent_only=True),
                 task, "Failed to upload task artifact")
         except Exception as e:
             with task.task.report() as report:
                 report.add_exception(e)
-            task.failed("Upload")
+            task.failed_upload()
             raise e
         else:
-            hooks.task_finished_upload(task)
-            task.finished("Upload")
+            task.finished_upload()
 
     def run(self, env):
         self._upload(env, self.task)
@@ -216,6 +230,9 @@ class ExecutorRegistry(object):
         self._local_factory.shutdown()
         self._concurrent_factory.shutdown()
 
+    def create_session(self, graph):
+        return {factory: factory.create_session(graph) for factory in self._factories}
+
     def create_skipper(self, task):
         return SkipTask(self._concurrent_factory, task)
 
@@ -231,9 +248,9 @@ class ExecutorRegistry(object):
         task.set_locally_executed()
         return self._local_factory.create(task, force=force)
 
-    def create_network(self, task):
+    def create_network(self, session, task):
         for factory in self._factories:
-            executor = factory.create(task)
+            executor = factory.create(session[factory], task)
             if executor is not None:
                 task.set_remotely_executed()
                 return executor
@@ -338,7 +355,7 @@ class LocalExecutorFactory(ExecutorFactory):
         max_workers = config.getint(
             "jolt", "parallel_tasks",
             os.getenv("JOLT_PARALLEL_TASKS", 1 if options is None else options.jobs))
-        super(LocalExecutorFactory, self).__init__(
+        super().__init__(
             options=options,
             max_workers=max_workers)
 
@@ -349,7 +366,7 @@ class LocalExecutorFactory(ExecutorFactory):
 class ConcurrentLocalExecutorFactory(ExecutorFactory):
     def __init__(self, options=None):
         max_workers = tools.Tools().thread_count()
-        super(ConcurrentLocalExecutorFactory, self).__init__(
+        super().__init__(
             options=options,
             max_workers=max_workers)
 
@@ -359,11 +376,14 @@ class ConcurrentLocalExecutorFactory(ExecutorFactory):
 
 class NetworkExecutorFactory(ExecutorFactory):
     def __init__(self, *args, **kwargs):
-        super(NetworkExecutorFactory, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
+
+    def create(self, session, task):
+        raise NotImplementedError()
 
 
 class ExecutionStrategy(object):
-    def create_executor(self, task):
+    def create_executor(self, session, task):
         raise NotImplementedError()
 
 
@@ -372,7 +392,7 @@ class LocalStrategy(ExecutionStrategy, PruneStrategy):
         self.executors = executors
         self.cache = cache
 
-    def create_executor(self, task):
+    def create_executor(self, session, task):
         if task.is_alias():
             return self.executors.create_skipper(task)
         if not task.is_cacheable():
@@ -398,7 +418,7 @@ class DownloadStrategy(ExecutionStrategy, PruneStrategy):
         self.executors = executors
         self.cache = cache
 
-    def create_executor(self, task):
+    def create_executor(self, session, task):
         if task.is_alias():
             return self.executors.create_skipper(task)
         if task.is_resource():
@@ -420,7 +440,7 @@ class DistributedStrategy(ExecutionStrategy, PruneStrategy):
         self.executors = executors
         self.cache = cache
 
-    def create_executor(self, task):
+    def create_executor(self, session, task):
         if task.is_alias():
             return self.executors.create_skipper(task)
 
@@ -431,10 +451,10 @@ class DistributedStrategy(ExecutionStrategy, PruneStrategy):
                 return self.executors.create_skipper(task)
 
         if not task.is_cacheable():
-            return self.executors.create_network(task)
+            return self.executors.create_network(session, task)
 
         if not self.cache.upload_enabled():
-            return self.executors.create_network(task)
+            return self.executors.create_network(session, task)
 
         if not task.is_goal(with_extensions=False):
             task.disable_download()
@@ -454,7 +474,7 @@ class DistributedStrategy(ExecutionStrategy, PruneStrategy):
             if task.is_fast() and task.deps_available_locally():
                 return self.executors.create_local(task)
 
-        return self.executors.create_network(task)
+        return self.executors.create_network(session, task)
 
     def should_prune_requirements(self, task):
         if task.is_alias() or not task.is_cacheable():
@@ -469,7 +489,7 @@ class WorkerStrategy(ExecutionStrategy, PruneStrategy):
         self.executors = executors
         self.cache = cache
 
-    def create_executor(self, task):
+    def create_executor(self, session, task):
         if task.is_resource():
             return self.executors.create_local(task)
 
@@ -519,8 +539,8 @@ class WorkerStrategy(ExecutionStrategy, PruneStrategy):
 
 
 class TaskIdentityExtension(ManifestExtension):
-    def export_manifest(self, manifest, task):
-        for child in [task] + task.extensions + task.descendants:
+    def export_manifest(self, manifest, tasks):
+        for child in tasks:
             manifest_task = manifest.find_task(child.qualified_name)
             if manifest_task is None:
                 manifest_task = manifest.create_task()
@@ -533,9 +553,9 @@ ManifestExtensionRegistry.add(TaskIdentityExtension())
 
 
 class TaskExportExtension(ManifestExtension):
-    def export_manifest(self, manifest, task):
+    def export_manifest(self, manifest, tasks):
         short_task_names = set()
-        for child in [task] + task.extensions + task.descendants:
+        for child in tasks:
             manifest_task = manifest.find_task(child.qualified_name)
             if manifest_task is None:
                 manifest_task = manifest.create_task()
@@ -549,10 +569,11 @@ class TaskExportExtension(ManifestExtension):
         # Figure out if any task with an overridden default parameter
         # value was included in the manifest. If so, add info about it.
         default_task_names = set()
-        for task in task.options.default:
-            short_name, _ = utils.parse_task_name(task)
-            if short_name in short_task_names:
-                default_task_names.add(task)
+        for task in tasks:
+            for task in task.options.default:
+                short_name, _ = utils.parse_task_name(task)
+                if short_name in short_task_names:
+                    default_task_names.add(task)
         if default_task_names:
             build = manifest.create_build()
             for task in default_task_names:
@@ -561,3 +582,50 @@ class TaskExportExtension(ManifestExtension):
 
 
 ManifestExtensionRegistry.add(TaskExportExtension())
+
+
+def export_tasks(tasks):
+    pb_tasks = {}
+
+    for task in tasks:
+        properties = []
+        for key, export in task.task._get_export_objects().items():
+            pb_attrib = common_pb.Property(key=key, value=export.export(task.task))
+            properties.append(pb_attrib)
+
+        platform = common_pb.Platform(
+            properties=[
+                common_pb.Property(key, value)
+                for key, value in task.task.platform.items()
+            ]
+        )
+
+        args = dict(
+            identity=task.identity,
+            instance=task.instance,
+            taint=str(task.task.taint),
+            name=task.short_qualified_name,
+            platform=platform,
+            properties=properties,
+        )
+
+        pb_tasks[task.short_qualified_name] = common_pb.Task(**args)
+
+    return pb_tasks
+
+
+def export_task_default_params(tasks):
+    default_task_names = {}
+
+    for task in tasks:
+        for task in task.options.default:
+            short_name, params = utils.parse_task_name(task)
+            if short_name in default_task_names:
+                default_task_names[short_name].update(params)
+            else:
+                default_task_names[short_name] = params
+
+    return [
+        utils.format_task_name(name, params)
+        for name, params in default_task_names.items()
+    ]

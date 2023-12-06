@@ -495,9 +495,6 @@ class DockerImage(Task):
     labels = []
     """ A list of image metadata labels """
 
-    platform = None
-    """ Target platform, e.g. linux/arm/v7. """
-
     pull = True
     """
     Always pull images when building.
@@ -519,6 +516,9 @@ class DockerImage(Task):
     tags = ["{canonical_name}:{identity}"]
     """ Optional list of image tags. Defaults to task's canonical name. """
 
+    target = None
+    """ Target platform, e.g. linux/arm/v7. """
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -539,7 +539,7 @@ class DockerImage(Task):
 
     @property
     def _platform(self):
-        platform = self.tools.expand(self.platform) if self.platform else None
+        platform = self.tools.expand(self.target) if self.target else None
         return utils.option("--platform ", platform)
 
     @property

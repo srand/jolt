@@ -6,8 +6,7 @@ from threading import RLock
 from collections import OrderedDict
 import uuid
 
-from jolt.tasks import Alias, Resource, WorkspaceResource, Task
-from jolt.influence import HashInfluenceRegistry, TaskRequirementInfluence
+from jolt import common_pb2 as common_pb
 from jolt import log
 from jolt import utils
 from jolt import colors
@@ -15,7 +14,9 @@ from jolt import hooks
 from jolt import filesystem as fs
 from jolt.error import raise_error_if
 from jolt.error import raise_task_error_if
+from jolt.influence import HashInfluenceRegistry, TaskRequirementInfluence
 from jolt.options import JoltOptions
+from jolt.tasks import Alias, Resource, WorkspaceResource, Task
 
 
 class TaskProxy(object):
@@ -42,6 +43,7 @@ class TaskProxy(object):
         self._local = False
         self._network = False
         self._artifacts = []
+        self._status = None
 
         hooks.task_created(self)
 
@@ -286,7 +288,35 @@ class TaskProxy(object):
     def resolve_requirement_alias(self, name):
         return self.requirement_aliases.get(name)
 
+    def set_passed(self):
+        self.set_status(common_pb.TaskStatus.TASK_PASSED)
+
+    def set_failed(self):
+        self.set_status(common_pb.TaskStatus.TASK_FAILED)
+
+    def set_skipped(self):
+        self.set_status(common_pb.TaskStatus.TASK_SKIPPED)
+
+    def set_downloaded(self):
+        self.set_status(common_pb.TaskStatus.TASK_DOWNLOADED)
+
+    def set_uploaded(self):
+        self.set_status(common_pb.TaskStatus.TASK_UPLOADED)
+
+    def set_running(self):
+        self.set_status(common_pb.TaskStatus.TASK_RUNNING)
+
+    def set_queued(self):
+        self.set_status(common_pb.TaskStatus.TASK_QUEUED)
+
+    def status(self):
+        return self._status
+
+    def set_status(self, status):
+        self._status = status
+
     def set_in_progress(self):
+        self.set_queued()
         self._in_progress = True
 
     def set_locally_executed(self):
@@ -336,19 +366,48 @@ class TaskProxy(object):
             self.identity = None
             self.identity
 
-    def started(self, what="Execution"):
-        self.task.info(colors.blue(what + " started " + self.log_name))
+    def queued(self, remote=True):
+        self.task.verbose("Task queued " + self.log_name)
         self.duration_queued = utils.duration()
-        self.duration_running = utils.duration()
-        hooks.task_started(self)
+        self.set_queued()
+        hooks.task_queued(self)
 
-    def running(self, when=None):
+    def running(self, when=None, what="Execution"):
+        if what:
+            self.task.info(colors.blue(what + " started " + self.log_name))
+            self.set_running()
+            hooks.task_started(self)
         self.duration_running = utils.duration() if not when else when
 
-    def failed(self, what="Execution"):
-        self.error("{0} failed after {1} {2}", what,
-                   self.duration_running,
-                   self.duration_queued.diff(self.duration_running))
+    def running_execution(self, remote=False):
+        hooks.task_started_execution(self)
+        self.running(what="Remote execution" if remote else "Execution")
+
+    def started_execution(self, remote=False):
+        self.queued()
+        self.running_execution(remote=remote)
+
+    def started_download(self):
+        self.queued()
+        self.running(what="Download")
+        hooks.task_started_download(self)
+
+    def started_upload(self):
+        self.queued()
+        self.running(what="Upload")
+        hooks.task_started_upload(self)
+
+    def _failed(self, what="Execution"):
+        self.set_failed()
+        if self.duration_queued and self.duration_running:
+            self.error("{0} failed after {1} {2}", what,
+                       self.duration_running,
+                       self.duration_queued.diff(self.duration_running))
+        elif self.duration_queued:
+            self.error("{0} failed after {1}", what, self.duration_queued or utils.duration())
+        else:
+            self.error("{0} failed immediately", what)
+
         if self.is_unstable:
             try:
                 self.graph.remove_node(self)
@@ -360,10 +419,16 @@ class TaskProxy(object):
             self.graph.add_failed(self)
             hooks.task_failed(self)
 
-    def passed(self, what="Execution"):
-        hooks.task_passed(self)
+    def failed_download(self):
+        self._failed("Download")
 
-    def finished(self, what="Execution"):
+    def failed_upload(self):
+        self._failed("Upload")
+
+    def failed_execution(self, remote=False):
+        self._failed(what="Remote execution" if remote else "Execution")
+
+    def _finished(self, what="Execution"):
         raise_task_error_if(
             self.is_completed() and not self.is_extension(),
             self, "task has already been completed")
@@ -377,12 +442,28 @@ class TaskProxy(object):
                        self.duration_queued.diff(self.duration_running))
         hooks.task_finished(self)
 
+    def finished_download(self):
+        self.set_downloaded()
+        hooks.task_finished_download(self)
+        self._finished("Download")
+
+    def finished_upload(self):
+        self.set_uploaded()
+        hooks.task_finished_upload(self)
+        self._finished("Upload")
+
+    def finished_execution(self, remote=False):
+        self.set_passed()
+        hooks.task_finished_execution(self)
+        self._finished(what="Remote execution" if remote else "Execution")
+
     def skipped(self):
         self._completed = True
         try:
             self.graph.remove_node(self)
         except KeyError:
             pass
+        self.set_skipped()
         hooks.task_skipped(self)
 
     def pruned(self):
@@ -432,58 +513,73 @@ class TaskProxy(object):
                         log.verbose("Host: {0}", getenv("HOSTNAME", "localhost"))
 
                     with self.lock_artifacts(discard=force_build) as artifacts:
-                        if not self.is_available_locally() or self.has_extensions():
-                            with cache.get_context(self) as context:
-                                self.running()
-                                with self.tools.cwd(self.task.joltdir):
-                                    hooks.task_prerun(self, context, self.tools)
-                                    if self.is_goal() and self.options.debug:
-                                        log.info("Entering debug shell")
-                                        self.task.debugshell(context, self.tools)
+                        exitstack = ExitStack()
+                        try:
+                            context = cache.get_context(self)
+                            exitstack.enter_context(context)
+
+                            self.running_execution()
+                            with self.tools.cwd(self.task.joltdir):
+                                if self.is_goal() and self.options.debug:
+                                    log.info("Entering debug shell")
+                                    self.task.debugshell(context, self.tools)
+
+                                try:
+                                    # Run task
                                     try:
+                                        hooks.task_prerun(self, context, self.tools)
                                         self.task.run(context, self.tools)
                                     finally:
                                         hooks.task_postrun(self, context, self.tools)
-                                        # Publish session artifacts
-                                        with self.tools.cwd(self.task.joltdir):
-                                            for artifact in filter(lambda a: a.is_session(), artifacts):
-                                                self.publish(context, artifact)
-                                        raise_task_error_if(
-                                            not self.upload(force=force_upload, locked=False, session_only=True) and cache.upload_enabled(),
-                                            self, "Failed to upload session artifact")
 
-                                if not self.is_available_locally(extensions=False):
                                     # Publish persistent artifacts
-                                    with self.tools.cwd(self.task.joltdir):
-                                        with self.tools.cwd(self.task.joltdir):
-                                            for artifact in filter(lambda a: not a.is_session(), artifacts):
-                                                self.publish(context, artifact, buildlog)
-                                else:
-                                    self.info("Publication skipped, already in local cache")
-                        else:
-                            self.info("Execution skipped, already in local cache")
+                                    if not self.is_available_locally(extensions=False):
+                                        for artifact in filter(lambda a: not a.is_session(), artifacts):
+                                            self.publish(context, artifact, buildlog)
+                                    else:
+                                        self.info("Publication skipped, already in local cache")
 
-                        # Must upload the artifact while still holding its lock, otherwise the
-                        # artifact may become unpack():ed before we have a chance to.
-                        if force_upload or force_build or not available_remotely:
+                                finally:
+                                    # Publish session artifacts to local cache
+                                    for artifact in filter(lambda a: a.is_session(), artifacts):
+                                        self.publish(context, artifact)
+
+                        except Exception as e:
+                            self.failed_execution()
+                            exitstack.close()
+                            raise e
+
+                        else:
+                            self.finished_execution()
+                            exitstack.close()
+
+                            # Must upload the artifact while still holding its lock, otherwise the
+                            # artifact may become unpack():ed before we have a chance to.
+                            if force_upload or force_build or not available_remotely:
+                                raise_task_error_if(
+                                    not self.upload(force=force_upload, locked=False, persistent_only=True) \
+                                    and cache.upload_enabled(),
+                                    self, "Failed to upload task artifact")
+
+                        finally:
+                            # Upload session artifacts to remote cache
                             raise_task_error_if(
-                                not self.upload(force=force_upload, locked=False, persistent_only=True) and cache.upload_enabled(),
-                                self, "Failed to upload task artifact")
+                                not self.upload(force=force_upload, locked=False, session_only=True) \
+                                and cache.upload_enabled(),
+                                self, "Failed to upload session artifact")
+
             elif force_upload or not available_remotely:
                 raise_task_error_if(
-                    not self.upload(force=force_upload, persistent_only=True) and cache.upload_enabled(),
+                    not self.upload(force=force_upload, persistent_only=True) \
+                    and cache.upload_enabled(),
                     self, "Failed to upload task artifact")
 
+            else:
+                self.info("Execution skipped, already in local cache")
+
             for extension in self.extensions:
-                try:
-                    extension.started()
-                    with hooks.task_run(extension):
-                        extension.run(cache, force_upload, force_build)
-                except Exception as e:
-                    extension.failed()
-                    raise e
-                else:
-                    extension.finished()
+                with hooks.task_run(extension):
+                    extension.run(cache, force_upload, force_build)
 
     def publish(self, context, artifact, buildlog=None):
         hooks.task_prepublish(self, artifact, self.tools)
@@ -604,6 +700,13 @@ class Graph(object):
         with self._mutex:
             return self._nodes_by_name.get(qualified_name)
 
+    def get_task_by_identity(self, identity):
+        with self._mutex:
+            for task in self.nodes:
+                if task.identity == identity:
+                    return task
+        return None
+
     def select(self, func):
         with self._mutex:
             return [n for n in self.nodes if func(self, n)]
@@ -632,12 +735,13 @@ class Graph(object):
 
 
 class GraphBuilder(object):
-    def __init__(self, registry, cache, manifest, options=None, progress=False):
+    def __init__(self, registry, cache, manifest=None, options=None, progress=False, buildenv=None):
         self.cache = cache
         self.graph = Graph()
         self.nodes = {}
         self.registry = registry
         self.manifest = manifest
+        self.buildenv = buildenv
         self.progress = progress
         self.options = options or JoltOptions()
 
@@ -645,7 +749,7 @@ class GraphBuilder(object):
         name = utils.stable_task_name(name)
         node = self.nodes.get(name)
         if not node:
-            task = self.registry.get_task(name, manifest=self.manifest)
+            task = self.registry.get_task(name, manifest=self.manifest, buildenv=self.buildenv)
             node = self.nodes.get(task.qualified_name, None)
             if node is not None:
                 return node
