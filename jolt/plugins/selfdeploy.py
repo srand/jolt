@@ -1,3 +1,5 @@
+import pkg_resources
+
 from jolt import config
 from jolt import filesystem as fs
 from jolt import influence
@@ -75,13 +77,10 @@ class Jolt(Task):
 
     def publish(self, artifact, tools):
         with tools.cwd(tools.builddir()):
-            try:
-                pinned_reqs = self.dependencies
-                if pinned_reqs:
-                    tools.write_file("requirements.txt", "\n".join(pinned_reqs))
-                    artifact.collect("requirements.txt")
-            except Exception:
-                log.exception()
+            pinned_reqs = self.dependencies
+            if pinned_reqs:
+                tools.write_file("requirements.txt", "\n".join(pinned_reqs))
+                artifact.collect("requirements.txt")
         with tools.cwd(_path):
             artifact.collect('README.rst')
             artifact.collect('setup.py')
@@ -101,8 +100,8 @@ class Jolt(Task):
 class SelfDeployExtension(NetworkExecutorExtension):
     @utils.cached.instance
     def get_parameters(self, _):
-        url = publish_artifact()
-        return dict(jolt_url=url)
+        identity, url = publish_artifact()
+        return dict(jolt_identity=identity, jolt_url=url)
 
 
 @NetworkExecutorExtensionFactory.Register
@@ -113,39 +112,21 @@ class SelfDeployExtensionFactory(NetworkExecutorExtensionFactory):
 
 @utils.cached.method
 def get_dependencies(extra=None):
-    extra = extra or []
-
-    def get_installed_distributions():
-        try:
-            from pip._internal.metadata import get_environment
-        except ImportError:
-            from pip._internal.utils import misc
-            return {
-                dist.project_name.lower(): dist
-                for dist in misc.get_installed_distributions()
-            }
-        else:
-            dists = get_environment(None).iter_installed_distributions()
-            return {dist._dist.project_name.lower(): dist._dist for dist in dists}
-
-    dists = get_installed_distributions()
-    reqs = ["jolt"] + [dep.lower() for dep in extra]
+    reqs = ["jolt"] + (extra or [])
     pkgs = {}
 
     while reqs:
         req = reqs.pop()
-        name = req.partition("=")[0].partition("<")[0].partition(">")[0]
 
-        dist = dists.get(name)
+        dist = pkg_resources.working_set.by_key.get(req)
         if dist is None:
-            log.info("[SelfDeploy] Dependency not found: {}", req)
+            log.debug("[SelfDeploy] Dependency not found: {}", req)
             pkgs[req] = req
             continue
 
         for dep in dist.requires():
-            name = dep.project_name.lower()
-            if name not in pkgs:
-                reqs.append(name)
+            if dep.name not in pkgs:
+                reqs.append(dep.name)
 
         pkgs[req] = f"{dist.project_name}=={dist.version}"
 
@@ -180,11 +161,11 @@ def publish_artifact():
     substituteUrl = config.get("selfdeploy", "baseUri")
     if cacheUrl and substituteUrl:
         return jolt_url.replace(cacheUrl, substituteUrl)
-    return jolt_url
+    return task.identity, jolt_url
 
 
 def get_floating_version():
-    url = publish_artifact()
+    _, url = publish_artifact()
     return common_pb.Client(
         url=url,
         version=version.__version__,
