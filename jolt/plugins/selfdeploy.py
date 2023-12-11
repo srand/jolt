@@ -1,3 +1,5 @@
+import pkg_resources
+
 from jolt import config
 from jolt import filesystem as fs
 from jolt import influence
@@ -75,13 +77,10 @@ class Jolt(Task):
 
     def publish(self, artifact, tools):
         with tools.cwd(tools.builddir()):
-            try:
-                pinned_reqs = self.dependencies
-                if pinned_reqs:
-                    tools.write_file("requirements.txt", "\n".join(pinned_reqs))
-                    artifact.collect("requirements.txt")
-            except Exception:
-                log.exception()
+            pinned_reqs = self.dependencies
+            if pinned_reqs:
+                tools.write_file("requirements.txt", "\n".join(pinned_reqs))
+                artifact.collect("requirements.txt")
         with tools.cwd(_path):
             artifact.collect('README.rst')
             artifact.collect('setup.py')
@@ -123,18 +122,16 @@ def get_dependencies(packages=None):
 
     while reqs:
         req = reqs.pop()
-        name = req.partition("=")[0].partition("<")[0].partition(">")[0]
 
-        dist = dists.get(name)
+        dist = pkg_resources.working_set.by_key.get(req)
         if dist is None:
-            log.info("[SelfDeploy] Dependency not found: {}", req)
+            log.debug("[SelfDeploy] Dependency not found: {}", req)
             pkgs[req] = req
             continue
 
         for dep in dist.requires():
-            name = dep.project_name.lower()
-            if name not in pkgs:
-                reqs.append(name)
+            if dep.name not in pkgs:
+                reqs.append(dep.name)
 
         pkgs[req] = f"{dist.project_name}=={dist.version}"
 
@@ -173,7 +170,7 @@ def publish_artifact():
     substituteUrl = config.get("selfdeploy", "baseUri")
     if cacheUrl and substituteUrl:
         return task.identity, jolt_url.replace(cacheUrl, substituteUrl)
-    return jolt_url
+    return task.identity, jolt_url
 
 
 def get_floating_version():

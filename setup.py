@@ -78,6 +78,7 @@ setup(
         "jinja2",
         "keyring",
         "keyrings.alt",
+        "importlib_metadata",
         "lxml",
         "multi_key_dict",
         "ninja-syntax",

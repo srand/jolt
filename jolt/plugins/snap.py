@@ -56,7 +56,7 @@ def snap(ctx, task, default):
     gb = graph.GraphBuilder(registry, acache, manifest, options, progress=True)
     dag = gb.build([task])
 
-    manifest = JoltManifest.export(dag.requested_goals[0])
+    manifest = JoltManifest.export(dag.requested_goals)
     manifest.config = ""
     build = manifest.create_build()
 
