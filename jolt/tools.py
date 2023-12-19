@@ -1664,7 +1664,7 @@ class Tools(object):
 
         def unshare_chroot(overlayrootdir):
             uid = os.geteuid()
-            gid = os.geteuid()
+            gid = os.getguid()
             self._unshare([(uid, uid, 1)], [(gid, gid, 1)])
 
             from ctypes import CDLL, c_char_p
