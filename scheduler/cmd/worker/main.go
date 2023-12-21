@@ -40,8 +40,6 @@ var rootCmd = &cobra.Command{
 			log.Fatal(err)
 		}
 
-		fmt.Println(workerConfig)
-
 		// Validate the worker configuration.
 		if err := workerConfig.Validate(); err != nil {
 			log.Fatal(err)
