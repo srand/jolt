@@ -57,9 +57,9 @@ class SchedulerImage(docker.DockerImage):
     requires_push_true = ["docker/login"]
     version = Parameter(__version__, influence=False)
     tags = [
-        "robrt/jolt/scheduler:{identity}",
-        "robrt/jolt/scheduler:latest",
-        "robrt/jolt/scheduler:{version}",
+        "robrt/jolt-scheduler:{identity}",
+        "robrt/jolt-scheduler:latest",
+        "robrt/jolt-scheduler:{version}",
     ]
 
 
@@ -70,9 +70,9 @@ class WorkerImage(SchedulerImage):
     name = "jolt/worker"
     dockerfile = "docker/Dockerfile.worker"
     tags = [
-        "robrt/jolt/worker:{identity}",
-        "robrt/jolt/worker:latest",
-        "robrt/jolt/worker:{version}",
+        "robrt/jolt-worker:{identity}",
+        "robrt/jolt-worker:latest",
+        "robrt/jolt-worker:{version}",
     ]
 
 

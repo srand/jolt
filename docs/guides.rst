@@ -17,7 +17,7 @@ real time. It is designed to be deployed as a container on a node in the build c
 No configuration of the dashboard is required.
 
 The dashboard image is named
-`robrt/jolt/dashboard <https://hub.docker.com/r/robrt/jolt/dashboard>`_.
+`robrt/jolt-dashboard <https://hub.docker.com/r/robrt/jolt-dashboard>`_.
 It uses Debian as its base image.
 
 
@@ -40,7 +40,7 @@ distributing tasks to workers and relaying results back to clients. The current
 scheduler implementation uses a priority queue in which builds are ordered by
 priority and then by the number of queued tasks remaining to be executed in the build.
 
-The scheduler image is named `robrt/jolt/scheduler <https://hub.docker.com/r/robrt/jolt/scheduler>`_.
+The scheduler image is named `robrt/jolt-scheduler <https://hub.docker.com/r/robrt/jolt-scheduler>`_.
 It uses Debian as its base image.
 
   .. list-table::
@@ -104,28 +104,6 @@ It uses Debian as its base image.
     * - ``JOLT_CACHE_CLEANUP_LOG``
       -
 
-The Jolt scheduler image is named `robrt/jolt/scheduler <>`.
-It uses Debian as its base image.
-
-  .. list-table::
-    :widths: 20 80
-    :header-rows: 1
-    :class: tight-table
-
-    * - Environment Variable
-      - Description
-
-    * - ``JOLT_SCHEDULER_LISTEN``
-      - | A space separated list of URIs defining where the scheduler will accept connections from clients and workers.
-
-        | The format is ``<scheme>://<host>:<port>`` where accepted schemes are:
-
-        - ``tcp`` for both IPv4 and IPv6 connections
-        - ``tcp4`` for only IPv4 connections
-        - ``tcp6`` for only IPv6 connections
-
-        | The default is ``tcp://:9090`` which will listen on all interfaces on port 9090.
-
 
 Worker
 ~~~~~~~~~
@@ -136,7 +114,7 @@ worker will automatically enlist with the scheduler and start executing tasks.
 Multiple workers can be deployed on the same node and share the same local
 artifact cache.
 
-The Jolt worker image is named `robrt/jolt/worker <https://hub.docker.com/r/robrt/jolt/dashboard>`_.
+The Jolt worker image is named `robrt/jolt-worker <https://hub.docker.com/r/robrt/jolt-worker>`_.
 It uses Debian as a base image and includes the extra packages:
 
   - build-essential

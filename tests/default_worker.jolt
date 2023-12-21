@@ -20,11 +20,11 @@ class Worker(Resource):
                 for file in tools.glob("{joltdir}/../docker/swarm/*"):
                     tools.copy(file, "./")
                 tools.replace_in_file(
-                    "jolt.yaml", "robrt/jolt/scheduler:latest",
-                    tools.expand("robrt/jolt/scheduler:{deps[jolt/scheduler].task.identity}", deps=deps))
+                    "jolt.yaml", "robrt/jolt-scheduler:latest",
+                    tools.expand("robrt/jolt-scheduler:{deps[jolt/scheduler].task.identity}", deps=deps))
                 tools.replace_in_file(
-                    "jolt.yaml", "robrt/jolt/worker:latest",
-                    tools.expand("robrt/jolt/worker:{deps[jolt/worker].task.identity}", deps=deps))
+                    "jolt.yaml", "robrt/jolt-worker:latest",
+                    tools.expand("robrt/jolt-worker:{deps[jolt/worker].task.identity}", deps=deps))
                 tools.run("docker stack deploy -c jolt.yaml jolt_test", output_on_error=True)
                 tools.run("docker service scale jolt_test_worker=1", output_on_error=True)
                 config = tools.read_file("client.conf")

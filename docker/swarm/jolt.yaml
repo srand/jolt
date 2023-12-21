@@ -16,13 +16,13 @@ services:
     ports:
       - "80:80"
   scheduler:
-    image: robrt/jolt/scheduler:latest
+    image: robrt/jolt-scheduler:latest
     ports:
       - "9090:9090"
   worker:
     environment:
-      - JOLT_CACHE_URL=http://cache.
-    image: robrt/jolt/worker:latest
+      - JOLT_CACHE_URL=http://cache
+    image: robrt/jolt-worker:latest
     deploy:
       replicas: 2
     configs:
