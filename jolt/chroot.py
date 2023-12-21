@@ -8,6 +8,7 @@ import argparse
 from ctypes import CDLL, c_char_p
 import multiprocessing
 import os
+import sys
 
 
 libc = CDLL("libc.so.6")
@@ -42,10 +43,10 @@ def mount_bind(src, dst, ro=False):
 
 def mount_tmpfs(path):
     assert libc.mount(
-        c_char_p("tmpfs".encode("utf-8")),
+        c_char_p("none".encode("utf-8")),
         c_char_p(path.encode("utf-8")),
         c_char_p("tmpfs".encode("utf-8")),
-        0, None) == 0
+        0, None) == 0, f"Failed to mount tmpfs at '{path}'"
 
 
 def main():
@@ -61,7 +62,7 @@ def main():
     cwd = os.getcwd()
     gid = os.getegid()
     uid = os.geteuid()
-    gidmap = [uid, gid, 1]
+    gidmap = [gid, gid, 1]
     uidmap = [uid, uid, 1]
     gidmap = [str(i) for i in gidmap]
     uidmap = [str(i) for i in uidmap]
@@ -77,14 +78,14 @@ def main():
         if pid == 0:
             os.execve(newuidmap, [newuidmap, str(parent)] + uidmap, {})
             os._exit(1)
-        status, _ = os.waitpid(pid, 0)
+        _, status = os.waitpid(pid, 0)
         assert status == 0, f"Failed to map UIDs: newuidmap exit status: {status}"
         os.execve(newgidmap, [newgidmap, str(parent)] + gidmap, {})
         os._exit(1)
 
     assert libc.unshare(CLONE_NEWNS | CLONE_NEWUSER) == 0
     sem.release()
-    status, _ = os.waitpid(child, 0)
+    _, status = os.waitpid(child, 0)
     assert status == 0, f"Failed to map GIDs: newgidmap exit status: {status}"
 
     mount_tmpfs("/mnt")
@@ -103,5 +104,5 @@ if __name__ == "__main__":
     try:
         main()
     except Exception as e:
-        print(f"{type(e)}: {e}", f=os.stderr)
+        print(f"{type(e).__name__}: {e}", file=sys.stderr)
         os._exit(1)
