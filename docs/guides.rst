@@ -363,12 +363,12 @@ These configuration keys can also be set from command line:
 
   .. code:: bash
 
-    $ jolt config scheduler.host localhost.
-    $ jolt config http.uri http://localhost./
+    $ jolt config scheduler.uri tcp://127.0.0.1
+    $ jolt config http.uri http://127.0.0.1
 
 If your local machine is not part of the swarm you will need to replace
-``localhost`` with the IP-address of one of the nodes in the swarm or, preferably, a load
-balancing hostname.
+``127.0.0.1`` with the IP-address of one of the nodes in the swarm or,
+preferably, a load balancing hostname.
 
 To execute a task in the swarm, pass the ``-n/--network`` flag to the build command:
 

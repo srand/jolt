@@ -29,7 +29,7 @@ class Worker(Resource):
                 tools.run("docker service scale jolt_test_worker=1", output_on_error=True)
                 config = tools.read_file("client.conf")
                 config += "\n[selfdeploy]\nfloating = true\n"
-                config = config.replace("localhost", os.getenv("DOCKER_PUBLIC_IP", "localhost"))
+                config = config.replace("127.0.0.1", os.getenv("DOCKER_PUBLIC_IP", "127.0.0.1"))
                 artifact.strings.config = config
                 artifact.strings.plugin = "remote"
             for i in range(0, 20):
