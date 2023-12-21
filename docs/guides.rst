@@ -16,7 +16,9 @@ real time. It is designed to be deployed as a container on a node in the build c
 
 No configuration of the dashboard is required.
 
-The dashboard image is named ``robrt/jolt/dashboard``. It uses Debian as a base image.
+The dashboard image is named
+`robrt/jolt/dashboard <https://hub.docker.com/r/robrt/jolt/dashboard>`_.
+It uses Debian as its base image.
 
 
 Jolt
@@ -26,7 +28,8 @@ The Jolt client is the command line tool that executes tasks and optionally inte
 with a scheduler in a build cluster. It is available as a container image, but is
 typically installed as a standalone application on the user's machine.
 
-The image is named ``robrt/jolt``. It uses Debian as a base image.
+The image is named `robrt/jolt <https://hub.docker.com/r/robrt/jolt>`_.
+It uses Debian as its base image.
 
 
 Scheduler
@@ -37,7 +40,8 @@ distributing tasks to workers and relaying results back to clients. The current
 scheduler implementation uses a priority queue in which builds are ordered by
 priority and then by the number of queued tasks remaining to be executed in the build.
 
-The scheduler image is named ``robrt/jolt/scheduler``. It uses Debian as a base image.
+The scheduler image is named `robrt/jolt/scheduler <https://hub.docker.com/r/robrt/jolt/scheduler>`_.
+It uses Debian as its base image.
 
   .. list-table::
     :widths: 20 80
@@ -100,8 +104,8 @@ The scheduler image is named ``robrt/jolt/scheduler``. It uses Debian as a base 
     * - ``JOLT_CACHE_CLEANUP_LOG``
       -
 
-The Jolt scheduler image is named ``robrt/jolt/scheduler``.
-It uses Debian as a base image.
+The Jolt scheduler image is named `robrt/jolt/scheduler <>`.
+It uses Debian as its base image.
 
   .. list-table::
     :widths: 20 80
@@ -132,8 +136,8 @@ worker will automatically enlist with the scheduler and start executing tasks.
 Multiple workers can be deployed on the same node and share the same local
 artifact cache.
 
-The Jolt worker image is named ``robrt/jolt/worker``. It uses Debian as a base image
-and includes the extra packages:
+The Jolt worker image is named `robrt/jolt/worker <https://hub.docker.com/r/robrt/jolt/dashboard>`_.
+It uses Debian as a base image and includes the extra packages:
 
   - build-essential
   - git
@@ -263,6 +267,8 @@ Example:
       - "label=unittesting"
     scheduler_uri: "tcp://scheduler.:9090"
 
+
+.. _deploying_build_cluster:
 
 Deploying a Build Cluster
 -------------------------

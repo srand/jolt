@@ -54,51 +54,49 @@ a user.
 .. architecture-end
 
 
-Remote execution
+Remote Execution
 ----------------
 
 Tasks can be distributed and executed remotely with the help of a
 scheduler service and a set of workers. The scheduler is responsible
-for prioritizing and distributing tasks to workers and collecting
-the results. Workers install and run the Jolt client that initiated
-a build and execute tasks as instructed by the scheduler.
+for prioritizing and distributing tasks to workers and collecting the
+results. Workers install and run the Jolt client that initiated a
+build and execute tasks as instructed by the scheduler.
 
-Workers can be added or removed at any time. If a worker is added,
-the scheduler will detect this and automatically schedule
-tasks to it. If a worker is removed, the scheduler will reschedule
-the tasks that were running on it. Both scenarios are transparent
-to users running builds.
+Workers can be added or removed at any time. If a worker is added, the
+scheduler will detect this and automatically schedule tasks to it. If
+a worker is removed, the scheduler will reschedule the tasks that were
+running on it. Both scenarios are transparent to users running builds.
 
 Each worker has a set of platform properties that can be used to
-select which tasks should be executed on it. For example, a worker
-may have a property `node.os` with the value `linux` and another
-worker may have the same property with the value `windows`. A task
-can be configured to only run on workers with a specific property value.
+select which tasks should be executed on it. For example, a worker may
+have a property `node.os` with the value `linux` and another worker
+may have the same property with the value `windows`. A task can be
+configured to only run on workers with a specific property value.
 
-When a user starts a build, the client first check if the task
-has already been executed. If so, the artifact is downloaded and
-the build is finished. If not, the client sends a description
-of the build and its tasks to the scheduler. Once the build is
-registered, the client starts requesting execution of the tasks
-in the build in topological order. The scheduler selects a worker
-that matches a task's platform requirements and sends the task to it.
+When a user starts a build, the client first check if the task has
+already been executed. If so, the artifact is downloaded and the build
+is finished. If not, the client sends a description of the build and
+its tasks to the scheduler. Once the build is registered, the client
+starts requesting execution of the tasks in the build in topological
+order. The scheduler selects a worker that matches a task's platform
+requirements and sends the task to it.
 
 When requested to execute a task from a build, the worker first
 installs the client and starts an executor that connects to the
 scheduler to receive the task. The executor then runs the task and
-sends updates to the client (through the scheduler) in the form
-of logs and status messages. When the task is finished, the
-executor will upload the artifact to the cache and the client
-downloads it. The executor remains running as long as the worker
-is assigned to the build and there are tasks in the queue
-to be executed.
+sends updates to the client (through the scheduler) in the form of
+logs and status messages. When the task is finished, the executor will
+upload the artifact to the cache and the client downloads it. The
+executor remains running as long as the worker is assigned to the
+build and there are tasks in the queue to be executed.
 
-Since the client is installed on the worker, it is possible to
-execute tasks that depend on other tasks that are not part of
-the build. The client will automatically download the artifacts
-of the dependencies and make them available to the tasks.
+Since the client is installed on the worker, it is possible to execute
+tasks that depend on other tasks that are not part of the build. The
+client will automatically download the artifacts of the dependencies
+and make them available to the tasks.
 
-Deployment of the scheduler and workers can be done in different
-ways, but typically they are deployed as Docker containers in
-a Kubernetes cluster. See the user-guide for more information.
+Deployment of the scheduler and workers can be done in different ways,
+but typically they are deployed as Docker containers in a Kubernetes
+cluster. See :ref:`deploying_build_cluster` for more information.
 
