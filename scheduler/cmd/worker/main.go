@@ -58,9 +58,9 @@ var rootCmd = &cobra.Command{
 }
 
 func main() {
-	rootCmd.Flags().StringP("cache-uri", "c", "http://cache.", "Cache service URI")
+	rootCmd.Flags().StringP("cache-uri", "c", "http://cache", "Cache service URI")
 	rootCmd.Flags().StringSliceP("platform", "p", []string{}, "Platform property (repeatable)")
-	rootCmd.Flags().StringP("scheduler-uri", "s", "tcp://scheduler.:9090", "Scheduler service URI")
+	rootCmd.Flags().StringP("scheduler-uri", "s", "tcp://scheduler:9090", "Scheduler service URI")
 	rootCmd.Flags().CountP("verbose", "v", "Verbosity (repeatable)")
 
 	viper.BindPFlag("cache_uri", rootCmd.Flags().Lookup("cache-uri"))
