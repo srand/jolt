@@ -164,7 +164,7 @@ func (w *worker) run() error {
 			}
 
 		case err := <-currentCmd:
-			if err != nil {
+			if err != nil && !strings.Contains(err.Error(), "signal: interrupt") {
 				log.Info("Executor terminated with error:", err.Error())
 				err = reply(protocol.WorkerUpdate_EXECUTOR_FAILED, err)
 			} else {
