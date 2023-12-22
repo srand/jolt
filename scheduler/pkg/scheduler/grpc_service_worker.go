@@ -123,7 +123,7 @@ func (s *workerService) GetInstructions(stream protocol.Worker_GetInstructionsSe
 
 				var errType string
 
-				switch status.Status {
+				switch update.Status {
 				case protocol.WorkerUpdate_DEPLOY_FAILED:
 					log.Debug("Worker failed to deploy executor for build", currentBuild.Id())
 					errType = "Deployment Error"
