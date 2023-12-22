@@ -568,6 +568,19 @@ def executor(ctx, worker, build, request):
                 with log.handler(LogHandler(updates, task)):
                     executor.run(JoltEnvironment(cache=acache))
 
+            except KeyboardInterrupt as interrupt:
+                log.info("Task cancelled")
+
+                # Send an update to the scheduler
+                update = scheduler_pb.TaskUpdate(
+                    request=task,
+                    status=graph_task.status() or common_pb.TaskStatus.TASK_CANCELLED,
+                )
+                updates.push(update)
+
+                # Interrupt sent to process, not only the running task
+                raise interrupt
+
             except Exception as e:
                 log.set_level(log.EXCEPTION)
                 log.exception(e)
