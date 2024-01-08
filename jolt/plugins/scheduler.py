@@ -148,6 +148,8 @@ class RemoteExecutor(NetworkExecutor):
     def download_persistent_artifacts(self, task):
         """ Download persistent artifacts from the cache. """
 
+        for extension in task.extensions:
+            self.download_persistent_artifacts(extension)
         if not task.has_artifact():
             return
         if not task.cache.download_enabled():
@@ -157,12 +159,12 @@ class RemoteExecutor(NetworkExecutor):
         raise_task_error_if(
             not task.download(persistent_only=True), task,
             "Failed to download artifact")
-        for extension in task.extensions:
-            self.download_persistent_artifacts(extension)
 
     def download_session_artifacts(self, task):
         """ Download session artifacts from the cache. """
 
+        for extension in task.extensions:
+            self.download_session_artifacts(extension)
         if not task.has_artifact():
             return
         if not task.cache.download_enabled():
@@ -171,8 +173,6 @@ class RemoteExecutor(NetworkExecutor):
             return
         if not task.download(session_only=True):
             task.warning("Failed to download session artifact")
-        for extension in task.extensions:
-            self.download_persistent_artifacts(extension)
 
     def run(self, env):
         """ Run the task. """
