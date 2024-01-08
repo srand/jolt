@@ -174,20 +174,20 @@ func (s *workerService) GetInstructions(stream protocol.Worker_GetInstructionsSe
 
 func (s *workerService) GetTasks(stream protocol.Worker_GetTasksServer) error {
 	// Wait for initial message about what worker and build the request is concerning
-	status, err := stream.Recv()
+	execInfo, err := stream.Recv()
 	if err != nil {
 		log.Trace("Executor read error:", err)
 		return utils.GrpcError(err)
 	}
 
-	executor, err := s.scheduler.NewExecutor(status.Worker.Id, status.Request.BuildId)
+	executor, err := s.scheduler.NewExecutor(execInfo.Worker.Id, execInfo.Request.BuildId)
 	if err != nil {
-		log.Errorf("Executor failed to enlist for build: %s - %v", status.Request.BuildId, err)
+		log.Errorf("Executor failed to enlist for build: %s - %v", execInfo.Request.BuildId, err)
 		return utils.GrpcError(err)
 	}
 	defer executor.Close()
 
-	log.Infof("Executor enlisted for build: %s", status.Request.BuildId)
+	log.Infof("new - executor - build_id: %s, worker: %s", execInfo.Request.BuildId, execInfo.Worker.Id)
 
 	updates := make(chan *protocol.TaskUpdate, 100)
 	go func() {
@@ -209,7 +209,7 @@ func (s *workerService) GetTasks(stream protocol.Worker_GetTasksServer) error {
 	for {
 		select {
 		case <-executor.Done():
-			log.Infof("Executor delisted for build: %s", status.Request.BuildId)
+			log.Infof("del - executor - build_id: %s, worker: %s", execInfo.Request.BuildId, execInfo.Worker.Id)
 			return nil
 
 		case task := <-executor.Tasks():
@@ -220,6 +220,8 @@ func (s *workerService) GetTasks(stream protocol.Worker_GetTasksServer) error {
 			if currentTask != nil {
 				panic("Got a new task assignment while another task is in progress")
 			}
+
+			log.Debugf("run - task - id: %s, worker: %s", task.Identity(), execInfo.Worker.Id)
 
 			currentTask = task
 
@@ -260,7 +262,7 @@ func (s *workerService) GetTasks(stream protocol.Worker_GetTasksServer) error {
 			currentTask.PostUpdate(update)
 
 			if update.Status.IsCompleted() {
-				log.Debug("Task execution finished:", update.Request.TaskId)
+				log.Debugf("end - task - id: %s, worker: %s", update.Request.TaskId, execInfo.Worker.Id)
 				executor.Acknowledge()
 				currentTask = nil
 			}

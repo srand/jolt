@@ -80,11 +80,11 @@ func (s *priorityScheduler) ScheduleBuild(build *Build) (BuildUpdateObserver, er
 	defer s.Unlock()
 
 	if err := s.checkWorkerEligibility(build); err != nil {
-		log.Info("Build was rejected, no eligible worker:", err)
+		log.Info("nok - build, no eligible worker:", err)
 		return nil, err
 	}
 
-	log.Info("New build accepted:", build.Id())
+	log.Info("new - build - id:", build.Id())
 
 	s.builds[build.Id()] = build
 
@@ -107,11 +107,11 @@ func (s *priorityScheduler) CancelBuild(buildId string) error {
 
 	build, ok := s.builds[buildId]
 	if !ok {
-		log.Debug("Cannot cancel build, not found:", buildId)
+		log.Debug("int - build - not found - id:", buildId)
 		return utils.NotFoundError
 	}
 
-	log.Info("Build cancellation request for", buildId)
+	log.Info("int - build - id:", buildId)
 
 	s.dequeueBuildNoLock(build)
 	build.Cancel()
@@ -135,17 +135,17 @@ func (s *priorityScheduler) ScheduleTask(buildId, identity string) (TaskUpdateOb
 
 	build, ok := s.builds[buildId]
 	if !ok {
-		log.Debug("Task requested denied, no such build:", buildId)
+		log.Debug("exe - task - request denied, no such build:", buildId)
 		return nil, utils.NotFoundError
 	}
 
 	task, observer, err := build.ScheduleTask(identity)
 	if err != nil {
-		log.Debug("Failed to schedule task in build:", err)
+		log.Debug("exe - task - failed to schedule task in build:", err)
 		return nil, err
 	}
 
-	log.Debug("New task scheduled:", task.Identity(), task.Name())
+	log.Debug("exe - task -", task.Identity(), task.Name())
 
 	if build.HasQueuedTask() {
 		s.enqueueBuildNoLock(build)
@@ -183,7 +183,7 @@ func (s *priorityScheduler) Run(ctx context.Context) {
 					break
 				}
 
-				log.Debugf("Schedling build %s in worker %s", task.Build().id, worker.Id())
+				log.Debugf("run - build - id: %s, worker: %s", task.Build().Id(), worker.Id())
 				worker.Tasks() <- task
 			}
 		}
@@ -342,7 +342,7 @@ func (s *priorityScheduler) removeStaleBuilds() {
 
 // Close a build and remove it from the scheduler.
 func (s *priorityScheduler) closeBuildNoLock(build *Build) {
-	log.Info("Removing build", build.Id())
+	log.Infof("del - build - id: %s", build.Id())
 	s.dequeueBuildNoLock(build)
 	delete(s.builds, build.Id())
 	build.Close()
@@ -366,10 +366,11 @@ func (s *priorityScheduler) NewWorker(platform *Platform) (Worker, error) {
 	}
 	s.workers[id.String()] = worker
 
-	log.Info("New worker enlisted:", worker.Id())
-	log.Info("Properties:")
+	// FIXME: Log as single record to avoid interleaving
+	log.Info("new - worker", worker.Id())
+	log.Info("      properties:")
 	for _, prop := range worker.Platform().Properties {
-		log.Infof("  %s=%s", prop.Key, prop.Value)
+		log.Infof("      * %s=%s", prop.Key, prop.Value)
 	}
 
 	s.workers[worker.Id()] = worker
@@ -394,7 +395,7 @@ func (s *priorityScheduler) removeWorker(worker Worker) error {
 	s.Lock()
 	defer s.Unlock()
 
-	log.Info("Worker delisted:", worker.Id())
+	log.Info("del - worker", worker.Id())
 
 	s.deassociateTaskWithWorker(worker)
 	delete(s.availWorkers, worker.Id())
