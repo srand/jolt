@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -13,9 +14,27 @@ var rootCmd = &cobra.Command{
 	Short: "Scheduler control command",
 }
 
+var configData = ControlConfig{}
+
 func main() {
-	rootCmd.PersistentFlags().StringP("scheduler", "s", "scheduler:9090", "Address of scheduler service")
-	viper.BindPFlag("scheduler", rootCmd.PersistentFlags().Lookup("scheduler"))
+	rootCmd.PersistentFlags().StringP("scheduler-uri", "s", "tcp://scheduler:9090", "Scheduler service URI")
+	viper.BindPFlag("scheduler_uri", rootCmd.PersistentFlags().Lookup("scheduler-uri"))
+
+	viper.SetEnvPrefix("jolt")
+	viper.AutomaticEnv()
+
+	viper.SetConfigName("schedulerctl.yaml")
+	viper.SetConfigType("yaml")
+	viper.AddConfigPath("/etc/jolt/")
+	viper.AddConfigPath("$HOME/.config/jolt")
+	viper.AddConfigPath(".")
+	viper.ReadInConfig()
+
+	config, err := LoadConfig()
+	if err != nil {
+		log.Fatal(err)
+	}
+	configData = *config
 
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)

@@ -68,6 +68,5 @@ var mockTaskCmd = &cobra.Command{
 
 func init() {
 	mockTaskCmd.Flags().StringP("build", "b", "", "Build identifier")
-	mockTaskCmd.Flags().StringP("scheduler", "s", "localhost:9090", "Address of scheduler service")
 	mockCmd.AddCommand(mockTaskCmd)
 }

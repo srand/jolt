@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"strings"
 
@@ -19,11 +18,6 @@ var mockBuildCmd = &cobra.Command{
 	Use:   "build",
 	Short: "Schedule build with scheduler service and then cancel it",
 	Run: func(cmd *cobra.Command, args []string) {
-		schedulerAddr, err := cmd.Flags().GetString("scheduler")
-		if err != nil {
-			panic(err)
-		}
-
 		platform := &protocol.Platform{
 			Properties: []*protocol.Property{},
 		}
@@ -54,8 +48,13 @@ var mockBuildCmd = &cobra.Command{
 			}
 		}
 
+		grpcHost, err := utils.ParseGrpcUrl(configData.SchedulerUri)
+		if err != nil {
+			log.Fatal(err)
+		}
+
 		opts := grpc.WithTransportCredentials(insecure.NewCredentials())
-		conn, err := grpc.Dial(schedulerAddr, opts)
+		conn, err := grpc.Dial(grpcHost, opts)
 		if err != nil {
 			panic(err)
 		}
@@ -78,7 +77,11 @@ var mockBuildCmd = &cobra.Command{
 			panic(err)
 		}
 
-		fmt.Println(response.BuildId, response.Status)
+		buildResponse, err := response.Recv()
+		if err != nil {
+			panic(err)
+		}
+		defer response.CloseSend()
 
 		chans := []chan bool{}
 
@@ -91,7 +94,7 @@ var mockBuildCmd = &cobra.Command{
 
 				identity, _ := utils.Sha1String(taskName)
 				taskRequest := &protocol.TaskRequest{
-					BuildId: response.BuildId,
+					BuildId: buildResponse.GetBuildId(),
 					TaskId:  identity,
 				}
 
@@ -125,7 +128,6 @@ var mockBuildCmd = &cobra.Command{
 }
 
 func init() {
-	mockBuildCmd.Flags().StringP("scheduler", "s", "localhost:9090", "Address of scheduler service")
 	mockBuildCmd.Flags().StringSliceP("platform", "p", []string{}, "Platform key/value descriptor")
 	mockBuildCmd.Flags().StringSliceP("task", "t", []string{}, "Task name")
 	mockCmd.AddCommand(mockBuildCmd)

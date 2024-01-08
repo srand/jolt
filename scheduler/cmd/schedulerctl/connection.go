@@ -2,21 +2,25 @@ package main
 
 import (
 	"context"
+	"log"
 	"time"
 
-	"github.com/spf13/viper"
+	"github.com/srand/jolt/scheduler/pkg/utils"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
 
 func NewSchedulerConn() *grpc.ClientConn {
-	schedulerAddress := viper.GetString("scheduler")
-
 	opts := grpc.WithTransportCredentials(insecure.NewCredentials())
 
-	conn, err := grpc.Dial(schedulerAddress, opts)
+	grpcHost, err := utils.ParseGrpcUrl(configData.SchedulerUri)
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
+	}
+
+	conn, err := grpc.Dial(grpcHost, opts)
+	if err != nil {
+		log.Fatal(err)
 	}
 
 	return conn

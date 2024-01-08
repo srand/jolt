@@ -2,6 +2,7 @@ package scheduler
 
 import (
 	"context"
+	"errors"
 
 	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/srand/jolt/scheduler/pkg/protocol"
@@ -20,15 +21,18 @@ func NewAdminService(scheduler Scheduler) *adminService {
 }
 
 func (s *adminService) CancelBuild(_ context.Context, req *protocol.CancelBuildRequest) (*protocol.CancelBuildResponse, error) {
-	panic("not implemented") // TODO: Implement
+	// Not implemented
+	return nil, errors.New("not implemented")
 }
 
 func (s *adminService) ListBuilds(_ context.Context, req *protocol.ListBuildsRequest) (*protocol.ListBuildsResponse, error) {
-	panic("not implemented") // TODO: Implement
+	// Not implemented
+	return nil, errors.New("not implemented")
 }
 
 func (s *adminService) ListWorkers(_ context.Context, req *protocol.ListWorkersRequest) (*protocol.ListWorkersResponse, error) {
-	panic("not implemented") // TODO: Implement
+	// Not implemented
+	return nil, errors.New("not implemented")
 }
 
 func (s *adminService) Reschedule(_ context.Context, _ *empty.Empty) (*empty.Empty, error) {

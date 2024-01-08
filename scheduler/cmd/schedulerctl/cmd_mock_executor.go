@@ -52,9 +52,13 @@ var mockExecutorCmd = &cobra.Command{
 
 		log.Info("Enlisting executor with scheduler")
 		update := &protocol.TaskUpdate{
-			BuildId:  buildId,
-			WorkerId: workerId,
-			Status:   protocol.TaskStatus_TASK_PASSED,
+			Request: &protocol.TaskRequest{
+				BuildId: buildId,
+			},
+			Status: protocol.TaskStatus_TASK_PASSED,
+			Worker: &protocol.WorkerAllocation{
+				Id: workerId,
+			},
 		}
 		err = stream.Send(update)
 		if err != nil {
@@ -77,10 +81,11 @@ var mockExecutorCmd = &cobra.Command{
 				log.Info("Sending update:", i)
 
 				err = stream.Send(&protocol.TaskUpdate{
-					WorkerId: workerId,
-					BuildId:  buildId,
-					Request:  task,
-					Status:   protocol.TaskStatus_TASK_RUNNING,
+					Worker: &protocol.WorkerAllocation{
+						Id: workerId,
+					},
+					Request: task,
+					Status:  protocol.TaskStatus_TASK_RUNNING,
 					Loglines: []*protocol.LogLine{
 						&protocol.LogLine{Level: protocol.LogLevel_INFO, Time: timestamppb.Now(), Message: fmt.Sprint(i)},
 					},
@@ -91,10 +96,11 @@ var mockExecutorCmd = &cobra.Command{
 			}
 
 			err = stream.Send(&protocol.TaskUpdate{
-				WorkerId: workerId,
-				BuildId:  buildId,
-				Request:  task,
-				Status:   protocol.TaskStatus_TASK_PASSED,
+				Worker: &protocol.WorkerAllocation{
+					Id: workerId,
+				},
+				Request: task,
+				Status:  protocol.TaskStatus_TASK_PASSED,
 			})
 			if err != nil {
 				panic(err)
