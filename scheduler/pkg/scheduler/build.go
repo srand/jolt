@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 
-	"github.com/srand/jolt/scheduler/pkg"
 	"github.com/srand/jolt/scheduler/pkg/protocol"
 	"github.com/srand/jolt/scheduler/pkg/utils"
 )
@@ -120,7 +119,7 @@ func (b *Build) IsCancelled() bool {
 
 // Returns true if the build is terminal.
 func (b *Build) IsTerminal() bool {
-	return (!b.HasQueuedTask() && !b.HasRunningTask() && !b.HasObserver() && !b.HasTasks()) || (b.IsCancelled() && !b.HasRunningTask())
+	return (!b.HasQueuedTask() && !b.HasRunningTask() && !b.HasObserver()) || (b.IsCancelled() && !b.HasRunningTask())
 }
 
 // Returns true if the build or one of its tasks has an observer.
@@ -138,17 +137,12 @@ func (b *Build) HasObserver() bool {
 
 // Returns true if the build has a queued task.
 func (b *Build) HasQueuedTask() bool {
-	return b.queue.Len() > 0
+	return !b.queue.Empty()
 }
 
 // Returns true if the build has a running task.
 func (b *Build) HasRunningTask() bool {
 	return b.queue.HasUnackedData()
-}
-
-// Returns true if the build has any tasks.
-func (b *Build) HasTasks() bool {
-	return !b.IsCancelled() && !b.queue.Empty()
 }
 
 // Returns the identity of the build.
@@ -162,7 +156,7 @@ func (b *Build) Id() string {
 func (b *Build) ScheduleTask(identity string) (*Task, TaskUpdateObserver, error) {
 	task, ok := b.tasks[identity]
 	if !ok {
-		return nil, nil, pkg.NotFoundError
+		return nil, nil, utils.NotFoundError
 	}
 
 	observer := task.NewUpdateObserver()
@@ -174,7 +168,7 @@ func (b *Build) ScheduleTask(identity string) (*Task, TaskUpdateObserver, error)
 func (b *Build) CancelTask(identity string) error {
 	task, ok := b.tasks[identity]
 	if !ok {
-		return pkg.NotFoundError
+		return utils.NotFoundError
 	}
 
 	return task.Cancel()

@@ -23,7 +23,7 @@ func (s *schedulerService) ScheduleBuild(request *protocol.BuildRequest, stream 
 
 	id, err := utils.Sha1String(request.String())
 	if err != nil {
-		return err
+		return utils.GrpcError(err)
 	}
 
 	if build = s.scheduler.GetBuild(id); build == nil {
@@ -32,7 +32,7 @@ func (s *schedulerService) ScheduleBuild(request *protocol.BuildRequest, stream 
 
 	observer, err := s.scheduler.ScheduleBuild(build)
 	if err != nil {
-		return err
+		return utils.GrpcError(err)
 	}
 	defer observer.Close()
 
@@ -40,7 +40,7 @@ func (s *schedulerService) ScheduleBuild(request *protocol.BuildRequest, stream 
 		select {
 		case update := <-observer.Updates():
 			if err := stream.Send(update); err != nil {
-				return err
+				return utils.GrpcError(err)
 			}
 
 			if update.Status.IsCompleted() {
@@ -55,7 +55,7 @@ func (s *schedulerService) ScheduleBuild(request *protocol.BuildRequest, stream 
 
 func (s *schedulerService) CancelBuild(ctx context.Context, req *protocol.CancelBuildRequest) (*protocol.CancelBuildResponse, error) {
 	if err := s.scheduler.CancelBuild(req.BuildId); err != nil {
-		return nil, err
+		return nil, utils.GrpcError(err)
 	}
 
 	return &protocol.CancelBuildResponse{
@@ -66,7 +66,7 @@ func (s *schedulerService) CancelBuild(ctx context.Context, req *protocol.Cancel
 func (s *schedulerService) ScheduleTask(request *protocol.TaskRequest, stream protocol.Scheduler_ScheduleTaskServer) error {
 	observer, err := s.scheduler.ScheduleTask(request.BuildId, request.TaskId)
 	if err != nil {
-		return err
+		return utils.GrpcError(err)
 	}
 	defer observer.Close()
 
@@ -74,7 +74,7 @@ func (s *schedulerService) ScheduleTask(request *protocol.TaskRequest, stream pr
 		select {
 		case update := <-observer.Updates():
 			if err := stream.Send(update); err != nil {
-				return err
+				return utils.GrpcError(err)
 			}
 
 			if update.Status.IsCompleted() {

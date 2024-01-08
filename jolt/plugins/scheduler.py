@@ -402,7 +402,8 @@ class RemoteSession(object):
         """ Clear the build request. Called when a build fails. """
 
         # Close grpc server response stream
-        self.build.cancel()
+        if self.build:
+            self.build.cancel()
         self.build = None
         self.build_id = None
 

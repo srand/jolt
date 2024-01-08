@@ -6,7 +6,6 @@ import (
 	"sync"
 
 	"github.com/google/uuid"
-	"github.com/srand/jolt/scheduler/pkg"
 	"github.com/srand/jolt/scheduler/pkg/log"
 	"github.com/srand/jolt/scheduler/pkg/protocol"
 	"github.com/srand/jolt/scheduler/pkg/utils"
@@ -109,7 +108,7 @@ func (s *priorityScheduler) CancelBuild(buildId string) error {
 	build, ok := s.builds[buildId]
 	if !ok {
 		log.Debug("Cannot cancel build, not found:", buildId)
-		return pkg.NotFoundError
+		return utils.NotFoundError
 	}
 
 	log.Info("Build cancellation request for", buildId)
@@ -137,7 +136,7 @@ func (s *priorityScheduler) ScheduleTask(buildId, identity string) (TaskUpdateOb
 	build, ok := s.builds[buildId]
 	if !ok {
 		log.Debug("Task requested denied, no such build:", buildId)
-		return nil, pkg.NotFoundError
+		return nil, utils.NotFoundError
 	}
 
 	task, observer, err := build.ScheduleTask(identity)
@@ -148,7 +147,7 @@ func (s *priorityScheduler) ScheduleTask(buildId, identity string) (TaskUpdateOb
 
 	log.Debug("New task scheduled:", task.Identity(), task.Name())
 
-	if build.HasTasks() {
+	if build.HasQueuedTask() {
 		s.enqueueBuildNoLock(build)
 		if s.hasReadyWorker() {
 			go s.Reschedule()
@@ -272,7 +271,7 @@ func (s *priorityScheduler) selectTaskAndWorker() (*Task, Worker) {
 				s.associateTaskWithWorker(worker, task)
 				s.dequeueWorkerNoLock(worker)
 
-				if !build.HasTasks() {
+				if !build.HasQueuedTask() {
 					s.dequeueBuildNoLock(build)
 				}
 

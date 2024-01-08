@@ -6,6 +6,7 @@ import (
 
 	"github.com/srand/jolt/scheduler/pkg/log"
 	"github.com/srand/jolt/scheduler/pkg/protocol"
+	"github.com/srand/jolt/scheduler/pkg/utils"
 )
 
 type workerService struct {
@@ -22,7 +23,7 @@ func NewWorkerService(scheduler Scheduler) *workerService {
 func (s *workerService) GetInstructions(stream protocol.Worker_GetInstructionsServer) error {
 	status, err := stream.Recv()
 	if err != nil {
-		return err
+		return utils.GrpcError(err)
 	}
 
 	if status.Status != protocol.WorkerUpdate_ENLISTING {
@@ -31,7 +32,7 @@ func (s *workerService) GetInstructions(stream protocol.Worker_GetInstructionsSe
 
 	worker, err := s.scheduler.NewWorker((*Platform)(status.Platform))
 	if err != nil {
-		return err
+		return utils.GrpcError(err)
 	}
 	defer worker.Close()
 
@@ -72,7 +73,7 @@ func (s *workerService) GetInstructions(stream protocol.Worker_GetInstructionsSe
 
 			if err := stream.Send(request); err != nil {
 				log.Trace("Worker write error:", err)
-				return err
+				return utils.GrpcError(err)
 			}
 
 		case <-worker.Done():
@@ -103,7 +104,7 @@ func (s *workerService) GetInstructions(stream protocol.Worker_GetInstructionsSe
 
 			if err := stream.Send(request); err != nil {
 				log.Trace("Worker write error:", err)
-				return err
+				return utils.GrpcError(err)
 			}
 
 		case update := <-updates:
@@ -176,13 +177,13 @@ func (s *workerService) GetTasks(stream protocol.Worker_GetTasksServer) error {
 	status, err := stream.Recv()
 	if err != nil {
 		log.Trace("Executor read error:", err)
-		return err
+		return utils.GrpcError(err)
 	}
 
 	executor, err := s.scheduler.NewExecutor(status.Worker.Id, status.Request.BuildId)
 	if err != nil {
 		log.Errorf("Executor failed to enlist for build: %s - %v", status.Request.BuildId, err)
-		return err
+		return utils.GrpcError(err)
 	}
 	defer executor.Close()
 
@@ -229,7 +230,7 @@ func (s *workerService) GetTasks(stream protocol.Worker_GetTasksServer) error {
 
 			if err := stream.Send(request); err != nil {
 				log.Trace("Executor write error:", err)
-				return err
+				return utils.GrpcError(err)
 			}
 
 		case update := <-updates:
@@ -242,7 +243,7 @@ func (s *workerService) GetTasks(stream protocol.Worker_GetTasksServer) error {
 			}
 			if err != nil {
 				log.Trace("Executor read error:", err)
-				return err
+				return utils.GrpcError(err)
 			}
 
 			if currentTask == nil {
