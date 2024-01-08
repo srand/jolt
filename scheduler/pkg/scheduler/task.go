@@ -1,12 +1,16 @@
 package scheduler
 
 import (
+	"sync"
+
 	"github.com/srand/jolt/scheduler/pkg/log"
 	"github.com/srand/jolt/scheduler/pkg/protocol"
 )
 
 // A task to be executed by a worker.
 type Task struct {
+	sync.RWMutex
+
 	// The build that the task belongs to.
 	build *Build
 
@@ -63,6 +67,8 @@ func (t *Task) Name() string {
 // Returns true if the task is completed.
 // A task is not completed if it is queued or running.
 func (t *Task) IsCompleted() bool {
+	t.RLock()
+	defer t.RUnlock()
 	return t.status.IsCompleted()
 }
 
@@ -87,6 +93,9 @@ func (t *Task) PostUpdate(update *protocol.TaskUpdate) {
 // The status can only be changed if the current status is queued or running.
 // Returns true if the status was changed.
 func (t *Task) SetStatus(status protocol.TaskStatus) bool {
+	t.Lock()
+	defer t.Unlock()
+
 	switch t.status {
 	case protocol.TaskStatus_TASK_QUEUED, protocol.TaskStatus_TASK_RUNNING:
 		t.status = status

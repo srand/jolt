@@ -3,6 +3,7 @@ package scheduler
 import (
 	"context"
 	"errors"
+	"sync"
 
 	"github.com/srand/jolt/scheduler/pkg/protocol"
 	"github.com/srand/jolt/scheduler/pkg/utils"
@@ -11,6 +12,8 @@ import (
 type TaskWalkFunc func(*Build, *Task) bool
 
 type Build struct {
+	sync.RWMutex
+
 	// The context of the build.
 	// Cancel the context to cancel the build.
 	ctx context.Context
@@ -76,24 +79,32 @@ func NewBuildFromRequest(id string, request *protocol.BuildRequest) *Build {
 
 // Returns the priority of the build.
 func (b *Build) Priority() int {
+	b.RLock()
+	defer b.RUnlock()
 	return b.priority
 }
 
 // Returns the number of queued tasks.
 func (b *Build) NumQueuedTasks() int {
+	b.RLock()
+	defer b.RUnlock()
 	return b.queue.Len()
 }
 
 // Cancel the build.
 func (b *Build) Cancel() {
+	b.Lock()
+	defer b.Unlock()
 	b.status = protocol.BuildStatus_BUILD_CANCELLED
 	b.ctxCancel()
 }
 
 // Close the build and all its tasks.
 func (b *Build) Close() {
-	b.ctxCancel()
+	b.RLock()
+	defer b.RUnlock()
 
+	b.ctxCancel()
 	b.buildObservers.Close()
 
 	tasks := []*Task{}
@@ -101,6 +112,7 @@ func (b *Build) Close() {
 		tasks = append(tasks, t)
 		return true
 	})
+
 	for _, task := range tasks {
 		task.Close()
 	}
@@ -114,6 +126,8 @@ func (b *Build) Done() <-chan struct{} {
 
 // Returns true if the build is cancelled.
 func (b *Build) IsCancelled() bool {
+	b.RLock()
+	defer b.RUnlock()
 	return b.status == protocol.BuildStatus_BUILD_CANCELLED
 }
 
@@ -124,6 +138,9 @@ func (b *Build) IsTerminal() bool {
 
 // Returns true if the build or one of its tasks has an observer.
 func (b *Build) HasObserver() bool {
+	b.RLock()
+	defer b.RUnlock()
+
 	if b.buildObservers.HasObserver() {
 		return true
 	}
@@ -137,11 +154,15 @@ func (b *Build) HasObserver() bool {
 
 // Returns true if the build has a queued task.
 func (b *Build) HasQueuedTask() bool {
+	b.RLock()
+	defer b.RUnlock()
 	return !b.queue.Empty()
 }
 
 // Returns true if the build has a running task.
 func (b *Build) HasRunningTask() bool {
+	b.RLock()
+	defer b.RUnlock()
 	return b.queue.HasUnackedData()
 }
 
@@ -154,6 +175,9 @@ func (b *Build) Id() string {
 // Returns the task and an observer for task updates.
 // Returns an error if the task does not exist.
 func (b *Build) ScheduleTask(identity string) (*Task, TaskUpdateObserver, error) {
+	b.Lock()
+	defer b.Unlock()
+
 	task, ok := b.tasks[identity]
 	if !ok {
 		return nil, nil, utils.NotFoundError
@@ -166,6 +190,9 @@ func (b *Build) ScheduleTask(identity string) (*Task, TaskUpdateObserver, error)
 
 // Cancel a task.
 func (b *Build) CancelTask(identity string) error {
+	b.Lock()
+	defer b.Unlock()
+
 	task, ok := b.tasks[identity]
 	if !ok {
 		return utils.NotFoundError
@@ -176,6 +203,9 @@ func (b *Build) CancelTask(identity string) error {
 
 // Returns the queued task with the given identity, or nil.
 func (b *Build) FindQueuedTask(walkFn TaskWalkFunc) *Task {
+	b.RLock()
+	defer b.RUnlock()
+
 	var lastTask *Task
 
 	if b.WalkQueuedTasks(func(b *Build, t *Task) bool {
@@ -191,6 +221,9 @@ func (b *Build) FindQueuedTask(walkFn TaskWalkFunc) *Task {
 // Iterate over all tasks.
 // Returns false if the walk was aborted by the walkFn returning false.
 func (b *Build) WalkTasks(walkFn TaskWalkFunc) bool {
+	b.RLock()
+	defer b.RUnlock()
+
 	for _, task := range b.tasks {
 		if !walkFn(b, task) {
 			return false
@@ -202,6 +235,9 @@ func (b *Build) WalkTasks(walkFn TaskWalkFunc) bool {
 // Iterate over all queued tasks.
 // Returns false if the walk was aborted by the walkFn returning false.
 func (b *Build) WalkQueuedTasks(walkFn TaskWalkFunc) bool {
+	b.RLock()
+	defer b.RUnlock()
+
 	return b.queue.Walk(func(unicast *utils.Unicast[*Task], task *Task) bool {
 		return walkFn(b, task)
 	})
@@ -218,5 +254,6 @@ func (b *Build) NewExecutor(scheduler Scheduler, platform *Platform) (Executor, 
 
 // Create a new build update observer.
 func (b *Build) NewUpdateObserver() BuildUpdateObserver {
+	// Locking is not necessary here because the build observers have their own locks.
 	return b.buildObservers.NewObserver()
 }
