@@ -21,8 +21,11 @@ from jolt.error import JoltError, JoltCommandError
 
 
 class CompileError(JoltError):
-    def __init__(self):
-        super().__init__("Compilation failed")
+    def __init__(self, error):
+        if error:
+            super().__init__(f"{error.type}: {error.location}: {error.message}")
+        else:
+            super().__init__("Compilation failed")
 
 
 class attributes:
@@ -2214,9 +2217,10 @@ if __name__ == "__main__":
         try:
             tools.run("ninja{3}{2} -C {0} {1}", self.outdir, verbose, threads, depsfile)
         except JoltCommandError as e:
-            with utils.ignore_exception(), self.report() as report:
-                self._report_errors(report, "\n".join(e.stdout))
-            raise CompileError()
+            with self.report() as report:
+                with utils.ignore_exception():
+                    self._report_errors(report, "\n".join(e.stdout))
+            raise CompileError(self._first_reported_error(report))
 
         if bool(getattr(self, "coverage", False)):
             self.covdatadir = tools.builddir("coverage-data")
@@ -2268,6 +2272,8 @@ if __name__ == "__main__":
             super().debugshell(deps, tools)
 
     def _report_errors(self, report, logbuffer):
+        """ Parses the build log and reports errors. """
+
         # GCC style errors
         report.add_regex_errors_with_file(
             "Compiler Error",
@@ -2292,8 +2298,13 @@ if __name__ == "__main__":
         # LLVM linker errors
         report.add_regex_errors(
             "Linker Error",
-            r"^(?P<location>ld): (error|warning): (?P<message>.*)",
+            r"^(?P<location>ld(\.lld)?): (error|warning): (?P<message>.*)",
             logbuffer)
+
+    def _first_reported_error(self, report):
+        """ Returns the first reported error or None if no errors were reported. """
+        for error in report.errors:
+            return error
 
 
 class CXXLibrary(CXXProject):
