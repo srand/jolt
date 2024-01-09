@@ -344,6 +344,38 @@ func (suite *SchedulerTest) TestScheduleBuildWithPriority() {
 	worker.Acknowledge()
 }
 
+func (suite *SchedulerTest) TestCancelBuild() {
+	build1 := newBuild()
+	build1.priority = 1
+	task1 := addTask(build1, "task1")
+	defer build1.Close()
+
+	worker, err := suite.newWorker()
+	defer worker.Close()
+
+	buildObserver1, err := suite.scheduler.ScheduleBuild(build1)
+	assert.NoError(suite.T(), err)
+	defer buildObserver1.Close()
+
+	// Schedule task from build2 first
+	taskObserver1, err := suite.scheduler.ScheduleTask(build1.Id(), task1.Identity())
+	assert.NoError(suite.T(), err)
+	defer taskObserver1.Close()
+
+	scheduledTask := <-worker.Tasks()
+	assert.NotNil(suite.T(), scheduledTask)
+	assert.Equal(suite.T(), task1, scheduledTask)
+	worker.Acknowledge()
+
+	suite.scheduler.CancelBuild(build1.Id())
+
+	select {
+	case scheduledTask = <-worker.Tasks():
+		suite.T().FailNow()
+	default:
+	}
+}
+
 func TestPriorityScheduler(t *testing.T) {
 	suite.Run(t, &SchedulerTest{
 		createScheduler: func() Scheduler {

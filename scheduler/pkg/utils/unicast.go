@@ -2,13 +2,14 @@ package utils
 
 import (
 	"context"
+	"slices"
 	"sync"
 
 	"github.com/google/uuid"
 	"github.com/srand/jolt/scheduler/pkg/log"
 )
 
-type UnicastConsumer[E any] struct {
+type UnicastConsumer[E comparable] struct {
 	Chan    chan E
 	ID      string
 	cancel  func()
@@ -19,11 +20,11 @@ type UnicastConsumer[E any] struct {
 
 // Callback when iterating items in the queue.
 // Return true to continue iteration, or false to stop.
-type UnicastWalkFunc[E any] func(unicast *Unicast[E], item E) bool
+type UnicastWalkFunc[E comparable] func(unicast *Unicast[E], item E) bool
 
 // Callback to select the next item to be delivered to a consumer.
 // Return true to select the current item, or false to evaluate the next item.
-type UnicastSelectionFunc[E any] func(item E, consumer interface{}) bool
+type UnicastSelectionFunc[E comparable] func(item E, consumer interface{}) bool
 
 // A reliable unicast queue.
 // Items added to the queue are delivered to a single consumer.
@@ -31,7 +32,7 @@ type UnicastSelectionFunc[E any] func(item E, consumer interface{}) bool
 // otherwise the item is delivered to another consumer if the original consumer
 // unsubscribes from the queue. There is no deadline for consumers to acknowledge
 // an item.
-type Unicast[E any] struct {
+type Unicast[E comparable] struct {
 	sync.RWMutex
 
 	// All consumers
@@ -54,7 +55,7 @@ type Unicast[E any] struct {
 	selectionFn UnicastSelectionFunc[E]
 }
 
-func NewUnicast[E any](selectionFn UnicastSelectionFunc[E]) *Unicast[E] {
+func NewUnicast[E comparable](selectionFn UnicastSelectionFunc[E]) *Unicast[E] {
 	return &Unicast[E]{
 		consumers:      map[string]*UnicastConsumer[E]{},
 		availConsumers: map[string]*UnicastConsumer[E]{},
@@ -163,8 +164,22 @@ func (bc *Unicast[E]) remove(bcc *UnicastConsumer[E]) {
 
 // Add item to queue.
 func (bc *Unicast[E]) Send(data E) {
-	bc.RLock()
-	defer bc.RUnlock()
+	bc.Lock()
+	defer bc.Unlock()
+
+	// Don't add duplicate items to the queue.
+	if slices.Contains[[]E, E](bc.queue, data) {
+		return
+	}
+
+	// Item may also have been delivered to a consumer but not yet acknowledged.
+	// FIXME: Possible performance issue if many consumers are available.
+	for _, item := range bc.consumerItem {
+		if item == data {
+			return
+		}
+	}
+
 	bc.queue = append(bc.queue, data)
 	bc.send()
 }

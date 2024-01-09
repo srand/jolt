@@ -61,7 +61,7 @@ func (s *workerService) GetInstructions(stream protocol.Worker_GetInstructionsSe
 	for {
 		select {
 		case <-currentBuildCtx:
-			log.Info("Sending cancellation request to worker for", currentBuild.Id())
+			log.Infof("int - build - id: %s, worker: %s", currentBuild.Id(), worker.Id())
 			currentBuildCtx = nil
 
 			request := &protocol.WorkerRequest{
@@ -87,6 +87,13 @@ func (s *workerService) GetInstructions(stream protocol.Worker_GetInstructionsSe
 
 			if currentBuild != nil {
 				panic("Got a new build assignment while another build is in progress")
+			}
+
+			if task.build.IsDone() {
+				log.Debug("Got a new build assignment for a build that is already done")
+				task.SetStatus(protocol.TaskStatus_TASK_CANCELLED)
+				worker.Acknowledge()
+				continue
 			}
 
 			currentBuild = task.build
@@ -182,7 +189,7 @@ func (s *workerService) GetTasks(stream protocol.Worker_GetTasksServer) error {
 
 	executor, err := s.scheduler.NewExecutor(execInfo.Worker.Id, execInfo.Request.BuildId)
 	if err != nil {
-		log.Errorf("Executor failed to enlist for build: %s - %v", execInfo.Request.BuildId, err)
+		log.Errorf("err - executor - failed to enlist: %v - build_id: %s", err, execInfo.Request.BuildId)
 		return utils.GrpcError(err)
 	}
 	defer executor.Close()
@@ -238,14 +245,6 @@ func (s *workerService) GetTasks(stream protocol.Worker_GetTasksServer) error {
 		case update := <-updates:
 			if update == nil {
 				return nil
-			}
-
-			if err == io.EOF {
-				return nil
-			}
-			if err != nil {
-				log.Trace("Executor read error:", err)
-				return utils.GrpcError(err)
 			}
 
 			if currentTask == nil {

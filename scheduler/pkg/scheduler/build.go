@@ -60,7 +60,7 @@ func NewBuildFromRequest(id string, request *protocol.BuildRequest) *Build {
 		status:      protocol.BuildStatus_BUILD_ACCEPTED,
 		tasks:       map[string]*Task{},
 		queue: utils.NewUnicast[*Task](func(task *Task, platform interface{}) bool {
-			if task.build.IsCancelled() {
+			if task.build.isCancelled() {
 				return false
 			}
 			pfm := platform.(*Platform)
@@ -128,7 +128,18 @@ func (b *Build) Done() <-chan struct{} {
 func (b *Build) IsCancelled() bool {
 	b.RLock()
 	defer b.RUnlock()
+	return b.isCancelled()
+}
+
+func (b *Build) isCancelled() bool {
 	return b.status == protocol.BuildStatus_BUILD_CANCELLED
+}
+
+// Returns true if the build is in a terminal state, but may have outstanding work to complete.
+func (b *Build) IsDone() bool {
+	b.RLock()
+	defer b.RUnlock()
+	return b.status != protocol.BuildStatus_BUILD_ACCEPTED
 }
 
 // Returns true if the build is terminal.
@@ -183,8 +194,23 @@ func (b *Build) ScheduleTask(identity string) (*Task, TaskUpdateObserver, error)
 		return nil, nil, utils.NotFoundError
 	}
 
+	switch task.Status() {
+	case protocol.TaskStatus_TASK_QUEUED, protocol.TaskStatus_TASK_RUNNING:
+		// Task is already queued or running.
+	default:
+		// The task has completed or is cancelled.
+		// Restart the task so that the client can observe it again.
+		// In most cases, the task will only be downloaded on the worker, or skipped.
+		task.SetStatus(protocol.TaskStatus_TASK_QUEUED)
+	}
+
 	observer := task.NewUpdateObserver()
+
+	// Add the task to the queue.
+	// The task will be executed when a worker becomes available.
+	// Duplicate tasks are not added to the queue.
 	b.queue.Send(task)
+
 	return task, observer, nil
 }
 

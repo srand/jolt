@@ -102,9 +102,21 @@ func (t *Task) SetStatus(status protocol.TaskStatus) bool {
 		return true
 
 	default:
-		log.Debugf("New task status %v rejected, status already %v", status, t.status)
+		// Allow the task to be restarted if it has completed.
+		if status == protocol.TaskStatus_TASK_QUEUED {
+			t.status = status
+			return true
+		}
+
+		log.Debugf("err - task - id: %s, status: %v - new status rejected: %v", t.Identity(), t.status, status)
 		return false
 	}
+}
+
+func (t *Task) Status() protocol.TaskStatus {
+	t.RLock()
+	defer t.RUnlock()
+	return t.status
 }
 
 // Cancel the task.

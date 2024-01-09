@@ -84,6 +84,11 @@ func (s *priorityScheduler) ScheduleBuild(build *Build) (BuildUpdateObserver, er
 		return nil, err
 	}
 
+	if build.IsDone() {
+		log.Debugf("exe - task - request denied, build is done - id: %s", build.Id())
+		return nil, utils.GrpcError(utils.TerminalBuild)
+	}
+
 	log.Info("new - build - id:", build.Id())
 
 	s.builds[build.Id()] = build
@@ -139,13 +144,18 @@ func (s *priorityScheduler) ScheduleTask(buildId, identity string) (TaskUpdateOb
 		return nil, utils.NotFoundError
 	}
 
+	if build.IsDone() {
+		log.Debugf("exe - task - request denied, build is done - id: %s", buildId)
+		return nil, utils.GrpcError(utils.TerminalBuild)
+	}
+
 	task, observer, err := build.ScheduleTask(identity)
 	if err != nil {
 		log.Debug("exe - task - failed to schedule task in build:", err)
 		return nil, err
 	}
 
-	log.Debug("exe - task -", task.Identity(), task.Name())
+	log.Debugf("exe - task - id: %s, name: %s", task.Identity(), task.Name())
 
 	if build.HasQueuedTask() {
 		s.enqueueBuildNoLock(build)
@@ -245,7 +255,16 @@ func (s *priorityScheduler) hasReadyWorker() bool {
 
 // Select a task for a worker.
 func (s *priorityScheduler) selectTaskForWorkerNoLock(worker Worker, build *Build) *Task {
+	if build.IsDone() {
+		return nil
+	}
+
 	return build.FindQueuedTask(func(b *Build, t *Task) bool {
+		// Must not be cancelled
+		if t.IsCompleted() {
+			return false
+		}
+
 		// Must not already be allocated to a worker
 		if _, ok := s.workerTasks[t.Identity()]; ok {
 			return false

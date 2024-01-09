@@ -19,7 +19,7 @@ func init() {
 		for sig := range ch {
 			switch sig {
 			case syscall.SIGUSR1:
-				buf := make([]byte, 1<<16)
+				buf := make([]byte, 1<<18)
 				len := runtime.Stack(buf, true)
 				fmt.Printf("%s\n", buf[:len])
 			}

@@ -11,6 +11,7 @@ var (
 	NoEligibleWorkerError = fmt.Errorf("No eligible worker available")
 	NoTaskError           = fmt.Errorf("No tasks available")
 	NotFoundError         = fmt.Errorf("Not found")
+	TerminalBuild         = fmt.Errorf("Build is terminal")
 )
 
 type DetailedError interface {
@@ -27,6 +28,8 @@ func GrpcError(err error) error {
 		return status.Errorf(codes.Unavailable, err.Error())
 	case NoTaskError:
 		return status.Errorf(codes.Unavailable, err.Error())
+	case TerminalBuild:
+		return status.Errorf(codes.FailedPrecondition, err.Error())
 	}
 	return err
 }

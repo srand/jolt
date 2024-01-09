@@ -77,3 +77,34 @@ func TestUnicastAck(t *testing.T) {
 		c1.Acknowledge()
 	}
 }
+
+func TestDuplicate(t *testing.T) {
+	bc := NewUnicast[string](func(item string, consumer interface{}) bool { return true })
+
+	bc.Send("test1")
+	bc.Send("test1")
+
+	c1 := bc.NewConsumer(nil)
+	defer c1.Close()
+
+	msg := <-c1.Chan
+	t.Log(msg)
+	assert.Equal(t, "test1", msg)
+	select {
+	case msg = <-c1.Chan:
+	default:
+		msg = ""
+	}
+	assert.Equal(t, "", msg)
+
+	c2 := bc.NewConsumer(nil)
+	defer c2.Close()
+
+	bc.Send("test1")
+	select {
+	case msg = <-c2.Chan:
+	default:
+		msg = ""
+	}
+	assert.Equal(t, "", msg)
+}

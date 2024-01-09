@@ -2,6 +2,7 @@ package utils
 
 import (
 	"sync"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/srand/jolt/scheduler/pkg/log"
@@ -71,8 +72,8 @@ func (bcc *BroadcastConsumer[E]) send(data E) error {
 	select {
 	case bcc.Chan <- data:
 		return nil
-	default:
-		log.Debugf("Unable to send event to %s, channel full", bcc.ID)
+	case <-time.After(30 * time.Second):
+		log.Debugf("unable to send event to %s, channel full", bcc.ID)
 	}
 
 	bcc.Chan <- data
