@@ -285,7 +285,7 @@ class RemoteExecutor(NetworkExecutor):
                         )
                 with self.task.task.report() as report:
                     for error in report.errors:
-                        raise_error(error.message)
+                        raise_error(f"{error.type}: {error.message}")
                 raise raise_error("Remote execution failed")
 
             if progress.status in [
@@ -341,6 +341,7 @@ class RemoteSession(object):
 
         # The build associated with this session.
         self.build = None
+        self.build_id = None
 
         # Flag to indicate if the build has been aborted.
         self.aborted = False
