@@ -540,7 +540,13 @@ class WorkerStrategy(ExecutionStrategy, PruneStrategy):
 
 class TaskIdentityExtension(ManifestExtension):
     def export_manifest(self, manifest, tasks):
-        for child in tasks:
+        # Generate a list of all tasks that must be evaluated
+        # for inclusion in the manifest
+        all_tasks = []
+        for task in tasks:
+            all_tasks += [task] + task.extensions + task.descendants
+
+        for child in all_tasks:
             manifest_task = manifest.find_task(child.qualified_name)
             if manifest_task is None:
                 manifest_task = manifest.create_task()
@@ -555,7 +561,15 @@ ManifestExtensionRegistry.add(TaskIdentityExtension())
 class TaskExportExtension(ManifestExtension):
     def export_manifest(self, manifest, tasks):
         short_task_names = set()
-        for child in tasks:
+
+        # Generate a list of all tasks that must be evaluated
+        # for inclusion in the manifest
+        all_tasks = []
+        for task in tasks:
+            all_tasks += [task] + task.extensions + task.descendants
+
+        # Add all tasks with export attributes to the manifest
+        for child in all_tasks:
             manifest_task = manifest.find_task(child.qualified_name)
             if manifest_task is None:
                 manifest_task = manifest.create_task()
@@ -569,7 +583,7 @@ class TaskExportExtension(ManifestExtension):
         # Figure out if any task with an overridden default parameter
         # value was included in the manifest. If so, add info about it.
         default_task_names = set()
-        for task in tasks:
+        for task in all_tasks:
             for task in task.options.default:
                 short_name, _ = utils.parse_task_name(task)
                 if short_name in short_task_names:
