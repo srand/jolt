@@ -9,3 +9,13 @@ func (status TaskStatus) IsCompleted() bool {
 		return true
 	}
 }
+
+// Should return true if the task is no longer in progress
+func (status TaskStatus) IsCancellable() bool {
+	switch status {
+	case TaskStatus_TASK_QUEUED:
+		return true
+	default:
+		return false
+	}
+}

@@ -84,17 +84,34 @@ func (t *Task) NewUpdateObserver() TaskUpdateObserver {
 
 // Post a task update to all task observers.
 func (t *Task) PostUpdate(update *protocol.TaskUpdate) {
-	if t.SetStatus(update.Status) {
+	if t.setStatus(update.Status) {
 		t.updateObservers.Post(update)
 	}
+}
+
+// Post a task status update to all task observers.
+func (t *Task) PostStatusUpdate(status protocol.TaskStatus) {
+	t.PostUpdate(&protocol.TaskUpdate{
+		Request: &protocol.TaskRequest{
+			BuildId: t.build.Id(),
+			TaskId:  t.Identity(),
+		},
+		Status: status,
+	})
 }
 
 // Set the status of the task.
 // The status can only be changed if the current status is queued or running.
 // Returns true if the status was changed.
-func (t *Task) SetStatus(status protocol.TaskStatus) bool {
+func (t *Task) setStatus(status protocol.TaskStatus) bool {
 	t.Lock()
 	defer t.Unlock()
+
+	// Can only transition to cancelled from queued.
+	if status == protocol.TaskStatus_TASK_CANCELLED && t.status != protocol.TaskStatus_TASK_QUEUED {
+		log.Debugf("err - task - id: %s, status: %v - new status rejected: %v", t.Identity(), t.status, status)
+		return false
+	}
 
 	switch t.status {
 	case protocol.TaskStatus_TASK_QUEUED, protocol.TaskStatus_TASK_RUNNING:
@@ -121,13 +138,7 @@ func (t *Task) Status() protocol.TaskStatus {
 
 // Cancel the task.
 func (t *Task) Cancel() error {
-	t.PostUpdate(&protocol.TaskUpdate{
-		Request: &protocol.TaskRequest{
-			BuildId: t.build.Id(),
-			TaskId:  t.Identity(),
-		},
-		Status: protocol.TaskStatus_TASK_CANCELLED,
-	})
+	t.PostStatusUpdate(protocol.TaskStatus_TASK_CANCELLED)
 	return nil
 }
 

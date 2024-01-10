@@ -47,6 +47,7 @@ func (bc *Broadcast[E]) HasConsumer() bool {
 func (bc *Broadcast[E]) Close() {
 	bc.Lock()
 	defer bc.Unlock()
+
 	for _, consumer := range bc.consumers {
 		close(consumer.Chan)
 	}

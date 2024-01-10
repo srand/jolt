@@ -91,7 +91,7 @@ func (s *workerService) GetInstructions(stream protocol.Worker_GetInstructionsSe
 
 			if task.build.IsDone() {
 				log.Debug("Got a new build assignment for a build that is already done")
-				task.SetStatus(protocol.TaskStatus_TASK_CANCELLED)
+				task.Cancel()
 				worker.Acknowledge()
 				continue
 			}

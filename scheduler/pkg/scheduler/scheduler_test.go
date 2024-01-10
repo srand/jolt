@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/srand/jolt/scheduler/pkg/protocol"
@@ -373,6 +374,78 @@ func (suite *SchedulerTest) TestCancelBuild() {
 	case scheduledTask = <-worker.Tasks():
 		suite.T().FailNow()
 	default:
+	}
+}
+
+func (suite *SchedulerTest) TestCancelBuildWithObservers() {
+	build1 := newBuild()
+	build1.priority = 1
+	task1 := addTask(build1, "task1")
+	task2 := addTask(build1, "task2")
+	defer build1.Close()
+
+	worker, err := suite.newWorker()
+	defer worker.Close()
+
+	buildObserver1, err := suite.scheduler.ScheduleBuild(build1)
+	assert.NoError(suite.T(), err)
+	defer buildObserver1.Close()
+
+	select {
+	case update := <-buildObserver1.Updates():
+		assert.Equal(suite.T(), protocol.BuildStatus_BUILD_ACCEPTED, update.Status)
+	case <-time.After(1 * time.Second):
+		assert.FailNow(suite.T(), "Build should have been accepted")
+	}
+
+	// Schedule task
+	taskObserver1, err := suite.scheduler.ScheduleTask(build1.Id(), task1.Identity())
+	assert.NoError(suite.T(), err)
+	defer taskObserver1.Close()
+
+	taskObserver2, err := suite.scheduler.ScheduleTask(build1.Id(), task2.Identity())
+	assert.NoError(suite.T(), err)
+	defer taskObserver2.Close()
+
+	scheduledTask := <-worker.Tasks()
+	assert.NotNil(suite.T(), scheduledTask)
+	assert.Equal(suite.T(), task1, scheduledTask)
+
+	executor, err := suite.scheduler.NewExecutor(worker.Id(), scheduledTask.Build().Id())
+	assert.NoError(suite.T(), err)
+
+	scheduledTask = <-executor.Tasks()
+	assert.NotNil(suite.T(), scheduledTask)
+	assert.Equal(suite.T(), task1, scheduledTask)
+	scheduledTask.PostStatusUpdate(protocol.TaskStatus_TASK_PASSED)
+
+	suite.scheduler.CancelBuild(build1.Id())
+
+	executor.Acknowledge()
+	executor.Close()
+
+	worker.Acknowledge()
+
+	select {
+	case scheduledTask = <-worker.Tasks():
+		assert.Fail(suite.T(), "No more tasks should be scheduled to the worker")
+	default:
+	}
+
+	select {
+	case update := <-taskObserver1.Updates():
+		assert.NotNil(suite.T(), update)
+		assert.Equal(suite.T(), protocol.TaskStatus_TASK_PASSED, update.Status)
+	case <-time.After(1 * time.Second):
+		assert.Fail(suite.T(), "Task1 should have been completed")
+	}
+
+	select {
+	case update := <-taskObserver2.Updates():
+		assert.NotNil(suite.T(), update)
+		assert.Equal(suite.T(), protocol.TaskStatus_TASK_CANCELLED, update.Status)
+	case <-time.After(1 * time.Second):
+		assert.Fail(suite.T(), "Task2 should have been cancelled")
 	}
 }
 

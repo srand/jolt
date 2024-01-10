@@ -96,6 +96,13 @@ func (b *Build) Cancel() {
 	b.Lock()
 	defer b.Unlock()
 	b.status = protocol.BuildStatus_BUILD_CANCELLED
+
+	// Attempt to cancel all tasks.
+	// Tasks that are in progress or have already finished will be ignored.
+	for _, task := range b.tasks {
+		task.Cancel()
+	}
+
 	b.ctxCancel()
 }
 
@@ -189,6 +196,10 @@ func (b *Build) ScheduleTask(identity string) (*Task, TaskUpdateObserver, error)
 	b.Lock()
 	defer b.Unlock()
 
+	if b.isCancelled() {
+		return nil, nil, errors.New("Build is cancelled")
+	}
+
 	task, ok := b.tasks[identity]
 	if !ok {
 		return nil, nil, utils.NotFoundError
@@ -201,7 +212,7 @@ func (b *Build) ScheduleTask(identity string) (*Task, TaskUpdateObserver, error)
 		// The task has completed or is cancelled.
 		// Restart the task so that the client can observe it again.
 		// In most cases, the task will only be downloaded on the worker, or skipped.
-		task.SetStatus(protocol.TaskStatus_TASK_QUEUED)
+		task.PostStatusUpdate(protocol.TaskStatus_TASK_QUEUED)
 	}
 
 	observer := task.NewUpdateObserver()
