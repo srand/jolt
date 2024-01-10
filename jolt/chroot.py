@@ -3,13 +3,14 @@ Helper module that sets up a mount and user namespace before executing
 a command. The helper primarily bypasses the restriction on creating
 namespaces from multithreaded applications (which Jolt is).
 """
+print("hello")
 
 import argparse
 from ctypes import CDLL, c_char_p
 import multiprocessing
 import os
+import shutil
 import sys
-
 
 libc = CDLL("libc.so.6")
 
@@ -57,6 +58,7 @@ def main():
     parser.add_argument('-b', '--bind', nargs="*")
     parser.add_argument('-c', '--chroot', required=True)
     parser.add_argument('-d', '--chdir')
+    parser.add_argument('--shell', default="True")
     args = parser.parse_args()
 
     cwd = os.getcwd()
@@ -97,7 +99,12 @@ def main():
 
     os.chroot("/mnt")
     os.chdir(args.chdir or cwd)
-    os.execve("/bin/sh", ["sh", "-c", " ".join(args.command)], os.environ)
+
+    if args.shell in ["True", "true"]:
+        os.execve("/bin/sh", ["sh", "-c", " ".join(args.command)], os.environ)
+    else:
+        exe = shutil.which(args.command[0])
+        os.execve(exe, args.command, os.environ)
 
 
 if __name__ == "__main__":

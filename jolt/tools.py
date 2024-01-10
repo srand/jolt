@@ -1382,7 +1382,17 @@ class Tools(object):
                     tools.run("make {target} VERBOSE={verbose} JOBS={0}", tools.cpu_count())
 
         """
+        kwargs.setdefault("shell", True)
+
+        # Append command prefix before expanding string
+        if self._run_prefix:
+            if type(cmd) is list:
+                cmd = self._run_prefix + cmd
+            else:
+                cmd = " ".join(self._run_prefix) + " " + cmd
+
         cmd = self.expand(cmd, *args, **kwargs)
+
         stdi, stdo, stde = None, None, None
         try:
             stdi, stdo, stde = None, None, None
@@ -1394,11 +1404,8 @@ class Tools(object):
                 raise e
             except Exception:
                 pass
-            if self._run_prefix:
-                if type(cmd) is list:
-                    cmd = self._run_prefix + cmd
-                else:
-                    cmd = " ".join(self._run_prefix) + " " + cmd
+
+
             return _run(cmd, self._cwd, self._env, self._preexec_fn, *args, **kwargs)
         finally:
             if stdi:
@@ -1696,7 +1703,7 @@ class Tools(object):
 
         unshare = os.path.join(os.path.dirname(__file__), "chroot.py")
         with self.runprefix(
-                "{} {} -b {} -c {} -- ",
+                "{} {} -b {} -c {} --shell={{shell}} -- ",
                 sys.executable, unshare, " ".join(bind), chroot):
             old_chroot = self._chroot
             self._chroot = chroot
