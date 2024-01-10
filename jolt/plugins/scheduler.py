@@ -550,16 +550,8 @@ def executor(ctx, worker, build, request):
 
             log.info("Queuing {}", task.task_id)
             graph_task = dag.get_task_by_identity(task.task_id)
-
-            # Execute resource tasks first. This ensures that the resource artifact
-            # is available before the task is executed. The resource acquisition
-            # is done later when the consumer task starts executing.
-            for resource in filter(lambda task: task.is_resource() and not task.is_completed(), reversed(graph_task.children)):
-                session = {}
-                executor = strategy.create_executor(session, resource)
-                executor.run(JoltEnvironment(cache=acache))
-
             executor = None
+
             try:
                 session = {}
 

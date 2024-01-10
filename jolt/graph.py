@@ -484,21 +484,38 @@ class TaskProxy(object):
                 else:
                     log.debug(" Retained: {} ({})", self.short_qualified_name, artifact.identity)
 
+    def _run_download_dependencies(self, cache, force_upload=False, force_build=False):
+        for child in self.children:
+            if not child.has_artifact():
+                continue
+            raise_task_error_if(
+                not child.is_completed() and child.is_unstable,
+                self, "Task depends on failed task '{}'", child.short_qualified_name)
+            if not child.is_available_locally(extensions=False):
+                raise_task_error_if(
+                    not child.download(persistent_only=True),
+                    child, "Failed to download task artifact")
+
+    def _run_prepare_resources(self, cache, force_upload=False, force_build=False):
+        from jolt.scheduler import ExecutorRegistry, JoltEnvironment
+
+        for child in filter(lambda task: task.is_resource() and not task.is_completed(), reversed(self.children)):
+            session = {}
+            executor = ExecutorRegistry.get().create_local(child)
+            executor.run(JoltEnvironment(cache=cache))
+
     def run(self, cache, force_upload=False, force_build=False):
         with self.tools:
             available_locally = available_remotely = False
 
-            for child in self.children:
-                if not child.has_artifact():
-                    continue
-                raise_task_error_if(
-                    not child.is_completed() and child.is_unstable,
-                    self, "Task depends on failed task '{}'", child.short_qualified_name)
-                if not child.is_available_locally(extensions=False):
-                    raise_task_error_if(
-                        not child.download(persistent_only=True),
-                        child, "Failed to download task artifact")
+            # Download dependency artifacts if not already done
+            self._run_download_dependencies(cache, force_upload, force_build)
 
+            # Prepare resources if not already done. They are not acquired yet.
+            self._run_prepare_resources(cache, force_upload, force_build)
+
+            # Check if task artifact is available locally or remotely,
+            # either skip execution or download it if necessary.
             if not force_build:
                 available_locally = self.is_available_locally()
                 if available_locally and not force_upload:

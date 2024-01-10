@@ -20,7 +20,7 @@ from jolt import filesystem as fs
 from jolt import log
 from jolt import utils
 from jolt.cache import ArtifactAttributeSetProvider
-from jolt.error import raise_error_if, raise_task_error, raise_task_error_if
+from jolt.error import raise_error, raise_error_if, raise_task_error, raise_task_error_if
 from jolt.error import raise_unreported_task_error_if
 from jolt.error import JoltError, JoltCommandError
 from jolt.expires import Immediately
@@ -3167,6 +3167,9 @@ class ResourceAttributeSetProvider(ArtifactAttributeSetProvider):
         resource = artifact.task
         if isinstance(resource, Resource):
             from inspect import signature
+
+            if not hasattr(resource, "_run_env"):
+                raise_error("Internal scheduling error, resource has not been prepared: {}", task.short_qualified_name)
 
             deps = resource._run_env
             deps.__enter__()
