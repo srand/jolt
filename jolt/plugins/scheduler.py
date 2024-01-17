@@ -22,6 +22,8 @@ from jolt.scheduler import ExecutorRegistry, JoltEnvironment, NetworkExecutor, N
 from jolt.tasks import TaskRegistry
 from jolt.options import JoltOptions
 from jolt.plugins import selfdeploy
+from jolt.plugins.remote_execution import log_pb2 as log_pb
+from jolt.plugins.remote_execution import log_pb2_grpc as log_grpc
 from jolt.plugins.remote_execution import scheduler_pb2 as scheduler_pb
 from jolt.plugins.remote_execution import scheduler_pb2_grpc as scheduler_grpc
 from jolt.plugins.remote_execution import worker_pb2_grpc as worker_grpc
@@ -174,6 +176,21 @@ class RemoteExecutor(NetworkExecutor):
         if not task.download(session_only=True):
             task.warning("Failed to download session artifact")
 
+    def download_log(self, task):
+        """ Download log and transfer lines into local logging system. """
+        request = log_pb.ReadLogRequest(
+            id=task.instance,
+        )
+        for response in self.session.logs.ReadLog(request):
+            for line in response.loglines:
+                log.log(
+                    line.level,
+                    line.message,
+                    created=line.time.ToMicroseconds() / 1000000,
+                    context=line.context[:7],
+                    prefix=True)
+
+
     def run(self, env):
         """ Run the task. """
         try:
@@ -219,6 +236,13 @@ class RemoteExecutor(NetworkExecutor):
 
         except Exception as e:
             log.exception()
+
+            if self.factory.options.mute:
+                try:
+                    self.download_log(self.task)
+                except Exception:
+                    self.task.warning("Failed to download build log")
+
             self.task.failed_execution(remote=True)
             for extension in self.task.extensions:
                 extension.failed_execution(remote=True)
@@ -331,8 +355,11 @@ class RemoteSession(object):
             target=self.address.netloc,
         )
 
-        # GRPC stub for scheduler service.
+        # GRPC stub for the scheduler service.
         self.exec = scheduler_grpc.SchedulerStub(self.channel)
+
+        # GRPC stub for the logstash service.
+        self.logs = log_grpc.LogStashStub(self.channel)
 
         # Read build priority from config.
         # Higher priority builds will be scheduled first.
@@ -381,6 +408,7 @@ class RemoteSession(object):
         req = scheduler_pb.BuildRequest(
             environment=self.buildenv,
             priority=self.priority,
+            logstream=not self.factory.options.mute,
         )
 
         # Register the build with the scheduler.

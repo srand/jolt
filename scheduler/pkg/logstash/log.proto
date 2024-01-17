@@ -1,0 +1,32 @@
+syntax = "proto3";
+
+import "google/protobuf/timestamp.proto";
+import "jolt/common.proto";
+
+option go_package = "pkg/protocol";
+
+// Request to read a log file.
+message ReadLogRequest {
+    // Log stream identifier
+    string id = 1;
+
+    // Include records before and after these timestamps.
+    // May be left empty if no filtering is desired.
+    google.protobuf.Timestamp before = 2;
+    google.protobuf.Timestamp after = 3;
+}
+
+// Response with log file data
+message ReadLogResponse {
+    // Log stream identifier
+    string id = 1;
+
+    // List of logline records
+    repeated LogLine loglines = 2;
+}
+
+service LogStash {
+    // Read a log file.
+    // Log lines are streamed back as they are read from internal storage.
+    rpc ReadLog(ReadLogRequest) returns (stream ReadLogResponse);
+}

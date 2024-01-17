@@ -8,12 +8,8 @@ type ControlConfig struct {
 	SchedulerUri string `mapstructure:"scheduler_uri"`
 }
 
-func LoadConfig() (*ControlConfig, error) {
+func ParseConfig() (*ControlConfig, error) {
 	config := &ControlConfig{}
-	err := viper.Unmarshal(config)
-	if err != nil {
-		return nil, err
-	}
-
+	config.SchedulerUri = viper.GetString("scheduler_uri")
 	return config, nil
 }

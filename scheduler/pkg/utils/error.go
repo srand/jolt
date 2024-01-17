@@ -11,6 +11,7 @@ var (
 	NoEligibleWorkerError = fmt.Errorf("No eligible worker available")
 	NoTaskError           = fmt.Errorf("No tasks available")
 	NotFoundError         = fmt.Errorf("Not found")
+	ParseError            = fmt.Errorf("Parse error")
 	TerminalBuild         = fmt.Errorf("Build is terminal")
 )
 

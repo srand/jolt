@@ -202,7 +202,7 @@ def _autocomplete_tasks(ctx, args, incomplete):
 @click.option("-l", "--local", is_flag=True, default=False, help="Disable remote cache access.")
 @click.option("-n", "--network", is_flag=True, default=False, help="Distribute tasks to network workers.")
 @click.option("-s", "--salt", type=str, help="Add salt as hash influence for all tasks in dependency tree.", metavar="SALT")
-@click.option("-m", "--mute", is_flag=True, help="Reduce log verbosity to exclude stdout.")
+@click.option("-m", "--mute", is_flag=True, help="Display task log only if it fails.")
 @click.option("-v", "--verbose", is_flag=True, help="Verbose output.")
 @click.option("-vv", "--extra-verbose", is_flag=True, help="Extra verbose output.")
 @click.option("--result", type=click.Path(), hidden=True,
@@ -272,11 +272,8 @@ def build(ctx, task, network, keep_going, default, local,
         log.set_level(log.VERBOSE)
     elif extra_verbose:
         log.set_level(log.DEBUG)
-    elif mute:
-        log.set_level(log.INFO)
 
-    duration = utils.duration()
-
+    ts_start = utils.duration()
     task = list(task)
     task = [utils.stable_task_name(t) for t in task]
 
@@ -300,16 +297,18 @@ def build(ctx, task, network, keep_going, default, local,
         if upload:
             _upload = True
 
-    options = JoltOptions(network=network,
-                          local=local,
-                          download=_download,
-                          upload=_upload,
-                          keep_going=keep_going,
-                          default=default,
-                          worker=worker,
-                          debug=debug,
-                          salt=salt,
-                          jobs=jobs)
+    options = JoltOptions(
+        network=network,
+        local=local,
+        download=_download,
+        upload=_upload,
+        keep_going=keep_going,
+        default=default,
+        worker=worker,
+        debug=debug,
+        salt=salt,
+        jobs=jobs,
+        mute=mute)
 
     acache = cache.ArtifactCache.get(options)
 
@@ -429,7 +428,7 @@ def build(ctx, task, network, keep_going, default, local,
 
         log.info("Ended: {}", datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
         log.info("Total execution time: {0} {1}",
-                 str(duration),
+                 str(ts_start),
                  str(queue.duration_acc) if network else '')
         if result:
             with report.update() as manifest:

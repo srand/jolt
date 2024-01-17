@@ -5,6 +5,29 @@ import (
 	"net/url"
 )
 
+func ParseHttpUrl(urlstr string) (string, error) {
+	uri, err := url.Parse(urlstr)
+	if err != nil {
+		return "", err
+	}
+
+	port := uri.Port()
+	if port == "" {
+		uri.Host += ":8080"
+	}
+
+	var httpUri string
+	switch uri.Scheme {
+	case "tcp":
+		httpUri = uri.Host
+
+	default:
+		return "", errors.New("Unsupported protocol: " + uri.Scheme)
+	}
+
+	return httpUri, nil
+}
+
 // Parses a string of the form <scheme>://<host>:<port> and returns the
 // host and port as a string, or an error if the string is not a valid URL.
 // If the port is not specified, it defaults to 9090.

@@ -49,6 +49,11 @@ func (t *Task) Identity() string {
 	return t.task.Identity
 }
 
+// Returns the instance ID of the task.
+func (t *Task) Instance() string {
+	return t.task.Instance
+}
+
 // Returns the platform properties of the task.
 func (t *Task) Platform() *Platform {
 	return t.platform
@@ -84,7 +89,29 @@ func (t *Task) NewUpdateObserver() TaskUpdateObserver {
 
 // Post a task update to all task observers.
 func (t *Task) PostUpdate(update *protocol.TaskUpdate) {
-	if t.setStatus(update.Status) {
+	statusChanged := t.setStatus(update.Status)
+	if t.build.logstream {
+		if !statusChanged {
+			if len(update.Loglines) <= 0 {
+				return
+			}
+			update.Status = t.status
+		}
+		t.updateObservers.Post(update)
+	} else if statusChanged {
+		// Copy update
+		update := &protocol.TaskUpdate{
+			Request:  update.Request,
+			Status:   update.Status,
+			Errors:   update.Errors,
+			Worker:   update.Worker,
+			Loglines: update.Loglines,
+		}
+
+		if !t.build.logstream {
+			update.Loglines = []*protocol.LogLine{}
+		}
+
 		t.updateObservers.Post(update)
 	}
 }
@@ -107,6 +134,11 @@ func (t *Task) setStatus(status protocol.TaskStatus) bool {
 	t.Lock()
 	defer t.Unlock()
 
+	// Ignore identical statuses
+	if status == t.status {
+		return false
+	}
+
 	// Can only transition to cancelled from queued.
 	if status == protocol.TaskStatus_TASK_CANCELLED && t.status != protocol.TaskStatus_TASK_QUEUED {
 		log.Debugf("err - task - id: %s, status: %v - new status rejected: %v", t.Identity(), t.status, status)
@@ -115,8 +147,11 @@ func (t *Task) setStatus(status protocol.TaskStatus) bool {
 
 	switch t.status {
 	case protocol.TaskStatus_TASK_QUEUED, protocol.TaskStatus_TASK_RUNNING:
-		t.status = status
-		return true
+		if t.status != status {
+			t.status = status
+			return true
+		}
+		return false
 
 	default:
 		// Allow the task to be restarted if it has completed.

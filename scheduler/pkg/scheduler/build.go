@@ -30,6 +30,9 @@ type Build struct {
 	// The priority of the build.
 	priority int
 
+	// Stream log lines to client
+	logstream bool
+
 	// The current status of the build.
 	status protocol.BuildStatus
 
@@ -57,6 +60,7 @@ func NewBuildFromRequest(id string, request *protocol.BuildRequest) *Build {
 		environment: request.Environment,
 		id:          id,
 		priority:    int(request.Priority),
+		logstream:   request.Logstream,
 		status:      protocol.BuildStatus_BUILD_ACCEPTED,
 		tasks:       map[string]*Task{},
 		queue: utils.NewUnicast[*Task](func(task *Task, platform interface{}) bool {

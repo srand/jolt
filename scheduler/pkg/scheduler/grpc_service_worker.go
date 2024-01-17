@@ -5,17 +5,20 @@ import (
 	"io"
 
 	"github.com/srand/jolt/scheduler/pkg/log"
+	"github.com/srand/jolt/scheduler/pkg/logstash"
 	"github.com/srand/jolt/scheduler/pkg/protocol"
 	"github.com/srand/jolt/scheduler/pkg/utils"
 )
 
 type workerService struct {
 	protocol.UnimplementedWorkerServer
+	logs      logstash.LogStash
 	scheduler Scheduler
 }
 
-func NewWorkerService(scheduler Scheduler) *workerService {
+func NewWorkerService(stash logstash.LogStash, scheduler Scheduler) *workerService {
 	return &workerService{
+		logs:      stash,
 		scheduler: scheduler,
 	}
 }
@@ -212,7 +215,15 @@ func (s *workerService) GetTasks(stream protocol.Worker_GetTasksServer) error {
 		}
 	}()
 
+	var currentLog logstash.LogWriter
 	var currentTask *Task
+
+	defer func() {
+		if currentLog != nil {
+			currentLog.Close()
+		}
+	}()
+
 	for {
 		select {
 		case <-executor.Done():
@@ -228,9 +239,14 @@ func (s *workerService) GetTasks(stream protocol.Worker_GetTasksServer) error {
 				panic("Got a new task assignment while another task is in progress")
 			}
 
-			log.Debugf("run - task - id: %s, worker: %s", task.Identity(), execInfo.Worker.Id)
+			log.Debugf("run - task - id: %s (%s), worker: %s", task.Identity(), task.Instance(), execInfo.Worker.Id)
 
 			currentTask = task
+
+			currentLog, err = s.logs.Append(task.Instance())
+			if err != nil {
+				log.Debug("unable to append log: ", err)
+			}
 
 			request := &protocol.TaskRequest{
 				BuildId: currentTask.Build().id,
@@ -258,12 +274,30 @@ func (s *workerService) GetTasks(stream protocol.Worker_GetTasksServer) error {
 			}
 
 			log.Trace("Task update", update.Request.TaskId, update.Status)
+
+			if currentLog != nil {
+				for _, line := range update.Loglines {
+					if err := currentLog.WriteLine(line); err != nil {
+						log.Debug(":", err)
+					}
+				}
+			}
+
 			currentTask.PostUpdate(update)
 
 			if update.Status.IsCompleted() {
 				log.Debugf("end - task - id: %s, worker: %s", update.Request.TaskId, execInfo.Worker.Id)
+
 				executor.Acknowledge()
-				currentTask = nil
+
+				if currentTask != nil {
+					currentTask = nil
+				}
+
+				if currentLog != nil {
+					currentLog.Close()
+					currentLog = nil
+				}
 			}
 		}
 	}

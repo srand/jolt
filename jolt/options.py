@@ -11,4 +11,5 @@ class JoltOptions(object):
         self.worker = False
         self.salt = None
         self.jobs = 1
+        self.mute = False
         self.__dict__.update(kwargs)

@@ -171,6 +171,7 @@ class GenerateProtobufs(cxx.Compilation):
     sources = [
         "jolt/common.proto",
         "jolt/plugins/remote_execution/administration.proto",
+        "jolt/plugins/remote_execution/log.proto",
         "jolt/plugins/remote_execution/scheduler.proto",
         "jolt/plugins/remote_execution/worker.proto",
     ]
