@@ -8,11 +8,11 @@ import (
 )
 
 var (
-	NoEligibleWorkerError = fmt.Errorf("No eligible worker available")
-	NoTaskError           = fmt.Errorf("No tasks available")
-	NotFoundError         = fmt.Errorf("Not found")
-	ParseError            = fmt.Errorf("Parse error")
-	TerminalBuild         = fmt.Errorf("Build is terminal")
+	ErrNoEligibleWorker = fmt.Errorf("No eligible worker available")
+	ErrNoTask           = fmt.Errorf("No tasks available")
+	ErrNotFound         = fmt.Errorf("Not found")
+	ErrParse            = fmt.Errorf("Parse error")
+	ErrTerminalBuild    = fmt.Errorf("Build is terminal")
 )
 
 type DetailedError interface {
@@ -23,13 +23,13 @@ type DetailedError interface {
 // Convert errors to errors with grpc status codes
 func GrpcError(err error) error {
 	switch err {
-	case NotFoundError:
+	case ErrNotFound:
 		return status.Errorf(codes.NotFound, err.Error())
-	case NoEligibleWorkerError:
+	case ErrNoEligibleWorker:
 		return status.Errorf(codes.Unavailable, err.Error())
-	case NoTaskError:
+	case ErrNoTask:
 		return status.Errorf(codes.Unavailable, err.Error())
-	case TerminalBuild:
+	case ErrTerminalBuild:
 		return status.Errorf(codes.FailedPrecondition, err.Error())
 	}
 	return err

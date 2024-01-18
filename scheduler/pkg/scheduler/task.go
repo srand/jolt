@@ -26,6 +26,9 @@ type Task struct {
 	// Observers to be notified of task updates.
 	// Includes status and log updates.
 	updateObservers TaskUpdateObservers
+
+	// Scheduler to which the task belongs
+	schedulerHooks SchedulerObserver
 }
 
 // Create a new task.
@@ -35,13 +38,15 @@ func NewTask(build *Build, task *protocol.Task) *Task {
 		platform = &Platform{}
 	}
 
-	return &Task{
+	newTask := &Task{
 		build:           build,
 		platform:        platform,
 		status:          protocol.TaskStatus_TASK_QUEUED,
 		task:            task,
 		updateObservers: NewTaskUpdateObservers(),
 	}
+
+	return newTask
 }
 
 // Returns the influende identity of the task.
@@ -149,6 +154,7 @@ func (t *Task) setStatus(status protocol.TaskStatus) bool {
 	case protocol.TaskStatus_TASK_QUEUED, protocol.TaskStatus_TASK_RUNNING:
 		if t.status != status {
 			t.status = status
+			t.postStatusUpdated()
 			return true
 		}
 		return false
@@ -157,6 +163,7 @@ func (t *Task) setStatus(status protocol.TaskStatus) bool {
 		// Allow the task to be restarted if it has completed.
 		if status == protocol.TaskStatus_TASK_QUEUED {
 			t.status = status
+			t.postStatusUpdated()
 			return true
 		}
 
@@ -181,4 +188,14 @@ func (t *Task) Cancel() error {
 func (t *Task) Close() {
 	t.Cancel()
 	t.updateObservers.Close()
+}
+
+func (t *Task) SetScheduler(hooks SchedulerObserver) {
+	t.schedulerHooks = hooks
+}
+
+func (t *Task) postStatusUpdated() {
+	if t.schedulerHooks != nil {
+		t.schedulerHooks.TaskStatusChanged(t, t.status)
+	}
 }

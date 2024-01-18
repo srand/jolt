@@ -35,6 +35,9 @@ type priorityScheduler struct {
 
 	// Map of assigned task id to worker
 	workerTasks map[string]Worker
+
+	// List of telemtry receivers
+	observers []SchedulerObserver
 }
 
 // Create a new round robin scheduler.
@@ -86,7 +89,7 @@ func (s *priorityScheduler) ScheduleBuild(build *Build) (BuildUpdateObserver, er
 
 	if build.IsDone() {
 		log.Debugf("exe - task - request denied, build is done - id: %s", build.Id())
-		return nil, utils.GrpcError(utils.TerminalBuild)
+		return nil, utils.GrpcError(utils.ErrTerminalBuild)
 	}
 
 	log.Info("new - build - id:", build.Id())
@@ -113,7 +116,7 @@ func (s *priorityScheduler) CancelBuild(buildId string) error {
 	build, ok := s.builds[buildId]
 	if !ok {
 		log.Debug("int - build - not found - id:", buildId)
-		return utils.NotFoundError
+		return utils.ErrNotFound
 	}
 
 	log.Info("int - build - id:", buildId)
@@ -129,7 +132,7 @@ func (s *priorityScheduler) GetBuild(buildId string) *Build {
 	s.Lock()
 	defer s.Unlock()
 
-	build, _ := s.builds[buildId]
+	build := s.builds[buildId]
 	return build
 }
 
@@ -141,12 +144,12 @@ func (s *priorityScheduler) ScheduleTask(buildId, identity string) (TaskUpdateOb
 	build, ok := s.builds[buildId]
 	if !ok {
 		log.Debug("exe - task - request denied, no such build:", buildId)
-		return nil, utils.NotFoundError
+		return nil, utils.ErrNotFound
 	}
 
 	if build.IsDone() {
 		log.Debugf("exe - task - request denied, build is done - id: %s", buildId)
-		return nil, utils.GrpcError(utils.TerminalBuild)
+		return nil, utils.GrpcError(utils.ErrTerminalBuild)
 	}
 
 	task, observer, err := build.ScheduleTask(identity)
@@ -154,6 +157,12 @@ func (s *priorityScheduler) ScheduleTask(buildId, identity string) (TaskUpdateOb
 		log.Debug("exe - task - failed to schedule task in build:", err)
 		return nil, err
 	}
+
+	// Install telemetry callbacks
+	task.SetScheduler(s)
+
+	// Post scheduling telemetry to observers
+	s.TaskScheduled(task)
 
 	log.Debugf("exe - task - id: %s, name: %s", task.Identity(), task.Name())
 
@@ -430,13 +439,34 @@ func (s *priorityScheduler) NewExecutor(workerid, buildid string) (Executor, err
 
 	worker, ok := s.workers[workerid]
 	if !ok {
-		return nil, utils.NotFoundError
+		return nil, utils.ErrNotFound
 	}
 
 	build, ok := s.builds[buildid]
 	if !ok {
-		return nil, utils.NotFoundError
+		return nil, utils.ErrNotFound
 	}
 
 	return build.NewExecutor(s, worker.Platform())
+}
+
+func (s *priorityScheduler) AddObserver(receiver SchedulerObserver) {
+	s.Lock()
+	defer s.Unlock()
+
+	s.observers = append(s.observers, receiver)
+}
+
+// Implementation of SchedulerObserver interface
+func (s *priorityScheduler) TaskScheduled(task *Task) {
+	for _, receiver := range s.observers {
+		receiver.TaskScheduled(task)
+	}
+}
+
+// Implementation of SchedulerObserver interface
+func (s *priorityScheduler) TaskStatusChanged(task *Task, status protocol.TaskStatus) {
+	for _, receiver := range s.observers {
+		receiver.TaskStatusChanged(task, status)
+	}
 }

@@ -5,16 +5,16 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/srand/jolt/scheduler/pkg/dashboard"
 	"github.com/srand/jolt/scheduler/pkg/log"
 	"github.com/srand/jolt/scheduler/pkg/logstash"
 	"github.com/srand/jolt/scheduler/pkg/scheduler"
 
-	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
-var config Config
+var config *Config
 
 var rootCmd = &cobra.Command{
 	Use:   "scheduler",
@@ -49,19 +49,24 @@ var rootCmd = &cobra.Command{
 		case verbosity >= 1:
 			log.SetLevel(log.DebugLevel)
 		}
+
+		log.Debugf("Configuration: %+v", config)
 	},
 	Run: func(cmd *cobra.Command, args []string) {
-
 		// Create scheduler.
 		sched := scheduler.NewPriorityScheduler()
+
+		// Create dashboard telemetry provider if configured
+		if config.Dashboard != nil {
+			hooks := dashboard.NewDashboardTelemetryHook(config)
+			sched.AddObserver(hooks)
+		}
 
 		// Create filesystem storage for the logstash
 		stashFs, err := config.LogStash.CreateFs()
 		if err != nil {
 			log.Fatal(err)
 		}
-
-		afero.WriteFile(stashFs, "asdf", []byte("here is the log"), 0666)
 
 		// Create new logstash
 		stash := logstash.NewLogStash(&config.LogStash, stashFs)

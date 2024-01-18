@@ -17,8 +17,6 @@ type SchedulerTest struct {
 	suite.Suite
 	createScheduler func() Scheduler
 	scheduler       Scheduler
-	build           Build
-	worker          Worker
 	ctx             context.Context
 	cancel          func()
 }
@@ -124,6 +122,7 @@ func (suite *SchedulerTest) TestScheduleBuildWithNoEligibleWorker() {
 	addTask(build, "task", "label=label")
 
 	worker, err := suite.newWorker()
+	assert.NoError(suite.T(), err)
 	defer worker.Close()
 
 	observer, err := suite.scheduler.ScheduleBuild(build)
@@ -136,6 +135,7 @@ func (suite *SchedulerTest) TestScheduleBuildWithOneWorker() {
 	addTask(build, "task")
 
 	worker, err := suite.newWorker()
+	assert.NoError(suite.T(), err)
 	defer worker.Close()
 
 	observer, err := suite.scheduler.ScheduleBuild(build)
@@ -148,6 +148,7 @@ func (suite *SchedulerTest) TestScheduleBuildWithEligibleWorker() {
 	addTask(build, "task", "label=one")
 
 	worker, err := suite.newWorker("label=one")
+	assert.NoError(suite.T(), err)
 	defer worker.Close()
 
 	observer, err := suite.scheduler.ScheduleBuild(build)
@@ -161,6 +162,7 @@ func (suite *SchedulerTest) TestScheduleTask() {
 	task2 := addTask(build, "task21")
 
 	worker, err := suite.newWorker()
+	assert.NoError(suite.T(), err)
 
 	buildObserver, err := suite.scheduler.ScheduleBuild(build)
 	assert.NoError(suite.T(), err)
@@ -248,6 +250,7 @@ func (suite *SchedulerTest) TestScheduleTaskWithInvalidIdentifiers() {
 	task := addTask(build, "task")
 
 	worker, err := suite.newWorker()
+	assert.NoError(suite.T(), err)
 	defer worker.Close()
 
 	buildObserver, err := suite.scheduler.ScheduleBuild(build)
@@ -268,6 +271,7 @@ func (suite *SchedulerTest) TestNewExecutorWithInvalidIdentifiers() {
 	task := addTask(build, "task")
 
 	worker, err := suite.newWorker()
+	assert.NoError(suite.T(), err)
 	defer worker.Close()
 
 	buildObserver, err := suite.scheduler.ScheduleBuild(build)
@@ -302,6 +306,7 @@ func (suite *SchedulerTest) TestScheduleBuildWithPriority() {
 	defer build3.Close()
 
 	worker, err := suite.newWorker()
+	assert.NoError(suite.T(), err)
 
 	buildObserver1, err := suite.scheduler.ScheduleBuild(build1)
 	assert.NoError(suite.T(), err)
@@ -331,6 +336,7 @@ func (suite *SchedulerTest) TestScheduleBuildWithPriority() {
 	defer taskObserver3.Close()
 
 	worker, err = suite.newWorker()
+	assert.NoError(suite.T(), err)
 	defer worker.Close()
 
 	scheduledTask := <-worker.Tasks()
@@ -339,9 +345,11 @@ func (suite *SchedulerTest) TestScheduleBuildWithPriority() {
 	worker.Acknowledge()
 
 	scheduledTask = <-worker.Tasks()
+	assert.NotNil(suite.T(), scheduledTask)
 	worker.Acknowledge()
 
 	scheduledTask = <-worker.Tasks()
+	assert.NotNil(suite.T(), scheduledTask)
 	worker.Acknowledge()
 }
 
@@ -352,6 +360,7 @@ func (suite *SchedulerTest) TestCancelBuild() {
 	defer build1.Close()
 
 	worker, err := suite.newWorker()
+	assert.NoError(suite.T(), err)
 	defer worker.Close()
 
 	buildObserver1, err := suite.scheduler.ScheduleBuild(build1)
@@ -371,7 +380,7 @@ func (suite *SchedulerTest) TestCancelBuild() {
 	suite.scheduler.CancelBuild(build1.Id())
 
 	select {
-	case scheduledTask = <-worker.Tasks():
+	case <-worker.Tasks():
 		suite.T().FailNow()
 	default:
 	}
@@ -385,6 +394,7 @@ func (suite *SchedulerTest) TestCancelBuildWithObservers() {
 	defer build1.Close()
 
 	worker, err := suite.newWorker()
+	assert.NoError(suite.T(), err)
 	defer worker.Close()
 
 	buildObserver1, err := suite.scheduler.ScheduleBuild(build1)
@@ -427,7 +437,7 @@ func (suite *SchedulerTest) TestCancelBuildWithObservers() {
 	worker.Acknowledge()
 
 	select {
-	case scheduledTask = <-worker.Tasks():
+	case <-worker.Tasks():
 		assert.Fail(suite.T(), "No more tasks should be scheduled to the worker")
 	default:
 	}

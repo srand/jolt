@@ -72,7 +72,7 @@ class LogHandler(object):
             record.message = record.msg
 
         timestamp = Timestamp()
-        timestamp.FromMilliseconds(int(record.created * 1000))
+        timestamp.FromNanoseconds(int(record.created * 1000000000))
 
         self.stream.push(
             scheduler_pb.TaskUpdate(

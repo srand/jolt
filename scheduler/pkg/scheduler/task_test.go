@@ -87,7 +87,7 @@ func (s *TaskTest) TestObserver() {
 	o3 := s.task.NewUpdateObserver()
 	defer o3.Close()
 	select {
-	case update = <-o3.Updates():
+	case <-o3.Updates():
 		s.FailNow("Unexpected message")
 	case <-time.After(0):
 	}

@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strings"
-	"time"
 
 	echo "github.com/labstack/echo/v4"
 	"github.com/srand/jolt/scheduler/pkg/log"
@@ -53,7 +51,13 @@ func serveHttp(stash logstash.LogStash, uri string) {
 				return c.String(http.StatusInternalServerError, err.Error())
 			}
 
-			line := fmt.Sprintf("%s %7s - %s\n", record.Time.AsTime().Local().Format(time.RFC3339), strings.ToLower(record.Level.String()), record.Message)
+			ts := record.Time.AsTime().Local()
+			line := fmt.Sprintf(
+				"%s.%06d [%7s] %s\n",
+				ts.Format("2006-01-02 15:04:05"),
+				ts.Nanosecond()/1000,
+				record.Level.String(),
+				record.Message)
 
 			if _, err := writer.WriteString(line); err != nil {
 				return c.String(http.StatusInternalServerError, err.Error())

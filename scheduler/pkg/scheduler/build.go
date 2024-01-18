@@ -206,7 +206,7 @@ func (b *Build) ScheduleTask(identity string) (*Task, TaskUpdateObserver, error)
 
 	task, ok := b.tasks[identity]
 	if !ok {
-		return nil, nil, utils.NotFoundError
+		return nil, nil, utils.ErrNotFound
 	}
 
 	switch task.Status() {
@@ -236,7 +236,7 @@ func (b *Build) CancelTask(identity string) error {
 
 	task, ok := b.tasks[identity]
 	if !ok {
-		return utils.NotFoundError
+		return utils.ErrNotFound
 	}
 
 	return task.Cancel()
