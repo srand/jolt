@@ -20,9 +20,7 @@ func TestPlatform(t *testing.T) {
 }
 
 func TestPlatformLoadConfig(t *testing.T) {
-	viper.Set("platform", []any{
-		map[string]any{"label": "test"},
-	})
+	viper.Set("platform", []string{"label=test"})
 
 	p := NewPlatform()
 	err := p.LoadConfig()
