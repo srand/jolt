@@ -23,6 +23,9 @@ type Executor interface {
 	// Channel that is closed when the executor has terminated.
 	Done() <-chan struct{}
 
+	// The platform properties of the worker.
+	Platform() *Platform
+
 	// A channel where task execution requests are sent by the scheduler.
 	Tasks() chan *Task
 }

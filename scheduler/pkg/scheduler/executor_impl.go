@@ -6,13 +6,15 @@ import (
 
 type executor struct {
 	scheduler     Scheduler
+	platform      *Platform
 	queueConsumer *utils.UnicastConsumer[*Task]
 }
 
-func NewExecutor(scheduler Scheduler, consumer *utils.UnicastConsumer[*Task]) Executor {
+func NewExecutor(scheduler Scheduler, platform *Platform, consumer *utils.UnicastConsumer[*Task]) Executor {
 	return &executor{
-		scheduler:     scheduler,
+		platform:      platform,
 		queueConsumer: consumer,
+		scheduler:     scheduler,
 	}
 }
 
@@ -25,6 +27,10 @@ func (o *executor) Close() {
 }
 func (o *executor) Done() <-chan struct{} {
 	return o.queueConsumer.Done()
+}
+
+func (o *executor) Platform() *Platform {
+	return o.platform
 }
 
 func (o *executor) Tasks() chan *Task {

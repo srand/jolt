@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/labstack/echo/v4"
 	"github.com/srand/jolt/scheduler/pkg/log"
@@ -50,6 +51,18 @@ func (d *dashboardHooks) formatEvent(task *scheduler.Task, status protocol.TaskS
 		Name:     task.Name(),
 		Role:     "scheduler",
 		Log:      fmt.Sprintf("%s/logs/%s", d.config.GetLogstashUri(), task.Instance()),
+	}
+
+	// Include required labels as the routing key field
+	if labels, ok := task.Platform().GetPropertiesForKey("label"); ok {
+		event.RoutingKey = strings.Join(labels, ",")
+	}
+
+	// Include hostname of worker in the event
+	if pfm := task.MatchedPlatform(); pfm != nil {
+		if hostnames, ok := pfm.GetPropertiesForKey("worker.hostname"); ok {
+			event.Hostname = hostnames[0]
+		}
 	}
 
 	switch status {

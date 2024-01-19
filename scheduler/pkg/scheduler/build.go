@@ -290,7 +290,7 @@ func (b *Build) NewExecutor(scheduler Scheduler, platform *Platform) (Executor, 
 		return nil, errors.New("Build is cancelled")
 	}
 	consumer := b.queue.NewConsumer(platform)
-	return NewExecutor(scheduler, consumer), nil
+	return NewExecutor(scheduler, platform, consumer), nil
 }
 
 // Create a new build update observer.

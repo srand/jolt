@@ -242,6 +242,7 @@ func (s *workerService) GetTasks(stream protocol.Worker_GetTasksServer) error {
 			log.Debugf("run - task - id: %s (%s), worker: %s", task.Identity(), task.Instance(), execInfo.Worker.Id)
 
 			currentTask = task
+			currentTask.SetMatchedPlatform(executor.Platform())
 
 			currentLog, err = s.logs.Append(task.Instance())
 			if err != nil {

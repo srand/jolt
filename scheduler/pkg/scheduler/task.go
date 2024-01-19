@@ -15,7 +15,8 @@ type Task struct {
 	build *Build
 
 	// The platform that the task should be executed on.
-	platform *Platform
+	platform           *Platform
+	platformAssignment *Platform
 
 	// The current status of the task.
 	status protocol.TaskStatus
@@ -62,6 +63,16 @@ func (t *Task) Instance() string {
 // Returns the platform properties of the task.
 func (t *Task) Platform() *Platform {
 	return t.platform
+}
+
+// Returns the platform that was assigned to execute the task, if any
+func (t *Task) MatchedPlatform() *Platform {
+	return t.platformAssignment
+}
+
+// Set the platform that has been assigned to execute the task
+func (t *Task) SetMatchedPlatform(platform *Platform) {
+	t.platformAssignment = platform
 }
 
 // Returns the build that the task belongs to.
