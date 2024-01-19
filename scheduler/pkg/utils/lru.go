@@ -108,6 +108,10 @@ func (lru *LRU[E]) Get(path string) (item E, ok bool) {
 	return
 }
 
+func (lru *LRU[E]) Size() int64 {
+	return lru.currentSize
+}
+
 // Remove the oldest item from the cache.
 func (lru *LRU[E]) removeOldest() {
 	ele := lru.cacheList.Back()

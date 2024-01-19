@@ -33,3 +33,22 @@ func TestParseSize(t *testing.T) {
 		assert.Equal(t, data.value, size)
 	}
 }
+
+func TestHumanByteSize(t *testing.T) {
+	testData := []struct {
+		value string
+		input int64
+	}{
+		{"0B", 0},
+		{"123KB", 123 * 1024},
+		{"123.0MB", 123 * 1024 * 1024},
+		{"123.5MB", 123*1024*1024 + 511*1024},
+		{"123.00GB", 123 * 1024 * 1024 * 1024},
+		{"123.00TB", 123 * 1024 * 1024 * 1024 * 1024},
+	}
+
+	for _, data := range testData {
+		size := HumanByteSize(data.input)
+		assert.Equal(t, data.value, size)
+	}
+}

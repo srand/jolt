@@ -2,8 +2,10 @@ package logstash
 
 import (
 	"io"
+	"os"
 	"sync"
 
+	"github.com/spf13/afero"
 	"github.com/srand/jolt/scheduler/pkg/log"
 	"github.com/srand/jolt/scheduler/pkg/utils"
 )
@@ -78,6 +80,18 @@ func NewLogStash(config LogStashConfig, fs utils.Fs) LogStash {
 		log.Debug("del - log - id:", item.Path())
 		item.Unlink()
 	})
+
+	// Load existing log files into LRU
+	logCount := 0
+
+	afero.Walk(fs, ".", func(path string, info os.FileInfo, err error) error {
+		stash.lru.Add(newLogFile(fs, path))
+		logCount++
+		return nil
+	})
+
+	log.Infof("Loaded %d log files into logstash LRU cache. Size: %s / %s",
+		logCount, utils.HumanByteSize(stash.lru.Size()), utils.HumanByteSize(config.MaxSize()))
 
 	return stash
 }
