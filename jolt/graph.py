@@ -26,10 +26,22 @@ class TaskProxy(object):
         self.cache = cache
         self.options = options
 
+        # Direct and transitive dependencies.
+        # The dependency chain is broken at
+        # selfsustained dependencies that don't
+        # require their own dependencies anymore
+        # after being executed.
         self.children = []
         self.ancestors = set()
+
+        # All direct and transitive dependencies.
+        # Unlike 'children', this set is not filtered
+        # from selfsustained tasks.
         self.descendants = set()
+
+        # Unfiltered direct dependencies.
         self.neighbors = []
+
         self.extensions = []
         self.duration_queued = None
         self.duration_running = None

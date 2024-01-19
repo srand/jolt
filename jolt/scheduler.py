@@ -538,13 +538,21 @@ class WorkerStrategy(ExecutionStrategy, PruneStrategy):
         return False
 
 
+def get_exported_task_set(task):
+    children = [task] + task.descendants
+    for ext in task.extensions:
+        children.extend(get_exported_task_set(ext))
+    return list(set(children))
+
+
 class TaskIdentityExtension(ManifestExtension):
     def export_manifest(self, manifest, tasks):
         # Generate a list of all tasks that must be evaluated
         # for inclusion in the manifest
         all_tasks = []
         for task in tasks:
-            all_tasks += [task] + task.extensions + task.descendants
+            all_tasks += get_exported_task_set(task)
+        all_tasks = list(set(all_tasks))
 
         for child in all_tasks:
             manifest_task = manifest.find_task(child.qualified_name)
@@ -557,7 +565,6 @@ class TaskIdentityExtension(ManifestExtension):
 
 ManifestExtensionRegistry.add(TaskIdentityExtension())
 
-
 class TaskExportExtension(ManifestExtension):
     def export_manifest(self, manifest, tasks):
         short_task_names = set()
@@ -566,7 +573,8 @@ class TaskExportExtension(ManifestExtension):
         # for inclusion in the manifest
         all_tasks = []
         for task in tasks:
-            all_tasks += [task] + task.extensions + task.descendants
+            all_tasks += get_exported_task_set(task)
+        all_tasks = list(set(all_tasks))
 
         # Add all tasks with export attributes to the manifest
         for child in all_tasks:
