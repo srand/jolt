@@ -13,6 +13,7 @@ import (
 	"github.com/srand/jolt/scheduler/pkg/scheduler"
 )
 
+// The event data structure expected by the Jolt Dashbord /api/v1/tasks endpoint.
 type taskEvent struct {
 	Event      string
 	Hostname   string
@@ -24,8 +25,12 @@ type taskEvent struct {
 	Log        string
 }
 
+// Configuration properties required by the dashboard telemetry hooks
 type DashboardConfig interface {
+	// The URI of the Dashboard web service
 	GetDashboardUri() string
+
+	// The URI or the scheduler logstash web service.
 	GetLogstashUri() string
 }
 
@@ -101,6 +106,10 @@ func (d *dashboardHooks) postEvent(event *taskEvent) error {
 		log.Trace("failed to post telemetry:", err)
 	}
 	return err
+}
+
+func (d *dashboardHooks) Close() {
+	close(d.ch)
 }
 
 func (d *dashboardHooks) TaskScheduled(task *scheduler.Task) {

@@ -85,6 +85,10 @@ func NewLogStash(config LogStashConfig, fs utils.Fs) LogStash {
 	logCount := 0
 
 	afero.Walk(fs, ".", func(path string, info os.FileInfo, err error) error {
+		if path == "." {
+			return nil
+		}
+
 		stash.lru.Add(newLogFile(fs, path))
 		logCount++
 		return nil
