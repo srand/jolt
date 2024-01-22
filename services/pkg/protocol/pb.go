@@ -5,4 +5,4 @@ package protocol
 //go:generate protoc -I../../.. --go_out=../.. --go-grpc_out=../.. jolt/plugins/remote_execution/administration.proto
 //go:generate protoc -I../../.. --go_out=../.. --go-grpc_out=../.. jolt/plugins/remote_execution/scheduler.proto
 //go:generate protoc -I../../.. --go_out=../.. --go-grpc_out=../.. jolt/plugins/remote_execution/worker.proto
-//go:generate protoc -I../../.. --go_out=../.. --go-grpc_out=../.. scheduler/pkg/logstash/log.proto
+//go:generate protoc -I../../.. --go_out=../.. --go-grpc_out=../.. services/pkg/logstash/log.proto
