@@ -49,8 +49,6 @@ var rootCmd = &cobra.Command{
 		case verbosity >= 1:
 			log.SetLevel(log.DebugLevel)
 		}
-
-		log.Debugf("Configuration: %+v", config)
 	},
 	Run: func(cmd *cobra.Command, args []string) {
 		// Create scheduler.
