@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"runtime/debug"
+	"time"
 )
 
 type LogLevel string
@@ -65,8 +66,10 @@ func (l *logWrapper) Println(level LogLevel, args ...any) {
 	if !ShouldLog(level, l.Level) {
 		return
 	}
-	levelStr := fmt.Sprintf("%5s -", level)
-	allArgs := []any{levelStr}
+	ts := time.Now().Local()
+	timeStr := fmt.Sprintf("%s.%03d", ts.Format("2006-01-02 15:04:05"), ts.Nanosecond()/1000000)
+	levelStr := fmt.Sprintf("- %5s -", level)
+	allArgs := []any{timeStr, levelStr}
 	allArgs = append(allArgs, args...)
 	l.log.Println(allArgs...)
 }
