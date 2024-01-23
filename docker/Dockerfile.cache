@@ -1,0 +1,17 @@
+FROM golang:1.21-bookworm as base
+
+FROM base as tools
+ARG DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get -y upgrade
+
+FROM tools as build
+ARG BUILD_ARGS
+ADD . /usr/src
+WORKDIR /usr/src/services
+RUN go build -ldflags '-s -w' ${BUILD_ARGS} ./cmd/cache
+
+FROM debian:bookworm-slim
+COPY --from=build /usr/src/services/cache /opt/jolt/cache
+RUN mkdir /data
+WORKDIR /data
+ENTRYPOINT ["/opt/jolt/cache"]

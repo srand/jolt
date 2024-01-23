@@ -76,9 +76,10 @@ func NewLogStash(config LogStashConfig, fs utils.Fs) LogStash {
 		fs:     fs,
 	}
 
-	stash.lru = utils.NewLRU[*logFile](config.MaxSize(), func(item *logFile) {
+	stash.lru = utils.NewLRU[*logFile](config.MaxSize(), func(item *logFile) bool {
 		log.Debug("del - log - id:", item.Path())
 		item.Unlink()
+		return true
 	})
 
 	// Load existing log files into LRU

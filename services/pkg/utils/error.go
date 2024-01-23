@@ -8,6 +8,7 @@ import (
 )
 
 var (
+	ErrBadRequest       = fmt.Errorf("Bad request")
 	ErrNoEligibleWorker = fmt.Errorf("No eligible worker available")
 	ErrNoTask           = fmt.Errorf("No tasks available")
 	ErrNotFound         = fmt.Errorf("Not found")

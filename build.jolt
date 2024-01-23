@@ -6,6 +6,23 @@ from jolt.plugins import cxx, docker, git, selfdeploy
 from os import getenv
 
 
+@influence.files("{dockerfile}")
+@attributes.requires("requires_push_{push}")
+@git.influence("services")
+class CacheImage(docker.DockerImage):
+    name = "jolt/cache"
+    dockerfile = "docker/Dockerfile.cache"
+    push = BooleanParameter(False)
+    requires = ["docker/cli"]
+    requires_push_true = ["docker/login"]
+    version = Parameter(__version__, influence=False)
+    tags = [
+        "robrt/jolt-cache:{identity}",
+        "robrt/jolt-cache:latest",
+        "robrt/jolt-cache:{version}",
+    ]
+
+
 class Jolt(selfdeploy.Jolt):
     version = Parameter(__version__, influence=False)
 
@@ -48,7 +65,7 @@ class RabbitImage(docker.DockerImage):
 
 @influence.files("{dockerfile}")
 @attributes.requires("requires_push_{push}")
-@git.influence("scheduler")
+@git.influence("services")
 class SchedulerImage(docker.DockerImage):
     name = "jolt/scheduler"
     dockerfile = "docker/Dockerfile.scheduler"
@@ -65,7 +82,7 @@ class SchedulerImage(docker.DockerImage):
 
 @influence.files("{dockerfile}")
 @attributes.requires("requires_push_{push}")
-@git.influence("scheduler")
+@git.influence("services")
 class WorkerImage(SchedulerImage):
     name = "jolt/worker"
     dockerfile = "docker/Dockerfile.worker"
@@ -190,6 +207,7 @@ class Default(Alias):
     push = BooleanParameter(False)
 
     requires = [
+        "jolt/cache:push={push}",
         "jolt/docker/pypi:release={push}",
         "jolt/image:push={push}",
         "jolt/pypi:release={push}",

@@ -11,12 +11,12 @@ RUN apt-get update && apt-get install -y \
 FROM tools as build
 ARG BUILD_ARGS
 ADD . /usr/src
-WORKDIR /usr/src/scheduler
+WORKDIR /usr/src/services
 RUN go generate ./...
 RUN go build -ldflags '-s -w' ${BUILD_ARGS} ./cmd/scheduler
 
 FROM debian:bookworm-slim
-COPY --from=build /usr/src/scheduler/scheduler /opt/jolt/scheduler
+COPY --from=build /usr/src/services/scheduler /opt/jolt/scheduler
 RUN mkdir /data
 WORKDIR /data
 ENTRYPOINT ["/opt/jolt/scheduler", "-v"]

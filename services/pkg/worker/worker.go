@@ -247,10 +247,10 @@ func (w *worker) deployClient(client *protocol.Client) (string, error) {
 		return "", err
 	}
 
-	if client.Identity != "" || client.Url != "" {
+	if (client.Identity != "" && w.config.CacheUri != "") || client.Url != "" {
 		var url string = client.Url
 
-		if client.Identity != "" && w.config.CacheUri != "" {
+		if url == "" {
 			url = fmt.Sprintf("%s/jolt/main@%s.tar.gz", w.config.CacheUri, client.Identity)
 		}
 

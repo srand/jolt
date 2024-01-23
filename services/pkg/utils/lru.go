@@ -39,7 +39,7 @@ func (f *LRUFile) Size() int64 {
 }
 
 // EvictFunc is a function that is called when a file is evicted from the cache.
-type EvictFunc[E LRUItem] func(item E)
+type EvictFunc[E LRUItem] func(item E) bool
 
 // LRU is an LRU cache of files.
 type LRU[E LRUItem] struct {
@@ -91,8 +91,8 @@ func (lru *LRU[E]) Add(item E) {
 	lru.currentSize += item.Size()
 
 	// If the cache is full, remove the least recently used CacheItem.
-	for lru.currentSize > lru.maxSize {
-		lru.removeOldest()
+	if lru.currentSize > lru.maxSize {
+		lru.trimSize()
 	}
 }
 
@@ -108,21 +108,42 @@ func (lru *LRU[E]) Get(path string) (item E, ok bool) {
 	return
 }
 
+func (lru *LRU[E]) Count() int {
+	lru.mu.Lock()
+	defer lru.mu.Unlock()
+
+	return len(lru.cacheMap)
+}
+
 func (lru *LRU[E]) Size() int64 {
+	lru.mu.Lock()
+	defer lru.mu.Unlock()
+
 	return lru.currentSize
 }
 
 // Remove the oldest item from the cache.
-func (lru *LRU[E]) removeOldest() {
-	ele := lru.cacheList.Back()
-	if ele != nil {
-		lru.removeElement(ele)
+func (lru *LRU[E]) trimSize() {
+	var evictedSize int64 = 0
+	var removed = []*list.Element{}
 
-		// Call the eviction function if it's set.
+	for ele := lru.cacheList.Back(); ele != nil; ele = ele.Prev() {
+		if lru.currentSize-evictedSize <= lru.maxSize {
+			break
+		}
+
 		if lru.onEvict != nil {
-			lru.onEvict(ele.Value.(E))
+			if lru.onEvict(ele.Value.(E)) {
+				removed = append(removed, ele)
+				evictedSize += ele.Value.(E).Size()
+			}
 		}
 	}
+
+	for _, ele := range removed {
+		lru.removeElement(ele)
+	}
+
 }
 
 // Remove an item from the cache.

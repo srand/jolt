@@ -21,12 +21,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 FROM tools as build
 ADD . /usr/src
-WORKDIR /usr/src/scheduler
+WORKDIR /usr/src/services
 RUN go generate ./...
 RUN go build -ldflags '-s -w' ./cmd/worker
 
 FROM base
-COPY --from=build /usr/src/scheduler/worker /opt/jolt/worker
+COPY --from=build /usr/src/services/worker /opt/jolt/worker
 RUN mkdir -p /data/cache /data/ws
 WORKDIR /data/ws
 ENTRYPOINT ["/opt/jolt/worker", "-v"]

@@ -4,6 +4,11 @@ import "google/protobuf/timestamp.proto";
 
 option go_package = "pkg/protocol";
 
+message Digest {
+    string algorithm = 1 [json_name = "alg"];
+    string hex = 2;
+}
+
 enum LogLevel {
     // Used for exception callstacks
     EXCEPTION = 0;

@@ -84,6 +84,10 @@ func init() {
 	stderrLog = logWrapper{*log.New(os.Stderr, "", 0), InfoLevel}
 }
 
+func GetLevel() LogLevel {
+	return stdoutLog.Level
+}
+
 func SetLevel(loglevel LogLevel) error {
 	_, ok := levelmap[loglevel]
 	if !ok {
