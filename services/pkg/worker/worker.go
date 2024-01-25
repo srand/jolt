@@ -263,6 +263,10 @@ func (w *worker) deployClient(client *protocol.Client) (string, error) {
 		}
 		defer response.Body.Close()
 
+		if response.StatusCode >= 400 {
+			return "", errors.New(response.Status)
+		}
+
 		srcPath := filepath.Join(deployPath, "src")
 		err = os.MkdirAll(srcPath, 0777)
 		if err != nil {
