@@ -930,8 +930,8 @@ class TaskApi(JoltTest):
         """
         --- tasks:
         class Zlib(Download):
-            version = Parameter("1.3")
-            url = "https://zlib.net/zlib-{{version}}.tar.gz"
+            version = Parameter("1.3.1")
+            url = "https://github.com/madler/zlib/releases/download/v{{version}}/zlib-{{version}}.tar.gz"
             collect = [
                 ("zlib-{{version}}", "zlib1"),
                 dict(files="zlib-{{version}}", dest="zlib2"),
