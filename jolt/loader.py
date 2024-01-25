@@ -205,6 +205,7 @@ class JoltLoader(object):
                     self._tasks += recipe.tasks
 
         self._load_project_recipes()
+
         return self._tasks
 
     def load_plugin(self, filepath):
@@ -347,7 +348,10 @@ def get_workspacedir():
 
 def export_workspace(tasks=None):
     loader = JoltLoader.get()
-    workspace = common_pb.Workspace()
+    workspace = common_pb.Workspace(
+        cachedir=config.get_cachedir(),
+        rootdir=loader.joltdir,
+    )
 
     for recipe in loader.recipes:
         workspace.files.append(
