@@ -35,9 +35,9 @@ var rootCmd = &cobra.Command{
 		}
 
 		switch {
-		case config.Verbose >= 2:
+		case config.Verbosity >= 2:
 			log.SetLevel(log.TraceLevel)
-		case config.Verbose >= 1:
+		case config.Verbosity >= 1:
 			log.SetLevel(log.DebugLevel)
 		}
 		log.Info("Log verbosity:", log.GetLevel())
@@ -120,7 +120,7 @@ func init() {
 	viper.BindPFlag("listen_http", rootCmd.Flags().Lookup("listen-http"))
 	viper.BindPFlag("max_size", rootCmd.Flags().Lookup("max-size"))
 	viper.BindPFlag("path", rootCmd.Flags().Lookup("path"))
-	viper.BindPFlag("verbose", rootCmd.Flags().Lookup("verbose"))
+	viper.BindPFlag("verbosity", rootCmd.Flags().Lookup("verbose"))
 }
 
 func main() {

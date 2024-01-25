@@ -36,7 +36,8 @@ type Config struct {
 	// Use "memory" to store files in memory.
 	Path string `mapstructure:"path"`
 
-	Verbose int `mapstructure:"verbose"`
+	// Log verbosity level: 0 = info, 1 = debug, 2 = trace
+	Verbosity int `mapstructure:"verbosity"`
 }
 
 func (c *Config) MaxSize() int64 {
