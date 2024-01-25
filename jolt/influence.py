@@ -3,6 +3,7 @@ import hashlib
 import os
 from pathlib import Path, PurePath
 
+from jolt import config
 from jolt import inspection
 from jolt import utils
 from jolt import filesystem as fs
@@ -231,6 +232,14 @@ class TaskRequirementInfluence(HashInfluenceProvider):
 
     def get_influence(self, task):
         return "{}: {}".format(self._identity, self._name)
+
+
+@HashInfluenceRegistry.Register
+class CacheLocationInfluence(HashInfluenceProvider):
+    name = "Cache"
+
+    def get_influence(self, task):
+        return config.get_cachedir()
 
 
 @HashInfluenceRegistry.Register

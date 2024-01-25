@@ -9,6 +9,10 @@ type WorkerConfig struct {
 	// Base URL to the cache service.
 	CacheUri string `mapstructure:"cache_uri"`
 
+	// Directory to use for caching.
+	CacheDir string `mapstructure:"cache_dir"`
+
+	// Base URL to the scheduler service.
 	SchedulerUri string `mapstructure:"scheduler_uri"`
 }
 

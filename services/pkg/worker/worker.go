@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -132,7 +133,7 @@ func (w *worker) run() error {
 				}
 
 				log.Info("Deploying client", request.Build.Environment.Client)
-				digest, err := w.deployClient(request.Build.Environment.Client)
+				clientDigest, err := w.deployClient(request.Build.Environment.Client, request.Build.Environment.Workspace)
 				if err != nil {
 					log.Error("Failed to deploy client:", err)
 					reply(protocol.WorkerUpdate_DEPLOY_FAILED, err)
@@ -140,7 +141,10 @@ func (w *worker) run() error {
 					continue
 				}
 
-				currentCmd, currentProc, err = w.startExecutor(digest, request.WorkerId, request.BuildId, currentBuildFile)
+				clientCache := request.Build.Environment.Workspace.Cachedir
+				clientWs := request.Build.Environment.Workspace.Rootdir
+
+				currentCmd, currentProc, err = w.startExecutor(clientDigest, clientWs, clientCache, request.WorkerId, request.BuildId, currentBuildFile)
 				if err != nil {
 					reply(protocol.WorkerUpdate_EXECUTOR_FAILED, err)
 					os.RemoveAll(currentBuildFile)
@@ -207,22 +211,24 @@ func (w *worker) writeBuildRequest(request *protocol.BuildRequest) (string, erro
 	return file.Name(), nil
 }
 
-func (w *worker) deployClient(client *protocol.Client) (string, error) {
+func (w *worker) deployClient(client *protocol.Client, workspace *protocol.Workspace) (string, error) {
 	if client == nil {
 		return "", errors.New("Client information is missing")
 	}
 
-	digest, err := utils.Sha1String(client.String())
+	clientWs := workspace.Rootdir
+
+	clientDigest, err := utils.Sha1String(client.String())
 	if err != nil {
 		return "", err
 	}
 
-	deployPath := w.deployPath(digest)
+	deployPath := w.deployPath(clientDigest)
 
-	venv := w.vEnvPath(digest)
+	venv := w.vEnvPath(clientDigest)
 	if _, err := os.Stat(venv); err == nil {
-		if err := w.runClient(digest, "jolt", "--version"); err == nil {
-			return digest, nil
+		if err := w.runClientCmd(clientDigest, clientWs, "jolt", "--version"); err == nil {
+			return clientDigest, nil
 		} else {
 			os.RemoveAll(deployPath)
 		}
@@ -235,13 +241,13 @@ func (w *worker) deployClient(client *protocol.Client) (string, error) {
 		return "", err
 	}
 
-	err = utils.RunWait("virtualenv", venv)
+	err = w.runCmd(clientWs, "virtualenv", venv)
 	if err != nil {
 		os.RemoveAll(deployPath)
 		return "", err
 	}
 
-	err = w.runClient(digest, "pip", "install", "--upgrade", "pip")
+	err = w.runClientCmd(clientDigest, clientWs, "pip", "install", "--upgrade", "pip")
 	if err != nil {
 		os.RemoveAll(deployPath)
 		return "", err
@@ -296,7 +302,7 @@ func (w *worker) deployClient(client *protocol.Client) (string, error) {
 			log.Fatal("Unsupported file extension:", url)
 		}
 
-		err = w.runClient(digest, "pip", "install", srcPath)
+		err = w.runClientCmd(clientDigest, clientWs, "pip", "install", srcPath)
 		if err != nil {
 			os.RemoveAll(deployPath)
 			return "", err
@@ -305,43 +311,124 @@ func (w *worker) deployClient(client *protocol.Client) (string, error) {
 		log.Info("Deploying client from the Python Package Index:", client.Version)
 
 		args := append([]string{"pip", "install", "jolt==" + client.Version}, client.Requirements...)
-		err = w.runClient(digest, args...)
+		err = w.runClientCmd(clientDigest, clientWs, args...)
 		if err != nil {
 			os.RemoveAll(deployPath)
 			return "", err
 		}
 	}
 
-	return digest, nil
+	return clientDigest, nil
 }
 
-func (w *worker) deployPath(digest string) string {
-	return filepath.Join("build", "selfdeploy", digest)
+func (w *worker) deployPath(clientDigest string) string {
+	return filepath.Join("build", "selfdeploy", clientDigest)
 }
 
-func (w *worker) vEnvPath(digest string) string {
-	return filepath.Join(w.deployPath(digest), "env")
+func (w *worker) vEnvPath(clientDigest string) string {
+	return filepath.Join(w.deployPath(clientDigest), "env")
 }
 
-func (w *worker) activateVEnvPath(digest string) string {
-	return filepath.Join(w.vEnvPath(digest), "bin", "activate")
+func (w *worker) activateVEnvPath(clientDigest string) string {
+	return filepath.Join(w.vEnvPath(clientDigest), "bin", "activate")
 }
 
-func (w *worker) runClient(digest string, args ...string) error {
-	activate := w.activateVEnvPath(digest)
+// If bubblewrap is installed, returns a command prefix that
+// will setup a namespace with workspace and cache mounted
+// at the same paths as on the client.
+func (w *worker) nsWrapperCmd(clientWs, clientCache string) ([]string, []string) {
+	if clientWs == "" || clientWs == "/tmp" {
+		return []string{}, nil
+	}
 
-	envargs := []string{"sh", "-c", fmt.Sprintf(". %s && %s", activate, strings.Join(args, " "))}
-	args = append(envargs, args...)
-	return utils.RunWait(envargs...)
+	wd, err := os.Getwd()
+	if err != nil {
+		log.Warn("Current working directory unknown:", err)
+		return []string{}, nil
+	}
+
+	// The client workspace must not be a subdirectory of the
+	// current working directory for bubblewrap to be able to mount it.
+	if strings.HasPrefix(clientWs, wd) {
+		return []string{}, nil
+	}
+
+	path, err := exec.LookPath("bwrap")
+	if err != nil {
+		return []string{}, nil
+	}
+
+	cmd := []string{
+		path,
+		"--bind", "/", "/",
+		"--bind", "/tmp", "/tmp",
+		"--dev", "/dev",
+		"--bind", wd, clientWs,
+		"--chdir", clientWs,
+	}
+	config := []string{}
+
+	// If the client cache is specified, bind it to the same path as on the client.
+	// Also set the jolt.cachedir config option to the client cache path.
+	if clientCache != "" {
+		var localCache string
+
+		if w.config.CacheDir != "" {
+			localCache = w.config.CacheDir
+		} else {
+			home, err := os.UserHomeDir()
+			if err != nil {
+				log.Warn("Current user's home directory unknown:", err)
+			}
+
+			// Default to ~/.cache/jolt if the worker cache is not specified.
+			localCache = filepath.Join(home, ".cache", "jolt")
+		}
+
+		cmd = append(cmd, "--bind", localCache, clientCache)
+		config = append(config, "-c", "jolt.cachedir="+clientCache)
+		os.MkdirAll(clientCache, 0777)
+	}
+
+	os.MkdirAll(clientWs, 0777)
+
+	return cmd, config
 }
 
-func (w *worker) startExecutor(digest, worker, build, request string) (chan error, *os.Process, error) {
-	activate := w.activateVEnvPath(digest)
+func (w *worker) runCmd(clientWs string, args ...string) error {
+	// Build bubblewrap command prefix to run the executor in a namespace.
+	// If a namespace cannot be used, the command prefix will be empty.
+	cmd, _ := w.nsWrapperCmd("", "")
+	cmd = append(cmd, "/bin/sh", "-c", strings.Join(args, " "))
+	return utils.RunWait(cmd...)
+}
 
-	args := []string{"jolt", "-vv", "executor", "-w", worker, "-b", build, request}
-	envargs := []string{"sh", "-c", fmt.Sprintf(". %s && %s", activate, strings.Join(args, " "))}
+func (w *worker) runClientCmd(clientDigest, clientWs string, args ...string) error {
+	activate := w.activateVEnvPath(clientDigest)
 
-	return utils.Run(envargs...)
+	// Build bubblewrap command prefix to run the executor in a namespace.
+	// If a namespace cannot be used, the command prefix will be empty.
+	cmd := []string{"/bin/sh", "-c", fmt.Sprintf(". %s && %s", activate, strings.Join(args, " "))}
+	return w.runCmd(clientWs, cmd...)
+}
+
+func (w *worker) startExecutor(clientDigest, clientWs, clientCache, worker, build, request string) (chan error, *os.Process, error) {
+	activate := w.activateVEnvPath(clientDigest)
+
+	// Build bubblewrap command prefix to run the executor in a namespace.
+	// If a namespace cannot be used, the command prefix will be empty.
+	cmd, config := w.nsWrapperCmd(clientWs, clientCache)
+
+	// Build the executor command.
+	jolt := []string{"jolt", "-vv"}
+	if config != nil {
+		jolt = append(jolt, config...)
+	}
+	jolt = append(jolt, "executor", "-w", worker, "-b", build, request)
+
+	// Run the executor in a namespace if possible.
+	cmd = append(cmd, "/bin/sh", "-c", fmt.Sprintf(". %s && %s", activate, strings.Join(jolt, " ")))
+	return utils.Run(cmd...)
 }
 
 func (w *worker) enlist(stream protocol.Worker_GetInstructionsClient) error {

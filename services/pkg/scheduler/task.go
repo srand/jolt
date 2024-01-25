@@ -67,8 +67,6 @@ func (t *Task) Platform() *Platform {
 
 // Returns the platform that was assigned to execute the task, if any
 func (t *Task) MatchedPlatform() *Platform {
-	t.Lock()
-	defer t.Unlock()
 	return t.platformAssignment
 }
 
