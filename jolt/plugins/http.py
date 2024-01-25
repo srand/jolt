@@ -24,9 +24,8 @@ class Http(cache.StorageProvider):
         super(Http, self).__init__()
         self._cache = cache
         self._uri = config.get(NAME, "uri", "http://cache.")
+        self._uri = self._uri.rstrip("/")
         raise_error_if(not self._uri, "HTTP URI not configured")
-        if self._uri[-1] != "/":
-            self._uri += "/"
         self._upload = config.getboolean(NAME, "upload", True)
         self._download = config.getboolean(NAME, "download", True)
         self._disabled = False
