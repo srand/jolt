@@ -2,6 +2,7 @@ bz2file
 colorama
 fasteners
 ninja-syntax
+protobuf
 psutil
 sphinx<7.0
 sphinx_click
