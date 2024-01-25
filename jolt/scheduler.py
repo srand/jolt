@@ -565,6 +565,7 @@ class TaskIdentityExtension(ManifestExtension):
 
 ManifestExtensionRegistry.add(TaskIdentityExtension())
 
+
 class TaskExportExtension(ManifestExtension):
     def export_manifest(self, manifest, tasks):
         short_task_names = set()

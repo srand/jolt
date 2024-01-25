@@ -3,8 +3,6 @@ Helper module that sets up a mount and user namespace before executing
 a command. The helper primarily bypasses the restriction on creating
 namespaces from multithreaded applications (which Jolt is).
 """
-print("hello")
-
 import argparse
 from ctypes import CDLL, c_char_p
 import multiprocessing

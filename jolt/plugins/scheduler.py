@@ -190,7 +190,6 @@ class RemoteExecutor(NetworkExecutor):
                     context=line.context[:7],
                     prefix=True)
 
-
     def run(self, env):
         """ Run the task. """
         try:

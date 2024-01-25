@@ -512,7 +512,6 @@ class TaskProxy(object):
         from jolt.scheduler import ExecutorRegistry, JoltEnvironment
 
         for child in filter(lambda task: task.is_resource() and not task.is_completed(), reversed(self.children)):
-            session = {}
             executor = ExecutorRegistry.get().create_local(child)
             executor.run(JoltEnvironment(cache=cache))
 

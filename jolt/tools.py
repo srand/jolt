@@ -1406,8 +1406,8 @@ class Tools(object):
             except Exception:
                 pass
 
-
             return _run(cmd, self._cwd, self._env, self._preexec_fn, *args, **kwargs)
+
         finally:
             if stdi:
                 termios.tcsetattr(sys.stdin.fileno(), termios.TCSANOW, stdi)
