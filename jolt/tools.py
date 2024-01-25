@@ -467,6 +467,7 @@ class Tools(object):
 
     def __init__(self, task=None, cwd=None, env=None):
         self._chroot = None
+        self._chroot_prefix = []
         self._run_prefix = []
         self._preexec_fn = None
         self._cwd = fs.path.normpath(fs.path.join(config.get_workdir(), cwd or config.get_workdir()))
@@ -1386,11 +1387,11 @@ class Tools(object):
         kwargs.setdefault("shell", True)
 
         # Append command prefix before expanding string
-        if self._run_prefix:
+        if self._chroot_prefix or self._run_prefix:
             if type(cmd) is list:
-                cmd = self._run_prefix + cmd
+                cmd = self._chroot_prefix + self._run_prefix + cmd
             else:
-                cmd = " ".join(self._run_prefix) + " " + cmd
+                cmd = " ".join(self._chroot_prefix + self._run_prefix) + " " + cmd
 
         cmd = self.expand(cmd, *args, **kwargs)
 
@@ -1703,15 +1704,25 @@ class Tools(object):
             bind.append("/proc")
 
         unshare = os.path.join(os.path.dirname(__file__), "chroot.py")
-        with self.runprefix(
-                "{} {} -b {} -c {} --shell={{shell}} -- ",
-                sys.executable, unshare, " ".join(bind), chroot):
-            old_chroot = self._chroot
-            self._chroot = chroot
-            try:
-                yield
-            finally:
-                self._chroot = old_chroot
+
+        old_chroot = self._chroot
+        old_chroot_prefix = self._chroot_prefix
+        self._chroot = chroot
+        self._chroot_prefix = [
+            sys.executable,
+            unshare,
+            "-b",
+        ] + bind + [
+            "-c",
+            chroot,
+            "--shell={shell}",
+            "--",
+        ]
+        try:
+            yield
+        finally:
+            self._chroot = old_chroot
+            self._chroot_prefix = old_chroot_prefix
 
     def _unshare(self, uidmap, gidmap):
         from ctypes import CDLL
