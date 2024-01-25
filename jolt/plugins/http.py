@@ -1,4 +1,3 @@
-from requests import Session
 from requests.auth import HTTPBasicAuth
 from requests.exceptions import ConnectTimeout, RequestException
 from urllib.parse import urlparse, urlunparse
@@ -11,6 +10,7 @@ from jolt import cache
 from jolt import log
 from jolt import config
 from jolt import filesystem as fs
+from jolt import tools
 from jolt.error import raise_error_if, JoltError
 
 
@@ -30,7 +30,6 @@ class Http(cache.StorageProvider):
         self._upload = config.getboolean(NAME, "upload", True)
         self._download = config.getboolean(NAME, "download", True)
         self._disabled = False
-        self._session = Session()
 
     def _get_auth(self):
         service = config.get(NAME, "keyring.service")
@@ -99,7 +98,7 @@ class Http(cache.StorageProvider):
 
         url = self._get_url(artifact)
         try:
-            response = self._session.head(url, stream=True, timeout=TIMEOUT_HEAD, auth=self._get_auth())
+            response = tools.http_session.head(url, stream=True, timeout=TIMEOUT_HEAD, auth=self._get_auth())
         except ConnectTimeout:
             self._disabled = True
             log.warning("[HTTP] failed to establish server connection, disabled")

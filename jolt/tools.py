@@ -20,11 +20,11 @@ import bz2file
 import hashlib
 from contextlib import contextmanager
 from psutil import NoSuchProcess, Process
-
 from jinja2 import Environment, FileSystemLoader
 from jinja2.exceptions import TemplateError
 from jinja2.runtime import Context
 from jinja2.utils import missing
+from requests import Session
 
 
 from jolt import cache
@@ -35,6 +35,9 @@ from jolt import config
 from jolt.error import JoltCommandError
 from jolt.error import raise_error_if
 from jolt.error import raise_task_error, raise_task_error_if
+
+
+http_session = Session()
 
 
 def stdout_write(line):
@@ -804,9 +807,7 @@ class Tools(object):
         url = self.expand(url)
         pathname = self.expand_path(pathname)
         try:
-            from requests.api import get
-
-            response = get(url, stream=True, **kwargs)
+            response = http_session.get(url, stream=True, **kwargs)
             raise_error_if(
                 exceptions and response.status_code not in [200],
                 f"Download from '{url}' failed with status '{response.status_code}'")
@@ -1860,8 +1861,7 @@ class Tools(object):
                 pbar.update(len(data))
                 return data
 
-            from requests.api import put
-            response = put(url, data=iter(read, b''), auth=auth, **kwargs)
+            response = http_session.put(url, data=iter(read, b''), auth=auth, **kwargs)
             raise_error_if(
                 exceptions and response.status_code not in [201, 204],
                 f"Upload to '{url}' failed with status '{response.status_code}'")
