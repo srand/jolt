@@ -253,9 +253,8 @@ class BuildCli(testsupport.JoltTest):
 
         # Starting two builds in parallel
         with self.assertRaises(Exception), self.tools.cwd(self.ws):
-            self.tools.run("timeout 5 jolt -c test.conf -c net.conf -c jolt.cachedir={ws}/c1 "
-                           "build -n sleep:t=10")
-        self.jolt(f"-c jolt.cachedir={self.ws}/c2 build -n sleep:t=10")
+            self.tools.run("timeout 5 jolt -c test.conf -c net.conf build -n sleep:t=10")
+        self.jolt(f"build -n sleep:t=10")
         self.tools.run("sleep 10")
 
         # Assert that only one build request reaches the worker
