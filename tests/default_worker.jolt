@@ -12,13 +12,16 @@ class Worker(Resource):
 
     storage = Parameter()
 
-    requires = ["jolt/scheduler", "jolt/worker"]
+    requires = ["jolt/cache", "jolt/scheduler", "jolt/worker"]
 
     def acquire(self, artifact, deps, tools, owner):
         try:
             with tools.cwd(tools.builddir()):
                 for file in tools.glob("{joltdir}/../docker/swarm/*"):
                     tools.copy(file, "./")
+                tools.replace_in_file(
+                    "jolt.yaml", "robrt/jolt-cache:latest",
+                    tools.expand("robrt/jolt-cache:{deps[jolt/cache].task.identity}", deps=deps))
                 tools.replace_in_file(
                     "jolt.yaml", "robrt/jolt-scheduler:latest",
                     tools.expand("robrt/jolt-scheduler:{deps[jolt/scheduler].task.identity}", deps=deps))
@@ -28,7 +31,7 @@ class Worker(Resource):
                 tools.run("docker stack deploy -c jolt.yaml jolt_test", output_on_error=True)
                 tools.run("docker service scale jolt_test_worker=1", output_on_error=True)
                 config = tools.read_file("client.conf")
-                config += "\n[selfdeploy]\nfloating = true\nbaseUri = http://cache"
+                config += "\n[selfdeploy]\nfloating = true\nbaseUri = http://cache:8080/files"
                 config = config.replace("127.0.0.1", os.getenv("DOCKER_PUBLIC_IP", "127.0.0.1"))
                 artifact.strings.config = config
                 artifact.strings.plugin = "remote"

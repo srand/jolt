@@ -89,7 +89,9 @@ class JoltTest(Test):
 
     def setup(self, deps, tools):
         self.deps = deps
-        self.ws = tools.builddir(self._testMethodName)
+        self.ws = tools.builddir("workspace", unique=False)
+        tools.rmtree(self.ws, ignore_errors=True)
+        tools.mkdir(self.ws)
         with tools.cwd(self.ws):
             tools.setenv("JOLT_CONFIG_PATH", self.ws)
             tools.write_file("default.joltxmanifest", """
@@ -114,7 +116,7 @@ global_string("{test}")
                 tools.write_file(filename, content)
 
     def cleanup(self):
-        fs.rmtree(self.ws)
+        self.tools.rmtree(self.ws, ignore_errors=True)
 
     def jolt(self, command, *args, **kwargs):
         with self.tools.cwd(self.ws):

@@ -629,10 +629,14 @@ class Tools(object):
             return dirname
 
         if name not in self._builddir:
-            fs.makedirs(fs.path.dirname(dirname))
-            self._builddir[name] = fs.mkdtemp(
-                prefix=fs.path.basename(dirname) + "-",
-                dir=fs.path.dirname(dirname))
+            if unique:
+                fs.makedirs(fs.path.dirname(dirname))
+                self._builddir[name] = fs.mkdtemp(
+                    prefix=fs.path.basename(dirname) + "-",
+                    dir=fs.path.dirname(dirname))
+            else:
+                fs.makedirs(dirname)
+                self._builddir[name] = dirname
 
         return self._builddir[name]
 

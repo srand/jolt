@@ -555,7 +555,7 @@ class BuildCli(testsupport.JoltTest):
 
         for i in [0, 1]:
             self.jolt("clean a b")
-            self.tools.run("docker run --rm -i -v jolt_test_cache-http:/cache -w /cache busybox:latest find -delete")
+            self.tools.run("docker run --rm -i -v jolt_test_cache-http:/cache -w /cache busybox:latest find  -delete")
             r = self.build("a b")
             self.assertBuild(r, "a")
             self.assertBuild(r, "b")

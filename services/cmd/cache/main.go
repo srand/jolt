@@ -109,7 +109,7 @@ func init() {
 	rootCmd.Flags().StringP("expiration", "e", "", "Artifact expiration timeout in seconds.")
 	rootCmd.Flags().BoolP("insecure", "i", false, "Don't use TLS")
 	rootCmd.Flags().StringSliceP("listen-http", "l", nil, "Address and port to listen on (default :8080, :8443)")
-	rootCmd.Flags().StringP("max-size", "s", "100MB", "Maximum size of the cache.")
+	rootCmd.Flags().StringP("max-size", "s", "10GB", "Maximum size of the cache.")
 	rootCmd.Flags().StringP("path", "p", "/data", "Path to cache storage on disk, or 'memory' to store files in memory.")
 	rootCmd.Flags().CountP("verbose", "v", "Verbosity (repeatable)")
 

@@ -92,11 +92,21 @@ func (c *lruCache) hasFile(path string) CacheItem {
 	c.Lock()
 	defer c.Unlock()
 
+	// Check if the file is in the cache
 	item, found := c.lru.Get(path)
 	if !found {
 		c.stats.Misses++
 		return nil
 	}
+
+	// Check if the file still exists on disk
+	if _, err := c.fs.Stat(path); err != nil {
+		log.Warn("inconsistent cache: file not found on disk:", path)
+		c.lru.Remove(path)
+		c.stats.Misses++
+		return nil
+	}
+
 	item.access = time.Now()
 	c.stats.Hits++
 	return item
@@ -106,20 +116,23 @@ func (c *lruCache) readFile(path string) (io.ReadCloser, error) {
 	c.Lock()
 	defer c.Unlock()
 
+	// Check if the file is in the cache
 	item, ok := c.lru.Get(path)
 	if !ok {
 		c.stats.Misses++
 		return nil, utils.ErrNotFound
 	}
 
-	c.stats.Hits++
-	item.access = time.Now()
-
 	file, err := c.fs.Open(path)
 	if err != nil {
+		log.Warn("inconsistent cache: file not found on disk:", path)
+		c.lru.Remove(path)
+		c.stats.Misses++
 		return nil, err
 	}
 
+	item.access = time.Now()
+	c.stats.Hits++
 	return file, nil
 }
 

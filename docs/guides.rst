@@ -8,6 +8,21 @@ Container Images
 
 The Jolt container images are available on `Docker Hub <https://hub.docker.com/r/robrt>`_.
 
+
+Cache
+~~~~~
+
+The cache service is an HTTP-based server for artifact sharing between
+clients and workers in a build cluster. Files and objects are
+automatically evicted from the cache in LRU order when the total size
+reaches a configured limit. A configurable quaranteen protects
+artifacts from eviction for some time after the last access.
+
+The cache image is named
+`robrt/jolt-cache <https://hub.docker.com/r/robrt/jolt-cache>`_.
+It uses Debian as its base image.
+
+
 Dashboard
 ~~~~~~~~~
 
@@ -106,7 +121,7 @@ It uses Debian as its base image.
 
 
 Worker
-~~~~~~~~~
+~~~~~~
 
 The worker is responsible for executing tasks as instructed by the scheduler. It
 is designed to be deployed as a container on a node in the build cluster. The
@@ -289,8 +304,7 @@ Docker Swarm
 
 Docker Swarm is an easy to use container orchestration tool which can be used
 to deploy and manage the Jolt build cluster. The below Docker stack yaml file
-will deploy a scheduler and two workers, as well as an artifact cache served
-by `Nginx`.
+will deploy a scheduler and two workers, as well as an artifact cache.
 
   .. literalinclude:: ../docker/swarm/jolt.yaml
     :language: yaml
@@ -308,12 +322,6 @@ node with the ``jolt.cachesize`` configuration key. If multiple workers are
 deployed on the same node, the local cache may be shared between them in the
 same directory. Fast SSD storage is recommended for the local cache and the
 worker workspace.
-
-
-The Nginx HTTP cache is configured in the ``nginx.conf`` file:
-
-  .. literalinclude:: ../docker/swarm/nginx.conf
-    :language: nginx
 
 To deploy the system into a swarm, run:
 

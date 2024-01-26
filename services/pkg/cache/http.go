@@ -24,6 +24,7 @@ func newError(c echo.Context, err error) error {
 		return c.JSON(http.StatusBadRequest, &Error{Message: err.Error()})
 	}
 
+	log.Error(c.Request().URL, err)
 	return c.JSON(http.StatusInternalServerError, &Error{Message: err.Error()})
 }
 
