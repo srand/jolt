@@ -337,6 +337,8 @@ func (w *worker) activateVEnvPath(clientDigest string) string {
 // will setup a namespace with workspace and cache mounted
 // at the same paths as on the client.
 func (w *worker) nsWrapperCmd(clientWs, clientCache string) ([]string, []string) {
+	return []string{}, nil
+
 	if clientWs == "" || clientWs == "/tmp" {
 		return []string{}, nil
 	}
@@ -408,7 +410,7 @@ func (w *worker) runClientCmd(clientDigest, clientWs string, args ...string) err
 
 	// Build bubblewrap command prefix to run the executor in a namespace.
 	// If a namespace cannot be used, the command prefix will be empty.
-	cmd := []string{"/bin/sh", "-c", fmt.Sprintf(". %s && %s", activate, strings.Join(args, " "))}
+	cmd := []string{fmt.Sprintf(". %s && %s", activate, strings.Join(args, " "))}
 	return w.runCmd(clientWs, cmd...)
 }
 
