@@ -334,7 +334,7 @@ class RecipeExtension(ManifestExtension):
 
             for path in project.paths:
                 loader._add_project_module(project.name, path.path)
-                sys.path.append(fs.path.join(buildenv.workspace.rootdir, path.path))
+                sys.path.append(fs.path.join(loader.joltdir, path.path))
 
 
 ManifestExtensionRegistry.add(RecipeExtension())
