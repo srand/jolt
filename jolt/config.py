@@ -274,6 +274,11 @@ class ConfigExtension(ManifestExtension):
     def export_manifest(self, manifest, _):
         manifest.config = get("network", "config", "", expand=False)
 
+        for key, value in options("params"):
+            p = manifest.create_parameter()
+            p.key = "config." + key
+            p.value = value
+
     def import_manifest(self, manifest):
         if manifest.config:
             _manifest.read_string(manifest.config)
