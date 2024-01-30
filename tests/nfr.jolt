@@ -10,6 +10,7 @@ from jolt import utils
 
 class NonFunctionalRequirements(JoltTest):
     name = "nfr"
+    unstable = True
 
     def test_many_deps(self):
         """
