@@ -274,7 +274,6 @@ class ConfigExtension(ManifestExtension):
     def export_manifest(self, manifest, _):
         manifest.config = get("network", "config", "", expand=False)
 
-
     def import_manifest(self, manifest):
         if manifest.config:
             _manifest.read_string(manifest.config)
