@@ -38,4 +38,34 @@ type Scheduler interface {
 
 	// Force scheduler to re-evaluate it's builds and tasks (mostly for debug)
 	Reschedule()
+
+	// Get scheduler statistics
+	Statistics() *SchedulerStatistics
+}
+
+// Scheduler statistics
+type SchedulerStatistics struct {
+	// Number of workers
+	Workers int64
+
+	// Number of builds in progress
+	Builds int64
+
+	// Number of completed builds
+	CompletedBuilds int64
+
+	// Total number of tasks that are queued
+	QueuedTasks int64
+
+	// Total number of tasks that are running
+	RunningTasks int64
+
+	// Total number of successful tasks
+	SuccessfulTasks int64
+
+	// Total number of failed tasks
+	FailedTasks int64
+
+	// Total number of completed tasks (successful or failed)
+	CompletedTasks int64
 }

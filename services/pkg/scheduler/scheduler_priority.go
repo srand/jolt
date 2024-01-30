@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"sync/atomic"
 
 	"github.com/google/uuid"
 	"github.com/srand/jolt/scheduler/pkg/log"
@@ -38,6 +39,12 @@ type priorityScheduler struct {
 
 	// List of telemtry receivers
 	observers []SchedulerObserver
+
+	// Statistics
+	numCompletedBuilds int64
+	numFailedTasks     int64
+	numSuccessfulTasks int64
+	numCompletedTasks  int64
 }
 
 // Create a new round robin scheduler.
@@ -374,6 +381,9 @@ func (s *priorityScheduler) closeBuildNoLock(build *Build) {
 	s.dequeueBuildNoLock(build)
 	delete(s.builds, build.Id())
 	build.Close()
+
+	// Update statistics
+	atomic.AddInt64(&s.numCompletedBuilds, 1)
 }
 
 // Register a new worker with the scheduler.
@@ -466,7 +476,45 @@ func (s *priorityScheduler) TaskScheduled(task *Task) {
 
 // Implementation of SchedulerObserver interface
 func (s *priorityScheduler) TaskStatusChanged(task *Task, status protocol.TaskStatus) {
+	switch status {
+	case protocol.TaskStatus_TASK_FAILED, protocol.TaskStatus_TASK_ERROR, protocol.TaskStatus_TASK_UNSTABLE:
+		atomic.AddInt64(&s.numFailedTasks, 1)
+		atomic.AddInt64(&s.numCompletedTasks, 1)
+	case protocol.TaskStatus_TASK_PASSED, protocol.TaskStatus_TASK_SKIPPED, protocol.TaskStatus_TASK_UPLOADED, protocol.TaskStatus_TASK_DOWNLOADED:
+		atomic.AddInt64(&s.numSuccessfulTasks, 1)
+		atomic.AddInt64(&s.numCompletedTasks, 1)
+	}
+
+	// Post scheduling telemetry to observers
 	for _, receiver := range s.observers {
 		receiver.TaskStatusChanged(task, status)
 	}
+}
+
+// Scheduler statistics
+func (s *priorityScheduler) Statistics() *SchedulerStatistics {
+	s.Lock()
+	defer s.Unlock()
+
+	stats := &SchedulerStatistics{
+		Workers:         int64(len(s.workers)),
+		Builds:          int64(len(s.builds)),
+		CompletedBuilds: s.numCompletedBuilds,
+		QueuedTasks:     0,
+		RunningTasks:    0,
+		FailedTasks:     s.numFailedTasks,
+		SuccessfulTasks: s.numSuccessfulTasks,
+		CompletedTasks:  s.numCompletedTasks,
+	}
+
+	for _, build := range s.builds {
+		if build.IsDone() {
+			stats.CompletedBuilds++
+		} else {
+			stats.QueuedTasks += int64(build.NumQueuedTasks())
+			stats.RunningTasks += int64(build.NumRunningTasks())
+		}
+	}
+
+	return stats
 }

@@ -95,6 +95,13 @@ func (b *Build) NumQueuedTasks() int {
 	return b.queue.Len()
 }
 
+// Returns the number of queued tasks.
+func (b *Build) NumRunningTasks() int {
+	b.RLock()
+	defer b.RUnlock()
+	return b.queue.NumUnackedData()
+}
+
 // Cancel the build.
 func (b *Build) Cancel() {
 	b.Lock()

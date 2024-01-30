@@ -102,6 +102,13 @@ func (bc *Unicast[E]) HasUnackedData() bool {
 	return len(bc.consumerItem) > 0
 }
 
+// Number of items that have been delivered but not yet acknowledged.
+func (bc *Unicast[E]) NumUnackedData() int {
+	bc.Lock()
+	defer bc.Unlock()
+	return len(bc.consumerItem)
+}
+
 func (bc *Unicast[E]) acknowledge(bcc *UnicastConsumer[E]) {
 	bc.Lock()
 	defer bc.Unlock()

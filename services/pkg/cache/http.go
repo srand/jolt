@@ -39,14 +39,7 @@ type FindBlobsResponse struct {
 func NewHttpHandler(cache Cache) http.Handler {
 	r := echo.New()
 	r.HideBanner = true
-
-	r.Use(func(next echo.HandlerFunc) echo.HandlerFunc {
-		return func(c echo.Context) error {
-			err := next(c)
-			log.Tracef("%4s %s %v", c.Request().Method, c.Request().URL, c.Response().Status)
-			return err
-		}
-	})
+	r.Use(utils.HttpLogger)
 
 	r.HEAD("/objects/:digest", func(c echo.Context) error {
 		digest, err := utils.ParseDigest(c.Param("digest"))

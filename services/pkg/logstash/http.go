@@ -1,4 +1,4 @@
-package main
+package logstash
 
 import (
 	"bufio"
@@ -7,29 +7,9 @@ import (
 	"net/http"
 
 	echo "github.com/labstack/echo/v4"
-	"github.com/srand/jolt/scheduler/pkg/log"
-	"github.com/srand/jolt/scheduler/pkg/logstash"
-	"github.com/srand/jolt/scheduler/pkg/utils"
 )
 
-func HttpLogger(next echo.HandlerFunc) echo.HandlerFunc {
-	return func(c echo.Context) error {
-		err := next(c)
-		log.Trace("HTTP", c.Request().Method, c.Response().Status, c.Request().URL, err)
-		return err
-	}
-}
-
-func serveHttp(stash logstash.LogStash, uri string) {
-	host, err := utils.ParseHttpUrl(uri)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	r := echo.New()
-	r.HideBanner = true
-	r.Use(HttpLogger)
-
+func NewHttpHandler(stash LogStash, r *echo.Echo) http.Handler {
 	r.GET("/logs/:id", func(c echo.Context) error {
 		reader, err := stash.Read(c.Param("id"))
 		if err != nil {
@@ -67,7 +47,5 @@ func serveHttp(stash logstash.LogStash, uri string) {
 		}
 	})
 
-	if err := r.Start(host); err != nil {
-		log.Fatal(err)
-	}
+	return r
 }

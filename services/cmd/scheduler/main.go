@@ -3,12 +3,15 @@ package main
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"os"
 
+	"github.com/labstack/echo/v4"
 	"github.com/srand/jolt/scheduler/pkg/dashboard"
 	"github.com/srand/jolt/scheduler/pkg/log"
 	"github.com/srand/jolt/scheduler/pkg/logstash"
 	"github.com/srand/jolt/scheduler/pkg/scheduler"
+	"github.com/srand/jolt/scheduler/pkg/utils"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -78,7 +81,21 @@ var rootCmd = &cobra.Command{
 		// Start listening for logstash HTTP connections on all configured addresses
 		logstashUris := viper.GetStringSlice("http_listen")
 		for _, uri := range logstashUris {
-			go serveHttp(stash, uri)
+			host, err := utils.ParseHttpUrl(uri)
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			log.Info("Listening on http", host)
+
+			r := echo.New()
+			r.HideBanner = true
+			r.Use(utils.HttpLogger)
+
+			logstash.NewHttpHandler(stash, r)
+			scheduler.NewHttpHandler(sched, r)
+
+			go http.ListenAndServe(host, r)
 		}
 
 		// Ready to run the scheduler
