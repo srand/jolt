@@ -2454,7 +2454,12 @@ class ReportProxy(object):
                     details = str(error["line"]) + ": " + details[int(error["line"]) - 1]
                 except Exception:
                     details = ""
-            self.add_error(type, error.get("location", ""), message, details)
+
+            location = error.get("location", "")
+            if location:
+                location = self._task.tools.expand_relpath(location, self._task.joltdir)
+
+            self.add_error(type, location, message, details)
 
     def add_exception(self, exc, errtype=None, location=None):
         """
@@ -2473,7 +2478,7 @@ class ReportProxy(object):
         if any(map(lambda frame: installdir not in frame, tb[1:-1])):
             while len(tb) > 2 and installdir in tb[1]:
                 del tb[1]
-        loc = re.findall("\"(.*?\", line [0-9]+, in .*?)\n", tb[1])
+        loc = re.findall("(\".*?\", line [0-9]+, in .*?)\n", tb[1])
         location = location or (loc[0] if loc and len(loc) > 0 else "")
         message = log.format_exception_msg(exc)
         if isinstance(exc, JoltCommandError):
