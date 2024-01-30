@@ -372,7 +372,7 @@ class TaskProxy(object):
         return self.identity
 
     def taint(self, salt=None):
-        self.task.taint = salt or uuid.uuid4()
+        self.task.taint = self.task.taint or salt or uuid.uuid4()
         if salt is None:
             # Only recalculate identity when build is forced, not when salted
             self.identity = None
