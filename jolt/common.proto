@@ -216,6 +216,9 @@ message BuildEnvironment {
 
     // Requested log level for the build.
     LogLevel loglevel = 6;
+
+    // Additional client configuration snippet
+    string config = 7;
 }
 
 enum BuildStatus {

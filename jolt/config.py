@@ -2,6 +2,7 @@ from configparser import ConfigParser, NoOptionError, NoSectionError
 from urllib.parse import urlparse
 import os
 
+from jolt import common_pb2 as common_pb
 from jolt import filesystem as fs
 from jolt import utils
 from jolt.error import raise_error_if
@@ -270,13 +271,9 @@ def split(string):
 
 
 class ConfigExtension(ManifestExtension):
-    def export_manifest(self, manifest, task):
+    def export_manifest(self, manifest, _):
         manifest.config = get("network", "config", "", expand=False)
 
-        for key, value in options("params"):
-            p = manifest.create_parameter()
-            p.key = "config." + key
-            p.value = value
 
     def import_manifest(self, manifest):
         if manifest.config:
@@ -287,6 +284,20 @@ class ConfigExtension(ManifestExtension):
         for param in manifest.parameters:
             if param.key.startswith("config."):
                 set("params", param.key.split(".", 1)[1], param.value)
+
+    def import_protobuf(self, pb):
+        self.import_manifest(pb)
+
+
+def export_config():
+    return get("network", "config", "", expand=False)
+
+
+def export_params():
+    parameters = []
+    for key, value in options("params"):
+        parameters.append(common_pb.Property(key="config." + key, value=value))
+    return parameters
 
 
 # High priority so that plugins are loaded before resources are acquired.

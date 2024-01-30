@@ -385,6 +385,9 @@ class RemoteSession(object):
         for key, value in registry.get_network_parameters(None).items():
             parameters.append(common_pb.Property(key=key, value=value))
 
+        # Add parameters from the config / command line (-c params.key).
+        parameters.extend(config.export_params())
+
         # Create the build environment.
         self.buildenv = common_pb.BuildEnvironment(
             client=selfdeploy.get_client(),
@@ -393,6 +396,7 @@ class RemoteSession(object):
             tasks=scheduler.export_tasks(graph.tasks),
             workspace=loader.export_workspace(graph.tasks),
             loglevel=log.get_level(),
+            config=config.export_config(),
         )
 
     @locked
