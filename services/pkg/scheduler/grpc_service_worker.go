@@ -3,6 +3,7 @@ package scheduler
 import (
 	"errors"
 	"io"
+	"time"
 
 	"github.com/srand/jolt/scheduler/pkg/log"
 	"github.com/srand/jolt/scheduler/pkg/logstash"
@@ -224,8 +225,21 @@ func (s *workerService) GetTasks(stream protocol.Worker_GetTasksServer) error {
 		}
 	}()
 
+	// Initial timeout to wait for the scheduler to send a task.
+	// If the scheduler doesn't send a task within this time, the
+	// executor will exit and allow the worker to be used for other
+	// builds. Most likely cause of this is that another executor
+	// has already been given the task that triggered this executor.
+	initTimeout := time.After(3 * time.Second)
+
 	for {
 		select {
+		case <-initTimeout:
+			if currentTask == nil {
+				log.Debugf("del - executor - build_id: %s, worker: %s", execInfo.Request.BuildId, execInfo.Worker.Id)
+				return nil
+			}
+
 		case <-executor.Done():
 			log.Infof("del - executor - build_id: %s, worker: %s", execInfo.Request.BuildId, execInfo.Worker.Id)
 			return nil

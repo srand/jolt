@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/srand/jolt/scheduler/pkg/log"
@@ -190,7 +191,12 @@ func (s *priorityScheduler) Reschedule() {
 
 // Run the scheduler.
 func (s *priorityScheduler) Run(ctx context.Context) {
-	log.Info("Starting")
+	// Create a timer to trigger rescheduling in case of no activity
+	tickerPeriod := time.Minute
+	ticker := time.NewTicker(tickerPeriod)
+	defer ticker.Stop()
+
+	log.Info("starting")
 	for {
 		select {
 		case <-ctx.Done():
@@ -198,8 +204,12 @@ func (s *priorityScheduler) Run(ctx context.Context) {
 			s.cancelAllWorkers()
 			return
 
+		case <-ticker.C:
+			go s.Reschedule()
+
 		case <-s.rescheduleChan:
-			log.Trace("Rescheduling")
+			log.Trace("rescheduling")
+			ticker.Reset(tickerPeriod)
 
 			for {
 				s.removeStaleBuilds()
@@ -285,6 +295,7 @@ func (s *priorityScheduler) selectTaskForWorkerNoLock(worker Worker, build *Buil
 		if _, ok := s.workerTasks[t.Identity()]; ok {
 			return false
 		}
+
 		return worker.Platform().Fulfills(t.Platform())
 	})
 }
