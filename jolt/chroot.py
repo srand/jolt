@@ -40,6 +40,23 @@ def mount_bind(src, dst, ro=False):
         None) == 0
 
 
+def mount_overlay(src, dst, temp):
+    src = os.path.normpath(src)
+    dst = os.path.normpath(dst)
+
+    upper = os.path.join(temp, "upper")
+    work = os.path.join(temp, "work")
+    os.makedirs(upper, exist_ok=True)
+    os.makedirs(work, exist_ok=True)
+
+    return libc.mount(
+        c_char_p("none".encode("utf-8")),
+        c_char_p(dst.encode("utf-8")),
+        c_char_p("overlay".encode("utf-8")),
+        0,
+        f"lowerdir={src},upperdir={upper},workdir={work}".encode("utf-8")) == 0
+
+
 def mount_tmpfs(path):
     assert libc.mount(
         c_char_p("none".encode("utf-8")),
@@ -89,7 +106,8 @@ def main():
     assert status == 0, f"Failed to map GIDs: newgidmap exit status: {status}"
 
     mount_tmpfs("/mnt")
-    mount_bind(args.chroot, "/mnt", True)
+    if not mount_overlay(args.chroot, "/mnt", "/mnt"):
+        mount_bind(args.chroot, "/mnt", True)
     mount_bind("/proc", "/mnt/proc", True)
 
     for path in args.bind or []:
