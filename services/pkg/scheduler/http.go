@@ -17,7 +17,7 @@ func NewHttpHandler(scheduler Scheduler, r *echo.Echo) {
 
 		metrics += fmt.Sprintln("# TYPE jolt_scheduler_builds_total counter")
 		metrics += fmt.Sprintln("# HELP jolt_scheduler_builds_total The total number of completed builds.")
-		metrics += fmt.Sprintf("jolt_scheduler_builds_completed_total %d\n", stats.CompletedBuilds)
+		metrics += fmt.Sprintf("jolt_scheduler_builds_total %d\n", stats.CompletedBuilds)
 
 		metrics += fmt.Sprintln("# TYPE jolt_scheduler_tasks_queued gauge")
 		metrics += fmt.Sprintln("# HELP jolt_scheduler_tasks_queued The total number of tasks currently queued.")
