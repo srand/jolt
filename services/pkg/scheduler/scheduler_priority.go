@@ -177,7 +177,7 @@ func (s *priorityScheduler) ScheduleTask(buildId, identity string) (TaskUpdateOb
 	if build.HasQueuedTask() {
 		s.enqueueBuildNoLock(build)
 		if s.hasReadyWorker() {
-			go s.Reschedule()
+			s.Reschedule()
 		}
 	}
 
@@ -186,7 +186,9 @@ func (s *priorityScheduler) ScheduleTask(buildId, identity string) (TaskUpdateOb
 
 // Request scheduler to reevaluate the scheduling of builds.
 func (s *priorityScheduler) Reschedule() {
-	s.rescheduleChan <- true
+	go func() {
+		s.rescheduleChan <- true
+	}()
 }
 
 // Run the scheduler.
@@ -205,7 +207,7 @@ func (s *priorityScheduler) Run(ctx context.Context) {
 			return
 
 		case <-ticker.C:
-			go s.Reschedule()
+			s.Reschedule()
 
 		case <-s.rescheduleChan:
 			log.Trace("rescheduling")
@@ -424,7 +426,7 @@ func (s *priorityScheduler) NewWorker(platform *Platform) (Worker, error) {
 
 	s.workers[worker.Id()] = worker
 	s.enqueueWorkerNoLock(worker)
-	go s.Reschedule()
+	s.Reschedule()
 
 	return worker, nil
 }
@@ -435,7 +437,7 @@ func (s *priorityScheduler) releaseWorker(worker Worker) error {
 	defer s.Unlock()
 	s.deassociateTaskWithWorker(worker)
 	s.enqueueWorkerNoLock(worker)
-	go s.Reschedule()
+	s.Reschedule()
 	return nil
 }
 
@@ -449,7 +451,7 @@ func (s *priorityScheduler) removeWorker(worker Worker) error {
 	s.deassociateTaskWithWorker(worker)
 	delete(s.availWorkers, worker.Id())
 	delete(s.workers, worker.Id())
-	go s.Reschedule()
+	s.Reschedule()
 	return nil
 }
 
