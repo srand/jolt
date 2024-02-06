@@ -514,7 +514,7 @@ def executor(ctx, worker, build, request):
     channel = grpc.insecure_channel(address.netloc)
     log.verbose("Waiting for GRPC channel to connect")
     grpc.channel_ready_future(channel).result()
-    log.verbose("GRPC channel established")
+    log.verbose("GRPC channel established: {}", address.netloc)
 
     sched = worker_grpc.WorkerStub(channel)
 
