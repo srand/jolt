@@ -482,9 +482,10 @@ class TaskProxy(object):
         self._completed = True
         try:
             self.graph.remove_node(self)
+            self.graph.add_pruned(self)
+            hooks.task_pruned(self)
         except KeyError:
             self.warning("Pruned task was already pruned")
-        hooks.task_pruned(self)
 
     def clean(self, cache, if_expired, onerror=None):
         with self.tools:
@@ -641,6 +642,7 @@ class Graph(object):
         self._mutex = RLock()
         self._failed = []
         self._unstable = []
+        self._pruned = []
         self._children = OrderedDict()
         self._parents = OrderedDict()
 
@@ -658,6 +660,9 @@ class Graph(object):
                 del self._children[parent][node]
             del self._children[node]
             del self._parents[node]
+
+    def add_pruned(self, node):
+        self._pruned.append(node)
 
     def add_edges_from(self, edges):
         with self._mutex:
@@ -725,6 +730,10 @@ class Graph(object):
     def tasks(self):
         with self._mutex:
             return [n for n in self.nodes]
+
+    @property
+    def pruned(self):
+        return self._pruned
 
     @property
     def roots(self):

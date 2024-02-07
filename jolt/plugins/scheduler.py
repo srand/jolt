@@ -393,7 +393,7 @@ class RemoteSession(object):
             client=selfdeploy.get_client(),
             parameters=parameters,
             task_default_parameters=scheduler.export_task_default_params(graph.tasks),
-            tasks=scheduler.export_tasks(graph.tasks),
+            tasks=scheduler.export_tasks(graph.tasks + graph.pruned),
             workspace=loader.export_workspace(graph.tasks),
             loglevel=log.get_level(),
             config=config.export_config(),
