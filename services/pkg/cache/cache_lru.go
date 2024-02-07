@@ -140,11 +140,6 @@ func (c *lruCache) writeFile(path string) (io.WriteCloser, error) {
 	c.Lock()
 	defer c.Unlock()
 
-	_, ok := c.lru.Get(path)
-	if ok {
-		c.lru.Remove(path)
-	}
-
 	dirpath := filepath.Dir(path)
 	err := c.fs.MkdirAll(dirpath, 0777)
 	if err != nil {
