@@ -190,6 +190,10 @@ class RemoteExecutor(NetworkExecutor):
                     context=line.context[:7],
                     prefix=True)
 
+    def update_logstash(self, task):
+        """ Update logstash with the task status. """
+        self.task.logstash = self.session.http_uri + "/logs/" + self.task.instance
+
     def run(self, env):
         """ Run the task. """
         try:
@@ -213,6 +217,8 @@ class RemoteExecutor(NetworkExecutor):
                 task_id=self.task.identity,
             )
             response = self.session.exec.ScheduleTask(request)
+
+            self.update_logstash(self.task)
 
             with hooks.task_run([self.task] + self.task.extensions):
                 self.run_task(env, response)
@@ -348,6 +354,9 @@ class RemoteSession(object):
         self.address = config.geturi(NAME, "uri", "tcp://scheduler.:9090")
         raise_error_if(self.address.scheme not in ["tcp"], "Invalid scheme in scheduler URI config: {}", self.address.scheme)
         raise_error_if(not self.address.netloc, "Invalid network address in scheduler URI config: {}", self.address.netloc)
+
+        # URI of scheduler HTTP endpoints.
+        self.http_uri = config.get(NAME, "http_uri", f"http://{self.address.netloc}")
 
         # GRPC channel.
         self.channel = grpc.insecure_channel(
