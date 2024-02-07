@@ -60,7 +60,7 @@ class EmailHooks(CliHook):
             if not self._failure:
                 return
         else:
-            if not self._success:
+            if not self._success or not report.has_tasks():
                 return
 
         msg = EmailMessage()
