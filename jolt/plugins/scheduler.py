@@ -599,7 +599,7 @@ def executor(ctx, worker, build, request):
                 # Send an update to the scheduler
                 update = scheduler_pb.TaskUpdate(
                     request=task,
-                    status=graph_task.status() or common_pb.TaskStatus.TASK_CANCELLED,
+                    status=common_pb.TaskStatus.TASK_CANCELLED,
                 )
                 updates.push(update)
 
@@ -625,7 +625,7 @@ def executor(ctx, worker, build, request):
                 # Send an update to the scheduler
                 update = scheduler_pb.TaskUpdate(
                     request=task,
-                    status=graph_task.status() or common_pb.TaskStatus.TASK_FAILED,
+                    status=common_pb.TaskStatus.TASK_FAILED,
                     errors=errors,
                 )
                 updates.push(update)

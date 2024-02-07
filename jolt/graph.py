@@ -582,7 +582,8 @@ class TaskProxy(object):
 
                         except Exception as e:
                             self.failed_execution()
-                            exitstack.close()
+                            with utils.ignore_exception():
+                                exitstack.close()
                             raise e
 
                         else:
