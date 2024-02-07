@@ -11,10 +11,12 @@ import (
 	"github.com/srand/jolt/scheduler/pkg/utils"
 )
 
+// Represents an error response.
 type Error struct {
 	Message string `json:"message"`
 }
 
+// newError creates a new error response.
 func newError(c echo.Context, err error) error {
 	if errors.Is(err, utils.ErrNotFound) {
 		return c.JSON(http.StatusNotFound, &Error{Message: err.Error()})
@@ -28,14 +30,27 @@ func newError(c echo.Context, err error) error {
 	return c.JSON(http.StatusInternalServerError, &Error{Message: err.Error()})
 }
 
+// FindFilesRequest represents a request to find files.
+type FindFilesRequest struct {
+	Files []string `json:"files"`
+}
+
+// FindFilesResponse represents a response to a find files request.
+type FindFilesResponse struct {
+	Files []string `json:"files"`
+}
+
+// FindBlobsRequest represents a request to find objects.
 type FindBlobsRequest struct {
-	Blobs []utils.Digest
+	Blobs []utils.Digest `json:"blobs"`
 }
 
+// FindBlobsResponse represents a response to a find objects request.
 type FindBlobsResponse struct {
-	Blobs []utils.Digest
+	Blobs []utils.Digest `json:"blobs"`
 }
 
+// NewHttpHandler creates a new HTTP handler for the cache.
 func NewHttpHandler(cache Cache) http.Handler {
 	r := echo.New()
 	r.HideBanner = true
@@ -75,7 +90,7 @@ func NewHttpHandler(cache Cache) http.Handler {
 	})
 
 	r.POST("/objects", func(c echo.Context) error {
-		present := c.QueryParam("present") != "false"
+		present := !c.QueryParams().Has("missing")
 		request := FindBlobsRequest{}
 		response := FindBlobsResponse{}
 
@@ -138,6 +153,31 @@ func NewHttpHandler(cache Cache) http.Handler {
 		}
 
 		return nil
+	})
+
+	r.POST("/files", func(c echo.Context) error {
+		present := !c.QueryParams().Has("missing")
+
+		request := FindFilesRequest{}
+		response := FindFilesResponse{}
+
+		if err := c.Bind(&request); err != nil {
+			return newError(c, fmt.Errorf("%v: %v", utils.ErrBadRequest, err))
+		}
+
+		for _, path := range request.Files {
+			info := cache.HasFile(path)
+
+			if present && info != nil {
+				response.Files = append(response.Files, path)
+			}
+
+			if !present && info == nil {
+				response.Files = append(response.Files, path)
+			}
+		}
+
+		return c.JSON(http.StatusOK, response)
 	})
 
 	r.PUT("/files/:path", func(c echo.Context) error {
