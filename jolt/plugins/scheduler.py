@@ -631,10 +631,16 @@ def executor(ctx, worker, build, request):
                 updates.push(update)
 
             else:
+                status = graph_task.status()
+
+                # If the task status remains queued, mark it as failed
+                if status in [common_pb.TaskStatus.TASK_QUEUED]:
+                    status = common_pb.TaskStatus.TASK_FAILED
+
                 # Send an update to the scheduler
                 update = scheduler_pb.TaskUpdate(
                     request=task,
-                    status=graph_task.status(),
+                    status=status,
                 )
                 updates.push(update)
 

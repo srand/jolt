@@ -605,12 +605,15 @@ class TaskProxy(object):
                                 self, "Failed to upload session artifact")
 
             elif force_upload or not available_remotely:
+                self.started_upload()
                 raise_task_error_if(
                     not self.upload(force=force_upload, persistent_only=True) \
                     and cache.upload_enabled(),
                     self, "Failed to upload task artifact")
+                self.finished_upload()
 
             else:
+                self.skipped()
                 self.info("Execution skipped, already in local cache")
 
             for extension in self.extensions:
