@@ -37,7 +37,11 @@ type FindFilesRequest struct {
 
 // FindFilesResponse represents a response to a find files request.
 type FindFilesResponse struct {
-	Files []string `json:"files"`
+	// The files that are missing.
+	Missing []string `json:"missing,omitempty"`
+
+	// The files that are present.
+	Present []string `json:"present,omitempty"`
 }
 
 // FindBlobsRequest represents a request to find objects.
@@ -47,7 +51,11 @@ type FindBlobsRequest struct {
 
 // FindBlobsResponse represents a response to a find objects request.
 type FindBlobsResponse struct {
-	Blobs []utils.Digest `json:"blobs"`
+	// The objects that are missing.
+	Missing []utils.Digest `json:"missing"`
+
+	// The objects that are present.
+	Present []utils.Digest `json:"present"`
 }
 
 // NewHttpHandler creates a new HTTP handler for the cache.
@@ -90,7 +98,13 @@ func NewHttpHandler(cache Cache) http.Handler {
 	})
 
 	r.POST("/objects", func(c echo.Context) error {
-		present := !c.QueryParams().Has("missing")
+		missing := c.QueryParams().Has("missing")
+		present := c.QueryParams().Has("present")
+		if !missing && !present {
+			missing = true
+			present = true
+		}
+
 		request := FindBlobsRequest{}
 		response := FindBlobsResponse{}
 
@@ -102,11 +116,11 @@ func NewHttpHandler(cache Cache) http.Handler {
 			info := cache.HasObject(digest)
 
 			if present && info != nil {
-				response.Blobs = append(response.Blobs, digest)
+				response.Present = append(response.Present, digest)
 			}
 
-			if !present && info == nil {
-				response.Blobs = append(response.Blobs, digest)
+			if missing && info == nil {
+				response.Missing = append(response.Missing, digest)
 			}
 		}
 
@@ -156,7 +170,12 @@ func NewHttpHandler(cache Cache) http.Handler {
 	})
 
 	r.POST("/files", func(c echo.Context) error {
-		present := !c.QueryParams().Has("missing")
+		missing := c.QueryParams().Has("missing")
+		present := c.QueryParams().Has("present")
+		if !missing && !present {
+			missing = true
+			present = true
+		}
 
 		request := FindFilesRequest{}
 		response := FindFilesResponse{}
@@ -169,11 +188,11 @@ func NewHttpHandler(cache Cache) http.Handler {
 			info := cache.HasFile(path)
 
 			if present && info != nil {
-				response.Files = append(response.Files, path)
+				response.Present = append(response.Present, path)
 			}
 
-			if !present && info == nil {
-				response.Files = append(response.Files, path)
+			if missing && info == nil {
+				response.Missing = append(response.Missing, path)
 			}
 		}
 
