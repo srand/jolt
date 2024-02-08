@@ -19,7 +19,7 @@ def enable_network_testing(cls, storage_providers=None, schedulers=None):
             classes = []
 
             for scheduler in schedulers or ["", "amqp/"]:
-                for cache in storage_providers or ["http"]:
+                for cache in storage_providers or ["cache", "http"]:
                     class Net(cls):
                         name = cls.name + "/" + scheduler + cache
                         requires = [f"deployment=jolt/{scheduler}deployment:storage={cache}"]

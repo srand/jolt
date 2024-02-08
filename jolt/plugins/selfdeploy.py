@@ -160,13 +160,13 @@ def publish_artifact():
     task = dag.select(lambda graph, task: True)
     assert len(task) == 1, "Too many selfdeploy tasks found"
     task = task[0]
-    if not task.is_available_remotely():
+    if not task.is_available_remotely(cache=False):
         factory = LocalExecutorFactory()
         executor = LocalExecutor(factory, task, force_upload=True)
         executor.run(env)
     jolt_url = acache.location(task.artifacts[0])
     raise_error_if(not jolt_url, "Failed to deploy jolt to a remote cache")
-    cacheUrl = config.get("http", "uri")
+    cacheUrl = config.get("http", "uri", config.get("cache", "uri", "") + "/files")
     substituteUrl = config.get("selfdeploy", "baseUri")
     if cacheUrl and substituteUrl:
         return task.identity, jolt_url.replace(cacheUrl, substituteUrl)

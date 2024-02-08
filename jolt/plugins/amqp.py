@@ -746,10 +746,6 @@ class AmqpExecutor(scheduler.NetworkExecutor):
             raise_error("[AMQP] Remote build failed")
 
         raise_task_error_if(
-            self.task.has_artifact() and not self.task.is_available_remotely(), self.task,
-            "No task artifact available in any cache, check configuration")
-
-        raise_task_error_if(
             self.task.has_artifact() and not self.task.download(persistent_only=True) and env.cache.download_enabled(),
             self.task, "Failed to download task artifact")
 

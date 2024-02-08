@@ -5,16 +5,15 @@ services:
     ports:
       - "5672:5672"
   cache:
-    image: nginx:latest
-    deploy:
-      replicas: 1
-    configs:
-      - source: nginx.conf
-        target: /etc/nginx/nginx.conf
+    image: robrt/jolt-cache:latest
+    environment:
+      - JOLT_INSECURE=true
+      - JOLT_MAX_SIZE=10GB
+      - JOLT_VERBOSITY=2
     ports:
-      - "8080:80"
+      - "8080:8080"
     volumes:
-      - cache-http:/usr/share/nginx/html
+      - cache-http:/data
   dashboard:
     image: robrt/jolt-dashboard:latest
     ports:
@@ -27,6 +26,8 @@ services:
     configs:
       - source: worker-amqp.conf
         target: /opt/jolt/worker.conf
+    environment:
+      - "JOLT_CACHE_URL=http://cache"
     volumes:
       - cache-node:/root/.cache/jolt
 configs:

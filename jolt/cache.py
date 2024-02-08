@@ -49,6 +49,21 @@ class StorageProvider(object):
     def location(self, artifact):
         return ''  # URL
 
+    def availability(self, artifacts):
+        # Ensure artifacts is a list
+        artifacts = utils.as_list(artifacts)
+
+        present = set()
+        missing = set()
+
+        for artifact in artifacts:
+            if self.location(artifact):
+                present.add(artifact)
+            else:
+                missing.add(artifact)
+
+        return list(present), list(missing)
+
 
 class StorageProviderFactory(StorageProvider):
     def create(self):
@@ -1011,11 +1026,15 @@ class ArtifactCache(StorageProvider):
 
     def __init__(self, options=None, pidprovider=None):
         self._options = options or JoltOptions()
-        self._local_presence_cache = set()
-        self._remote_presence_cache = set()
         self._storage_providers = [
             factory.create(self)
             for factory in ArtifactCache.storage_provider_factories]
+
+        # If no storage providers supports the availability method,
+        # we will not only use the local presence cache.
+        self._local_presence_cache = set()
+        self._remote_presence_cache = set()
+        self._presence_cache_only = self.has_availability()
 
         # Read configuration
         self._max_size = config.getsize(
@@ -1428,14 +1447,18 @@ class ArtifactCache(StorageProvider):
                 return True
         return False
 
-    def is_available_remotely(self, artifact):
+    def is_available_remotely(self, artifact, cache=True):
         """
         Check presence of task artifact in external remote caches.
         """
-        if artifact.identity in self._remote_presence_cache:
-            return True
+        if cache:
+            if artifact.identity in self._remote_presence_cache:
+                return True
+            if self._presence_cache_only:
+                return False
         for provider in self._storage_providers:
-            if provider.location(artifact):
+            present, _ = provider.availability([artifact])
+            if present:
                 self._remote_presence_cache.add(artifact.identity)
                 return True
         return False
@@ -1443,6 +1466,48 @@ class ArtifactCache(StorageProvider):
     def is_available(self, artifact):
         """ Check presence of task artifact in any cache, local or remote """
         return self.is_available_locally(artifact) or self.is_available_remotely(artifact)
+
+    def has_availability(self):
+        # Returns true if all storage providers implement the availability method
+        return all([provider.availability.__func__ != StorageProvider.availability for provider in self._storage_providers])
+
+    def availability(self, artifacts):
+        """ Check presence of task artifacts in any cache, local or remote """
+        present = set()
+        missing = set()
+
+        # Make sure artifacts is a list
+        artifacts = utils.as_list(artifacts)
+
+        # Check presence of all artifacts in the local cache
+        for artifact in artifacts:
+            if self.is_available_locally(artifact):
+                present.add(artifact)
+            else:
+                missing.add(artifact)
+
+        # Check presence of all artifacts in the remote caches
+        missing_remotely = artifacts
+
+        for provider in self._storage_providers:
+            present_in_provider, missing_in_provider = provider.availability(missing_remotely)
+            for artifact in present_in_provider:
+                self._remote_presence_cache.add(artifact.identity)
+            present.update(present_in_provider)
+            missing_remotely = missing_in_provider
+            if not missing_in_provider:
+                break
+
+        missing.update(missing_remotely)
+        missing = missing - present
+
+        for artifact in present:
+            log.debug("Artifact + {}", artifact.identity)
+
+        for artifact in missing:
+            log.debug("Artifact - {}", artifact.identity)
+
+        return list(present), list(missing)
 
     def download_enabled(self):
         return self._options.download and \

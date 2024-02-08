@@ -348,7 +348,7 @@ def build(ctx, task, network, keep_going, default, local,
     dag = gb.build(task)
 
     if not no_prune:
-        gp = graph.GraphPruner(strategy)
+        gp = graph.GraphPruner(acache, strategy)
         dag = gp.prune(dag)
 
     goal_tasks = dag.goals
@@ -1036,7 +1036,7 @@ def _export(ctx, task):
     dag = graph.GraphBuilder(registry, acache, ctx.obj["manifest"])
     dag = dag.build(task)
 
-    gp = graph.GraphPruner(strategy)
+    gp = graph.GraphPruner(acache, strategy)
     dag = gp.prune(dag)
 
     class Export(object):

@@ -185,13 +185,13 @@ class TaskProxy(object):
         artifacts = filter(lambda a: not a.is_session(), self._artifacts + dep_artifacts)
         return all(map(self.cache.is_available_locally, artifacts))
 
-    def is_available_remotely(self, extensions=True):
+    def is_available_remotely(self, extensions=True, cache=True):
         dep_artifacts = []
         if extensions:
             for dep in self.extensions:
                 dep_artifacts += dep.artifacts
         artifacts = filter(lambda a: not a.is_session(), self._artifacts + dep_artifacts)
-        return all(map(self.cache.is_available_remotely, artifacts))
+        return all(map(lambda artifact: self.cache.is_available_remotely(artifact, cache=cache), artifacts))
 
     def is_cacheable(self):
         return self.task.is_cacheable()
@@ -706,6 +706,17 @@ class Graph(object):
         return g
 
     @property
+    def artifacts(self):
+        artifacts = []
+        for node in self.nodes:
+            artifacts.extend(node.artifacts)
+        return artifacts
+
+    @property
+    def persistent_artifacts(self):
+        return list(filter(lambda a: not a.is_session(), self.artifacts))
+
+    @property
     def nodes(self):
         with self._mutex:
             return self._children.keys()
@@ -894,10 +905,19 @@ class PruneStrategy(object):
 
 
 class GraphPruner(object):
-    def __init__(self, strategy):
+    def __init__(self, cache, strategy):
+        self.cache = cache
         self.strategy = strategy
         self.retained = set()
         self.visited = set()
+
+    def _cache_presence_prefetch(self, graph):
+        if not self.cache.has_availability():
+            return
+
+        artifacts = graph.persistent_artifacts
+        present, missing = self.cache.availability(artifacts)
+        log.verbose("Cache: {}/{} artifacts present", len(present), len(artifacts))
 
     def _check_node(self, node):
         if node in self.visited:
@@ -911,6 +931,8 @@ class GraphPruner(object):
             utils.map_concurrent(self._check_node, node.neighbors)
 
     def prune(self, graph):
+        self._cache_presence_prefetch(graph)
+
         with log.progress("Checking availability", 0, " tasks") as p:
             self._progress = p
             for root in graph.roots:

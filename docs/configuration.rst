@@ -103,6 +103,27 @@ The ``[jolt]`` config section contains global configuration.
   The default value is 1.
 
 
+Cache
+-----
+
+The ``[cache]`` section configures a remote artifact cache. The cache
+is used to store artifacts that are built by Jolt. When a task is built,
+Jolt will first check the cache to see if the artifact is already present.
+If it is, the artifact is downloaded and used. If not, the artifact is
+built and then uploaded to the cache so that it can be shared with others.
+
+Available configuration keys:
+
+* ``uri = <uri>``
+
+  The URI of the remote artifact cache. The targeted service is expected
+  to implement the default Jolt cache REST API. The default value is
+  ``http://cache``.
+
+  Use the ``robrt/jolt-cache`` Docker image to deploy the official
+  cache service implementation.
+
+
 Scheduler
 ---------
 
