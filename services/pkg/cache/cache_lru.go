@@ -46,6 +46,11 @@ func (f *lruFile) Close() error {
 	return f.cache.fileClosed(f, err)
 }
 
+func (f *lruFile) Discard() error {
+	f.file.Close()
+	return f.cache.fileDiscarded(f)
+}
+
 type lruCache struct {
 	sync.Mutex
 
@@ -136,7 +141,7 @@ func (c *lruCache) readFile(path string) (io.ReadCloser, error) {
 	return file, nil
 }
 
-func (c *lruCache) writeFile(path string) (io.WriteCloser, error) {
+func (c *lruCache) writeFile(path string) (WriteCloseDiscarder, error) {
 	c.Lock()
 	defer c.Unlock()
 
@@ -162,7 +167,7 @@ func (c *lruCache) ReadFile(path string) (io.ReadCloser, error) {
 	return c.readFile(filepath.Join("files", path))
 }
 
-func (c *lruCache) WriteFile(path string) (io.WriteCloser, error) {
+func (c *lruCache) WriteFile(path string) (WriteCloseDiscarder, error) {
 	return c.writeFile(filepath.Join("files", path))
 }
 
@@ -176,7 +181,7 @@ func (c *lruCache) ReadObject(digest utils.Digest) (io.ReadCloser, error) {
 	return c.ReadFile(path)
 }
 
-func (c *lruCache) WriteObject(digest utils.Digest) (io.WriteCloser, error) {
+func (c *lruCache) WriteObject(digest utils.Digest) (WriteCloseDiscarder, error) {
 	path := c.pathFromDigest(digest)
 	return c.WriteFile(path)
 }
@@ -218,6 +223,12 @@ func (c *lruCache) fileClosed(file *lruFile, err error) error {
 	})
 
 	return nil
+}
+
+func (c *lruCache) fileDiscarded(file *lruFile) error {
+	c.Lock()
+	defer c.Unlock()
+	return c.fs.Remove(file.file.Name())
 }
 
 func (c *lruCache) load() error {

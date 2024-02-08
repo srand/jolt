@@ -137,12 +137,13 @@ func NewHttpHandler(cache Cache) http.Handler {
 		if err != nil {
 			return newError(c, err)
 		}
-		defer writer.Close()
 
 		if _, err := io.Copy(writer, c.Request().Body); err != nil {
+			writer.Discard()
 			return newError(c, err)
 		}
 
+		writer.Close()
 		return c.JSON(http.StatusCreated, nil)
 	})
 
@@ -204,11 +205,12 @@ func NewHttpHandler(cache Cache) http.Handler {
 		if err != nil {
 			return newError(c, err)
 		}
-		defer writer.Close()
 
 		if _, err := io.Copy(writer, c.Request().Body); err != nil {
+			writer.Discard()
 			return newError(c, err)
 		}
+		writer.Close()
 
 		return c.JSON(http.StatusCreated, nil)
 	})
