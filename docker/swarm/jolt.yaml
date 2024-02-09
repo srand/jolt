@@ -4,7 +4,7 @@ services:
     image: robrt/jolt-cache:latest
     environment:
       - JOLT_INSECURE=true
-      - JOLT_MAX_SIZE=10GB
+      - JOLT_MAX_SIZE=100GB
       - JOLT_VERBOSITY=2
     ports:
       - "8080:8080"
@@ -32,8 +32,6 @@ services:
 configs:
   worker.conf:
     file: ./worker.conf
-  nginx.conf:
-    file: ./nginx.conf
 volumes:
   cache-node:
   cache-http:
