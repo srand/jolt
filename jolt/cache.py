@@ -1501,12 +1501,6 @@ class ArtifactCache(StorageProvider):
         missing.update(missing_remotely)
         missing = missing - present
 
-        for artifact in present:
-            log.debug("Artifact + {}", artifact.identity)
-
-        for artifact in missing:
-            log.debug("Artifact - {}", artifact.identity)
-
         return list(present), list(missing)
 
     def download_enabled(self):
@@ -1767,3 +1761,10 @@ class ArtifactCache(StorageProvider):
                 with self._db() as db:
                     if self._db_select_lock_count(db, artifact.identity) == 0:
                         fs.unlink(lock_path, ignore_errors=True)
+
+    def precheck(self, artifacts):
+        """ Precheck artifacts for availability and cache status. """
+        if not self.has_availability():
+            return
+        present, missing = self.availability(artifacts)
+        log.verbose("Cache: {}/{} artifacts present", len(present), len(artifacts))

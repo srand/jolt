@@ -709,7 +709,8 @@ class Graph(object):
     def artifacts(self):
         artifacts = []
         for node in self.nodes:
-            artifacts.extend(node.artifacts)
+            if node.is_cacheable():
+                artifacts.extend(node.artifacts)
         return artifacts
 
     @property
@@ -911,14 +912,6 @@ class GraphPruner(object):
         self.retained = set()
         self.visited = set()
 
-    def _cache_presence_prefetch(self, graph):
-        if not self.cache.has_availability():
-            return
-
-        artifacts = graph.persistent_artifacts
-        present, missing = self.cache.availability(artifacts)
-        log.verbose("Cache: {}/{} artifacts present", len(present), len(artifacts))
-
     def _check_node(self, node):
         if node in self.visited:
             return
@@ -931,8 +924,6 @@ class GraphPruner(object):
             utils.map_concurrent(self._check_node, node.neighbors)
 
     def prune(self, graph):
-        self._cache_presence_prefetch(graph)
-
         with log.progress("Checking availability", 0, " tasks") as p:
             self._progress = p
             for root in graph.roots:

@@ -427,7 +427,7 @@ class DownloadStrategy(ExecutionStrategy, PruneStrategy):
             return self.executors.create_skipper(task)
         if task.is_available_locally():
             return self.executors.create_skipper(task)
-        if self.cache.download_enabled() and task.is_available_remotely():
+        if self.cache.download_enabled() and task.is_available_remotely(cache=False):
             return self.executors.create_downloader(task)
         raise_task_error(task, "Task must be built first")
 

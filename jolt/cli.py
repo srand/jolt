@@ -347,6 +347,9 @@ def build(ctx, task, network, keep_going, default, local,
     gb = graph.GraphBuilder(registry, acache, manifest, options, progress=True)
     dag = gb.build(task)
 
+    # Collect information about artifact presence before starting prune or build
+    acache.precheck(dag.persistent_artifacts)
+
     if not no_prune:
         gp = graph.GraphPruner(acache, strategy)
         dag = gp.prune(dag)
@@ -785,14 +788,11 @@ def freeze(ctx, task, default, output, remove):
     gb = graph.GraphBuilder(registry, acache, manifest)
     dag = gb.build(task)
 
-    available_in_cache = [
-        (t.is_available_locally(acache) or (
-            t.is_available_remotely(acache) and acache.download_enabled()), t)
-        for t in dag.tasks if t.is_cacheable()]
+    available, missing = acache.availability(dag.persistent_artifacts)
 
-    for available, task in available_in_cache:
+    for artifact in missing:
         raise_task_error_if(
-            not remove and not available, task,
+            not remove, artifact.get_task(),
             "Task artifact is not available in any cache, build it first")
 
     for task in dag.tasks:
@@ -968,8 +968,9 @@ def inspect(ctx, task, influence=False, artifact=False, salt=None):
         task.taint = salt
 
     if artifact:
+        options = JoltOptions(salt=salt)
         acache = cache.ArtifactCache.get()
-        builder = graph.GraphBuilder(task_registry, acache, manifest)
+        builder = graph.GraphBuilder(task_registry, acache, manifest, options)
         dag = builder.build([task.qualified_name])
         tasks = dag.select(lambda graph, node: node.task is task)
         assert len(tasks) == 1, "graph produced multiple tasks, one expected"
@@ -985,7 +986,7 @@ def inspect(ctx, task, influence=False, artifact=False, salt=None):
                 utils.as_human_size(sum([artifact.get_size() for artifact in proxy.artifacts]))))
         else:
             print("    Local             False")
-        print("    Remote            {0}".format(proxy.is_available_remotely()))
+        print("    Remote            {0}".format(proxy.is_available_remotely(cache=False)))
         print()
 
     if influence:
