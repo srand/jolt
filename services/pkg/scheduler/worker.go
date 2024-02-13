@@ -31,4 +31,7 @@ type Worker interface {
 	// The worker shall launch an executor to execute the task.
 	// The executor may execute additinonal compatible tasks.
 	Tasks() chan *Task
+
+	// Post a task to the worker.
+	Post(*Task)
 }

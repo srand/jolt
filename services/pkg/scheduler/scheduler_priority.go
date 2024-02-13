@@ -222,8 +222,9 @@ func (s *priorityScheduler) Run(ctx context.Context) {
 					break
 				}
 
+				// Post task to worker
 				log.Debugf("run - build - id: %s, worker: %s", task.Build().Id(), worker.Id())
-				worker.Tasks() <- task
+				worker.Post(task)
 			}
 		}
 	}

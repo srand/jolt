@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/srand/jolt/scheduler/pkg/log"
 )
 
 // A worker associated with the priority scheduler.
@@ -74,4 +75,15 @@ func (w *priorityWorker) String() string {
 // Returns a channel that receives tasks to be executed by the worker.
 func (w *priorityWorker) Tasks() chan *Task {
 	return w.tasks
+}
+
+// Post a task to the worker.
+func (w *priorityWorker) Post(task *Task) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Errorf("task could not be delivered: %v", r)
+		}
+	}()
+
+	w.tasks <- task
 }
