@@ -73,7 +73,7 @@ func (d *dashboardHooks) formatEvent(task *scheduler.Task, status protocol.TaskS
 	switch status {
 	case protocol.TaskStatus_TASK_CANCELLED:
 		event.Log = ""
-		fallthrough
+		event.Event = "cancelled"
 	case protocol.TaskStatus_TASK_ERROR, protocol.TaskStatus_TASK_FAILED, protocol.TaskStatus_TASK_UNSTABLE:
 		event.Event = "failed"
 	case protocol.TaskStatus_TASK_DOWNLOADED, protocol.TaskStatus_TASK_PASSED, protocol.TaskStatus_TASK_UPLOADED, protocol.TaskStatus_TASK_SKIPPED:
