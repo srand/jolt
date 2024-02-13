@@ -186,9 +186,10 @@ func (s *priorityScheduler) ScheduleTask(buildId, identity string) (TaskUpdateOb
 
 // Request scheduler to reevaluate the scheduling of builds.
 func (s *priorityScheduler) Reschedule() {
-	go func() {
-		s.rescheduleChan <- true
-	}()
+	select {
+	case s.rescheduleChan <- true:
+	default:
+	}
 }
 
 // Run the scheduler.
