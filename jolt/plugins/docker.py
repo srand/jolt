@@ -173,6 +173,22 @@ class DockerContainer(Resource):
     Alternatively, assign ``True`` to publish all exposed ports to random ports.
     """
 
+    security_opts = []
+    """
+    A list of security options.
+
+    By default, the container is started with the default security profile.
+
+    Example:
+
+    .. code-block:: python
+
+        security_opts = [
+            "seccomp:unconfined",
+        ]
+
+    """
+
     volumes = []
     """
     A list of volumes to mount.
@@ -249,6 +265,10 @@ class DockerContainer(Resource):
         return " ".join([utils.option("-p ", self.tools.expand(port)) for port in self.ports])
 
     @property
+    def _security_opts(self):
+        return " ".join([utils.option("--security-opt ", self.tools.expand(opt)) for opt in self.security_opts])
+
+    @property
     def _user(self):
         if self.user:
             return f"--user {self.user}"
@@ -273,7 +293,7 @@ class DockerContainer(Resource):
 
         self._info(f"Creating container from image '{image}'")
         self.container = tools.run(
-            "docker run -i -d {_cap_adds} {_cap_drops} {_entrypoint} {_labels} {_ports} {_privileged} {_user} {_environment} {_volumes} {image} {_arguments}",
+            "docker run -i -d {_cap_adds} {_cap_drops} {_entrypoint} {_labels} {_ports} {_privileged} {_security_opts} {_user} {_environment} {_volumes} {image} {_arguments}",
             image=image, output_on_error=True)
 
         self._info("Created container '{container}'")
