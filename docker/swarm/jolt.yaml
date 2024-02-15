@@ -29,6 +29,7 @@ services:
         target: /root/.config/jolt/config
     volumes:
       - cache-node:/root/.cache/jolt
+      - /etc/machine-id:/etc/machine-id
 configs:
   worker.conf:
     file: ./worker.conf
