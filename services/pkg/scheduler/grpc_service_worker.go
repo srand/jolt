@@ -230,21 +230,28 @@ func (s *workerService) GetTasks(stream protocol.Worker_GetTasksServer) error {
 	// executor will exit and allow the worker to be used for other
 	// builds. Most likely cause of this is that another executor
 	// has already been given the task that triggered this executor.
-	initTimeout := time.After(3 * time.Second)
+	initTimeoutPeriod := 3 * time.Second
+	initTimeout := time.After(initTimeoutPeriod)
 
 	for {
 		select {
 		case <-initTimeout:
+			// If no new task is received within this time, the executor will exit
+
 			if currentTask == nil {
 				log.Debugf("del - executor - build_id: %s, worker: %s", execInfo.Request.BuildId, execInfo.Worker.Id)
 				return nil
 			}
 
 		case <-executor.Done():
+			// If the executor is cancelled, exit
+
 			log.Infof("del - executor - build_id: %s, worker: %s", execInfo.Request.BuildId, execInfo.Worker.Id)
 			return nil
 
 		case task := <-executor.Tasks():
+			// If a new task is received, start processing it
+
 			if task == nil {
 				return nil
 			}
@@ -274,6 +281,8 @@ func (s *workerService) GetTasks(stream protocol.Worker_GetTasksServer) error {
 			}
 
 		case update := <-updates:
+			// If a task update is received, process it
+
 			if update == nil {
 				return nil
 			}
@@ -313,6 +322,10 @@ func (s *workerService) GetTasks(stream protocol.Worker_GetTasksServer) error {
 					currentLog.Close()
 					currentLog = nil
 				}
+
+				// Reset the initial timeout. If no new task is received within this time,
+				// the executor will exit and allow the worker to be used for other builds.
+				initTimeout = time.After(initTimeoutPeriod)
 			}
 		}
 	}

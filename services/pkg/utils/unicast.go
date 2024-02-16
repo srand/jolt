@@ -115,10 +115,6 @@ func (bc *Unicast[E]) acknowledge(bcc *UnicastConsumer[E]) {
 	bc.availConsumers[bcc.ID] = bcc
 	delete(bc.consumerItem, bcc.ID)
 	bc.send()
-	_, newData := bc.consumerItem[bcc.ID]
-	if !newData {
-		bcc.cancel()
-	}
 }
 
 func (bc *Unicast[E]) send() {
