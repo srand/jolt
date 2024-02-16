@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"sync"
+	"time"
 
 	"github.com/srand/jolt/scheduler/pkg/protocol"
 	"github.com/srand/jolt/scheduler/pkg/utils"
@@ -29,6 +30,9 @@ type Build struct {
 
 	// The priority of the build.
 	priority int
+
+	// The time of scheduling.
+	scheduledAt time.Time
 
 	// Stream log lines to client
 	logstream bool
@@ -60,6 +64,7 @@ func NewBuildFromRequest(id string, request *protocol.BuildRequest) *Build {
 		environment: request.Environment,
 		id:          id,
 		priority:    int(request.Priority),
+		scheduledAt: time.Now(),
 		logstream:   request.Logstream,
 		status:      protocol.BuildStatus_BUILD_ACCEPTED,
 		tasks:       map[string]*Task{},
@@ -86,6 +91,13 @@ func (b *Build) Priority() int {
 	b.RLock()
 	defer b.RUnlock()
 	return b.priority
+}
+
+// Returns the time of scheduling.
+func (b *Build) ScheduledAt() time.Time {
+	b.RLock()
+	defer b.RUnlock()
+	return b.scheduledAt
 }
 
 // Returns the number of queued tasks.

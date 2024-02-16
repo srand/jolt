@@ -69,11 +69,11 @@ func buildPriorityFunc(a, b any) int {
 		return -1
 	}
 
-	// Then by the number of queued tasks. Fewer tasks is higher priority.
-	if a.(*Build).NumQueuedTasks() < b.(*Build).NumQueuedTasks() {
-		return 1
-	} else if a.(*Build).NumQueuedTasks() > b.(*Build).NumQueuedTasks() {
+	// Then by time of scheduling, oldest first
+	if a.(*Build).ScheduledAt().Before(b.(*Build).ScheduledAt()) {
 		return -1
+	} else if a.(*Build).ScheduledAt().After(b.(*Build).ScheduledAt()) {
+		return 1
 	}
 
 	return 0

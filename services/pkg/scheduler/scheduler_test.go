@@ -322,7 +322,6 @@ func (suite *SchedulerTest) TestScheduleBuildWithPriority() {
 
 	worker.Close()
 
-	// Schedule task from build2 first
 	taskObserver1, err := suite.scheduler.ScheduleTask(build1.Id(), task1.Identity())
 	assert.NoError(suite.T(), err)
 	defer taskObserver1.Close()
@@ -343,13 +342,59 @@ func (suite *SchedulerTest) TestScheduleBuildWithPriority() {
 	assert.NotNil(suite.T(), scheduledTask)
 	assert.Equal(suite.T(), task3, scheduledTask)
 	worker.Acknowledge()
+}
 
-	scheduledTask = <-worker.Tasks()
-	assert.NotNil(suite.T(), scheduledTask)
-	worker.Acknowledge()
+func (suite *SchedulerTest) TestScheduleBuild_BuildsOrderedFIFO() {
+	// Test that builds with different priorities are scheduled in the correct order.
 
-	scheduledTask = <-worker.Tasks()
+	build1 := newBuild()
+	task1 := addTask(build1, "task1")
+	defer build1.Close()
+
+	build2 := newBuild()
+	task2 := addTask(build2, "task2")
+	defer build2.Close()
+
+	build3 := newBuild()
+	task3 := addTask(build3, "task3")
+	defer build3.Close()
+
+	worker, err := suite.newWorker()
+	assert.NoError(suite.T(), err)
+
+	buildObserver1, err := suite.scheduler.ScheduleBuild(build1)
+	assert.NoError(suite.T(), err)
+	defer buildObserver1.Close()
+
+	buildObserver2, err := suite.scheduler.ScheduleBuild(build2)
+	assert.NoError(suite.T(), err)
+	defer buildObserver2.Close()
+
+	buildObserver3, err := suite.scheduler.ScheduleBuild(build3)
+	assert.NoError(suite.T(), err)
+	defer buildObserver3.Close()
+
+	worker.Close()
+
+	taskObserver1, err := suite.scheduler.ScheduleTask(build1.Id(), task1.Identity())
+	assert.NoError(suite.T(), err)
+	defer taskObserver1.Close()
+
+	taskObserver2, err := suite.scheduler.ScheduleTask(build2.Id(), task2.Identity())
+	assert.NoError(suite.T(), err)
+	defer taskObserver2.Close()
+
+	taskObserver3, err := suite.scheduler.ScheduleTask(build3.Id(), task3.Identity())
+	assert.NoError(suite.T(), err)
+	defer taskObserver3.Close()
+
+	worker, err = suite.newWorker()
+	assert.NoError(suite.T(), err)
+	defer worker.Close()
+
+	scheduledTask := <-worker.Tasks()
 	assert.NotNil(suite.T(), scheduledTask)
+	assert.Equal(suite.T(), task1, scheduledTask)
 	worker.Acknowledge()
 }
 
