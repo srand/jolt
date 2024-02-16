@@ -348,7 +348,7 @@ def build(ctx, task, network, keep_going, default, local,
     dag = gb.build(task)
 
     # Collect information about artifact presence before starting prune or build
-    acache.precheck(dag.persistent_artifacts)
+    acache.precheck(dag.persistent_artifacts, remote=not local)
 
     if not no_prune:
         gp = graph.GraphPruner(acache, strategy)

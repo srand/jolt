@@ -1471,7 +1471,7 @@ class ArtifactCache(StorageProvider):
         # Returns true if all storage providers implement the availability method
         return all([provider.availability.__func__ != StorageProvider.availability for provider in self._storage_providers])
 
-    def availability(self, artifacts):
+    def availability(self, artifacts, remote=True):
         """ Check presence of task artifacts in any cache, local or remote """
         present = set()
         missing = set()
@@ -1485,6 +1485,9 @@ class ArtifactCache(StorageProvider):
                 present.add(artifact)
             else:
                 missing.add(artifact)
+
+        if not remote:
+            return list(present), list(missing)
 
         # Check presence of all artifacts in the remote caches
         missing_remotely = artifacts
@@ -1762,9 +1765,9 @@ class ArtifactCache(StorageProvider):
                     if self._db_select_lock_count(db, artifact.identity) == 0:
                         fs.unlink(lock_path, ignore_errors=True)
 
-    def precheck(self, artifacts):
+    def precheck(self, artifacts, remote=True):
         """ Precheck artifacts for availability and cache status. """
         if not self.has_availability():
             return
-        present, missing = self.availability(artifacts)
+        present, missing = self.availability(artifacts, remote=remote)
         log.verbose("Cache: {}/{} artifacts present", len(present), len(artifacts))
