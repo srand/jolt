@@ -213,19 +213,8 @@ func (s *priorityScheduler) Run(ctx context.Context) {
 		case <-s.rescheduleChan:
 			log.Trace("rescheduling")
 			ticker.Reset(tickerPeriod)
-
-			for {
-				s.removeStaleBuilds()
-
-				task, worker := s.selectTaskAndWorker()
-				if task == nil {
-					break
-				}
-
-				// Post task to worker
-				log.Debugf("run - build - id: %s, worker: %s", task.Build().Id(), worker.Id())
-				worker.Post(task)
-			}
+			s.removeStaleBuilds()
+			s.selectTaskAndWorker()
 		}
 	}
 }
@@ -305,32 +294,50 @@ func (s *priorityScheduler) selectTaskForWorkerNoLock(worker Worker, build *Buil
 }
 
 // Select a task and worker for scheduling.
-func (s *priorityScheduler) selectTaskAndWorker() (*Task, Worker) {
+func (s *priorityScheduler) selectTaskAndWorker() {
 	s.Lock()
-	defer s.Unlock()
 
 	if s.readyBuilds.Len() == 0 {
-		return nil, nil
+		s.Unlock()
+		return
 	}
 
+	// Order builds by priority
 	s.readyBuilds.Reorder()
 
-	for _, build := range s.readyBuilds.Items() {
-		for _, worker := range s.availWorkers {
+	// Task worker assignments
+	assignments := make(map[Worker]*Task)
+
+	// Assign tasks to workers.
+	// Workers are selected in a round-robin fashion.
+	// Tasks are selected in priority order.
+	for _, worker := range s.availWorkers {
+		for _, build := range s.readyBuilds.Items() {
 			if task := s.selectTaskForWorkerNoLock(worker, build); task != nil {
 				s.associateTaskWithWorker(worker, task)
-				s.dequeueWorkerNoLock(worker)
 
 				if !build.HasQueuedTask() {
 					s.dequeueBuildNoLock(build)
 				}
 
-				return task, worker
+				assignments[worker] = task
+				break
 			}
 		}
 	}
 
-	return nil, nil
+	// Mark workers as busy
+	for worker := range assignments {
+		s.dequeueWorkerNoLock(worker)
+	}
+
+	s.Unlock()
+
+	// Send tasks to workers
+	for worker, task := range assignments {
+		log.Debugf("run - build - id: %s, worker: %s", task.Build().Id(), worker.Id())
+		worker.Post(task)
+	}
 }
 
 // Remove a build from the ready queue.
