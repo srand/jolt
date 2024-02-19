@@ -4,6 +4,7 @@
   <xsl:variable name="Failures" select="jolt-manifest/task[result='FAILED']"/>
   <xsl:variable name="Unstable" select="jolt-manifest/task[result='UNSTABLE']"/>
   <xsl:variable name="FailuresAndUnstable" select="jolt-manifest/task[result='UNSTABLE' or result='FAILED']"/>
+  <xsl:variable name="Executed" select="jolt-manifest/task[result!='CANCELLED' and result!='SKIPPED']"/>
   <xsl:variable name="Successful" select="jolt-manifest/task[result='SUCCESS']"/>
   <xsl:variable name="Tasks" select="jolt-manifest/task"/>
   <xsl:variable name="Goals" select="jolt-manifest/task[goal='true']"/>
@@ -53,7 +54,7 @@
                   <td width="25%" align="center" style="border-left: 1px solid #c0c0c0">
                     <table>
                       <tr><td width="100%" align="center">Completed</td></tr>
-                      <tr><td align="center"><h2><xsl:value-of select="count($Tasks)"/></h2></td></tr>
+                      <tr><td align="center"><h2><xsl:value-of select="count($Executed)"/></h2></td></tr>
                     </table>
                   </td>
                   <td width="25%" align="center" style="border-left: 1px solid #c0c0c0">
