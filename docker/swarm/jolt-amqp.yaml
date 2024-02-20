@@ -7,9 +7,9 @@ services:
   cache:
     image: robrt/jolt-cache:latest
     environment:
-      - JOLT_INSECURE=true
-      - JOLT_MAX_SIZE=100GB
-      - JOLT_VERBOSITY=2
+      - JOLT_CACHE_INSECURE=true
+      - JOLT_CACHE_MAX_SIZE=100GB
+      - JOLT_CACHE_VERBOSITY=2
     ports:
       - "8080:8080"
     volumes:
@@ -27,7 +27,7 @@ services:
       - source: worker-amqp.conf
         target: /opt/jolt/worker.conf
     environment:
-      - "JOLT_CACHE_URL=http://cache"
+      - "JOLT_CACHE_URI=http://cache"
     volumes:
       - cache-node:/root/.cache/jolt
 configs:

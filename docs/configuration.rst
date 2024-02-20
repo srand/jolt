@@ -141,11 +141,7 @@ competing builds with fewer remaining tasks may be prioritized.
 
 Available configuration keys:
 
-* ``host`` - Hostname or address of the scheduler service. Default: jolt-scheduler.
-* ``port`` - Port number of the scheduler service. Default: 9090.
-* ``priority`` - The base priority of the tasks submitted to the scheduler.
-  Default: 0. Any number is allowed, both positive and negative.
-
+* ``uri`` - The URI of the scheduler service. Default: tcp://scheduler:9090.
 
 Network
 --------
@@ -585,3 +581,253 @@ These configuration keys exist:
 * ``started`` - Enable started event. Default: ``true``.
 * ``failed`` - Enable failed event. Default: ``true``.
 * ``finished`` - Enable finished event. Default: ``true``.
+
+
+Services
+--------
+
+All Jolt services can be deployed using container images. The following
+sections detail how to configure the services using environment variables
+and/or configuration files.
+
+Cache
+^^^^^
+
+The cache service is used to store artifacts that are built by Jolt.
+The service implements an LRU cache and will evict artifacts when the
+cache exceeds a configured size. The cache is accessed using a REST API
+over HTTP(S).
+
+Its container image is available at `robrt/jolt-cache <https://hub.docker.com/r/robrt/jolt-cache>`_
+
+The following volume mount points exist:
+
+  .. list-table::
+    :widths: 20 80
+    :header-rows: 1
+    :class: tight-table
+
+    * - Volume Path
+      - Description
+
+    * - ``/data``
+      - | The default directory path where artifact files are stored.
+
+
+The cache service can be configured using environment variables and/or a configuration file at ``/etc/jolt/cache.yaml``.
+
+  .. list-table::
+    :widths: 20 20 60
+    :header-rows: 1
+    :class: tight-table
+
+    * - Environment Variable
+      - Config File Key
+      - Description
+
+    * - ``JOLT_CACHE_CERT``
+      - ``cert``
+      - | The path to the server certificate file to use if HTTPS is enabled.
+
+    * - ``JOLT_CACHE_CERT_KEY``
+      - ``cert_key``
+      - | The path to the server certificate private key file to use if HTTPS is enabled.
+
+    * - ``JOLT_CACHE_INSECURE``
+      - ``insecure``
+      - | If set to ``true``, the cache will not use HTTPS, even if a certificate
+          and key are provided.
+
+        | The default is ``false``.
+
+    * - ``JOLT_CACHE_LISTEN_HTTP``
+      - ``listen_http``
+      - | The address and port on which the cache will listen for HTTP(S) requests.
+
+        | The default is ``:8080`` for HTTP and ``:8443`` for HTTPS.
+
+    * - ``JOLT_CACHE_MAX_SIZE``
+      - ``max_size``
+      - | The maximum size of the cache in bytes. This is a soft limit and
+          the cache may exceed this size temporarily. The cache will start to
+          evict artifacts when it exceeds this size.
+
+        | The default is ``10GB`` (10 GiB).
+
+    * - ``JOLT_CACHE_PATH``
+      - ``cache_path``
+      - | The path to the cache directory.
+
+        | The default is ``/data``.
+
+    * - ``JOLT_CACHE_VERBOSITY``
+      - ``verbosity``
+      - | The verbosity level of the cache. The default is ``0``. Increase the
+          value to get more detailed logs.
+
+Dashboard
+^^^^^^^^^
+
+The dashboard service is used to collect and display task telemetry data
+from the Jolt scheduler.
+
+Its container image is available at `robrt/jolt-dashboard <https://hub.docker.com/r/robrt/jolt-dashboard>`_.
+No configuration is currently possible.
+
+
+Scheduler
+^^^^^^^^^
+
+The scheduler service is used to distribute tasks from clients to workers.
+Its container image is available at `robrt/jolt-scheduler <https://hub.docker.com/r/robrt/jolt-scheduler>`_.
+
+The scheduler can be configured using environment variables and/or a configuration file at ``/etc/jolt/scheduler.yaml``.
+
+  .. list-table::
+    :widths: 20  20 60
+    :header-rows: 1
+    :class: tight-table
+
+    * - Environment Variable
+      - Config File Key
+      - Description
+
+    * - ``JOLT_CACHE_URI``
+      - ``cache_uri``
+      - | The URI of the HTTP cache service from which the scheduler may fetch Jolt clients.
+          Normally, this is not used and the scheduler instead installs the same version of
+          the client from the public Python package index. However, for development
+          purposes it is possible to deploy the source of the running client to the cache
+          and have the scheduler fetch it from there.
+
+        | The format is ``<scheme>://<host>:<port>`` where accepted schemes are:
+
+        - ``tcp`` for both IPv4 and IPv6 connections
+        - ``tcp4`` for only IPv4 connections
+        - ``tcp6`` for only IPv6 connections
+
+        | The default is ``tcp://cache.``.
+
+    * - ``JOLT_CACHE_SIZE``
+      - ``cache_size``
+      - | The maximum size of the local cache in bytes.
+
+        | The default is ``1000000000`` (1 GB).
+
+    * - ``JOLT_CACHE_PATH``
+      - ``cache_path``
+      - | The path to the local cache directory.
+
+        | The default is ``/var/cache/jolt``.
+
+
+Worker
+^^^^^^
+
+The worker service is used to execute tasks.
+Its container image is available at `robrt/jolt-worker <https://hub.docker.com/r/robrt/jolt-worker>`_.
+
+The following volume mount points exist:
+
+  .. list-table::
+    :widths: 20 80
+    :header-rows: 1
+    :class: tight-table
+
+    * - Volume Path
+      - Description
+
+    * - ``/etc/jolt/worker.yaml``
+      - | The configuration file for the worker.
+
+        | A configuration file may be used instead of environment variables.
+          It uses the same key names as the environment variables, but without
+          the ``JOLT_`` prefix and with lowercase letters.
+
+    * - ``/data/cache``
+      - | The directory where the local Jolt artifact cache is kept.
+
+        | The cache may be shared between multiple workers on the same node.
+
+    * - ``/data/ws``
+      - | The working directory where tasks are executed.
+
+        | This is where source code and intermediate build files are stored.
+          The working directory is unique to each worker and should not be
+          shared between workers.
+
+        | It is recommended to use a fast SSD for the working directory.
+
+    * - ``$HOME/.config/jolt/config``
+      - | The configuration file for the Jolt client that executes tasks
+          on the worker as instructed by the scheduler.
+
+        | See :ref:`configuration` for details.
+
+
+The worker can be configured using environment variables and/or a configuration file at ``/etc/jolt/worker.yaml``.
+
+  .. list-table::
+    :widths: 20 20 60
+    :header-rows: 1
+    :class: tight-table
+
+    * - Environment Variable
+      - Config File Key
+      - Description
+
+    * - ``JOLT_CACHE_URI``
+      - ``cache_uri``
+      - | The URI of the HTTP cache service from which the worker may fetch Jolt clients.
+          Normally, this is not used and the worker instead installs the same version of
+          the client from the public Python package index. However, for development
+          purposes it is possible to deploy the source of the running client to the cache
+          and have the worker fetch it from there.
+
+        | The format is ``<scheme>://<host>:<port>`` where accepted schemes are:
+
+        - ``tcp`` for both IPv4 and IPv6 connections
+        - ``tcp4`` for only IPv4 connections
+        - ``tcp6`` for only IPv6 connections
+
+        | The default is ``tcp://cache.``.
+
+    * - ``JOLT_PLATFORM``
+      - ``platform``
+      - | A list of platform properties that the worker will advertise to the scheduler.
+
+        | The properties are used by the scheduler to select workers that are capable of
+          executing a task. For example, a task may require a worker with a specific
+          operating system or CPU architecture.
+
+        | The format is ``<key>=<value>`` where the key is the name of the property and
+          the value is its value. Multiple properties can be specified by separating them
+          with a comma or space.
+
+        | A set of default properties are always advertised:
+
+          - ``node.os``: The name of the operating system
+          - ``node.arch``: The name of the CPU architecture
+          - ``node.cpus``: The number of CPUs
+          - ``node.id``: A unique identifier for the node on which the worker is running
+          - ``worker.hostname``: The hostname of the worker.
+
+        | Example: ``label=compilation,label=unittesting``
+
+    * - ``JOLT_SCHEDULER_URI``
+      - ``scheduler_uri``
+      - | The URIs of the scheduler to which the worker will connect and enlist.
+
+        | See ``JOLT_CACHE_URI`` for format. The default is ``tcp://scheduler.:9090``.
+
+
+Example configuration:
+
+  .. code:: yaml
+
+    # /etc/jolt/worker.yaml
+    cache_uri: "tcp://cache:80"
+    platform:
+      - "label=compilation"
+      - "label=testing"
+    scheduler_uri: "tcp://scheduler:9090"

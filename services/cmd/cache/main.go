@@ -22,7 +22,7 @@ var rootCmd = &cobra.Command{
 		viper.SetConfigType("yaml")
 		viper.AddConfigPath("/etc/jolt/")
 		viper.AddConfigPath("$HOME/.config/jolt")
-		viper.SetEnvPrefix("jolt")
+		viper.SetEnvPrefix("jolt_cache")
 		viper.AutomaticEnv()
 
 		err := viper.ReadInConfig()
