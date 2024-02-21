@@ -3,7 +3,14 @@
 Configuration
 ==============
 
-By default, Jolt loads its configuration from ``$HOME/.config/jolt/config``.
+
+Client
+------
+
+By default, the Jolt client loads its configuration from
+``$HOME/.config/jolt/config`` on Linux and
+``%APPDATA%\Roaming\Jolt\config`` on Windows.
+
 It uses this format:
 
 .. code-block:: text
@@ -21,156 +28,95 @@ the recommended way to change configuration is to use the Jolt
 
 Available sections and their respective keys are detailed below.
 
+The ``[jolt]`` config section contains global configuration:
 
-Jolt
-------
+  .. list-table::
+    :widths: 20 10 70
+    :header-rows: 1
+    :class: tight-table
 
-The ``[jolt]`` config section contains global configuration.
+    * - Config Key
+      - Type
+      - Description
 
-* ``cachedir = <path>``
+    * - ``cachedir``
+      - String
+      - | Filesystem path to a directory where the Jolt artifact cache will reside.
+        | Default:
 
-  Filesystem path to a directory where the Jolt artifact cache will reside.
-  By default, this path is ``~/.cache/jolt`` on Linux and
-  ``%LOCALAPPDATA%/Jolt`` on Windows.
+           - Linux: ``~/.cache/jolt``
+           - Windows: ``%LOCALAPPDATA%/Jolt``
 
-* ``cachesize = <size>``
+    * - ``cachesize``
+      - String
+      - | Maximum size of the local artifact cache. When this size is reached, Jolt
+          will start to evict artifacts from the cache until it no longer exceeds the
+          configured limit. Artifacts which are required to execute a task currently
+          present in the dependency tree are never evicted. Therefore, it may not be
+          possible for Jolt to evict enough artifacts to reach the limit. Consider
+          this size advisory. The size is specified in bytes and SI suffixes such as
+          K, M and G are supported.
+        | Default: ``1G``
 
-  Maximum size of the local artifact cache. When this size is reached, Jolt
-  will start to evict artifacts from the cache until it no longer exceeds the
-  configured limit. Artifacts which are required to execute a task currently
-  present in the dependency tree are never evicted. Therefore, it may not be
-  possible for Jolt to evict enough artifacts to reach the limit. Consider
-  this size advisory. The size is specified in bytes and SI suffixes such as
-  K, M and G are supported. Example: ``cachesize = 5G``. The default size is
-  1G.
+    * - ``colors``
+      - Boolean
+      - | Colorize output. When enabled, Jolt uses colors to make it easier to
+          read the console log and to spot errors.
+        | Default: ``true``
 
-* ``colors = <boolean>``
+    * - ``default``
+      - String
+      - When invoked without any arguments, Jolt by default tries to build a
+        task called ``default``. The name of the default task can be overridden
+        by setting this configuration key.
 
-  Colorize output. When enabled, Jolt uses colors to make it easier to
-  read the console log and to spot errors. The default is ``true``.
+    * - ``download``
+      - Boolean
+      - | Enable Jolt to download artifacts from remote storage providers when
+          running tasks locally. The option has no effect on
+          distributed executions.
+        | Default: ``true``
 
-* ``default = <task>``
+    * - ``logcount``
+      - Integer
+      - | Number of log files to keep.
+        | Default: ``100``
 
-  When invoked without any arguments, Jolt by default tries to build a
-  task called ``default``. The name of the default task can be overridden
-  by setting this configuration key.
+    * - ``logpath``
+      - String
+      - Location of Jolt's log files.
+        | Default:
 
-* ``download = <boolean>``
+           - Linux: ``$HOME/.jolt``
+           - Windows: ``%LOCALAPPDATA%/Jolt``
 
-  Configures if Jolt is allowed to download artifacts from remote storage
-  providers or not when building locally. The option has no effect on
-  distributed network builds. The default value is ``true``.
+    * - ``upload``
+      - Boolean
+      - | Configures if Jolt is allowed to upload artifacts to remote storage
+          providers or not when building locally. The option has no effect on
+          distributed network builds.
+        | Default: ``true``
 
-* ``logcount = <integer>``
+    * - ``pager``
+      - String
+      - The pager to use, e.g. when viewing the logfile. Defaults to
+        the ``PAGER`` environment variable followed by ``less``, ``more`` and ``cat``,
+        in that order.
 
-  Number of log files to keep. Default: 100.
+    * - ``pluginpath``
+      - String
+      - A list of one or more directory names, separated by colon, specifying
+        additional search paths for plugins.
 
-* ``logpath = <path>``
+    * - ``shell``
+      - String
+      - The shell to use when entering the interactive task debug shell.
 
-  Location of Jolt's log files. By default, the logs are written to
-  ``$HOME/.jolt``.
-
-* ``upload = <boolean>``
-
-  Configures if Jolt is allowed to upload artifacts to remote storage
-  providers or not when building locally. The option has no effect on
-  distributed network builds. The default value is ``true``.
-
-* ``pager = <str>``
-
-  The pager to use, e.g. when viewing the logfile. Defaults to
-  the PAGER environment variable followed by less, more and cat,
-  in that order.
-
-* ``pluginpath = <str>``
-
-  A list of one or more directory names, separated by colon, specifying
-  additional search paths for plugins.
-
-* ``shell = <str>``
-
-  The shell to use when entering the interactive task debug shell.
-
-* ``threads = <integer>``
-  Used to limit the number of threads used by third party tools such as Ninja.
-  The environment variable ``JOLT_THREADS`` can also be used.
-  The default value is the number of CPUs available.
-
-* ``parallel_tasks = <integer>``
-  Used to control the number of tasks allowed to execute in parallel on the
-  local machine. The environment variable ``JOLT_PARALLEL_TASKS`` can also
-  be used as well as the ``-j/--jobs`` build command option.
-  The default value is 1.
-
-
-Cache
------
-
-The ``[cache]`` section configures a remote artifact cache. The cache
-is used to store artifacts that are built by Jolt. When a task is built,
-Jolt will first check the cache to see if the artifact is already present.
-If it is, the artifact is downloaded and used. If not, the artifact is
-built and then uploaded to the cache so that it can be shared with others.
-
-Available configuration keys:
-
-* ``uri = <uri>``
-
-  The URI of the remote artifact cache. The targeted service is expected
-  to implement the default Jolt cache REST API. The default value is
-  ``http://cache``.
-
-  Use the ``robrt/jolt-cache`` Docker image to deploy the official
-  cache service implementation.
-
-
-Scheduler
----------
-
-The ``[scheduler]`` section configures remote task scheduling.
-A remote scheduler accepts task execution requests from the Jolt client
-and distributes them to workers. Logs, artifacts and results are collected
-from the workers and returned to the client in real-time
-
-Tasks can be assigned a priority. The scheduler will always attempt to
-execute tasks with the highest priority first, if there is an eligible
-worker available. If no worker is available, the task is queued until
-one becomes available. The scheduler will also attempt to execute tasks
-in the order they were submitted, but this is not guaranteed. In some cases,
-competing builds with fewer remaining tasks may be prioritized.
-
-Available configuration keys:
-
-* ``uri`` - The URI of the scheduler service. Default: tcp://scheduler:9090.
-
-Network
---------
-
-The ``[network]`` section contains keys applicable when Jolt is started
-in network execution mode.
-
-* ``config = <text>``
-
-  The ``config`` key contains config file content for Jolt to be used
-  when Jolt is executed on a different machine during distributed
-  execution. The configuration is automatically passed to the remote
-  worker and may contain all subsections and keys detailed in this
-  document. Lines must be properly indented for the key to be
-  considered multiline. Example:
-
-  .. code-block:: text
-
-    [network]
-    config = [jolt]
-             upload = true
-             download = true
-
-Plugins
--------
-
-Jolt can be extended through plugins. Those already built-in and their
-configuration options are described below.
-
+    * - ``threads``
+      - Integer
+      - | Used to limit the number of threads used by third party tools such as Ninja.
+          The environment variable ``JOLT_THREADS`` can also be used.
+        | The default value is the number of CPUs available.
 
 Alias
 ^^^^^
@@ -217,11 +163,24 @@ installed separately:
 
 Available configuration keys:
 
-* ``loglevel`` - The level of detail to include in task logs:
-  ``INFO``, ``VERBOSE`` or ``DEBUG``
-* ``path`` - Path to directory where result files are written.
-  Default: ``<workspace>/allure-results``.
+  .. list-table::
+    :widths: 20 10 70
+    :header-rows: 1
+    :class: tight-table
 
+    * - Config Key
+      - Type
+      - Description
+
+    * - ``loglevel``
+      - String
+      - | The level of detail to include in task logs: ``INFO``, ``VERBOSE`` or ``DEBUG``.
+        | Default: ``INFO``
+
+    * - ``path``
+      - String
+      - | Path to directory where result files are written.
+        | Default: ``<workspace>/allure-results``
 
 AMQP
 ^^^^
@@ -256,42 +215,230 @@ installed separately:
 
 These configuration keys exist:
 
-* ``host`` - Hostname or address of the AMQP service. Default: amqp-service
+  .. list-table::
+    :widths: 20 10 70
+    :header-rows: 1
+    :class: tight-table
 
-* ``port`` - Port number of the AMQP service. Default: 5672
+    * - Config Key
+      - Type
+      - Description
 
-* ``max-priority`` -
-  Optional worker configuration. Enables task priority queues. Tasks
-  that are waiting in queue for a worker will be dequeued in order of
-  priority. See ``priority``.
-  This value configures the number of priority levels that will be
-  available and should be a positive integer between 1 and 255.
-  Values between 1 and 10 are recommended. Default: 1.
+    * - ``host``
+      - String
+      - | Hostname or address of the AMQP service.
+        | Default: ``amqp-service``
 
-* ``priority`` -
-  Optional client configuration. Configures the default priority of
-  all tasks submitted to the queue. Default: 0.
+    * - ``port``
+      - Integer
+      - | Port number of the AMQP service.
+        | Default: ``5672``
 
-* ``routing_key`` -
-  Optional. By using routing keys, tasks can be directed to different
-  types of workers. When starting a worker by using the ``amqp-worker``
-  command, the worker will only consume tasks tagged with the configured key.
-  To tag a task, set the ``routing_key`` task attribute. Default: default
+    * - ``max-priority``
+      - Integer
+      - | Optional worker configuration. Enables task priority queues. Tasks
+          that are waiting in queue for a worker will be dequeued in order of
+          priority. See ``priority``.
+          This value configures the number of priority levels that will be
+          available and should be a positive integer between 1 and 255.
+          Values between 1 and 10 are recommended.
+        | Default: ``1``
 
-* ``workers`` -
-  Optional client configuration. The maximum number of tasks Jolt is
-  allowed to run in parallel. Default: 16.
+    * - ``priority``
+      - Integer
+      - | Optional client configuration. Configures the default priority of
+          all tasks submitted to the queue.
+        | Default: ``0``
 
-* ``keyring.username`` -
-  Username to use when authenticating with the AMQP service.
+    * - ``routing_key``
+      - String
+      - | Optional. By using routing keys, tasks can be directed to different
+          types of workers. When starting a worker by using the ``amqp-worker``
+          command, the worker will only consume tasks tagged with the configured key.
+          To tag a task, set the ``routing_key`` task attribute.
+        | Default: ``default``
 
-* ``keyring.password`` -
-  Password to use when authenticating with AMQP service. Should normally
-  never need to be set in the configuration file. By default, Jolt asks
-  for the password when needed and stores it in a keyring for future use.
+    * -  ``workers``
+      - Integer
+      - | Optional client configuration. The maximum number of tasks Jolt is
+          allowed to run in parallel.
+        | Default: ``16``
 
-* ``keyring.service`` -
-  Keyring service identifier. Defaults to ``amqp``.
+    * - ``keyring.username``
+      - String
+      - Username to use when authenticating with the AMQP service.
+
+    * - ``keyring.password``
+      - String
+      - Password to use when authenticating with AMQP service. Should normally
+        never need to be set in the configuration file. By default, Jolt asks
+        for the password when needed and stores it in a keyring for future use.
+
+    * - ``keyring.service``
+      - String
+      - | Keyring service identifier.
+        | Default: ``amqp``
+
+
+Autoweight
+^^^^^^^^^^
+
+The autoweight plugin automatically collects statistics about task execution times.
+The data is used to assign weights to task, allowing the Jolt scheduler to favor tasks
+along the critical path. This improves overall execution time in a distributed execution
+configuration where many tasks are executed in parallel.
+
+The plugin is enabled by adding an ``[autoweight]`` section in
+the Jolt configuration.
+
+These configuration keys exist:
+
+
+  .. list-table::
+    :widths: 20 10 70
+    :header-rows: 1
+    :class: tight-table
+
+    * - Config Key
+      - Type
+      - Description
+
+    * - ``samples``
+      - Integer
+      - | The number of execution time samples to store per task in the database.
+          Once the number is exceeded, samples are evicted in FIFO order.
+        | Default: ``10``
+
+
+Cache
+^^^^^
+
+The ``[cache]`` section configures a remote artifact cache. The cache
+is used to store artifacts that are built by Jolt. When a task is built,
+Jolt will first check the cache to see if the artifact is already present.
+If it is, the artifact is downloaded and used. If not, the artifact is
+built and then uploaded to the cache so that it can be shared with others.
+
+Available configuration keys:
+
+
+  .. list-table::
+    :widths: 20 10 70
+    :header-rows: 1
+    :class: tight-table
+
+    * - Config Key
+      - Type
+      - Description
+
+    * - ``uri``
+      - String
+      - | The URI of the remote artifact cache. The targeted service is expected
+          to implement the default Jolt cache REST API.
+        | Default: ``http://cache``
+
+
+Configuration variables for the cache service itself can be found here:
+:ref:`Cache <configuration-services-cache>`
+
+
+Dashboard
+^^^^^^^^^
+
+The dashboard plugin automatically submits required telemetry to
+the Jolt Dashboard. It should be enabled on both clients and workers.
+
+The plugin is enabled by adding a ``[dashboard]`` section in
+the Jolt configuration.
+
+These configuration keys exist:
+
+
+  .. list-table::
+    :widths: 30 70
+    :header-rows: 1
+    :class: tight-table
+
+    * - Config Key
+      - Description
+
+    * - ``uri``
+      - | Base URI of the Jolt Dashboard.
+        | Default: http://dashboard
+
+
+Email
+^^^^^
+
+The email plugin sends an HTML email report to configured recipients
+when builds have completed. The email includes a list of interpreted
+errors in case of failure.
+
+.. image:: img/email.png
+
+The plugin is enabled by adding a ``[email]`` section in
+the Jolt configuration.
+
+These configuration keys exist:
+
+
+  .. list-table::
+    :widths: 20 10 70
+    :header-rows: 1
+    :class: tight-table
+
+    * - Config Key
+      - Type
+      - Description
+
+    * - ``server``
+      - String
+      - SMTP server used to send emails.
+
+    * - ``from``
+      - String
+      - Sender email address.
+
+    * - ``to``
+      - String
+      - Receiver email address. May also be read from environment, e.g.
+        ``{environ[GERRIT_PATCHSET_UPLOADER_EMAIL]}``. Multiple addresses should be
+        separated by a single space.
+
+    * - ``cc``
+      - String
+      - Carbon copy recipients.
+
+    * - ``bcc``
+      - String
+      - Blind carbon copy recipients.
+
+    * - ``stylesheet``
+      - String
+      - An optional custom XSLT stylesheet used to transform the
+        Jolt result manifest into an HTML email.
+
+    * - ``on_success``
+      - Boolean
+      - | Send emails when builds are successful.
+        | Default: ``true``
+
+    * - ``on_failure``
+      - Boolean
+      - | Send emails when builds failed.
+        | Default: ``true``
+
+
+GDB
+^^^
+
+The GDB plugin enables a new command, ``gdb``. When invoked, the command
+launches GDB with an executable from the specified task's artifact. It
+automatically configures the GDB sysroot based on environment variables
+set in the execution environment of the task.
+
+The plugin is enabled by adding a ``[gdb]`` section in
+the Jolt configuration. No additional dependencies have to be installed.
 
 
 HTTP
@@ -320,139 +467,44 @@ the Jolt configuration.
 
 These configuration keys exist:
 
-* ``download`` -
-  Boolean. Allow/disallow artifacts to be downloaded from the HTTP server.
-  Defaults to ``true``.
+  .. list-table::
+    :widths: 20 10 70
+    :header-rows: 1
+    :class: tight-table
 
-* ``upload`` -
-  Boolean. Allow/disallow artifacts to be uploaded to the HTTP server.
-  Defaults to ``true``.
+    * - Config Key
+      - Type
+      - Description
 
-* ``uri`` -
-  URL to the HTTP server.
+    * - ``download``
+      - Boolean
+      - | Allow/disallow artifacts to be downloaded from the HTTP server.
+        | Default: ``true``
 
-* ``keyring.service`` -
-  Keyring service identifier. Currently, only basic authentication is
-  supported. Authentication is disabled if left unset.
+    * - ``upload``
+      - Boolean
+      - | Allow/disallow artifacts to be uploaded to the HTTP server.
+        | Default: ``true``
 
-* ``keyring.username`` -
-  Username to use when authenticating with the HTTP server.
+    * - ``uri``
+      - String
+      - | URL to the HTTP server.
+        | Default: ``http://cache``
 
-* ``keyring.password`` -
-  Password to use when authenticating with the HTTP server. Should normally
-  never need to be set in the configuration file. By default, Jolt asks
-  for the password when needed and stores it in a keyring for future use.
+    * - ``keyring.service``
+      - String
+      - Keyring service identifier. Currently, only basic authentication is
+        supported. Authentication is disabled if left unset.
 
+    * - ``keyring.username``
+      - String
+      - Username to use when authenticating with the HTTP server.
 
-Autoweight
-^^^^^^^^^^
-
-The autoweight plugin automatically collects statistics about task execution times.
-The data is used to assign weights to task, allowing the Jolt scheduler to favor tasks
-along the critical path. This improves overall execution time in a distributed execution
-configuration where many tasks are executed in parallel.
-
-The plugin is enabled by adding an ``[autoweight]`` section in
-the Jolt configuration.
-
-These configuration keys exist:
-
-* ``samples`` - Integer. The number of execution time samples to store per task in the database. Once the number is exceeded, samples are evicted in FIFO order.
-
-
-Dashboard
-^^^^^^^^^
-
-The dashboard plugin automatically submits required telemetry to
-the Jolt Dashboard. It should be enabled on both clients and workers.
-
-The plugin is enabled by adding a ``[dashboard]`` section in
-the Jolt configuration.
-
-These configuration keys exist:
-
-* ``uri`` - Base URI of the Jolt Dashboard. Default: http://dashboard
-
-
-Email
-^^^^^
-
-The email plugin sends an HTML email report to configured recipients
-when builds have completed. The email includes a list of interpreted
-errors in case of failure.
-
-.. image:: img/email.png
-
-The plugin is enabled by adding a ``[email]`` section in
-the Jolt configuration.
-
-These configuration keys exist:
-
-* ``server`` - SMTP server used to send emails.
-* ``from`` - Sender email address.
-* ``to`` - Receiver email address. May also be read from environment, e.g.
-  ``{ENV|GERRIT_PATCHSET_UPLOADER_EMAIL}``. Multiple addresses should be
-  separated by a single space.
-* ``cc`` - Carbon copy recipients.
-* ``bcc`` - Blind carbon copy recipients.
-* ``stylesheet`` - An optional custom XSLT stylesheet used to transform the
-  Jolt result manifest into an HTML email.
-* ``on_success`` - Send emails when builds are successful. Default: ``true``
-* ``on_failure`` - Send emails when builds failed. Default: ``true``
-
-
-FTP
-^^^
-
-The FTP plugin implements an artifact storage provider. When used,
-artifacts can be automatically uploaded to and downloaded from a configured
-FTP server when tasks are executed.
-
-The plugin is enabled by adding an ``[ftp]`` section in
-the Jolt configuration.
-
-These configuration keys exist:
-
-* ``download`` -
-  Boolean. Allow/disallow artifacts to be downloaded from the FTP server.
-  Defaults to ``true``.
-
-* ``host`` -
-  Hostname/IP address of the FTP server.
-
-* ``path`` -
-  Path to directory where artifacts should be stored on the FTP server.
-  Defaults to ``jolt``. The directory is created if it doesn't exist.
-
-* ``tls`` -
-  Use a TLS connection to the FTP server.
-
-* ``upload`` -
-  Boolean. Allow/disallow artifacts to be uploaded to the FTP server.
-  Defaults to ``true``.
-
-* ``keyring.username`` -
-  Username to use when authenticating with the FTP server.
-
-* ``keyring.password`` -
-  Password to use when authenticating with the FTP server. Should normally
-  never need to be set in the configuration file. By default, Jolt asks
-  for the password when needed and stores it in a keyring for future use.
-
-* ``keyring.service`` -
-  Keyring service identifier. Defaults to ``ftp``.
-
-
-GDB
-^^^
-
-The GDB plugin enables a new command, ``gdb``. When invoked, the command
-launches GDB with an executable from the specified task's artifact. It
-automatically configures the GDB sysroot based on environment variables
-set in the execution environment of the task.
-
-The plugin is enabled by adding a ``[gdb]`` section in
-the Jolt configuration. No additional dependencies have to be installed.
+    * - ``keyring.password``
+      - String
+      - Password to use when authenticating with the HTTP server. Should normally
+        never need to be set in the configuration file. By default, Jolt asks
+        for the password when needed and stores it in a keyring for future use.
 
 
 Logstash (HTTP)
@@ -468,9 +520,59 @@ the Jolt configuration.
 
 These configuration keys exist:
 
-- ``http.uri`` - An HTTP URL where logs will be stashed. The HTTP PUT method is used.
-- ``failed`` - Boolean. Stash logs when tasks fail.
-- ``finished`` - Boolean. Stash logs when tasks finish successfully.
+  .. list-table::
+    :widths: 20 10 70
+    :header-rows: 1
+    :class: tight-table
+
+    * - Config Key
+      - Type
+      - Description
+
+    * - ``http.uri``
+      - String
+      - | An HTTP URL where logs will be stashed. The ``HTTP PUT`` method is used.
+        | Default: ``http://logstash``
+    * - ``failed``
+      - Boolean
+      - | Stash logs when tasks fail.
+        | Default: ``false``
+    * - ``passed``
+      - Boolean
+      - | Stash logs when tasks pass and finish successfully.
+        | Default: ``false``
+
+
+Network
+^^^^^^^
+
+The ``[network]`` section contains keys applicable when Jolt is started
+in network execution mode.
+
+  .. list-table::
+    :widths: 20 10 70
+    :header-rows: 1
+    :class: tight-table
+
+    * - Config Key
+      - Type
+      - Description
+
+    * - ``config``
+      - String
+      - The ``config`` key contains config file content for Jolt to be used
+        when Jolt is executed on a different machine during distributed
+        execution. The configuration is automatically passed to the remote
+        worker and may contain all subsections and keys detailed in this
+        document. Lines must be properly indented for the key to be
+        considered multiline. Example:
+
+        .. code-block:: text
+
+          [network]
+          config = [jolt]
+                   upload = true
+                   download = true
 
 
 Ninja Compilation Database
@@ -496,6 +598,42 @@ dependencies.
 The plugin is enabled by adding a ``[ninja-compdb]`` section in
 the Jolt configuration. Ninja version >= 1.10.0 is required.
 
+
+Scheduler
+^^^^^^^^^
+
+The ``[scheduler]`` section configures remote task scheduling.
+A remote scheduler accepts task execution requests from the Jolt client
+and distributes them to workers. Logs, artifacts and results are collected
+from the workers and returned to the client in real-time
+
+Tasks can be assigned a priority. The scheduler will always attempt to
+execute tasks with the highest priority first, if there is an eligible
+worker available. If no worker is available, the task is queued until
+one becomes available. The scheduler will also attempt to execute tasks
+in the order they were submitted, but this is not guaranteed. In some cases,
+competing builds with fewer remaining tasks may be prioritized.
+
+Available configuration keys:
+
+  .. list-table::
+    :widths: 20 10 70
+    :header-rows: 1
+    :class: tight-table
+
+    * - Config Key
+      - Type
+      - Description
+
+    * - ``uri``
+      - String
+      - | The URI of the scheduler service.
+        | Default: ``tcp://scheduler:9090``
+
+Configuration variables for the scheduler service itself can be found here:
+:ref:`Scheduler <configuration-services-scheduler>`
+
+
 Selfdeploy
 ^^^^^^^^^^
 
@@ -515,22 +653,44 @@ the Jolt configuration. Note that ``pip`` must be installed.
 
 These configuration keys exist:
 
-* ``extra`` -
-  Comma separated list of paths to additional python modules to be
-  deployed. The paths should be relative to the workspace root.
+  .. list-table::
+    :widths: 20 10 70
+    :header-rows: 1
+    :class: tight-table
 
-Once enabled, the plugin automatically passes two parameters to
-distributed network builds:
+    * - Config Key
+      - Type
+      - Description
 
-- ``jolt_url`` -
-  A URL to a compressed tarball with the sources of the running Jolt
-  version.
+    * - ``extra``
+      - String
+      - Comma separated list of paths to additional python modules to be
+        deployed. The paths should be relative to the workspace root.
 
-- ``jolt_identity`` -
-  The identity of the Jolt artifact.
+Once enabled, the plugin automatically passes two build environment
+parameters to the scheduler:
 
-- ``jolt_requires`` -
-  A list of additional Python modules to install on the executor.
+  .. list-table::
+    :widths: 20 10 70
+    :header-rows: 1
+    :class: tight-table
+
+    * - Config Key
+      - Type
+      - Description
+
+    * - ``jolt_url``
+      - String
+      - A URL to a compressed tarball with the sources of the running Jolt
+        version.
+
+    * - ``jolt_identity``
+      - String
+      - The identity of the Jolt artifact.
+
+    * - ``jolt_requires``
+      - String
+      - A list of additional Python modules to install on the executor.
 
 
 Symlinks
@@ -546,8 +706,20 @@ the Jolt configuration.
 
 These configuration keys exist:
 
-* ``path`` - Path, relative to the workspace root, where symlinks
-  will be created. Defaults to ``artifacts``.
+  .. list-table::
+    :widths: 20 10 70
+    :header-rows: 1
+    :class: tight-table
+
+    * - Config Key
+      - Type
+      - Description
+
+    * - ``path``
+      - String
+      - | Path, relative to the workspace root, where symlinks
+          will be created.
+        | Default: ``artifacts``.
 
 
 Telemetry
@@ -556,31 +728,91 @@ Telemetry
 The telemtry plugin posts task telemetry to a configured HTTP
 endpoint. The payload is a JSON object with these fields:
 
-* ``name`` - The name of the task.
-* ``identity`` - The identity of the task artifact.
-* ``instance`` - A UUID representing the lifecycle of the task.
-  Tasks can be executed multiple times with the same identity,
-  for example if the first execution attempt failed and a subsequent
-  attempt succeeded. The instance ID may be used to distingush between
-  such attempts.
-* ``hostname`` - hostname of the machine from which the telemetry
-  record originated.
-* ``role`` - ``client`` or ``worker`` depending on where the record
-  originated.
-* ``event`` - ``queued``, ``started``, ``failed`` or ``finished``.
+  .. list-table::
+    :widths: 20 10 70
+    :header-rows: 1
+    :class: tight-table
+
+    * - Field
+      - Type
+      - Description
+
+    * - ``name``
+      - String
+      - The name of the task.
+
+    * - ``identity``
+      - String
+      - The identity of the task artifact.
+
+    * - ``instance``
+      - String
+      - A UUID representing the lifecycle of the task.
+        Tasks can be executed multiple times with the same identity,
+        for example if the first execution attempt failed and a subsequent
+        attempt succeeded. The instance ID may be used to distingush between
+        such attempts.
+
+    * - ``hostname``
+      - String
+      - Hostname of the machine from which the telemetry
+        record originated.
+
+    * - ``role``
+      - String
+      - ``client`` or ``worker`` depending on where the record originated.
+
+    * - ``event``
+      - String
+      - ``queued``, ``started``, ``failed`` or ``finished``.
 
 The plugin is enabled by adding a ``[telemetry]`` section in
 the Jolt configuration.
 
 These configuration keys exist:
 
-* ``uri`` - Where telemetry records should be posted.
-* ``local`` - Submit telemetry for locally executed tasks. Default: ``true``.
-* ``network`` - Submit telemetry for tasks executed by a network worker. Default: ``true``.
-* ``queued`` - Enable queued event. Default: ``true``.
-* ``started`` - Enable started event. Default: ``true``.
-* ``failed`` - Enable failed event. Default: ``true``.
-* ``finished`` - Enable finished event. Default: ``true``.
+  .. list-table::
+    :widths: 20 10 70
+    :header-rows: 1
+    :class: tight-table
+
+    * - Config Key
+      - Type
+      - Description
+
+    * - ``uri``
+      - String
+      - Where telemetry records should be posted.
+
+    * - ``local``
+      - Boolean
+      - | Submit telemetry for locally executed tasks.
+        | Default: ``true``.
+
+    * - ``network``
+      - Boolean
+      - | Submit telemetry for tasks executed by a network worker.
+        | Default: ``true``.
+
+    * - ``queued``
+      - Boolean
+      - | Enable queued event.
+        | Default: ``true``.
+
+    * - ``started``
+      - Boolean
+      - | Enable started event.
+        | Default: ``true``.
+
+    * - ``failed``
+      - Boolean
+      - | Enable failed event.
+        | Default: ``true``.
+
+    * - ``finished``
+      - Boolean
+      - | Enable finished event.
+        | Default: ``true``.
 
 
 Services
@@ -589,6 +821,8 @@ Services
 All Jolt services can be deployed using container images. The following
 sections detail how to configure the services using environment variables
 and/or configuration files.
+
+ .. _configuration-services-cache:
 
 Cache
 ^^^^^
@@ -603,7 +837,7 @@ Its container image is available at `robrt/jolt-cache <https://hub.docker.com/r/
 The following volume mount points exist:
 
   .. list-table::
-    :widths: 20 80
+    :widths: 30 70
     :header-rows: 1
     :class: tight-table
 
@@ -611,59 +845,63 @@ The following volume mount points exist:
       - Description
 
     * - ``/data``
-      - | The default directory path where artifact files are stored.
+      - The default directory path where artifact files are stored.
 
 
 The cache service can be configured using environment variables and/or a configuration file at ``/etc/jolt/cache.yaml``.
 
   .. list-table::
-    :widths: 20 20 60
+    :widths: 20 20 10 50
     :header-rows: 1
     :class: tight-table
 
     * - Environment Variable
       - Config File Key
+      - Type
       - Description
 
     * - ``JOLT_CACHE_CERT``
       - ``cert``
+      - String
       - | The path to the server certificate file to use if HTTPS is enabled.
 
     * - ``JOLT_CACHE_CERT_KEY``
       - ``cert_key``
+      - String
       - | The path to the server certificate private key file to use if HTTPS is enabled.
 
     * - ``JOLT_CACHE_INSECURE``
       - ``insecure``
+      - Boolean
       - | If set to ``true``, the cache will not use HTTPS, even if a certificate
           and key are provided.
-
-        | The default is ``false``.
+        | Default: ``false``
 
     * - ``JOLT_CACHE_LISTEN_HTTP``
       - ``listen_http``
+      - String
       - | The address and port on which the cache will listen for HTTP(S) requests.
-
         | The default is ``:8080`` for HTTP and ``:8443`` for HTTPS.
 
     * - ``JOLT_CACHE_MAX_SIZE``
       - ``max_size``
+      - String
       - | The maximum size of the cache in bytes. This is a soft limit and
           the cache may exceed this size temporarily. The cache will start to
           evict artifacts when it exceeds this size.
-
-        | The default is ``10GB`` (10 GiB).
+        | Default: ``10GiB``
 
     * - ``JOLT_CACHE_PATH``
       - ``cache_path``
+      - String
       - | The path to the cache directory.
-
-        | The default is ``/data``.
+        | Default: ``/data``
 
     * - ``JOLT_CACHE_VERBOSITY``
       - ``verbosity``
-      - | The verbosity level of the cache. The default is ``0``. Increase the
-          value to get more detailed logs.
+      - Integer
+      - | The verbosity level of the cache. Higher value enables more detailed logs.
+        | Default: ``0``
 
 Dashboard
 ^^^^^^^^^
@@ -674,6 +912,7 @@ from the Jolt scheduler.
 Its container image is available at `robrt/jolt-dashboard <https://hub.docker.com/r/robrt/jolt-dashboard>`_.
 No configuration is currently possible.
 
+ .. _configuration-services-scheduler:
 
 Scheduler
 ^^^^^^^^^
@@ -684,7 +923,7 @@ Its container image is available at `robrt/jolt-scheduler <https://hub.docker.co
 The scheduler can be configured using environment variables and/or a configuration file at ``/etc/jolt/scheduler.yaml``.
 
   .. list-table::
-    :widths: 20  20 60
+    :widths: 20 20 60
     :header-rows: 1
     :class: tight-table
 
@@ -796,8 +1035,8 @@ The worker can be configured using environment variables and/or a configuration 
       - ``platform``
       - | A list of platform properties that the worker will advertise to the scheduler.
 
-        | The properties are used by the scheduler to select workers that are capable of
-          executing a task. For example, a task may require a worker with a specific
+        | The properties are used by the scheduler to select tasks that are compatible with
+          the worker. For example, a task may require a worker with a specific
           operating system or CPU architecture.
 
         | The format is ``<key>=<value>`` where the key is the name of the property and
@@ -806,13 +1045,31 @@ The worker can be configured using environment variables and/or a configuration 
 
         | A set of default properties are always advertised:
 
-          - ``node.os``: The name of the operating system
-          - ``node.arch``: The name of the CPU architecture
-          - ``node.cpus``: The number of CPUs
-          - ``node.id``: A unique identifier for the node on which the worker is running
-          - ``worker.hostname``: The hostname of the worker.
+          .. list-table::
+            :widths: 20 80
+            :header-rows: 1
+            :class: tight-table
 
-        | Example: ``label=compilation,label=unittesting``
+            * - Key
+              - Value
+
+            * - ``node.os``
+              - The name of the operating system, e.g. ``linux``, ``windows``.
+
+            * - ``node.arch``
+              - The name of the CPU architecture, e.g. ``amd64``, ``arm``.
+
+            * - ``node.cpus``
+              - The number of CPUs.
+
+            * - ``node.id``
+              - A unique identifier for the server on which the worker is running.
+
+            * - ``worker.hostname``
+              - The hostname of the worker.
+
+        | The recommandation is to use ``label`` for functional properties, for example
+          ``label=compilation,label=testing``.
 
     * - ``JOLT_SCHEDULER_URI``
       - ``scheduler_uri``
