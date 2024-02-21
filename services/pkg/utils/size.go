@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-var sizeRe = regexp.MustCompile(`(0|[1-9][0-9]*) ?([KMGTPE])?B?`)
+var sizeRe = regexp.MustCompile(`(0|[1-9][0-9]*) ?([KMGTPE]i?)?B?`)
 
 func ParseSize(size string) (int64, error) {
 	size = strings.TrimSpace(size)
@@ -23,23 +23,41 @@ func ParseSize(size string) (int64, error) {
 	}
 
 	switch parts[2] {
-	case "E":
+	case "Ei":
 		value *= 1024
+		fallthrough
+	case "Pi":
+		value *= 1024
+		fallthrough
+	case "Ti":
+		value *= 1024
+		fallthrough
+	case "Gi":
+		value *= 1024
+		fallthrough
+	case "Mi":
+		value *= 1024
+		fallthrough
+	case "Ki":
+		value *= 1024
+
+	case "E":
+		value *= 1000
 		fallthrough
 	case "P":
-		value *= 1024
+		value *= 1000
 		fallthrough
 	case "T":
-		value *= 1024
+		value *= 1000
 		fallthrough
 	case "G":
-		value *= 1024
+		value *= 1000
 		fallthrough
 	case "M":
-		value *= 1024
+		value *= 1000
 		fallthrough
 	case "K":
-		value *= 1024
+		value *= 1000
 	}
 
 	return value, nil
@@ -51,12 +69,12 @@ func HumanByteSize(byteSize int64) string {
 		format string
 	}{
 		{"B", "%.0f%s"},
-		{"KB", "%.0f%s"},
-		{"MB", "%.1f%s"},
-		{"GB", "%.2f%s"},
-		{"TB", "%.2f%s"},
-		{"PB", "%.2f%s"},
-		{"EB", "%.2f%s"},
+		{"KiB", "%.0f%s"},
+		{"MiB", "%.1f%s"},
+		{"GiB", "%.2f%s"},
+		{"TiB", "%.2f%s"},
+		{"PiB", "%.2f%s"},
+		{"EiB", "%.2f%s"},
 	}
 
 	var index = 0
