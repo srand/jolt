@@ -1,6 +1,7 @@
 from configparser import ConfigParser, NoOptionError, NoSectionError
 from urllib.parse import urlparse
 import os
+import re
 
 from jolt import common_pb2 as common_pb
 from jolt import filesystem as fs
@@ -150,27 +151,41 @@ def getint(section, key, default=None, alias=None):
 
 
 def getsize(section, key, default=None, alias=None):
-    units = {"B": 1, "K": 1024, "M": 1024**2, "G": 1024**3, "T": 1024**4}
+    units = {
+        None: 1,
+        "B": 1,
+
+        "K": 1000,
+        "M": 1000**2,
+        "G": 1000**3,
+        "T": 1000**4,
+        "P": 1000**5,
+        "E": 1000**6,
+
+        "Ki": 1024,
+        "Mi": 1024**2,
+        "Gi": 1024**3,
+        "Ti": 1024**4,
+        "Pi": 1024**5,
+        "Ei": 1024**6,
+    }
+
     value = get(section, key, default=None, alias=alias)
     if value is None:
         if type(default) is int:
             return default
         else:
             value = str(default)
-    value = value.strip()
-    value = value.split()
-    if len(value) == 1 and value[0][-1] in units:
-        size, unit = value[0][:-1], value[0][-1]
-    else:
-        raise_error_if(
-            len(value) != 2,
-            "Config: size '{2}' invalid for '{0}.{1}', expected '<size> <unit>'", value, section, key)
-        size, unit = value[0], value[1]
-    raise_error_if(
-        unit not in units,
-        "Config: unit invalid for '{0}.{1}', expected [B,K,M,G,T]", section, key)
-    return int(size) * units[unit]
 
+    m = re.search(r"^(0|[1-9][0-9]*) ?([KMGTPE]i?)?B?$", value)
+    raise_error_if(
+        not m,
+        "Config: size '{0}' invalid for '{1}.{2}', expected '<size> <unit>'", value, section, key)
+    raise_error_if(
+        m[2] not in units,
+        "Config: unit invalid for '{0}.{1}', expected [B,K,M,G,T,P,E,Mi,Gi,Ti,Pi,Ei]", section, key)
+
+    return int(m[1]) * units.get(m[2], 1)
 
 def getfloat(section, key, default=None, alias=None):
     return float(get(section, key, default=default, alias=alias))

@@ -86,7 +86,7 @@ def as_stable_tuple_list(o):
 
 
 def as_human_size(size):
-    unit_precision = [("B", 0), ("KB", 0), ("MB", 1), ("GB", 2), ("TB", 2), ("PB", 2)]
+    unit_precision = [("B", 0), ("KiB", 0), ("MiB", 1), ("GiB", 2), ("TiB", 2), ("PiB", 2), ("EiB", 2)]
     index = 0
     while size > 1024:
         size /= 1024
