@@ -96,7 +96,7 @@ class GitRepository(object):
 
     def diff(self):
         diff = self.diff_unchecked()
-        dlim = config.getsize("git", "maxdiffsize", "1M")
+        dlim = config.getsize("git", "maxdiffsize", "1 MiB")
         raise_error_if(
             len(diff) > dlim,
             "Repository '{}' has uncommitted changes. Size of patch exceeds configured transfer limit ({} > {} bytes)."
