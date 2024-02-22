@@ -613,8 +613,10 @@ def export_tasks(tasks):
     for task in tasks:
         properties = []
         for key, export in task.task._get_export_objects().items():
-            pb_attrib = common_pb.Property(key=key, value=str(export.export(task.task)))
-            properties.append(pb_attrib)
+            value = export.export(task.task)
+            if value is not None:
+                pb_attrib = common_pb.Property(key=key, value=str(value))
+                properties.append(pb_attrib)
 
         platform = common_pb.Platform(
             properties=[
