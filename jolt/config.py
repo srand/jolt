@@ -187,6 +187,7 @@ def getsize(section, key, default=None, alias=None):
 
     return int(m[1]) * units.get(m[2], 1)
 
+
 def getfloat(section, key, default=None, alias=None):
     return float(get(section, key, default=default, alias=alias))
 
