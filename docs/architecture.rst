@@ -209,10 +209,17 @@ Flowcharts
 Local Execution
 ~~~~~~~~~~~~~~~
 
-The diagram below illustrates what happens when a task is executed
-locally by a user.
+The diagram below illustrates what happens in the Jolt application when tasks are executed locally by a user.
 
 .. image:: img/execution.png
+
+
+Remote Execution
+~~~~~~~~~~~~~~~~
+
+The diagram below illustrates what happens in the Jolt application when a user executes tasks in a build cluster.
+
+.. image:: img/execution_remote.png
 
 
 .. architecture-end
