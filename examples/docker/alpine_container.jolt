@@ -1,0 +1,13 @@
+from jolt.plugins.docker import DockerContainer
+
+
+class AlpineContainer(DockerContainer):
+    name = "alpine/container"
+
+    # The image to use for the container.
+    # This is either a task name or a full image name.
+    image = "alpine"
+
+    # Mark the container as a chroot container.
+    # Consumer tasks will run all commands in the container.
+    chroot = True
