@@ -1,0 +1,10 @@
+from jolt import Task
+
+
+class Example(Task):
+    """ Example task that uses the alpine/container to run a command. """
+
+    requires = ["alpine/chroot"]
+
+    def run(self, deps, tools):
+        tools.run("cat /etc/os-release")

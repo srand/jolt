@@ -1,0 +1,11 @@
+from jolt import Task
+
+
+class Example2(Task):
+    """ Example task that uses the alpine image to run a command. """
+
+    requires = ["alpine"]
+
+    def run(self, deps, tools):
+        with tools.chroot(deps["alpine"]):
+            tools.run("cat /etc/os-release")

@@ -1,0 +1,21 @@
+from jolt import Chroot
+from jolt.plugins.docker import DockerImage
+
+
+class Alpine(DockerImage):
+    dockerfile = '''
+    FROM alpine:3.7
+    '''
+
+    # Extract the image into a directory tree
+    extract = True
+
+    # Dont publish the image as an archive
+    imagefile = None
+
+
+class AlpineChroot(Chroot):
+    name = "alpine/chroot"
+
+    # Task artifact that contains the chroot
+    chroot = "alpine"
