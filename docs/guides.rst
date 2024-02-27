@@ -86,7 +86,7 @@ will deploy a scheduler and two workers, as well as an artifact cache.
 The Jolt workers are configured in the ``worker.conf`` file:
 
   .. literalinclude:: ../docker/swarm/worker.conf
-    :language: conf
+    :language: ini
 
 The file configures the URIs of the scheduler service and the HTTP cache.
 In the example, local Docker volumes are used as storage for artifacts.
@@ -117,7 +117,7 @@ The newly deployed build cluster is utilized by configuring the Jolt client
 as follows:
 
   .. literalinclude:: ../docker/swarm/client.conf
-    :language: conf
+    :language: ini
 
 These configuration keys can also be set from command line:
 
@@ -141,3 +141,68 @@ Alternatively, if you are using a separate configuration file:
   .. code:: bash
 
     $ jolt -c client.conf build --network <task>
+
+
+Kubernetes
+~~~~~~~~~~~~
+
+Kubernetes is a more complex container orchestration tool which can be used
+to deploy and manage the Jolt build cluster. The below Kubernetes deployment
+yaml file will deploy a scheduler, two workers, an artifact cache as well as
+the dashboard. Notice inline ''FIXME'' comments in the yaml file that need to
+or should be replaced with actual values.
+
+  .. literalinclude:: ../docker/kubernetes/jolt.yaml
+    :language: yaml
+
+To deploy the system into a Kubernetes cluster, run:
+
+  .. code:: bash
+
+    $ kubectl apply -f jolt.yaml
+
+You can then scale up the the number of workers to a number suitable for your cluster:
+
+    .. code:: bash
+
+      $ kubectl scale deployment jolt-worker --replicas=10
+
+Scaling is possible even with tasks in progress as long as they don't cause any side
+effects. If a task is interrupted because the worker is terminated, the scheduler will
+redeliver the task execution request to another worker.
+
+The newly deployed build cluster is utilized by configuring the Jolt client
+as follows:
+
+  .. literalinclude:: ../docker/kubernetes/client.conf
+    :language: ini
+
+The placeholder hosts should be replaced with the actual hostnames or IPs
+of the services in the Kubernetes cluster. The services are typically exposed
+through a load balancer and/or an ingress controller. Both methods are exemplified
+in the yaml file, but may not work out of the box in all Kubernetes installations.
+Run the following command to find the ExternalIP addresses of the services:
+
+    .. code:: bash
+
+      $ kubectl get services jolt-cache jolt-scheduler
+
+The client configuration keys can also be set from command line:
+
+    .. code:: bash
+
+      $ jolt config scheduler.uri tcp://<scheduler-service-name-or-ip>:<port>
+      $ jolt config http.uri http://<cache-service-name-or-ip>:<port>
+
+To execute a task in the cluster, pass the ``-n/--network`` flag to the build command:
+
+  .. code:: bash
+
+    $ jolt build -n <task>
+
+Alternatively, if you are using a separate configuration file:
+
+    .. code:: bash
+
+      $ jolt -c client.conf build --network <task>
+

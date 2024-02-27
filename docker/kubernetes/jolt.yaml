@@ -1,0 +1,276 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: jolt-config
+data:
+  scheduler.yaml:
+    |-
+      listen_grpc:
+       - tcp://:9090
+      listen_http:
+       - tcp://:8080
+      public_http:
+       - http://jolt-scheduler:8080
+      logstash:
+        size: 10GB
+        storage: disk
+        path: /root/logstash
+      dashboard:
+        uri: "http://jolt-dashboard"
+  worker.conf:
+    |-
+      # This configuration is used by the Jolt application
+      # that is installed and executed by worker containers.
+
+      [jolt]
+      # The location of the local Jolt artifact cache.
+      cachedir = /data/cache
+
+      # The maximum size of the cache in bytes.
+      # FIXME: Replace with an actual value.
+      cachesize = 100G
+
+      [cache]
+      # Location of the Jolt cache inside the build cluster:
+      uri = http://jolt-cache:8080
+
+      [scheduler]
+      # URI of the Jolt scheduler inside the build cluster:
+      uri = tcp://jolt-scheduler:9090
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jolt-cache
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: jolt-cache
+  template:
+    metadata:
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: "/metrics"
+        prometheus.io/port: "8080"
+      labels:
+        app: jolt-cache
+    spec:
+      containers:
+        - name: jolt-cache
+          env:
+            - name: JOLT_CACHE_INSECURE
+              value: "true"
+            - name: JOLT_CACHE_MAX_SIZE
+              # FIXME: Replace with an actual value.
+              value: "100GiB"
+            - name: JOLT_CACHE_VERBOSITY
+              value: "2"
+          image: robrt/jolt-cache:latest
+          ports:
+            - containerPort: 8080
+          volumeMounts:
+            - name: jolt-cache
+              mountPath: /data
+      volumes:
+      - name: jolt-cache
+        # FIXME: Replace with an actual persistent volume claim.
+        #
+        # This volume is used to store task artifacts.
+        # An emptyDir volume is used as an example, but
+        # the volume should typically be backed by a
+        # persistent volume claim that survives pod restarts.
+        emptyDir: {}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jolt-dashboard
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: jolt-dashboard
+  template:
+    metadata:
+      labels:
+        app: jolt-dashboard
+    spec:
+      containers:
+        - name: jolt-dashboard
+          image: robrt/jolt-dashboard:latest
+          ports:
+            - containerPort: 80
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jolt-scheduler
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: jolt-scheduler
+  template:
+    metadata:
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: "/metrics"
+        prometheus.io/port: "8080"
+      labels:
+        app: jolt-scheduler
+    spec:
+      containers:
+        - name: jolt-scheduler
+          image: robrt/jolt-scheduler:latest
+          ports:
+            - containerPort: 8080
+          volumeMounts:
+            - name: jolt-config
+              mountPath: /etc/jolt
+      volumes:
+      - name: jolt-config
+        configMap:
+          name: jolt-config
+          items:
+            - key: scheduler.yaml
+              path: scheduler.yaml
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jolt-worker
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: jolt-worker
+  template:
+    metadata:
+      labels:
+        app: jolt-worker
+    spec:
+      containers:
+        - name: jolt-worker
+          env:
+            - name: JOLT_CACHE_DIR
+              value: /data/cache
+            - name: JOLT_SCHEDULER_URI
+              value: "tcp://jolt-scheduler:9090"
+          image: robrt/jolt-worker:latest
+          ports:
+            - containerPort: 8080
+          volumeMounts:
+            - name: jolt-cache
+              mountPath: /data/cache
+            - name: jolt-config
+              mountPath: /root/.config/jolt
+            - name: jolt-ws
+              mountPath: /data/ws
+            - name: machine-id
+              mountPath: /etc/machine-id
+      volumes:
+      - name: machine-id
+        hostPath:
+          path: /etc/machine-id
+      - name: jolt-config
+        configMap:
+          name: jolt-config
+          items:
+            - key: worker.conf
+              path: config
+      - name: jolt-cache
+        # FIXME: Replace with an actual hostPath volume.
+        #
+        # This volume is used to store the artifacts locally in the worker.
+        # An emptyDir volume is used as an example, but
+        # the volume should typically be backed by a hostPath volume
+        # with a path that is shared between all workers on the node.
+        #
+        #   hostPath:
+        #     path: /data/cache
+        #
+        emptyDir: {}
+      - name: jolt-ws
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: jolt-cache
+spec:
+  selector:
+    app: jolt-cache
+  ports:
+    - name: "http"
+      port: 8080
+      targetPort: 8080
+  type: LoadBalancer
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: jolt-dashboard
+spec:
+  selector:
+    app: jolt-dashboard
+  ports:
+    - name: "http"
+      port: 80
+      targetPort: 80
+  type: LoadBalancer
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: jolt-scheduler
+spec:
+  selector:
+    app: jolt-scheduler
+  ports:
+    - name: "http"
+      port: 8080
+      targetPort: 8080
+    - name: "grpc"
+      port: 9090
+      targetPort: 9090
+  type: LoadBalancer
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: jolt-cache
+spec:
+  rules:
+    # FIXME:
+    # Replace this with the actual domain name of the cache.
+    - host: cache.jolt.domain
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: jolt-cache
+                port:
+                  number: 8080
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: jolt-dashboard
+spec:
+  rules:
+    # FIXME:
+    # Replace this with the actual domain name of the dashboard.
+    - host: dashboard.jolt.domain
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: jolt-dashboard
+                port:
+                  number: 8080
+---

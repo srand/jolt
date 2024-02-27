@@ -203,8 +203,8 @@ share a local cache, only one worker needs to download dependencies,
 reducing network bandwidth usage.
 
 
-Flowcharts
-----------
+Diagrams
+--------
 
 Local Execution
 ~~~~~~~~~~~~~~~
