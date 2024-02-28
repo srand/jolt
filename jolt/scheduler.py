@@ -54,7 +54,6 @@ class TaskQueue(object):
             try:
                 future.result()
             except Exception as error:
-                log.exception()
                 return task, error
             finally:
                 self.duration_acc += task.duration_running or 0
@@ -117,7 +116,7 @@ class LocalExecutor(Executor):
                     force_upload=self.force_upload)
 
         except Exception as e:
-            log.exception()
+            log.exception(e if getattr(env, "worker", False) else None)
             if not task.is_unstable:
                 raise e
 

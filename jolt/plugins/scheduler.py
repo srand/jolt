@@ -81,7 +81,7 @@ class LogHandler(object):
                 loglines=[
                     common_pb.LogLine(
                         context=self.task.task_id[:8],
-                        level=record.levelno,
+                        level=log.level_to_pb(record.levelno),
                         time=timestamp,
                         message=record.message,
                     ),
@@ -184,7 +184,7 @@ class RemoteExecutor(NetworkExecutor):
         for response in self.session.logs.ReadLog(request):
             for line in response.loglines:
                 log.log(
-                    line.level,
+                    log.pb_to_level(line.level),
                     line.message,
                     created=line.time.ToMicroseconds() / 1000000,
                     context=line.context[:7],
@@ -276,7 +276,7 @@ class RemoteExecutor(NetworkExecutor):
         for progress in response:
             for line in progress.loglines:
                 log.log(
-                    line.level,
+                    log.pb_to_level(line.level),
                     line.message,
                     created=line.time.ToMicroseconds() / 1000000,
                     context=line.context[:7],
@@ -404,7 +404,7 @@ class RemoteSession(object):
             task_default_parameters=scheduler.export_task_default_params(graph.tasks),
             tasks=scheduler.export_tasks(graph.tasks + graph.pruned),
             workspace=loader.export_workspace(graph.tasks),
-            loglevel=log.get_level(),
+            loglevel=log.get_level_pb(),
             config=config.export_config(),
         )
 
@@ -533,7 +533,7 @@ def executor(ctx, worker, build, request):
 
     # Set log level
     loglevel = request.environment.loglevel
-    log.set_level(loglevel)
+    log.set_level_pb(loglevel)
 
     # Import protobuf build description
     manifest.ManifestExtensionRegistry.import_protobuf(request.environment)
@@ -586,7 +586,7 @@ def executor(ctx, worker, build, request):
 
         # Subscribe to tasks
         for task in sched.GetTasks(updates):
-            log.set_level(loglevel)
+            log.set_level_pb(loglevel)
 
             log.info("Queuing {}", task.task_id)
             graph_task = dag.get_task_by_identity(task.task_id)
@@ -600,7 +600,7 @@ def executor(ctx, worker, build, request):
 
                 # Run the task
                 with log.handler(LogHandler(updates, task)):
-                    executor.run(JoltEnvironment(cache=acache))
+                    executor.run(JoltEnvironment(cache=acache, worker=True))
 
             except KeyboardInterrupt as interrupt:
                 log.info("Task cancelled")
@@ -616,9 +616,6 @@ def executor(ctx, worker, build, request):
                 raise interrupt
 
             except Exception as e:
-                log.set_level(log.EXCEPTION)
-                log.exception(e)
-
                 errors = []
 
                 # Add errors from the task to the update sent to the scheduler

@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	echo "github.com/labstack/echo/v4"
+	"github.com/srand/jolt/scheduler/pkg/protocol"
 )
 
 func NewHttpHandler(stash LogStash, r *echo.Echo) http.Handler {
@@ -31,12 +32,22 @@ func NewHttpHandler(stash LogStash, r *echo.Echo) http.Handler {
 				return c.String(http.StatusInternalServerError, err.Error())
 			}
 
+			// Convert level to string
+			level := ""
+
+			switch record.Level {
+			case protocol.LogLevel_EXCEPTION:
+				level = "EXCEPT"
+			default:
+				level = record.Level.String()
+			}
+
 			ts := record.Time.AsTime().Local()
 			line := fmt.Sprintf(
 				"%s.%06d [%7s] %s\n",
 				ts.Format("2006-01-02 15:04:05"),
 				ts.Nanosecond()/1000,
-				record.Level.String(),
+				level,
 				record.Message)
 
 			if _, err := writer.WriteString(line); err != nil {

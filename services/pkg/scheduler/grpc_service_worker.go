@@ -137,15 +137,24 @@ func (s *workerService) GetInstructions(stream protocol.Worker_GetInstructionsSe
 
 				switch update.Status {
 				case protocol.WorkerUpdate_DEPLOY_FAILED:
-					log.Debug("Worker failed to deploy executor for build", currentBuild.Id())
+					log.Debug("Worker failed to deploy executor for build", currentBuild.Id(), worker.Id())
+					if update.Error != nil {
+						log.Debug("Executor error:", update.Error.Message, update.Error.Details)
+					}
 					errType = "Deployment Error"
 
 				case protocol.WorkerUpdate_EXECUTOR_FAILED:
-					log.Debug("Executor failed for build", currentBuild.Id())
+					log.Debug("Executor failed for build", currentBuild.Id(), worker.Id())
+					if update.Error != nil {
+						log.Debug("Executor error:", update.Error.Message, update.Error.Details)
+					}
 					errType = "Executor Error"
 
 				default:
-					log.Debug("Unspecified worker error for build", currentBuild.Id())
+					log.Debug("Unspecified worker error for build", currentBuild.Id(), worker.Id())
+					if update.Error != nil {
+						log.Debug("Executor error:", update.Error.Message, update.Error.Details)
+					}
 					errType = "Worker Error"
 				}
 

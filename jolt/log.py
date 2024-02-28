@@ -40,15 +40,15 @@ if not fs.path.exists(dirpath):
 
 ################################################################################
 
-ERROR = common_pb.LogLevel.ERROR
-WARNING = common_pb.LogLevel.WARNING
-INFO = common_pb.LogLevel.INFO
-VERBOSE = common_pb.LogLevel.VERBOSE
-DEBUG = common_pb.LogLevel.DEBUG
-EXCEPTION = common_pb.LogLevel.EXCEPTION
-STDOUT = common_pb.LogLevel.STDOUT
-STDERR = common_pb.LogLevel.STDERR
-SILENCE = STDERR + 1
+ERROR = common_pb.LogLevel.ERROR + 1
+WARNING = common_pb.LogLevel.WARNING + 1
+INFO = common_pb.LogLevel.INFO + 1
+VERBOSE = common_pb.LogLevel.VERBOSE + 1
+DEBUG = common_pb.LogLevel.DEBUG + 1
+EXCEPTION = common_pb.LogLevel.EXCEPTION + 1
+STDOUT = common_pb.LogLevel.STDOUT + 1
+STDERR = common_pb.LogLevel.STDERR + 1
+SILENCE = STDERR + 2
 
 logging.addLevelName(VERBOSE, "VERBOSE")
 logging.addLevelName(STDOUT, "STDOUT")
@@ -148,7 +148,7 @@ _root.setLevel(logging.CRITICAL)
 
 # create jolt logger
 _logger = logging.getLogger('jolt')
-_logger.setLevel(DEBUG)
+_logger.setLevel(EXCEPTION)
 
 _console_formatter = ConsoleFormatter('[{levelname:>7}] {message}', '{message}')
 
@@ -158,14 +158,14 @@ else:
     _stdout = logging.StreamHandler(sys.stdout)
 _stdout.setFormatter(_console_formatter)
 _stdout.addFilter(Filter(lambda r: r.levelno < ERROR))
+_stdout.addFilter(Filter(lambda r: r.levelno != EXCEPTION))
 
 if sys.stdout.isatty() and sys.stderr.isatty():
     _stderr = logging.StreamHandler(TqdmStream(sys.stdout))
 else:
     _stderr = logging.StreamHandler(sys.stderr)
 _stderr.setFormatter(_console_formatter)
-_stderr.addFilter(Filter(lambda r: r.levelno >= ERROR))
-_stderr.addFilter(Filter(lambda r: r.levelno != EXCEPTION))
+_stderr.addFilter(Filter(lambda r: r.levelno >= ERROR or r.levelno == EXCEPTION))
 
 _logger.addHandler(_stdout)
 _logger.addHandler(_stderr)
@@ -183,7 +183,7 @@ def start_file_log():
             os.unlink(file)
 
     _file = logging.FileHandler(logfile)
-    _file.setLevel(DEBUG)
+    _file.setLevel(EXCEPTION)
     _file.setFormatter(_file_formatter)
     _logger.addHandler(_file)
 
@@ -266,7 +266,7 @@ def format_exception_msg(exc):
 
 def exception(exc=None):
     if exc:
-        _logger.error(format_exception_msg(exc))
+        _logger.log(ERROR, format_exception_msg(exc))
         backtrace = traceback.format_exc().splitlines()
     else:
         backtrace = traceback.format_exc().splitlines()
@@ -343,16 +343,51 @@ def progress(desc, count, unit, estimates=True, debug=False):
 _level = INFO
 
 
+def level_to_pb(level):
+    """ Convert a log level to a protobuf enum value. """
+    return level - 1
+
+
+def pb_to_level(level):
+    """ Convert a protobuf enum value to a log level. """
+    return level + 1
+
+
 def set_level(level):
+    """ Set the log level for terminal output. """
+
+    if level not in [
+        DEBUG,
+        ERROR,
+        EXCEPTION,
+        INFO,
+        SILENCE,
+        STDERR,
+        STDOUT,
+        VERBOSE,
+        WARNING,
+    ]:
+        raise ValueError("invalid log level")
+
     global _level
     _level = level
     _stdout.setLevel(level)
     _stderr.setLevel(level)
 
 
+def set_level_pb(level):
+    """ Set the log level from a protobuf enum value. """
+    set_level(pb_to_level(level))
+
+
 def get_level():
     global _level
     return _level
+
+
+def get_level_pb():
+    """ Get the log level as a protobuf enum value. """
+    return level_to_pb(_level)
 
 
 def set_worker():

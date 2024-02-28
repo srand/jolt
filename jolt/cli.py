@@ -56,10 +56,12 @@ class PluginGroup(click.Group):
 
         if cmd_name in ["export", "inspect"]:
             log.set_level(log.SILENCE)
-        elif ctx.params.get("verbose", False):
-            log.set_level(log.VERBOSE)
-        elif ctx.params.get("extra_verbose", False):
+        elif ctx.params.get("verbose") >= 3:
+            log.set_level(log.EXCEPTION)
+        elif ctx.params.get("verbose") >= 2:
             log.set_level(log.DEBUG)
+        elif ctx.params.get("verbose") >= 1:
+            log.set_level(log.VERBOSE)
 
         config_files = ctx.params.get("config_file") or []
         for config_file in config_files:
@@ -74,8 +76,7 @@ class PluginGroup(click.Group):
 
 @click.group(cls=PluginGroup, invoke_without_command=True)
 @click.version_option(__version__)
-@click.option("-v", "--verbose", is_flag=True, help="Verbose output.")
-@click.option("-vv", "--extra-verbose", is_flag=True, help="Extra verbose output.")
+@click.option("-v", "--verbose", count=True, help="Verbose output (repeat to raise verbosity).")
 @click.option("-c", "--config", "config_file", multiple=True, type=str,
               help="Load a configuration file or set a configuration key.")
 @click.option("-d", "--debugger", is_flag=True,
@@ -98,7 +99,7 @@ class PluginGroup(click.Group):
               help="Number of tasks allowed to execute in parallel (1). ")
 @click.option("-h", "--help", is_flag=True, help="Show this message and exit.")
 @click.pass_context
-def cli(ctx, verbose, extra_verbose, config_file, debugger, profile,
+def cli(ctx, verbose, config_file, debugger, profile,
         force, salt, debug, network, local, keep_going, jobs, help):
     """
     A task execution tool.
@@ -203,8 +204,7 @@ def _autocomplete_tasks(ctx, args, incomplete):
 @click.option("-n", "--network", is_flag=True, default=False, help="Distribute tasks to network workers.")
 @click.option("-s", "--salt", type=str, help="Add salt as hash influence for all tasks in dependency tree.", metavar="SALT")
 @click.option("-m", "--mute", is_flag=True, help="Display task log only if it fails.")
-@click.option("-v", "--verbose", is_flag=True, help="Verbose output.")
-@click.option("-vv", "--extra-verbose", is_flag=True, help="Extra verbose output.")
+@click.option("-v", "--verbose", count=True, help="Verbose output (repeat to raise verbosity).")
 @click.option("--result", type=click.Path(), hidden=True,
               help="Write result manifest to this file.")
 @click.option("--no-download", is_flag=True, default=False,
@@ -223,7 +223,7 @@ def _autocomplete_tasks(ctx, args, incomplete):
 @hooks.cli_build
 def build(ctx, task, network, keep_going, default, local,
           no_download, no_upload, download, upload, worker, force,
-          salt, copy, debug, result, jobs, no_prune, verbose, extra_verbose,
+          salt, copy, debug, result, jobs, no_prune, verbose,
           mute):
     """
     Build task artifact.
@@ -268,10 +268,12 @@ def build(ctx, task, network, keep_going, default, local,
     raise_error_if(no_upload and upload,
                    "The --upload and --no-upload flags are mutually exclusive")
 
-    if verbose:
-        log.set_level(log.VERBOSE)
-    elif extra_verbose:
+    if verbose >= 3:
+        log.set_level(log.EXCEPTION)
+    elif verbose >= 2:
         log.set_level(log.DEBUG)
+    elif verbose >= 1:
+        log.set_level(log.VERBOSE)
 
     ts_start = utils.duration()
     task = list(task)
