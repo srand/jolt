@@ -106,12 +106,12 @@ func (t *Task) NewUpdateObserver() TaskUpdateObserver {
 }
 
 // Post a task update to all task observers.
-func (t *Task) PostUpdate(update *protocol.TaskUpdate) {
+func (t *Task) PostUpdate(update *protocol.TaskUpdate) bool {
 	statusChanged := t.setStatus(update.Status)
 	if t.build.logstream {
 		if !statusChanged {
 			if len(update.Loglines) <= 0 {
-				return
+				return statusChanged
 			}
 			update.Status = t.status
 		}
@@ -132,6 +132,7 @@ func (t *Task) PostUpdate(update *protocol.TaskUpdate) {
 
 		t.updateObservers.Post(update)
 	}
+	return statusChanged
 }
 
 // Post a task status update to all task observers.

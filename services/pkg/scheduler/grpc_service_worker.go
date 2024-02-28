@@ -3,12 +3,14 @@ package scheduler
 import (
 	"errors"
 	"io"
+	"strings"
 	"time"
 
 	"github.com/srand/jolt/scheduler/pkg/log"
 	"github.com/srand/jolt/scheduler/pkg/logstash"
 	"github.com/srand/jolt/scheduler/pkg/protocol"
 	"github.com/srand/jolt/scheduler/pkg/utils"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type workerService struct {
@@ -158,7 +160,7 @@ func (s *workerService) GetInstructions(stream protocol.Worker_GetInstructionsSe
 					errType = "Worker Error"
 				}
 
-				currentTask.PostUpdate(&protocol.TaskUpdate{
+				if currentTask.PostUpdate(&protocol.TaskUpdate{
 					Status: protocol.TaskStatus_TASK_ERROR,
 					Request: &protocol.TaskRequest{
 						BuildId: currentBuild.Id(),
@@ -175,9 +177,50 @@ func (s *workerService) GetInstructions(stream protocol.Worker_GetInstructionsSe
 							Details:  update.Error.Details,
 						},
 					},
-				})
+				}) {
+					writer, err := s.logs.Append(currentTask.Instance())
+					if err == nil {
+						for _, line := range strings.Split(strings.TrimSpace(update.Error.Details), "\n") {
+							var level protocol.LogLevel
+							switch {
+							case strings.HasPrefix(line, "[  ERROR]"):
+								level = protocol.LogLevel_ERROR
+								line = line[10:]
+							case strings.HasPrefix(line, "[WARNING]"):
+								level = protocol.LogLevel_WARNING
+								line = line[10:]
+							case strings.HasPrefix(line, "[VERBOSE]"):
+								level = protocol.LogLevel_VERBOSE
+								line = line[10:]
+							case strings.HasPrefix(line, "[  DEBUG]"):
+								level = protocol.LogLevel_DEBUG
+								line = line[10:]
+							case strings.HasPrefix(line, "[   INFO]"):
+								level = protocol.LogLevel_INFO
+								line = line[10:]
+							case strings.HasPrefix(line, "[ EXCEPT]"):
+								level = protocol.LogLevel_EXCEPTION
+								line = line[10:]
+							case strings.HasPrefix(line, "[ STDERR]"):
+								level = protocol.LogLevel_STDERR
+								line = line[10:]
+							case strings.HasPrefix(line, "[ STDOUT]"):
+								level = protocol.LogLevel_STDOUT
+								line = line[10:]
+							default:
+								level = protocol.LogLevel_STDOUT
+							}
+							writer.WriteLine(&protocol.LogLine{
+								Level:   level,
+								Message: line,
+								Time:    timestamppb.Now(),
+								Context: currentTask.Identity(),
+							})
+						}
+						writer.Close()
+					}
+				}
 
-				currentBuild.Cancel()
 				currentBuild = nil
 				currentBuildCtx = nil
 				currentTask = nil
