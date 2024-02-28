@@ -264,9 +264,10 @@ def format_exception_msg(exc):
             te.stack[-1].name)
 
 
-def exception(exc=None):
+def exception(exc=None, error=True):
     if exc:
-        _logger.log(ERROR, format_exception_msg(exc))
+        if error:
+            _logger.log(ERROR, format_exception_msg(exc))
 
         tb = traceback.format_exception(type(exc), value=exc, tb=exc.__traceback__)
         installdir = fs.path.dirname(__file__)

@@ -15,6 +15,11 @@ class JoltCommandError(JoltError):
         self.returncode = returncode
 
 
+class LoggedJoltError(JoltError):
+    def __init__(self, exc):
+        self.exc = exc
+
+
 def raise_error(msg, *args, **kwargs):
     raise JoltError(msg.format(*args, **kwargs))
 

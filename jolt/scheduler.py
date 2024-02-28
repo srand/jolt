@@ -12,6 +12,7 @@ from jolt import tools
 from jolt.error import raise_error
 from jolt.error import raise_task_error
 from jolt.error import raise_task_error_if
+from jolt.error import LoggedJoltError
 from jolt.graph import PruneStrategy
 from jolt.manifest import ManifestExtension
 from jolt.manifest import ManifestExtensionRegistry
@@ -116,8 +117,9 @@ class LocalExecutor(Executor):
                     force_upload=self.force_upload)
 
         except Exception as e:
-            log.exception(e if getattr(env, "worker", False) else None)
+            log.exception(e, error=False)
             if not task.is_unstable:
+                self.task.raise_for_status(log_error=getattr(env, "worker", False))
                 raise e
 
         return task

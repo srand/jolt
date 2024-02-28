@@ -22,7 +22,7 @@ from jolt import utils
 from jolt.cache import ArtifactAttributeSetProvider
 from jolt.error import raise_error, raise_error_if, raise_task_error, raise_task_error_if
 from jolt.error import raise_unreported_task_error_if
-from jolt.error import JoltError, JoltCommandError
+from jolt.error import JoltError, JoltCommandError, LoggedJoltError
 from jolt.expires import Immediately
 from jolt.influence import FileInfluence, TaintInfluenceProvider
 from jolt.influence import TaskClassSourceInfluence
@@ -2502,9 +2502,14 @@ class ReportProxy(object):
     def manifest(self):
         return self._report
 
-    def raise_for_status(self):
+    def raise_for_status(self, log_details=False, log_error=False):
         for error in self.errors:
-            raise_error(error.message)
+            if log_error:
+                log.error("{}: {}", error.type, error.message, context=self._task.identity[:7])
+            if log_details:
+                for line in error.details.splitlines():
+                    log.transfer(line, context=self._task.identity[:7])
+            raise LoggedJoltError(JoltError(f"{error.type}: {error.message}"))
 
 
 class Resource(Task):

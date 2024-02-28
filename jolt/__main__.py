@@ -3,6 +3,7 @@ import os
 import sys
 
 from jolt import cli
+from jolt import error
 from jolt import log
 
 
@@ -38,8 +39,15 @@ def main():
             extype, value, tb = sys.exc_info()
             pdb.post_mortem(tb)
         sys.exit(1)
+    except error.LoggedJoltError as e:
+        log.error(log.format_exception_msg(e.exc))
+        if cli.debug_enabled:
+            import pdb
+            extype, value, tb = sys.exc_info()
+            pdb.post_mortem(tb)
+        sys.exit(1)
     except Exception as e:
-        log.exception(e)
+        log.exception(e, error=True)
         if cli.debug_enabled:
             import pdb
             extype, value, tb = sys.exc_info()

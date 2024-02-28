@@ -402,6 +402,7 @@ def build(ctx, task, network, keep_going, default, local,
 
                 if not keep_going and error is not None:
                     queue.abort()
+                    task.raise_for_status()
                     raise error
 
         if dag.failed or dag.unstable:

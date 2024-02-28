@@ -16,7 +16,7 @@ from jolt import manifest
 from jolt import common_pb2 as common_pb
 from jolt import scheduler
 from jolt import utils
-from jolt.error import JoltError, raise_error, raise_error_if, raise_task_error, raise_task_error_if
+from jolt.error import LoggedJoltError, JoltError, raise_error, raise_error_if, raise_task_error, raise_task_error_if
 from jolt.graph import GraphBuilder
 from jolt.scheduler import ExecutorRegistry, JoltEnvironment, NetworkExecutor, NetworkExecutorFactory, WorkerStrategy
 from jolt.tasks import TaskRegistry
@@ -240,7 +240,8 @@ class RemoteExecutor(NetworkExecutor):
             raise rpc_error
 
         except Exception as e:
-            log.exception()
+            if not isinstance(e, LoggedJoltError):
+                log.exception()
 
             if self.factory.options.mute:
                 try:
@@ -312,9 +313,7 @@ class RemoteExecutor(NetworkExecutor):
                             error.message,
                             error.details,
                         )
-                with self.task.task.report() as report:
-                    for error in report.errors:
-                        raise_error(f"{error.type}: {error.message}")
+                self.task.raise_for_status()
                 raise raise_error("Remote execution failed")
 
             if progress.status in [
@@ -328,11 +327,7 @@ class RemoteExecutor(NetworkExecutor):
                             error.message,
                             error.details,
                         )
-                with self.task.task.report() as report:
-                    for error in report.errors:
-                        for line in error.details.splitlines():
-                            log.error(line)
-                        raise_error(f"{error.type}: {error.message}")
+                self.task.raise_for_status(log_details=True)
                 raise raise_error("Remote execution failed")
 
             last_status = progress.status
