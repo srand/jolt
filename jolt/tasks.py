@@ -2502,6 +2502,10 @@ class ReportProxy(object):
     def manifest(self):
         return self._report
 
+    def raise_for_status(self):
+        for error in self.errors:
+            raise_error(error.message)
+
 
 class Resource(Task):
     """

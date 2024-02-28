@@ -634,6 +634,10 @@ class TaskProxy(object):
         hooks.task_postpublish(self, artifact, self.tools)
         artifact.get_cache().commit(artifact)
 
+    def raise_for_status(self):
+        with self.report() as report:
+            report.raise_for_status()
+
     def report(self):
         return self.task.report()
 

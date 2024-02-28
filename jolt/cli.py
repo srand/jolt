@@ -407,6 +407,8 @@ def build(ctx, task, network, keep_going, default, local,
             for failed in dag.failed + dag.unstable:
                 log.error("- {}", failed.log_name.strip("()"))
 
+        for failed_task in dag.failed:
+            failed_task.raise_for_status()
         if dag.failed:
             raise_error("No more tasks could be executed")
 
