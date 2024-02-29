@@ -1,7 +1,7 @@
 import contextlib
 import copy
 import functools
-import ninja_syntax as ninja
+import ninja
 import os
 import sys
 
