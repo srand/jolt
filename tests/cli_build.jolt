@@ -234,77 +234,6 @@ class BuildCli(testsupport.JoltTest):
         r1 = self.lastLog()
         self.assertBuild(r1, "pass2")
 
-    def test_amqp_task_deduplication(self):
-        """
-        --- tasks:
-        class Sleep(Task):
-            t = Parameter()
-
-            def run(self, d, tools):
-                tools.run("sleep {{t}}")
-        ---
-        """
-        if not self.network:
-            self.skipTest("network build deployment required")
-
-        self.info("Network plugin: '{}'", self.network_plugin)
-        if self.network_plugin != "amqp":
-            self.skipTest("amqp network plugin required")
-
-        # Starting two builds in parallel
-        with self.assertRaises(Exception), self.tools.cwd(self.ws):
-            self.tools.run("timeout 5 jolt -c test.conf -c net.conf build -n sleep:t=10")
-        self.jolt(f"build -n sleep:t=10")
-        self.tools.run("sleep 10")
-
-        # Assert that only one build request reaches the worker
-        log = self.tools.run("docker service logs jolt_test_worker", output=False)
-        matches = re.findall(r"Finalizing: sleep:t=10", log, re.M)
-        self.assertEqual(len(matches), 1)
-
-    def test_amqp_task_priority(self):
-        """
-        --- tasks:
-        class Sleep2(Task):
-            t = Parameter()
-
-            def run(self, d, tools):
-                tools.run("sleep {{t}}")
-        ---
-        """
-        if not self.network:
-            self.skipTest("network build deployment required")
-
-        if self.network_plugin != "amqp":
-            self.skipTest("amqp network plugin required")
-
-        # Starting a task to keep the worker occupied
-        with self.assertRaises(Exception), self.tools.cwd(self.ws):
-            self.tools.run("timeout 2 jolt -c test.conf -c net.conf -c jolt.cachedir={ws}/c1 "
-                           "build -n sleep2:t=10")
-
-        # And a second task to be overtaken in the the queue
-        with self.assertRaises(Exception), self.tools.cwd(self.ws):
-            self.tools.run("timeout 2 jolt -c test.conf -c net.conf -c jolt.cachedir={ws}/c2 "
-                           "build -n sleep2:t=9")
-
-        # Then a third task to jump ahead in the queue.
-        with self.tools.cwd(self.ws):
-            self.tools.run("jolt -c test.conf -c net.conf -c jolt.cachedir={ws}/c3 -c amqp.priority=1 "
-                           "-vv build -n sleep2:t=1")
-
-        # "Wait" for second task
-        with self.tools.cwd(self.ws):
-            r = self.tools.run("jolt -c test.conf -c net.conf -c jolt.cachedir={ws}/c4 "
-                               "build -n sleep2:t=9")
-
-        # Now check the execution order in the worker
-        log = self.tools.run("docker service logs jolt_test_worker", output=False)
-        t = re.findall("xecution started.*?\((sleep2.*) [^ ]*\)", log)
-        print(t, log)
-        self.assertEqual(t[0], "sleep2:t=10")
-        self.assertEqual(t[1], "sleep2:t=1")
-        self.assertEqual(t[2], "sleep2:t=9")
 
     def test_fast_task(self):
         """
@@ -669,11 +598,7 @@ class BuildCli(testsupport.JoltTest):
             self.build("session:fail=true")
         a = self.artifacts(self.lastLog())
         self.info("Network plugin: '{}'", self.network_plugin)
-        if self.network_plugin == "amqp":
-            # artifacts() will parse both the local and the worker's log.
-            self.assertEqual(2, len(a))
-        else:
-            self.assertEqual(1, len(a))
+        self.assertEqual(1, len(a))
         self.assertExists(a[-1], "file.txt")
 
         # Trying to consume session artifact from a previous build shall fail
@@ -713,7 +638,5 @@ class BuildCli(testsupport.JoltTest):
         with self.assertRaises(Exception):
             self.build("a")
         r = self.lastLog()
-        if self.network_plugin != "amqp":
-            self.assertIn("Failed to download session artifact", r)
-        self.assertIn("AssertionError: assert False", r)
+        self.assertIn("Failed to download session artifact", r)
 

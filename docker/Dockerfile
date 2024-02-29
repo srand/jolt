@@ -15,7 +15,7 @@ RUN apt-get install -y --no-install-recommends \
 RUN apt-get clean
 
 COPY . /opt/jolt
-RUN pip3 install -e /opt/jolt[allure,amqp]
+RUN pip3 install -e /opt/jolt[allure]
 ENTRYPOINT ["jolt"]
 CMD []
 

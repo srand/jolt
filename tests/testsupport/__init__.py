@@ -18,7 +18,7 @@ def enable_network_testing(cls, storage_providers=None, schedulers=None):
         def generate(self):
             classes = []
 
-            for scheduler in schedulers or ["", "amqp/"]:
+            for scheduler in schedulers or [""]:
                 for cache in storage_providers or ["cache", "http"]:
                     class Net(cls):
                         name = cls.name + "/" + scheduler + cache
