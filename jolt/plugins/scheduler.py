@@ -610,7 +610,7 @@ def executor(ctx, worker, build, request):
                 # Interrupt sent to process, not only the running task
                 raise interrupt
 
-            except Exception as e:
+            except Exception:
                 errors = []
 
                 # Add errors from the task to the update sent to the scheduler
