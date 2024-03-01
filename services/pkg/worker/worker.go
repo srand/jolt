@@ -25,13 +25,17 @@ type worker struct {
 	client   protocol.WorkerClient
 	config   *WorkerConfig
 	platform *scheduler.Platform
+	cwd      string
 }
 
 func NewWorker(platform *scheduler.Platform, client protocol.WorkerClient, config *WorkerConfig) *worker {
+	wd, _ := os.Getwd()
+
 	return &worker{
 		client:   client,
 		config:   config,
 		platform: platform,
+		cwd:      wd,
 	}
 }
 
@@ -99,6 +103,7 @@ func (w *worker) run() error {
 		for {
 			request, err := stream.Recv()
 			if err == io.EOF {
+				return
 			}
 			if err != nil {
 				log.Debug(err)
@@ -402,7 +407,7 @@ func (w *worker) runCmd(clientWs string, args ...string) error {
 	// If a namespace cannot be used, the command prefix will be empty.
 	cmd, _ := w.nsWrapperCmd("", "")
 	cmd = append(cmd, "/bin/sh", "-c", strings.Join(args, " "))
-	return utils.RunWait(cmd...)
+	return utils.RunWaitCwd(w.cwd, cmd...)
 }
 
 func (w *worker) runClientCmd(clientDigest, clientWs string, args ...string) error {
@@ -430,7 +435,7 @@ func (w *worker) startExecutor(clientDigest, clientWs, clientCache, worker, buil
 
 	// Run the executor in a namespace if possible.
 	cmd = append(cmd, "/bin/sh", "-c", fmt.Sprintf(". %s && %s", activate, strings.Join(jolt, " ")))
-	return utils.Run(cmd...)
+	return utils.RunOptions(w.cwd, cmd...)
 }
 
 func (w *worker) enlist(stream protocol.Worker_GetInstructionsClient) error {

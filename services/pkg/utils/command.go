@@ -32,11 +32,18 @@ func (c *commandError) Error() string {
 }
 
 func Run(args ...string) (chan error, *os.Process, error) {
+	return RunOptions("", args...)
+}
+
+func RunOptions(cwd string, args ...string) (chan error, *os.Process, error) {
 	output := bytes.Buffer{}
 
 	cmd := exec.Command(args[0], args[1:]...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = io.MultiWriter(os.Stderr, &output)
+	if cwd != "" {
+		cmd.Dir = cwd
+	}
 
 	log.Info("Running", strings.Join(cmd.Args, " "))
 
@@ -60,6 +67,14 @@ func Run(args ...string) (chan error, *os.Process, error) {
 
 func RunWait(args ...string) error {
 	done, _, err := Run(args...)
+	if err != nil {
+		return err
+	}
+	return <-done
+}
+
+func RunWaitCwd(cwd string, args ...string) error {
+	done, _, err := RunOptions(cwd, args...)
 	if err != nil {
 		return err
 	}
