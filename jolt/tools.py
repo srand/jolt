@@ -1168,12 +1168,12 @@ class Tools(object):
         return _Meson(deps, self)
 
     @contextmanager
-    def nixpkgs(self, packages=None, pure=False, path=None, options=None):
+    def nixpkgs(self, nixfile=None, packages=None, pure=False, path=None, options=None):
         """
         Creates a Nix environment with the specified packages.
 
         Args:
-
+            nixfile (str): Path to a Nix expression file.
             packages (list): List of Nix packages to include in environment.
             pure (boolean): Create a pure environment.
             path (list): List of Nix expression paths.
@@ -1195,6 +1195,7 @@ class Tools(object):
             self._task,
             "Nix not available on this system")
 
+        nixfile = self.expand_path(nixfile) if nixfile else ""
         pathflags = " ".join(["-I {path}" for path in path or []])
         options = " ".join([f"--option {k} {v}" for k, v in (options or {}).items()])
         pureflag = "--pure" if pure else ""
@@ -1207,12 +1208,14 @@ class Tools(object):
 
         # Run nix-shell to stage packages and environment
         env = self.run(
-            "nix-shell {} {} {} --run 'env'",
+            "nix-shell {} {} {} --run 'env -0' {}",
             pathflags,
             pureflag,
             packages,
+            nixfile,
             output_on_error=True)
-        env = dict(line.split("=", 1) for line in env.splitlines())
+        env = env.strip().strip("\x00")
+        env = dict(line.split("=", 1) for line in env.split('\x00'))
 
         # Add host path first to environment PATH
         host_path = env.get("HOST_PATH", None)
@@ -1220,16 +1223,16 @@ class Tools(object):
             env["PATH"] = host_path + os.pathsep + env["PATH"]
 
         # Enter the environment
-        if pure:
-            old_env = self._env
-            try:
+        old_env = self._env
+        try:
+            if pure:
                 self._env = env
-                yield
-            finally:
-                self._env = old_env
-        else:
-            with self.environ(**env):
-                yield
+            else:
+                self._env = copy.deepcopy(env)
+                self._env.update(env)
+            yield
+        finally:
+            self._env = old_env
 
     def render(self, template, **kwargs):
         """ Render a Jinja template string.
