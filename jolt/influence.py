@@ -234,7 +234,6 @@ class TaskRequirementInfluence(HashInfluenceProvider):
         return "{}: {}".format(self._identity, self._name)
 
 
-@HashInfluenceRegistry.Register
 class CacheLocationInfluence(HashInfluenceProvider):
     name = "Cache"
 
