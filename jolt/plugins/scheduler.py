@@ -505,7 +505,7 @@ class RemoteExecutionFactory(NetworkExecutorFactory):
 log.verbose("[Remote] Loaded")
 
 
-@cli.cli.command()
+@cli.cli.command(hidden=True)
 @click.option("-w", "--worker", required=True, help="Worker identifier.")
 @click.option("-b", "--build", required=True, help="Build identifier to enlist for.")
 @click.argument("request", required=True)
