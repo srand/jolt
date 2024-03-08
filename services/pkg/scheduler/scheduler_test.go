@@ -67,7 +67,7 @@ func addTask(build *Build, name string, properties ...string) *Task {
 	return task
 }
 
-func (suite *SchedulerTest) newWorker(properties ...string) (Worker, error) {
+func (suite *SchedulerTest) newWorkerWithProps(properties, taskProperties []string) (Worker, error) {
 	platform := NewPlatformWithDefaults()
 	for _, prop := range properties {
 		key, value, _ := strings.Cut(prop, "=")
@@ -76,8 +76,20 @@ func (suite *SchedulerTest) newWorker(properties ...string) (Worker, error) {
 			Value: value,
 		})
 	}
+	taskPlatform := NewPlatform()
+	for _, prop := range taskProperties {
+		key, value, _ := strings.Cut(prop, "=")
+		taskPlatform.Properties = append(platform.Properties, &protocol.Property{
+			Key:   key,
+			Value: value,
+		})
+	}
 
-	return suite.scheduler.NewWorker(platform)
+	return suite.scheduler.NewWorker(platform, taskPlatform)
+}
+
+func (suite *SchedulerTest) newWorker() (Worker, error) {
+	return suite.newWorkerWithProps([]string{}, []string{})
 }
 
 func (suite *SchedulerTest) TestCancelScheduler() {
@@ -130,6 +142,19 @@ func (suite *SchedulerTest) TestScheduleBuildWithNoEligibleWorker() {
 	assert.Error(suite.T(), err)
 }
 
+func (suite *SchedulerTest) TestScheduleBuildWithNoEligibleWorker_TaskPlatformNotFulfilled() {
+	build := newBuild()
+	addTask(build, "task")
+
+	worker, err := suite.newWorkerWithProps([]string{}, []string{"label=one"})
+	assert.NoError(suite.T(), err)
+	defer worker.Close()
+
+	observer, err := suite.scheduler.ScheduleBuild(build)
+	assert.Nil(suite.T(), observer)
+	assert.Error(suite.T(), err)
+}
+
 func (suite *SchedulerTest) TestScheduleBuildWithOneWorker() {
 	build := newBuild()
 	addTask(build, "task")
@@ -147,7 +172,7 @@ func (suite *SchedulerTest) TestScheduleBuildWithEligibleWorker() {
 	build := newBuild()
 	addTask(build, "task", "label=one")
 
-	worker, err := suite.newWorker("label=one")
+	worker, err := suite.newWorkerWithProps([]string{"label=one"}, []string{})
 	assert.NoError(suite.T(), err)
 	defer worker.Close()
 

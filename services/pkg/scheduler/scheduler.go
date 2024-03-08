@@ -22,7 +22,7 @@ type Scheduler interface {
 	// Register a new worker with the scheduler.
 	// The returned worker must be Close():ed when it no longer wishes to accept
 	// new build requests. Closing unregisters the worker in the scheduler.
-	NewWorker(*Platform) (Worker, error)
+	NewWorker(*Platform, *Platform) (Worker, error)
 
 	///////////////////////////////////////////////////////////////////////////
 

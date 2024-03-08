@@ -27,6 +27,10 @@ type Worker interface {
 	//  - worker.hostname = <hostname>
 	Platform() *Platform
 
+	// The task platform properties of the worker.
+	// The properties that must be fulfilled by the tasks.
+	TaskPlatform() *Platform
+
 	// A channel where task execution requests are sent by the scheduler.
 	// The worker shall launch an executor to execute the task.
 	// The executor may execute additinonal compatible tasks.

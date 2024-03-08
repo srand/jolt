@@ -20,6 +20,10 @@ type priorityWorker struct {
 	// The platform properties of the worker.
 	platform *Platform
 
+	// The task platform properties of the worker, i.e.
+	// the properties that must be fulfilled by the tasks.
+	taskPlatform *Platform
+
 	// The scheduler that the worker belongs to.
 	scheduler *priorityScheduler
 
@@ -58,6 +62,11 @@ func (w *priorityWorker) Id() string {
 // Returns the platform properties of the worker.
 func (w *priorityWorker) Platform() *Platform {
 	return w.platform
+}
+
+// Returns the platform properties of the worker.
+func (w *priorityWorker) TaskPlatform() *Platform {
+	return w.taskPlatform
 }
 
 // Returns a string representation of the worker.

@@ -36,7 +36,14 @@ func (s *workerService) GetInstructions(stream protocol.Worker_GetInstructionsSe
 		return errors.New("bad request")
 	}
 
-	worker, err := s.scheduler.NewWorker((*Platform)(status.Platform))
+	platform := (*Platform)(status.Platform)
+
+	taskPlatform := (*Platform)(status.TaskPlatform)
+	if taskPlatform == nil {
+		taskPlatform = NewPlatform()
+	}
+
+	worker, err := s.scheduler.NewWorker(platform, taskPlatform)
 	if err != nil {
 		return utils.GrpcError(err)
 	}

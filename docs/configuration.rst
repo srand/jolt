@@ -936,7 +936,7 @@ The worker can be configured using environment variables and/or a configuration 
 
     * - ``JOLT_PLATFORM``
       - ``platform``
-      - | A list of platform properties that the worker will advertise to the scheduler.
+      - | A list of worker properties that tasks may specify in order to run on the worker.
 
         | The properties are used by the scheduler to select tasks that are compatible with
           the worker. For example, a task may require a worker with a specific
@@ -973,6 +973,19 @@ The worker can be configured using environment variables and/or a configuration 
 
         | The recommandation is to use ``label`` for functional properties, for example
           ``label=compilation,label=testing``.
+
+    * - ``JOLT_TASK_PLATFORM``
+      - ``task_platform``
+      - | A list of task properties that are required for tasks to run on the worker.
+
+        | For example, the worker may reject tasks that do not have the platform
+          property "label=fast".
+
+        | The format is ``<key>=<value>`` where the key is the name of the property and
+          the value is its value. Multiple properties can be specified by separating them
+          with a comma or space.
+
+        | The recommandation is to use ``label`` for functional properties.
 
     * - ``JOLT_SCHEDULER_URI``
       - ``scheduler_uri``

@@ -62,8 +62,14 @@ message WorkerUpdate {
     // node.os == Linux, node.arch == arm, etc.
     Platform platform = 2;
 
+    // The platform properties required from tasks in order
+    // to be executable.
+    Platform task_platform = 4;
+
     // Failure details
     WorkerError error = 3;
+
+    // Next id == 5
 }
 
 // Representation of a worker error

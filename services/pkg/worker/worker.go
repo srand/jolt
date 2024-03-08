@@ -20,22 +20,34 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+// The worker data
 type worker struct {
-	builds   chan *protocol.BuildRequest
-	client   protocol.WorkerClient
-	config   *WorkerConfig
+	// The client connection to the scheduler
+	client protocol.WorkerClient
+
+	// The worker configuration
+	config *WorkerConfig
+
+	// The worker platform properties, such as OS, architecture, etc.
 	platform *scheduler.Platform
-	cwd      string
+
+	// The platform properties that must be requested
+	// by tasks in order to be executed by this worker.
+	taskPlatform *scheduler.Platform
+
+	// The current working directory of the worker
+	cwd string
 }
 
-func NewWorker(platform *scheduler.Platform, client protocol.WorkerClient, config *WorkerConfig) *worker {
+func NewWorker(platform, taskPlatform *scheduler.Platform, client protocol.WorkerClient, config *WorkerConfig) *worker {
 	wd, _ := os.Getwd()
 
 	return &worker{
-		client:   client,
-		config:   config,
-		platform: platform,
-		cwd:      wd,
+		client:       client,
+		config:       config,
+		platform:     platform,
+		taskPlatform: taskPlatform,
+		cwd:          wd,
 	}
 }
 
@@ -440,8 +452,9 @@ func (w *worker) startExecutor(clientDigest, clientWs, clientCache, worker, buil
 
 func (w *worker) enlist(stream protocol.Worker_GetInstructionsClient) error {
 	update := &protocol.WorkerUpdate{
-		Status:   protocol.WorkerUpdate_ENLISTING,
-		Platform: (*protocol.Platform)(w.platform),
+		Status:       protocol.WorkerUpdate_ENLISTING,
+		Platform:     (*protocol.Platform)(w.platform),
+		TaskPlatform: (*protocol.Platform)(w.taskPlatform),
 	}
 	return stream.Send(update)
 }

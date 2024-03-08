@@ -255,7 +255,7 @@ func (s *priorityScheduler) checkWorkerEligibility(build *Build) error {
 
 	if !build.WalkTasks(func(b *Build, task *Task) bool {
 		for _, worker := range s.workers {
-			if worker.Platform().Fulfills(task.Platform()) {
+			if worker.Platform().Fulfills(task.Platform()) && task.Platform().Fulfills(worker.TaskPlatform()) {
 				return true
 			}
 		}
@@ -289,7 +289,7 @@ func (s *priorityScheduler) selectTaskForWorkerNoLock(worker Worker, build *Buil
 			return false
 		}
 
-		return worker.Platform().Fulfills(t.Platform())
+		return worker.Platform().Fulfills(t.Platform()) && t.Platform().Fulfills(worker.TaskPlatform())
 	})
 }
 
@@ -409,7 +409,7 @@ func (s *priorityScheduler) closeBuildNoLock(build *Build) {
 }
 
 // Register a new worker with the scheduler.
-func (s *priorityScheduler) NewWorker(platform *Platform) (Worker, error) {
+func (s *priorityScheduler) NewWorker(platform, taskPlatform *Platform) (Worker, error) {
 	s.Lock()
 	defer s.Unlock()
 
@@ -417,12 +417,13 @@ func (s *priorityScheduler) NewWorker(platform *Platform) (Worker, error) {
 
 	id, _ := uuid.NewRandom()
 	worker := &priorityWorker{
-		ctx:       ctx,
-		cancel:    cancel,
-		tasks:     make(chan *Task, 1),
-		id:        id,
-		platform:  platform,
-		scheduler: s,
+		ctx:          ctx,
+		cancel:       cancel,
+		tasks:        make(chan *Task, 1),
+		id:           id,
+		platform:     platform,
+		taskPlatform: taskPlatform,
+		scheduler:    s,
 	}
 	s.workers[id.String()] = worker
 
@@ -431,6 +432,12 @@ func (s *priorityScheduler) NewWorker(platform *Platform) (Worker, error) {
 	log.Info("      properties:")
 	for _, prop := range worker.Platform().Properties {
 		log.Infof("      * %s=%s", prop.Key, prop.Value)
+	}
+	if len(worker.TaskPlatform().Properties) == 0 {
+		log.Info("      task properties:")
+		for _, prop := range worker.TaskPlatform().Properties {
+			log.Infof("      * %s=%s", prop.Key, prop.Value)
+		}
 	}
 
 	s.workers[worker.Id()] = worker
