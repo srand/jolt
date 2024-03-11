@@ -1196,7 +1196,7 @@ class Tools(object):
             "Nix not available on this system")
 
         nixfile = self.expand_path(nixfile) if nixfile else ""
-        pathflags = " ".join(["-I {path}" for path in path or []])
+        pathflags = " ".join([f"-I {path}" for path in path or []])
         options = " ".join([f"--option {k} {v}" for k, v in (options or {}).items()])
         pureflag = "--pure" if pure else ""
         packages = "-p " + " ".join(packages) if packages else ""
