@@ -531,6 +531,7 @@ class TaskProxy(object):
             if not force_build:
                 available_locally = self.is_available_locally()
                 if available_locally and not force_upload:
+                    self.skipped()
                     return
                 available_remotely = cache.download_enabled() and self.is_available_remotely()
                 if not available_locally and available_remotely:
@@ -780,7 +781,7 @@ class Graph(object):
         with self._mutex:
             log.debug("[GRAPH] Listing all nodes")
             for node in self.topological_nodes:
-                log.debug("[GRAPH]   " + node.qualified_name + " ({})", len(self._children[node].keys()))
+                log.debug("[GRAPH]   " + node.short_qualified_name + " ({})", len(self._children[node].keys()))
 
     def is_leaf(self, node):
         with self._mutex:

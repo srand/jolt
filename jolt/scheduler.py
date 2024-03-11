@@ -472,7 +472,7 @@ class DistributedStrategy(ExecutionStrategy, PruneStrategy):
             if task.is_available_locally() and task.is_uploadable():
                 return self.executors.create_uploader(task)
             if task.is_fast() and task.deps_available_locally():
-                return self.executors.create_local(task)
+                return self.executors.create_local(task, force=True)
 
         return self.executors.create_network(session, task)
 
