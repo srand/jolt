@@ -426,6 +426,8 @@ def build(ctx, task, network, keep_going, default, local,
             log.warning("Interrupted again, exiting")
             _exit(1)
     finally:
+        queue.shutdown()
+
         for task in goal_tasks:
             for artifact in task.artifacts:
                 if acache.is_available_locally(artifact):

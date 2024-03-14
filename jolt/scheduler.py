@@ -16,6 +16,7 @@ from jolt.graph import PruneStrategy
 from jolt.manifest import ManifestExtension
 from jolt.manifest import ManifestExtensionRegistry
 from jolt.options import JoltOptions
+from jolt.timer import Timer
 
 
 class JoltEnvironment(object):
@@ -31,6 +32,12 @@ class TaskQueue(object):
         self.session = session
         self.duration_acc = utils.duration_diff(0)
         self._aborted = False
+        self._timer = Timer(60, self._log_task_running_time)
+        self._timer.start()
+
+    def _log_task_running_time(self):
+        for future in self.futures:
+            self.futures[future].task.log_running_time()
 
     def submit(self, task):
         if self._aborted:
@@ -69,6 +76,10 @@ class TaskQueue(object):
         if len(self.futures):
             log.info("Waiting for tasks to finish, please be patient")
         self.strategy.executors.shutdown()
+        self._timer.cancel()
+
+    def shutdown(self):
+        self._timer.cancel()
 
     def is_aborted(self):
         return self._aborted

@@ -90,6 +90,21 @@ class TaskProxy(object):
     def log_name(self):
         return "({0} {1})".format(self.short_qualified_name, self.identity[:8])
 
+    def log_running_time(self):
+        """ Emits an information log line every 5 mins a task has been running. """
+        if not self.is_running():
+            return
+        minutes = int(self.duration_running.seconds / 60)
+        if (minutes % 5) == 0 and minutes > 0:
+            if minutes >= 60:
+                fmt = f"{int(minutes/60)}h {int(minutes%60)}min"
+            else:
+                fmt = f"{int(minutes%60)}min"
+            if self.is_remotely_executed():
+                self.info("Remote execution still in progress after {}", fmt)
+            else:
+                self.info("Execution still in progress after {}", fmt)
+
     @property
     def identity(self):
         if self.task.identity is not None:
@@ -235,6 +250,9 @@ class TaskProxy(object):
 
     def is_resource(self):
         return isinstance(self.task, Resource)
+
+    def is_running(self):
+        return self.status() == common_pb.TaskStatus.TASK_RUNNING
 
     def is_unpackable(self):
         return self.task.unpack.__func__ is not Task.unpack
