@@ -5,7 +5,9 @@ from os import getenv
 from threading import RLock
 from collections import OrderedDict
 import uuid
+import sys
 
+from jolt import cli
 from jolt import common_pb2 as common_pb
 from jolt import log
 from jolt import utils
@@ -603,6 +605,12 @@ class TaskProxy(object):
                             self.failed_execution()
                             with utils.ignore_exception():
                                 exitstack.close()
+
+                            if cli.debug_enabled:
+                                import pdb
+                                extype, value, tb = sys.exc_info()
+                                pdb.post_mortem(tb)
+
                             raise e
 
                         else:
