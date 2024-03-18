@@ -1,0 +1,18 @@
+# go.jolt
+
+from jolt import influence
+from jolt import Task
+
+
+@influence.files("main.go")
+class App(Task):
+    def run(self, deps, tools):
+        self.builddir = tools.builddir()
+
+        for version in ["1_19", "1_20", "1_21"]:
+            with tools.nixpkgs(packages=[f"go_{version}"], path=["nixpkgs=channel:nixos-23.11"]):
+                tools.run("go build -o {builddir}/app.v{} main.go", version)
+
+    def publish(self, artifact, tools):
+        with tools.cwd(self.builddir):
+            artifact.collect("app.*")

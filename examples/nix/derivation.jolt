@@ -1,0 +1,21 @@
+# derivation.jolt
+
+from jolt import influence
+from jolt import Task
+
+
+@influence.files("env.nix")
+@influence.files("main.go")
+class DerivationApp(Task):
+    name = "app/derivation"
+
+    def run(self, deps, tools):
+        self.builddir = tools.builddir()
+
+        # Build the go app using a Nix shell derivation
+        with tools.nixpkgs(nixfile="env.nix"):
+            tools.run("go build -o {builddir}/app.bin main.go")
+
+    def publish(self, artifact, tools):
+        with tools.cwd(self.builddir):
+            artifact.collect("app.bin")
