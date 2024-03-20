@@ -221,6 +221,9 @@ def compdb(ctx, task, default):
             log.warning("Interrupted again, exiting")
             os._exit(1)
 
+    finally:
+        queue.shutdown()
+
     for goal in dag.goals:
         artifact, deps = get_task_artifacts(goal)
         db = CompDB("all_compile_commands.json", artifact)

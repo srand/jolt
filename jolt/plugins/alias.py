@@ -8,6 +8,9 @@ log.verbose("[Alias] Loaded")
 
 _registry = tasks.TaskRegistry.get()
 
+# Load task aliases from the configuration file
+# and add them to the task registry.
+
 for key, value in config.options("alias"):
     class ConfigAlias(tasks.Alias):
         name = key

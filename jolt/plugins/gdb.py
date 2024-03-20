@@ -113,9 +113,13 @@ def gdb(ctx, task, default, machine_interface, no_binary, gdb_args):
             print()
             log.warning("Interrupted again, exiting")
             os._exit(1)
+
     except Exception as e:
         log.set_interactive(True)
         raise e
+
+    finally:
+        queue.shutdown()
 
     assert len(dag.goals), "Too many tasks, can only debug one executable at a time"
 

@@ -765,9 +765,13 @@ def download(ctx, task, deps, copy, copy_all):
             print()
             log.warning("Interrupted again, exiting")
             _exit(1)
+
     except Exception as e:
         log.set_interactive(True)
         raise e
+
+    finally:
+        queue.shutdown()
 
 
 @cli.command(hidden=True)
