@@ -38,12 +38,14 @@ type dashboardHooks struct {
 	client http.Client
 	config DashboardConfig
 	ch     chan *taskEvent
+	uri    string
 }
 
 func NewDashboardTelemetryHook(config DashboardConfig) *dashboardHooks {
 	hooks := &dashboardHooks{
 		config: config,
 		ch:     make(chan *taskEvent, 1000),
+		uri:    fmt.Sprintf("%s/api/v1/tasks", config.GetDashboardUri()),
 	}
 	go hooks.run()
 	return hooks
@@ -88,10 +90,6 @@ func (d *dashboardHooks) formatEvent(task *scheduler.Task, status protocol.TaskS
 	return event
 }
 
-func (d *dashboardHooks) formatUri(event *taskEvent) string {
-	return fmt.Sprintf("%s/api/v1/tasks", d.config.GetDashboardUri())
-}
-
 func (d *dashboardHooks) postEvent(event *taskEvent) error {
 	data, err := json.Marshal(event)
 	if err != nil {
@@ -99,7 +97,7 @@ func (d *dashboardHooks) postEvent(event *taskEvent) error {
 	}
 
 	body := bytes.NewReader(data)
-	response, err := d.client.Post(d.formatUri(event), echo.MIMEApplicationJSON, body)
+	response, err := d.client.Post(d.uri, echo.MIMEApplicationJSON, body)
 	if err == nil {
 		response.Body.Close()
 	} else {
