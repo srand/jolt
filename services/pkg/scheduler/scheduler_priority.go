@@ -17,7 +17,7 @@ import (
 // Builds are scheduled in priority order, with builds of the same priority
 // being scheduled by the number of queued tasks, fewest first.
 type priorityScheduler struct {
-	sync.Mutex
+	sync.RWMutex
 
 	// Channel used to trigger rescheduling
 	rescheduleChan chan bool
@@ -51,7 +51,7 @@ type priorityScheduler struct {
 // Create a new round robin scheduler.
 func NewPriorityScheduler() *priorityScheduler {
 	return &priorityScheduler{
-		rescheduleChan: make(chan bool, 10),
+		rescheduleChan: make(chan bool, 1),
 		builds:         map[string]*Build{},
 		readyBuilds:    utils.NewPriorityQueue[*Build](buildPriorityFunc, buildEqualityFunc),
 		workers:        map[string]Worker{},
@@ -295,8 +295,12 @@ func (s *priorityScheduler) selectTaskForWorkerNoLock(worker Worker, build *Buil
 
 // Select a task and worker for scheduling.
 func (s *priorityScheduler) selectTaskAndWorker() {
-	s.Lock()
+	start := time.Now()
+	defer func() {
+		log.Debug("schedule() - elapsed:", time.Since(start))
+	}()
 
+	s.Lock()
 	if s.readyBuilds.Len() == 0 {
 		s.Unlock()
 		return
@@ -304,33 +308,34 @@ func (s *priorityScheduler) selectTaskAndWorker() {
 
 	// Order builds by priority
 	s.readyBuilds.Reorder()
+	s.Unlock()
 
 	// Task worker assignments
 	assignments := make(map[Worker]*Task)
 
+	s.RLock()
 	// Assign tasks to workers.
 	// Workers are selected in a round-robin fashion.
 	// Tasks are selected in priority order.
 	for _, worker := range s.availWorkers {
 		for _, build := range s.readyBuilds.Items() {
 			if task := s.selectTaskForWorkerNoLock(worker, build); task != nil {
-				s.associateTaskWithWorker(worker, task)
-
-				if !build.HasQueuedTask() {
-					s.dequeueBuildNoLock(build)
-				}
-
 				assignments[worker] = task
 				break
 			}
 		}
 	}
+	s.RUnlock()
 
+	s.Lock()
 	// Mark workers as busy
-	for worker := range assignments {
+	for worker, task := range assignments {
+		if !task.build.HasQueuedTask() {
+			s.dequeueBuildNoLock(task.build)
+		}
+		s.associateTaskWithWorker(worker, task)
 		s.dequeueWorkerNoLock(worker)
 	}
-
 	s.Unlock()
 
 	// Send tasks to workers
@@ -381,20 +386,22 @@ func (s *priorityScheduler) deassociateTaskWithWorker(worker Worker) {
 
 // Remove builds which are in a terminal state.
 func (s *priorityScheduler) removeStaleBuilds() {
-	s.Lock()
-	defer s.Unlock()
 
 	stale := []*Build{}
 
+	s.RLock()
 	for _, build := range s.builds {
 		if build.IsTerminal() {
 			stale = append(stale, build)
 		}
 	}
+	s.RUnlock()
 
+	s.Lock()
 	for _, build := range stale {
 		s.closeBuildNoLock(build)
 	}
+	s.Unlock()
 }
 
 // Close a build and remove it from the scheduler.
@@ -410,8 +417,6 @@ func (s *priorityScheduler) closeBuildNoLock(build *Build) {
 
 // Register a new worker with the scheduler.
 func (s *priorityScheduler) NewWorker(platform, taskPlatform *Platform) (Worker, error) {
-	s.Lock()
-	defer s.Unlock()
 
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -425,7 +430,11 @@ func (s *priorityScheduler) NewWorker(platform, taskPlatform *Platform) (Worker,
 		taskPlatform: taskPlatform,
 		scheduler:    s,
 	}
-	s.workers[id.String()] = worker
+
+	s.Lock()
+	s.workers[worker.Id()] = worker
+	s.enqueueWorkerNoLock(worker)
+	s.Unlock()
 
 	// FIXME: Log as single record to avoid interleaving
 	log.Info("new - worker", worker.Id())
@@ -433,15 +442,13 @@ func (s *priorityScheduler) NewWorker(platform, taskPlatform *Platform) (Worker,
 	for prop := range *worker.Platform() {
 		log.Infof("      * %s", prop)
 	}
-	if len(*worker.TaskPlatform()) == 0 {
+	if len(*worker.TaskPlatform()) > 0 {
 		log.Info("      task properties:")
 		for prop := range *worker.TaskPlatform() {
 			log.Infof("      * %s", prop)
 		}
 	}
 
-	s.workers[worker.Id()] = worker
-	s.enqueueWorkerNoLock(worker)
 	s.Reschedule()
 
 	return worker, nil
@@ -450,42 +457,45 @@ func (s *priorityScheduler) NewWorker(platform, taskPlatform *Platform) (Worker,
 // Release a worker back to the scheduler after it has completed a task.
 func (s *priorityScheduler) releaseWorker(worker Worker) error {
 	s.Lock()
-	defer s.Unlock()
 	s.deassociateTaskWithWorker(worker)
 	s.enqueueWorkerNoLock(worker)
+	s.Unlock()
+
 	s.Reschedule()
 	return nil
 }
 
 // Remove a worker from the scheduler.
 func (s *priorityScheduler) removeWorker(worker Worker) error {
-	s.Lock()
-	defer s.Unlock()
-
 	log.Info("del - worker", worker.Id())
 
+	s.Lock()
 	s.deassociateTaskWithWorker(worker)
 	delete(s.availWorkers, worker.Id())
 	delete(s.workers, worker.Id())
+	s.Unlock()
+
 	s.Reschedule()
 	return nil
 }
 
 // Create a new executor for a build.
 func (s *priorityScheduler) NewExecutor(workerid, buildid string) (Executor, error) {
-	s.Lock()
-	defer s.Unlock()
+	s.RLock()
 
 	worker, ok := s.workers[workerid]
 	if !ok {
+		s.RUnlock()
 		return nil, utils.ErrNotFound
 	}
 
 	build, ok := s.builds[buildid]
 	if !ok {
+		s.RUnlock()
 		return nil, utils.ErrNotFound
 	}
 
+	s.RUnlock()
 	return build.NewExecutor(s, worker.Platform())
 }
 
@@ -522,8 +532,8 @@ func (s *priorityScheduler) TaskStatusChanged(task *Task, status protocol.TaskSt
 
 // Scheduler statistics
 func (s *priorityScheduler) Statistics() *SchedulerStatistics {
-	s.Lock()
-	defer s.Unlock()
+	s.RLock()
+	defer s.RUnlock()
 
 	stats := &SchedulerStatistics{
 		Workers:         int64(len(s.workers)),
