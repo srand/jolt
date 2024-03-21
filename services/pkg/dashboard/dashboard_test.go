@@ -80,7 +80,10 @@ func TestDashboard(t *testing.T) {
 	assert.Equal(t, event["Log"], "")
 	assert.Equal(t, event["routing_key"], "routing key")
 
-	task.SetMatchedPlatform(&scheduler.Platform{Properties: []*protocol.Property{{Key: "worker.hostname", Value: "hostname"}}})
+	platform := &scheduler.Platform{}
+	platform.AddProperty("worker.hostname", "hostname")
+
+	task.SetMatchedPlatform(platform)
 	task.PostStatusUpdate(protocol.TaskStatus_TASK_RUNNING)
 	d.TaskStatusChanged(task, protocol.TaskStatus_TASK_RUNNING)
 	<-ch

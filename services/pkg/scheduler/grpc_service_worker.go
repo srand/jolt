@@ -36,12 +36,8 @@ func (s *workerService) GetInstructions(stream protocol.Worker_GetInstructionsSe
 		return errors.New("bad request")
 	}
 
-	platform := (*Platform)(status.Platform)
-
-	taskPlatform := (*Platform)(status.TaskPlatform)
-	if taskPlatform == nil {
-		taskPlatform = NewPlatform()
-	}
+	platform := NewPlatformFromProtobuf(status.Platform)
+	taskPlatform := NewPlatformFromProtobuf(status.TaskPlatform)
 
 	worker, err := s.scheduler.NewWorker(platform, taskPlatform)
 	if err != nil {

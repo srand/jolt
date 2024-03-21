@@ -34,9 +34,12 @@ type Task struct {
 
 // Create a new task.
 func NewTask(build *Build, task *protocol.Task) *Task {
-	platform := (*Platform)(task.Platform)
-	if platform == nil {
+	var platform *Platform
+
+	if task.Platform == nil {
 		platform = &Platform{}
+	} else {
+		platform = NewPlatformFromProtobuf(task.Platform)
 	}
 
 	newTask := &Task{

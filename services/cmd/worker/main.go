@@ -8,7 +8,6 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"github.com/srand/jolt/scheduler/pkg/log"
-	"github.com/srand/jolt/scheduler/pkg/protocol"
 	"github.com/srand/jolt/scheduler/pkg/scheduler"
 	"github.com/srand/jolt/scheduler/pkg/utils"
 	"github.com/srand/jolt/scheduler/pkg/worker"
@@ -32,8 +31,8 @@ var rootCmd = &cobra.Command{
 		platform := scheduler.NewPlatformWithDefaults()
 		platform.LoadConfig()
 		log.Info("Properties:")
-		for _, prop := range platform.Properties {
-			log.Infof("  %s=%s", prop.Key, prop.Value)
+		for prop := range *platform {
+			log.Infof("  %s", prop)
 		}
 
 		taskPlatform := scheduler.NewPlatform()
@@ -42,15 +41,12 @@ var rootCmd = &cobra.Command{
 			if len(parts) != 2 {
 				log.Fatalf("Invalid task platform property: %s", prop)
 			}
-			taskPlatform.Properties = append(taskPlatform.Properties, &protocol.Property{
-				Key:   parts[0],
-				Value: parts[1],
-			})
+			taskPlatform.AddProperty(parts[0], parts[1])
 		}
-		if len(taskPlatform.Properties) > 0 {
+		if len(*taskPlatform) > 0 {
 			log.Info("Task properties:")
-			for _, prop := range taskPlatform.Properties {
-				log.Infof("  %s=%s", prop.Key, prop.Value)
+			for prop := range *taskPlatform {
+				log.Infof("  %s", prop)
 			}
 		}
 

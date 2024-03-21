@@ -453,8 +453,8 @@ func (w *worker) startExecutor(clientDigest, clientWs, clientCache, worker, buil
 func (w *worker) enlist(stream protocol.Worker_GetInstructionsClient) error {
 	update := &protocol.WorkerUpdate{
 		Status:       protocol.WorkerUpdate_ENLISTING,
-		Platform:     (*protocol.Platform)(w.platform),
-		TaskPlatform: (*protocol.Platform)(w.taskPlatform),
+		Platform:     w.platform.Protobuf(),
+		TaskPlatform: w.taskPlatform.Protobuf(),
 	}
 	return stream.Send(update)
 }

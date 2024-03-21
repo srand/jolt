@@ -71,18 +71,12 @@ func (suite *SchedulerTest) newWorkerWithProps(properties, taskProperties []stri
 	platform := NewPlatformWithDefaults()
 	for _, prop := range properties {
 		key, value, _ := strings.Cut(prop, "=")
-		platform.Properties = append(platform.Properties, &protocol.Property{
-			Key:   key,
-			Value: value,
-		})
+		platform.AddProperty(key, value)
 	}
 	taskPlatform := NewPlatform()
 	for _, prop := range taskProperties {
 		key, value, _ := strings.Cut(prop, "=")
-		taskPlatform.Properties = append(platform.Properties, &protocol.Property{
-			Key:   key,
-			Value: value,
-		})
+		taskPlatform.AddProperty(key, value)
 	}
 
 	return suite.scheduler.NewWorker(platform, taskPlatform)

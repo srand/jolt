@@ -13,50 +13,50 @@ import (
 	"github.com/srand/jolt/scheduler/pkg/protocol"
 )
 
-type Platform protocol.Platform
+type Platform map[string]struct{}
 
 func NewPlatform() *Platform {
-	return &Platform{
-		Properties: []*protocol.Property{},
+	return &Platform{}
+}
+
+func NewPlatformFromProtobuf(platform *protocol.Platform) *Platform {
+	if platform == nil {
+		return NewPlatform()
 	}
+
+	p := NewPlatform()
+	for _, property := range platform.Properties {
+		p.AddProperty(property.Key, property.Value)
+	}
+	return p
 }
 
 // NewPlatformWithDefaults creates a new platform with default properties
 // like the architecture, operating system, number of cpus and a unique id.
 func NewPlatformWithDefaults() *Platform {
-	p := &Platform{
-		Properties: []*protocol.Property{},
-	}
+	p := &Platform{}
 	p.addDefaults()
 	return p
+}
+
+// AddProperty adds a new property to the platform.
+func (p *Platform) AddProperty(key, value string) {
+	(*p)[key+"="+value] = struct{}{}
 }
 
 // addDefaults adds default properties like the architecture, operating system,
 // number of cpus and a unique id.
 func (p *Platform) addDefaults() {
-	p.Properties = append(p.Properties, &protocol.Property{
-		Key:   "node.arch",
-		Value: runtime.GOARCH,
-	})
-	p.Properties = append(p.Properties, &protocol.Property{
-		Key:   "node.os",
-		Value: runtime.GOOS,
-	})
-	p.Properties = append(p.Properties, &protocol.Property{
-		Key:   "node.cpus",
-		Value: fmt.Sprint(runtime.NumCPU()),
-	})
+	p.AddProperty("node.arch", runtime.GOARCH)
+	p.AddProperty("node.os", runtime.GOOS)
+	p.AddProperty("node.cpus", fmt.Sprint(runtime.NumCPU()))
+
 	if id, err := machineid.ProtectedID("jolt-worker"); err == nil {
-		p.Properties = append(p.Properties, &protocol.Property{
-			Key:   "node.id",
-			Value: id,
-		})
+		p.AddProperty("node.id", id)
 	}
+
 	if hostname, err := os.Hostname(); err == nil {
-		p.Properties = append(p.Properties, &protocol.Property{
-			Key:   "worker.hostname",
-			Value: hostname,
-		})
+		p.AddProperty("worker.hostname", hostname)
 	}
 }
 
@@ -64,24 +64,9 @@ func (p *Platform) addDefaults() {
 // A platform fulfills a requirement if all properties of the requirement
 // are also present in the platform.
 func (p *Platform) Fulfills(requirement *Platform) bool {
-	d := p.Map()
-
-	for _, property := range requirement.Properties {
-		list, ok := d[property.Key]
+	for property := range *requirement {
+		_, ok := (*p)[property]
 		if !ok {
-			return false
-		}
-
-		found := false
-
-		for _, value := range list {
-			if value == property.Value {
-				found = true
-				break
-			}
-		}
-
-		if !found {
 			return false
 		}
 	}
@@ -89,22 +74,24 @@ func (p *Platform) Fulfills(requirement *Platform) bool {
 	return true
 }
 
-// Map returns a map of all properties of the platform.
-func (p *Platform) Map() map[string][]string {
-	d := map[string][]string{}
-
-	for _, property := range p.Properties {
-		d[property.Key] = append(d[property.Key], property.Value)
+// Protobuf returns the platform as a protobuf message.
+func (p *Platform) Protobuf() *protocol.Platform {
+	platform := &protocol.Platform{}
+	for property := range *p {
+		key, value, _ := strings.Cut(property, "=")
+		platform.Properties = append(platform.Properties, &protocol.Property{
+			Key:   key,
+			Value: value,
+		})
 	}
-
-	return d
+	return platform
 }
 
 // String returns a string representation of the platform.
 func (p *Platform) String() string {
 	data := bytes.Buffer{}
-	for _, prop := range p.Properties {
-		fmt.Fprintf(&data, "%s=%s\n", prop.Key, prop.Value)
+	for property := range *p {
+		fmt.Fprintln(&data, property)
 	}
 	return data.String()
 }
@@ -127,12 +114,7 @@ func (platform *Platform) LoadConfig() error {
 			log.Fatal("Invalid platform property: ", config)
 		}
 
-		property := &protocol.Property{
-			Key:   strings.TrimSpace(key),
-			Value: value,
-		}
-
-		platform.Properties = append(platform.Properties, property)
+		platform.AddProperty(strings.TrimSpace(key), value)
 	}
 
 	return nil
@@ -142,6 +124,17 @@ func (platform *Platform) LoadConfig() error {
 // It searches for the key in the platform's map of properties
 // and returns the corresponding values as a slice of strings.
 func (p *Platform) GetPropertiesForKey(key string) ([]string, bool) {
-	properties, ok := p.Map()[key]
-	return properties, ok
+	result := []string{}
+
+	for property := range *p {
+		if strings.HasPrefix(property, key+"=") {
+			result = append(result, strings.TrimPrefix(property, key+"="))
+		}
+	}
+
+	if len(result) > 0 {
+		return result, true
+	}
+
+	return nil, false
 }

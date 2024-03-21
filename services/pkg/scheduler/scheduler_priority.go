@@ -430,13 +430,13 @@ func (s *priorityScheduler) NewWorker(platform, taskPlatform *Platform) (Worker,
 	// FIXME: Log as single record to avoid interleaving
 	log.Info("new - worker", worker.Id())
 	log.Info("      properties:")
-	for _, prop := range worker.Platform().Properties {
-		log.Infof("      * %s=%s", prop.Key, prop.Value)
+	for prop := range *worker.Platform() {
+		log.Infof("      * %s", prop)
 	}
-	if len(worker.TaskPlatform().Properties) == 0 {
+	if len(*worker.TaskPlatform()) == 0 {
 		log.Info("      task properties:")
-		for _, prop := range worker.TaskPlatform().Properties {
-			log.Infof("      * %s=%s", prop.Key, prop.Value)
+		for prop := range *worker.TaskPlatform() {
+			log.Infof("      * %s", prop)
 		}
 	}
 
