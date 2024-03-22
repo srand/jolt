@@ -300,12 +300,20 @@ func (s *priorityScheduler) selectTaskAndWorker() {
 		log.Debug("schedule() - elapsed:", time.Since(start))
 	}()
 
-	s.Lock()
+	s.RLock()
 	if s.readyBuilds.Len() == 0 {
-		s.Unlock()
+		s.RUnlock()
 		return
 	}
 
+	// Copy workers
+	workers := make([]Worker, 0, len(s.availWorkers))
+	for _, worker := range s.availWorkers {
+		workers = append(workers, worker)
+	}
+	s.RUnlock()
+
+	s.Lock()
 	// Order builds by priority
 	s.readyBuilds.Reorder()
 	s.Unlock()
@@ -313,30 +321,54 @@ func (s *priorityScheduler) selectTaskAndWorker() {
 	// Task worker assignments
 	assignments := make(map[Worker]*Task)
 
-	s.RLock()
 	// Assign tasks to workers.
 	// Workers are selected in a round-robin fashion.
 	// Tasks are selected in priority order.
-	for _, worker := range s.availWorkers {
-		for _, build := range s.readyBuilds.Items() {
-			if task := s.selectTaskForWorkerNoLock(worker, build); task != nil {
-				assignments[worker] = task
+	for _, worker := range workers {
+		s.RLock()
+		candidates := make([]*Task, s.readyBuilds.Len())
+		wg := sync.WaitGroup{}
+
+		// Select tasks for worker
+		for i, build := range s.readyBuilds.Items() {
+			if candidates[i] != nil {
 				break
 			}
-		}
-	}
-	s.RUnlock()
 
-	s.Lock()
-	// Mark workers as busy
-	for worker, task := range assignments {
-		if !task.build.HasQueuedTask() {
-			s.dequeueBuildNoLock(task.build)
+			wg.Add(1)
+			go func(i int, build *Build) {
+				defer wg.Done()
+				if task := s.selectTaskForWorkerNoLock(worker, build); task != nil {
+					candidates[i] = task
+
+				}
+			}(i, build)
 		}
-		s.associateTaskWithWorker(worker, task)
-		s.dequeueWorkerNoLock(worker)
+
+		// Wait for all tasks to be selected
+		wg.Wait()
+		s.RUnlock()
+
+		s.Lock()
+		// Assign the first task that was selected
+		for _, task := range candidates {
+			if task == nil {
+				continue
+			}
+
+			// Associate task with worker
+			s.associateTaskWithWorker(worker, task)
+			s.dequeueWorkerNoLock(worker)
+
+			if !task.build.HasQueuedTask() {
+				s.dequeueBuildNoLock(task.build)
+			}
+
+			assignments[worker] = task
+			break
+		}
+		s.Unlock()
 	}
-	s.Unlock()
 
 	// Send tasks to workers
 	for worker, task := range assignments {
