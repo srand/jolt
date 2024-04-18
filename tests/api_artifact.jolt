@@ -294,3 +294,28 @@ class ArtifactApi(JoltTest):
         a = self.artifacts(self.lastLog())
         self.assertEqual(1, len(a))
         self.assertExists(a[0], "file.txt")
+
+    def test_uncacheable_session_artifact(self):
+        """
+        --- file: file.txt
+        --- tasks:
+        @attributes.artifact("logs", session=True)
+        @influence.files("*.txt")
+        class Session(Task):
+            fail = BooleanParameter(False)
+
+            def run(self, deps, tools):
+                assert not self.fail
+
+            def publish_logs(self, a, t):
+                a.collect("file.txt")
+        ---
+        """
+
+        with self.assertRaises(Exception):
+            self.build("session:fail=true")
+        r = self.lastLog()
+        a = self.artifacts(r)
+        self.assertBuild(r, "session:fail=true")
+        self.assertEqual(1, len(a))
+        self.assertExists(a[0], "file.txt")

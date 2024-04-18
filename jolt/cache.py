@@ -824,6 +824,8 @@ class Artifact(object):
     def is_cacheable(self):
         if not self._node:
             return True
+        if self.is_session():
+            return True
         return self.task.is_cacheable()
 
     @property
