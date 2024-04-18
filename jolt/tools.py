@@ -1704,11 +1704,11 @@ class Tools(object):
         raise_error_if(platform.system() != "Linux", "Tools.chroot() is only supported on Linux")
 
         raise_task_error_if(
-            not self.which("newuidmap"), self._task,
+            not self.which("newuidmap") and not self.which("/usr/bin/newuidmap"), self._task,
             "No usable 'newuidmap' found in PATH")
 
         raise_task_error_if(
-            not self.which("newgidmap"), self._task,
+            not self.which("newgidmap") and not self.which("/usr/bin/newuidmap"), self._task,
             "No usable 'newgidmap' found in PATH")
 
         if type(chroot) is cache.Artifact:
