@@ -586,6 +586,7 @@ def executor(ctx, worker, build, request):
             log.info("Queuing {}", task.task_id)
             graph_task = dag.get_task_by_identity(task.task_id)
             executor = None
+            status = None
 
             try:
                 session = {}
@@ -611,7 +612,17 @@ def executor(ctx, worker, build, request):
                 raise interrupt
 
             except Exception:
+                status = common_pb.TaskStatus.TASK_FAILED
+
+            else:
+                status = graph_task.status()
+
+            finally:
                 errors = []
+
+                # If the task status remains queued, mark it as failed
+                if status in [common_pb.TaskStatus.TASK_QUEUED]:
+                    status = common_pb.TaskStatus.TASK_FAILED
 
                 # Add errors from the task to the update sent to the scheduler
                 with graph_task.task.report() as report:
@@ -626,24 +637,11 @@ def executor(ctx, worker, build, request):
                 # Send an update to the scheduler
                 update = scheduler_pb.TaskUpdate(
                     request=task,
-                    status=common_pb.TaskStatus.TASK_FAILED,
+                    status=status,
                     errors=errors,
                 )
                 updates.push(update)
 
-            else:
-                status = graph_task.status()
-
-                # If the task status remains queued, mark it as failed
-                if status in [common_pb.TaskStatus.TASK_QUEUED]:
-                    status = common_pb.TaskStatus.TASK_FAILED
-
-                # Send an update to the scheduler
-                update = scheduler_pb.TaskUpdate(
-                    request=task,
-                    status=status,
-                )
-                updates.push(update)
 
     except Exception as e:
         log.set_level(log.EXCEPTION)
