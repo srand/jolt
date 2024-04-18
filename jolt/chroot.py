@@ -83,8 +83,9 @@ def main():
     uidmap = [uid, uid, 1]
     gidmap = [str(i) for i in gidmap]
     uidmap = [str(i) for i in uidmap]
-    newgidmap = "/usr/bin/newgidmap"
-    newuidmap = "/usr/bin/newuidmap"
+
+    newgidmap = shutil.which("newgidmap") or shutil.which("/usr/bin/newgidmap")
+    newuidmap = shutil.which("newuidmap") or shutil.which("/usr/bin/newuidmap")
 
     sem = multiprocessing.Semaphore(0)
     parent = os.getpid()
@@ -115,6 +116,21 @@ def main():
 
     os.chroot("/mnt")
     os.chdir(args.chdir or cwd)
+
+    # Adjust PATH to include standard paths, if missing
+    path = os.environ.get("PATH", None)
+    if path is None:
+        path = "/usr/local/bin:/usr/bin:/bin"
+    else:
+        path = path.split(os.pathsep)
+        if "/usr/local/bin" not in path:
+            path.append("/usr/local/bin")
+        if "/usr/bin" not in path:
+            path.append("/usr/bin")
+        if "/bin" not in path:
+            path.append("/bin")
+        path = os.pathsep.join(path)
+    os.environ["PATH"] = path
 
     if args.shell in ["True", "true"]:
         os.execve("/bin/sh", ["sh", "-c", " ".join(args.command)], os.environ)
