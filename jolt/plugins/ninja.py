@@ -1,3 +1,4 @@
+from collections import OrderedDict
 import contextlib
 import copy
 import functools
@@ -620,7 +621,7 @@ class Variable(HashInfluenceProvider):
 
     @staticmethod
     def __get_variables__(obj):
-        variables = {}
+        variables = OrderedDict()
         for mro in reversed(obj.__class__.__mro__):
             for key, variable in getattr(mro, "__variable_list", {}).items():
                 attr = getattr(obj.__class__, key)
@@ -631,7 +632,7 @@ class Variable(HashInfluenceProvider):
     def __set_name__(self, owner, name):
         self.name = name
         if "__variable_list" not in owner.__dict__:
-            setattr(owner, "__variable_list", {})
+            setattr(owner, "__variable_list", OrderedDict())
         getattr(owner, "__variable_list")[name] = self
 
     def create(self, project, writer, deps, tools):
@@ -885,7 +886,7 @@ class Rule(HashInfluenceProvider):
                  before any C++ file is compiled.
         """
         self.command = command
-        self.variables = variables or {}
+        self.variables = OrderedDict([(key, value) for key, value in (variables or {}).items()])
         self.depfile = depfile
         self.deps = deps
         self.infiles = infiles or []
@@ -938,7 +939,7 @@ class Rule(HashInfluenceProvider):
 
             result_files.append(outfile.replace("..", "__"))
 
-        result_vars = {}
+        result_vars = OrderedDict()
         for key, val in self.variables.items():
             result_vars[key] = project.tools.expand(
                 val,
@@ -1018,12 +1019,12 @@ class ProtobufCompiler(Rule):
             phony=True,
             variables=None,
             **kwargs):
-        variables_final = {
-            "desc": "[PROTOC] {in_base}{in_ext}",
-            "out_depfile": "{binary}.dir/{in_base}.pb.d",
-            "outdir_proto": os.path.dirname(outfiles[0]),
-            "in_path_outdir": "{in_path_outdir}",
-        }
+        variables_final = OrderedDict([
+            ("desc", "[PROTOC] {in_base}{in_ext}"),
+            ("out_depfile", "{binary}.dir/{in_base}.pb.d"),
+            ("outdir_proto", os.path.dirname(outfiles[0])),
+            ("in_path_outdir", "{in_path_outdir}"),
+        ])
         variables_final.update(variables or {})
         super().__init__(
             command=command,
@@ -1318,7 +1319,7 @@ class Toolchain(object):
 
     @staticmethod
     def build_rules_and_vars(obj):
-        rule_map = {}
+        rule_map = OrderedDict()
         rules, vars = Toolchain.all_rules_and_vars(obj)
         for name, rule in rules.items():
             rule.name = name
@@ -1923,7 +1924,7 @@ class CXXProject(Task):
         self._init_rules_and_vars()
 
     def _init_rules_and_vars(self):
-        self._rules_by_ext = {}
+        self._rules_by_ext = OrderedDict()
         self._rules = []
         self._variables = []
 
@@ -2108,7 +2109,7 @@ if __name__ == "__main__":
         sources = [(tools.expand_path(source), origin) for source, origin in sources]
 
         # Aggregated list of sources for each rule
-        rule_source_list = {}
+        rule_source_list = OrderedDict()
         while sources:
             source, origin = sources.pop()
             _, ext = fs.path.splitext(source)
