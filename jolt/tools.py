@@ -1090,7 +1090,7 @@ class Tools(object):
             files = [self.expand_path(file) for file in files]
         elif not fs.path.isabs(pathname):
             files = [self.expand_relpath(file, self.getcwd()) for file in files]
-        return files
+        return list(sorted(files))
 
     def mkdir(self, pathname, recursively=True):
         """ Create directory. """
