@@ -24,6 +24,10 @@ type Config struct {
 	// Ex: tcp://127.0.0.1:8080
 	Listen []string `mapstructure:"listen_http"`
 
+	// Addresses to listen on for gRPC.
+	// Ex: tcp://127.0.0.1:9090
+	ListenGrpc []string `mapstructure:"listen_grpc"`
+
 	// Maximum size of cache.
 	// Note that the cache may exceed this size temporarily
 	// while artifacts are being uploaded and not yet have been

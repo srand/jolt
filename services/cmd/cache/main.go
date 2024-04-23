@@ -67,6 +67,15 @@ var rootCmd = &cobra.Command{
 			log.Fatal(err)
 		}
 
+		if config.ListenGrpc == nil || len(config.ListenGrpc) == 0 {
+			config.ListenGrpc = []string{"tcp://:9090"}
+		}
+
+		// Start gRPC server
+		for _, address := range config.ListenGrpc {
+			go serveGrpc(lru, address)
+		}
+
 		handler := cache.NewHttpHandler(lru)
 
 		if config.Listen == nil || len(config.Listen) == 0 {
@@ -108,7 +117,8 @@ func init() {
 	rootCmd.Flags().StringP("cert-key", "k", "", "TLS private key file")
 	rootCmd.Flags().StringP("expiration", "e", "", "Artifact expiration timeout in seconds.")
 	rootCmd.Flags().BoolP("insecure", "i", false, "Don't use TLS")
-	rootCmd.Flags().StringSliceP("listen-http", "l", nil, "Address and port to listen on (default :8080, :8443)")
+	rootCmd.Flags().StringSliceP("listen-http", "l", []string{"tcp://:8080"}, "Addresses to listen on for HTTP connections")
+	rootCmd.Flags().StringSliceP("listen-grpc", "g", []string{"tcp://:9090"}, "Addresses to listen on for GRPC connections")
 	rootCmd.Flags().StringP("max-size", "s", "10GB", "Maximum size of the cache.")
 	rootCmd.Flags().StringP("path", "p", "/data", "Path to cache storage on disk, or 'memory' to store files in memory.")
 	rootCmd.Flags().CountP("verbose", "v", "Verbosity (repeatable)")
@@ -117,6 +127,7 @@ func init() {
 	viper.BindPFlag("cert_key", rootCmd.Flags().Lookup("cert-key"))
 	viper.BindPFlag("expiration", rootCmd.Flags().Lookup("expiration"))
 	viper.BindPFlag("insecure", rootCmd.Flags().Lookup("insecure"))
+	viper.BindPFlag("listen_grpc", rootCmd.Flags().Lookup("listen-grpc"))
 	viper.BindPFlag("listen_http", rootCmd.Flags().Lookup("listen-http"))
 	viper.BindPFlag("max_size", rootCmd.Flags().Lookup("max-size"))
 	viper.BindPFlag("path", rootCmd.Flags().Lookup("path"))

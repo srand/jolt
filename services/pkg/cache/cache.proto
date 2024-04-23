@@ -1,0 +1,42 @@
+
+syntax = "proto3";
+
+option go_package = "pkg/cache";
+
+package fstree;
+
+message ReadObjectRequest {
+    string digest = 1;
+}
+
+message ReadObjectResponse {
+    bytes data = 1;
+}
+
+message WriteObjectRequest {
+    string digest = 1;
+    bytes data = 2;
+}
+
+message WriteObjectResponse {
+}
+
+message HasObjectRequest {
+    repeated string digest = 1;
+}
+
+message HasObjectResponse {
+    repeated bool present = 1;
+}
+
+service CacheService {
+    // GetBlobPresence returns a list of blobs that are either missing or present in the cache.
+    rpc HasObject(HasObjectRequest) returns (HasObjectResponse);
+
+    // Read a blob from the cache
+    rpc ReadObject(ReadObjectRequest) returns (stream ReadObjectResponse);
+
+    // Write a blob to the cache
+    rpc WriteObject(stream WriteObjectRequest) returns (WriteObjectResponse);
+}
+

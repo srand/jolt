@@ -173,17 +173,17 @@ func (c *lruCache) WriteFile(path string) (WriteCloseDiscarder, error) {
 
 func (c *lruCache) HasObject(digest utils.Digest) CacheItem {
 	path := c.pathFromDigest(digest)
-	return c.HasFile(path)
+	return c.hasFile(path)
 }
 
 func (c *lruCache) ReadObject(digest utils.Digest) (io.ReadCloser, error) {
 	path := c.pathFromDigest(digest)
-	return c.ReadFile(path)
+	return c.readFile(path)
 }
 
 func (c *lruCache) WriteObject(digest utils.Digest) (WriteCloseDiscarder, error) {
 	path := c.pathFromDigest(digest)
-	return c.WriteFile(path)
+	return c.writeFile(path)
 }
 
 func (c *lruCache) Statistics() CacheStats {
