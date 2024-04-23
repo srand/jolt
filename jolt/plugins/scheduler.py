@@ -642,7 +642,6 @@ def executor(ctx, worker, build, request):
                 )
                 updates.push(update)
 
-
     except Exception as e:
         log.set_level(log.EXCEPTION)
         log.exception(e)
