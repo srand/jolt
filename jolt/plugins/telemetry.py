@@ -1,4 +1,3 @@
-from socket import gethostname
 from requests.exceptions import RequestException
 from requests.api import post
 
@@ -38,7 +37,7 @@ class TelemetryHooks(TaskHook):
             "name": task.short_qualified_name,
             "identity": task.identity,
             "instance": task.task._instance.value,
-            "hostname": gethostname(),
+            "hostname": utils.hostname(),
             "role": "client" if client else "worker",
             "event": event,
             "routing_key": getattr(task.task, "routing_key", "default")

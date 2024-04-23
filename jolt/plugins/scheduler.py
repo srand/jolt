@@ -2,6 +2,7 @@ import click
 import grpc
 import queue
 from threading import Lock
+import time
 
 from google.protobuf.timestamp_pb2 import Timestamp
 
@@ -319,6 +320,13 @@ class RemoteExecutor(NetworkExecutor):
             if progress.status in [
                     common_pb.TaskStatus.TASK_ERROR,
             ]:
+                log.log(
+                    log.VERBOSE,
+                    f"Host: {progress.worker.hostname}",
+                    created=time.time(),
+                    context=self.task.identity[:7],
+                    prefix=True)
+
                 for error in progress.errors:
                     with self.task.task.report() as report:
                         report.add_error(
@@ -327,7 +335,7 @@ class RemoteExecutor(NetworkExecutor):
                             error.message,
                             error.details,
                         )
-                self.task.raise_for_status(log_details=True)
+                self.task.raise_for_status(log_details=not self.factory.options.mute)
                 raise raise_error("Remote execution failed")
 
             last_status = progress.status
@@ -569,7 +577,7 @@ def executor(ctx, worker, build, request):
     # Enlist to execute build tasks from the scheduler
     enlist_msg = scheduler_pb.TaskUpdate(
         request=scheduler_pb.TaskRequest(build_id=build),
-        worker=scheduler_pb.WorkerAllocation(id=worker),
+        worker=scheduler_pb.WorkerAllocation(id=worker, hostname=utils.hostname()),
     )
 
     # A queue to send updates to the scheduler

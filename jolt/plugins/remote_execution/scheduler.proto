@@ -57,6 +57,9 @@ message TaskRequest {
 message WorkerAllocation {
     // Worker id
     string id = 1;
+
+    // Worker hostname
+    string hostname = 2;
 }
 
 // An update on the progress of an executing task.

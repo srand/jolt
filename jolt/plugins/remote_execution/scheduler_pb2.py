@@ -14,7 +14,7 @@ _sym_db = _symbol_database.Default()
 from jolt import common_pb2 as jolt_dot_common__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n-jolt/plugins/remote_execution/scheduler.proto\x1a\x11jolt/common.proto\"[\n\x0c\x42uildRequest\x12&\n\x0b\x65nvironment\x18\x01 \x01(\x0b\x32\x11.BuildEnvironment\x12\x10\n\x08priority\x18\x02 \x01(\x05\x12\x11\n\tlogstream\x18\x03 \x01(\x08\"=\n\x0b\x42uildUpdate\x12\x1c\n\x06status\x18\x01 \x01(\x0e\x32\x0c.BuildStatus\x12\x10\n\x08\x62uild_id\x18\x02 \x01(\t\"&\n\x12\x43\x61ncelBuildRequest\x12\x10\n\x08\x62uild_id\x18\x01 \x01(\t\"3\n\x13\x43\x61ncelBuildResponse\x12\x1c\n\x06status\x18\x01 \x01(\x0e\x32\x0c.BuildStatus\"0\n\x0bTaskRequest\x12\x10\n\x08\x62uild_id\x18\x01 \x01(\t\x12\x0f\n\x07task_id\x18\x02 \x01(\t\"\x1e\n\x10WorkerAllocation\x12\n\n\x02id\x18\x01 \x01(\t\"\xa3\x01\n\nTaskUpdate\x12\x1d\n\x07request\x18\x01 \x01(\x0b\x32\x0c.TaskRequest\x12\x1b\n\x06status\x18\x02 \x01(\x0e\x32\x0b.TaskStatus\x12!\n\x06worker\x18\x03 \x01(\x0b\x32\x11.WorkerAllocation\x12\x1a\n\x08loglines\x18\x04 \x03(\x0b\x32\x08.LogLine\x12\x1a\n\x06\x65rrors\x18\x05 \x03(\x0b\x32\n.TaskError2\xa2\x01\n\tScheduler\x12.\n\rScheduleBuild\x12\r.BuildRequest\x1a\x0c.BuildUpdate0\x01\x12\x38\n\x0b\x43\x61ncelBuild\x12\x13.CancelBuildRequest\x1a\x14.CancelBuildResponse\x12+\n\x0cScheduleTask\x12\x0c.TaskRequest\x1a\x0b.TaskUpdate0\x01\x42\x0eZ\x0cpkg/protocolb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n-jolt/plugins/remote_execution/scheduler.proto\x1a\x11jolt/common.proto\"[\n\x0c\x42uildRequest\x12&\n\x0b\x65nvironment\x18\x01 \x01(\x0b\x32\x11.BuildEnvironment\x12\x10\n\x08priority\x18\x02 \x01(\x05\x12\x11\n\tlogstream\x18\x03 \x01(\x08\"=\n\x0b\x42uildUpdate\x12\x1c\n\x06status\x18\x01 \x01(\x0e\x32\x0c.BuildStatus\x12\x10\n\x08\x62uild_id\x18\x02 \x01(\t\"&\n\x12\x43\x61ncelBuildRequest\x12\x10\n\x08\x62uild_id\x18\x01 \x01(\t\"3\n\x13\x43\x61ncelBuildResponse\x12\x1c\n\x06status\x18\x01 \x01(\x0e\x32\x0c.BuildStatus\"0\n\x0bTaskRequest\x12\x10\n\x08\x62uild_id\x18\x01 \x01(\t\x12\x0f\n\x07task_id\x18\x02 \x01(\t\"0\n\x10WorkerAllocation\x12\n\n\x02id\x18\x01 \x01(\t\x12\x10\n\x08hostname\x18\x02 \x01(\t\"\xa3\x01\n\nTaskUpdate\x12\x1d\n\x07request\x18\x01 \x01(\x0b\x32\x0c.TaskRequest\x12\x1b\n\x06status\x18\x02 \x01(\x0e\x32\x0b.TaskStatus\x12!\n\x06worker\x18\x03 \x01(\x0b\x32\x11.WorkerAllocation\x12\x1a\n\x08loglines\x18\x04 \x03(\x0b\x32\x08.LogLine\x12\x1a\n\x06\x65rrors\x18\x05 \x03(\x0b\x32\n.TaskError2\xa2\x01\n\tScheduler\x12.\n\rScheduleBuild\x12\r.BuildRequest\x1a\x0c.BuildUpdate0\x01\x12\x38\n\x0b\x43\x61ncelBuild\x12\x13.CancelBuildRequest\x1a\x14.CancelBuildResponse\x12+\n\x0cScheduleTask\x12\x0c.TaskRequest\x1a\x0b.TaskUpdate0\x01\x42\x0eZ\x0cpkg/protocolb\x06proto3')
 
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, globals())
 _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'jolt.plugins.remote_execution.scheduler_pb2', globals())
@@ -33,9 +33,9 @@ if _descriptor._USE_C_DESCRIPTORS == False:
   _TASKREQUEST._serialized_start=317
   _TASKREQUEST._serialized_end=365
   _WORKERALLOCATION._serialized_start=367
-  _WORKERALLOCATION._serialized_end=397
-  _TASKUPDATE._serialized_start=400
-  _TASKUPDATE._serialized_end=563
-  _SCHEDULER._serialized_start=566
-  _SCHEDULER._serialized_end=728
+  _WORKERALLOCATION._serialized_end=415
+  _TASKUPDATE._serialized_start=418
+  _TASKUPDATE._serialized_end=581
+  _SCHEDULER._serialized_start=584
+  _SCHEDULER._serialized_end=746
 # @@protoc_insertion_point(module_scope)

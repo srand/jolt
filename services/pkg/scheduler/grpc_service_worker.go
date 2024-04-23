@@ -170,7 +170,8 @@ func (s *workerService) GetInstructions(stream protocol.Worker_GetInstructionsSe
 						TaskId:  currentTask.Identity(),
 					},
 					Worker: &protocol.WorkerAllocation{
-						Id: worker.Id(),
+						Id:       worker.Id(),
+						Hostname: worker.Platform().GetHostname(),
 					},
 					Errors: []*protocol.TaskError{
 						{

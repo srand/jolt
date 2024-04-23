@@ -67,8 +67,8 @@ func (d *dashboardHooks) formatEvent(task *scheduler.Task, status protocol.TaskS
 
 	// Include hostname of worker in the event
 	if pfm := task.MatchedPlatform(); pfm != nil {
-		if hostnames, ok := pfm.GetPropertiesForKey("worker.hostname"); ok {
-			event.Hostname = hostnames[0]
+		if hostname := pfm.GetHostname(); hostname != "" {
+			event.Hostname = hostname
 		}
 	}
 

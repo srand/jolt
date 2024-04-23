@@ -70,14 +70,14 @@ func (w *priorityWorker) TaskPlatform() *Platform {
 }
 
 // Returns a string representation of the worker.
+// By default, the string representation is the hostname of the worker.
+// If the hostname is not available, the ID of the worker is returned.
 func (w *priorityWorker) String() string {
-	hostnames, ok := w.Platform().GetPropertiesForKey("worker.hostname")
-	if !ok {
-		return w.Id()
+	hostname := w.platform.GetHostname()
+	if hostname != "" {
+		return hostname
 	}
-	if len(hostnames) > 0 {
-		return hostnames[0]
-	}
+
 	return w.Id()
 }
 

@@ -531,3 +531,9 @@ def suffix(value, sfx):
     if type(value) is list:
         return [item + sfx for item in value]
     return value + sfx
+
+
+def hostname():
+    """ Returns the hostname of the machine. """
+    import socket
+    return socket.gethostname()

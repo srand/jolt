@@ -74,6 +74,15 @@ func (p *Platform) Fulfills(requirement *Platform) bool {
 	return true
 }
 
+// Get hostname from platform properties.
+func (p *Platform) GetHostname() string {
+	hostname, _ := p.GetPropertiesForKey("worker.hostname")
+	if len(hostname) > 0 {
+		return hostname[0]
+	}
+	return ""
+}
+
 // Protobuf returns the platform as a protobuf message.
 func (p *Platform) Protobuf() *protocol.Platform {
 	platform := &protocol.Platform{}
