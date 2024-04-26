@@ -68,12 +68,12 @@ func NewBuildFromRequest(id string, request *protocol.BuildRequest) *Build {
 		logstream:   request.Logstream,
 		status:      protocol.BuildStatus_BUILD_ACCEPTED,
 		tasks:       map[string]*Task{},
-		queue: utils.NewUnicast[*Task](func(task *Task, platform interface{}) bool {
+		queue: utils.NewUnicast[*Task](func(task *Task, worker interface{}) bool {
 			if task.build.isCancelled() {
 				return false
 			}
-			pfm := platform.(*Platform)
-			return pfm.Fulfills(task.Platform())
+			w := worker.(Worker)
+			return w.Platform().Fulfills(task.Platform()) && task.Platform().Fulfills(w.TaskPlatform())
 		}),
 		buildObservers: NewBuildUpdateObservers(),
 	}
@@ -304,12 +304,12 @@ func (b *Build) WalkQueuedTasks(walkFn TaskWalkFunc) bool {
 }
 
 // Creates a new task executor for the build.
-func (b *Build) NewExecutor(scheduler Scheduler, platform *Platform) (Executor, error) {
+func (b *Build) NewExecutor(scheduler Scheduler, worker Worker) (Executor, error) {
 	if b.IsCancelled() {
 		return nil, errors.New("Build is cancelled")
 	}
-	consumer := b.queue.NewConsumer(platform)
-	return NewExecutor(scheduler, platform, consumer), nil
+	consumer := b.queue.NewConsumer(worker)
+	return NewExecutor(scheduler, worker.Platform(), consumer), nil
 }
 
 // Create a new build update observer.

@@ -528,7 +528,7 @@ func (s *priorityScheduler) NewExecutor(workerid, buildid string) (Executor, err
 	}
 
 	s.RUnlock()
-	return build.NewExecutor(s, worker.Platform())
+	return build.NewExecutor(s, worker)
 }
 
 func (s *priorityScheduler) AddObserver(receiver SchedulerObserver) {
