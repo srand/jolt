@@ -30,6 +30,9 @@ type Task struct {
 
 	// Scheduler to which the task belongs
 	schedulerHooks SchedulerObserver
+
+	// Worker that the task is assigned to for deployment purposes
+	worker Worker
 }
 
 // Create a new task.
@@ -215,4 +218,16 @@ func (t *Task) postStatusUpdated() {
 	if t.schedulerHooks != nil {
 		t.schedulerHooks.TaskStatusChanged(t, t.status)
 	}
+}
+
+func (t *Task) AssignToWorker(worker Worker) {
+	t.Lock()
+	defer t.Unlock()
+	t.worker = worker
+}
+
+func (t *Task) AssignedWorker() Worker {
+	t.RLock()
+	defer t.RUnlock()
+	return t.worker
 }

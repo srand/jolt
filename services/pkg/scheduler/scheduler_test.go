@@ -363,6 +363,65 @@ func (suite *SchedulerTest) TestScheduleBuildWithPriority() {
 	worker.Acknowledge()
 }
 
+func (suite *SchedulerTest) TestTasksAssignedToOriginalWorker() {
+	// Test that tasks assigned to a worker are not reassigned to another worker.
+
+	build1 := newBuild()
+	build1.priority = 1
+	task1 := addTask(build1, "task1")
+	task2 := addTask(build1, "task2")
+	defer build1.Close()
+
+	worker1, err := suite.newWorker()
+	assert.NoError(suite.T(), err)
+
+	worker2, err := suite.newWorker()
+	assert.NoError(suite.T(), err)
+
+	buildObserver1, err := suite.scheduler.ScheduleBuild(build1)
+	assert.NoError(suite.T(), err)
+	defer buildObserver1.Close()
+
+	taskObserver1, err := suite.scheduler.ScheduleTask(build1.Id(), task1.Identity())
+	assert.NoError(suite.T(), err)
+	defer taskObserver1.Close()
+
+	taskObserver2, err := suite.scheduler.ScheduleTask(build1.Id(), task2.Identity())
+	assert.NoError(suite.T(), err)
+	defer taskObserver2.Close()
+
+	scheduledTask := <-worker1.Tasks()
+	assert.NotNil(suite.T(), scheduledTask)
+	assert.Equal(suite.T(), task1, scheduledTask)
+
+	executor1, err := suite.scheduler.NewExecutor(worker1.Id(), scheduledTask.Build().Id())
+	assert.NoError(suite.T(), err)
+
+	actualTask := <-executor1.Tasks()
+	assert.NotNil(suite.T(), actualTask)
+	assert.Equal(suite.T(), task1, actualTask)
+	executor1.Close()
+
+	// Attempt to get another task, should fail as the task is already assigned to worker2
+	actualTask = <-executor1.Tasks()
+	assert.Nil(suite.T(), actualTask)
+
+	scheduledTask = <-worker2.Tasks()
+	assert.NotNil(suite.T(), scheduledTask)
+	assert.Equal(suite.T(), task2, scheduledTask)
+
+	executor2, err := suite.scheduler.NewExecutor(worker2.Id(), scheduledTask.Build().Id())
+	assert.NoError(suite.T(), err)
+
+	actualTask = <-executor2.Tasks()
+	assert.NotNil(suite.T(), actualTask)
+	assert.Equal(suite.T(), task2, actualTask)
+	executor2.Close()
+
+	worker1.Close()
+	worker2.Close()
+}
+
 func (suite *SchedulerTest) TestScheduleBuild_BuildsOrderedFIFO() {
 	// Test that builds with different priorities are scheduled in the correct order.
 

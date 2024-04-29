@@ -36,7 +36,7 @@ type priorityScheduler struct {
 	availWorkers map[string]Worker
 
 	// Map of assigned task id to worker
-	workerTasks map[string]Worker
+	workerTasks map[*Task]Worker
 
 	// List of telemtry receivers
 	observers []SchedulerObserver
@@ -56,7 +56,7 @@ func NewPriorityScheduler() *priorityScheduler {
 		readyBuilds:    utils.NewPriorityQueue[*Build](buildPriorityFunc, buildEqualityFunc),
 		workers:        map[string]Worker{},
 		availWorkers:   map[string]Worker{},
-		workerTasks:    map[string]Worker{},
+		workerTasks:    map[*Task]Worker{},
 	}
 }
 
@@ -292,7 +292,7 @@ func (s *priorityScheduler) selectTaskForWorkerNoLock(ctx context.Context, worke
 		}
 
 		// Must not already be allocated to a worker
-		if _, ok := s.workerTasks[t.Identity()]; ok {
+		if w := t.AssignedWorker(); w != nil {
 			return false
 		}
 
@@ -412,13 +412,15 @@ func (s *priorityScheduler) enqueueWorkerNoLock(worker Worker) {
 
 // Associate a task with a worker.
 func (s *priorityScheduler) associateTaskWithWorker(worker Worker, task *Task) {
-	s.workerTasks[task.Identity()] = worker
+	s.workerTasks[task] = worker
+	task.AssignToWorker(worker)
 }
 
 // Deassociate a task with a worker.
 func (s *priorityScheduler) deassociateTaskWithWorker(worker Worker) {
 	for t, w := range s.workerTasks {
 		if w == worker {
+			t.AssignToWorker(nil)
 			delete(s.workerTasks, t)
 			return
 		}

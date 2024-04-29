@@ -73,6 +73,12 @@ func NewBuildFromRequest(id string, request *protocol.BuildRequest) *Build {
 				return false
 			}
 			w := worker.(Worker)
+
+			// Must not already be allocated to another worker
+			if w := task.AssignedWorker(); w != nil && w != worker {
+				return false
+			}
+
 			return w.Platform().Fulfills(task.Platform()) && task.Platform().Fulfills(w.TaskPlatform())
 		}),
 		buildObservers: NewBuildUpdateObservers(),
