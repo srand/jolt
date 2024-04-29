@@ -378,6 +378,9 @@ func (suite *SchedulerTest) TestTasksAssignedToOriginalWorker() {
 	worker2, err := suite.newWorker()
 	assert.NoError(suite.T(), err)
 
+	defer worker1.Close()
+	defer worker2.Close()
+
 	buildObserver1, err := suite.scheduler.ScheduleBuild(build1)
 	assert.NoError(suite.T(), err)
 	defer buildObserver1.Close()
@@ -392,14 +395,13 @@ func (suite *SchedulerTest) TestTasksAssignedToOriginalWorker() {
 
 	scheduledTask := <-worker1.Tasks()
 	assert.NotNil(suite.T(), scheduledTask)
-	assert.Equal(suite.T(), task1, scheduledTask)
 
 	executor1, err := suite.scheduler.NewExecutor(worker1.Id(), scheduledTask.Build().Id())
 	assert.NoError(suite.T(), err)
 
 	actualTask := <-executor1.Tasks()
 	assert.NotNil(suite.T(), actualTask)
-	assert.Equal(suite.T(), task1, actualTask)
+	assert.Equal(suite.T(), scheduledTask.Identity(), actualTask.Identity())
 	executor1.Close()
 
 	// Attempt to get another task, should fail as the task is already assigned to worker2
@@ -408,18 +410,14 @@ func (suite *SchedulerTest) TestTasksAssignedToOriginalWorker() {
 
 	scheduledTask = <-worker2.Tasks()
 	assert.NotNil(suite.T(), scheduledTask)
-	assert.Equal(suite.T(), task2, scheduledTask)
 
 	executor2, err := suite.scheduler.NewExecutor(worker2.Id(), scheduledTask.Build().Id())
 	assert.NoError(suite.T(), err)
 
 	actualTask = <-executor2.Tasks()
 	assert.NotNil(suite.T(), actualTask)
-	assert.Equal(suite.T(), task2, actualTask)
+	assert.Equal(suite.T(), scheduledTask.Identity(), actualTask.Identity())
 	executor2.Close()
-
-	worker1.Close()
-	worker2.Close()
 }
 
 func (suite *SchedulerTest) TestScheduleBuild_BuildsOrderedFIFO() {
@@ -579,6 +577,66 @@ func (suite *SchedulerTest) TestCancelBuildWithObservers() {
 		assert.Equal(suite.T(), protocol.TaskStatus_TASK_CANCELLED, update.Status)
 	case <-time.After(1 * time.Second):
 		assert.Fail(suite.T(), "Task2 should have been cancelled")
+	}
+}
+
+func (suite *SchedulerTest) TestDeploymentError() {
+	build1 := newBuild()
+	build1.priority = 1
+	task1 := addTask(build1, "task1")
+	task2 := addTask(build1, "task2")
+	defer build1.Close()
+
+	worker, err := suite.newWorker()
+	assert.NoError(suite.T(), err)
+	defer worker.Close()
+
+	buildObserver1, err := suite.scheduler.ScheduleBuild(build1)
+	assert.NoError(suite.T(), err)
+
+	select {
+	case update := <-buildObserver1.Updates():
+		assert.Equal(suite.T(), protocol.BuildStatus_BUILD_ACCEPTED, update.Status)
+	case <-time.After(1 * time.Second):
+		assert.FailNow(suite.T(), "Build should have been accepted")
+	}
+
+	// Schedule task
+	taskObserver1, err := suite.scheduler.ScheduleTask(build1.Id(), task1.Identity())
+	assert.NoError(suite.T(), err)
+	defer taskObserver1.Close()
+
+	taskObserver2, err := suite.scheduler.ScheduleTask(build1.Id(), task2.Identity())
+	assert.NoError(suite.T(), err)
+	defer taskObserver2.Close()
+
+	scheduledTask := <-worker.Tasks()
+	assert.NotNil(suite.T(), scheduledTask)
+	scheduledTask.PostStatusUpdate(protocol.TaskStatus_TASK_ERROR)
+	build1.Cancel()
+	worker.Acknowledge()
+
+	select {
+	case <-worker.Tasks():
+		assert.Fail(suite.T(), "No more tasks should be scheduled to the worker")
+	default:
+	}
+
+	buildObserver1.Close()
+	assert.True(suite.T(), build1.IsTerminal())
+
+	select {
+	case <-worker.Tasks():
+		assert.Fail(suite.T(), "No more tasks should be scheduled to the worker")
+	default:
+	}
+
+	select {
+	case update := <-taskObserver1.Updates():
+		assert.NotNil(suite.T(), update)
+		assert.Equal(suite.T(), protocol.TaskStatus_TASK_ERROR, update.Status)
+	case <-time.After(1 * time.Second):
+		assert.Fail(suite.T(), "Task1 should have been completed")
 	}
 }
 
