@@ -3,13 +3,28 @@ syntax = "proto3";
 option go_package = "pkg/protocol";
 
 import "google/protobuf/empty.proto";
+import "jolt/common.proto";
 import "jolt/plugins/remote_execution/scheduler.proto";
+
 
 message ListBuildsRequest {}
 
 message ListBuildsResponse {
+    message Task {
+        string id = 1;
+
+        string name = 2;
+
+        TaskStatus status = 3;
+    }
+
     message Build {
         string id = 1;
+
+        // Status
+        BuildStatus status = 2;
+
+        repeated Task tasks = 3;
     }
 
     repeated Build builds = 1;

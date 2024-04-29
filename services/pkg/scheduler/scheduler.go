@@ -1,6 +1,10 @@
 package scheduler
 
-import "context"
+import (
+	"context"
+
+	"github.com/srand/jolt/scheduler/pkg/protocol"
+)
 
 // Main scheduler interface.
 type Scheduler interface {
@@ -41,6 +45,9 @@ type Scheduler interface {
 
 	// Get scheduler statistics
 	Statistics() *SchedulerStatistics
+
+	// Get information about running builds
+	ListBuilds() *protocol.ListBuildsResponse
 }
 
 // Scheduler statistics

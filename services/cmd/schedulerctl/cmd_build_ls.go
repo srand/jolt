@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"sort"
 
 	"github.com/spf13/cobra"
 	"github.com/srand/jolt/scheduler/pkg/protocol"
@@ -22,7 +23,17 @@ var buildListCmd = &cobra.Command{
 		}
 
 		for index, build := range response.Builds {
-			fmt.Printf("%d: %s\n", index+1, build.Id)
+			fmt.Printf("Build %d: %s %s\n", index, build.Id, build.Status)
+
+			sort.Slice(build.Tasks, func(i, j int) bool {
+				return build.Tasks[i].Name < build.Tasks[j].Name
+			})
+
+			for taskIndex, task := range build.Tasks {
+				fmt.Printf("  %d: %s %-12s %s\n", taskIndex, task.Id, task.Status, task.Name)
+			}
+
+			fmt.Println()
 		}
 	},
 }

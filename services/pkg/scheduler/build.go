@@ -278,6 +278,13 @@ func (b *Build) FindQueuedTask(walkFn TaskWalkFunc) *Task {
 	return lastTask
 }
 
+// Return the build status
+func (b *Build) Status() protocol.BuildStatus {
+	b.RLock()
+	defer b.RUnlock()
+	return b.status
+}
+
 // Iterate over all tasks.
 // Returns false if the walk was aborted by the walkFn returning false.
 func (b *Build) WalkTasks(walkFn TaskWalkFunc) bool {

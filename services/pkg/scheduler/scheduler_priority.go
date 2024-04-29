@@ -589,3 +589,31 @@ func (s *priorityScheduler) Statistics() *SchedulerStatistics {
 
 	return stats
 }
+
+// Get information about running builds
+func (s *priorityScheduler) ListBuilds() *protocol.ListBuildsResponse {
+	s.RLock()
+	defer s.RUnlock()
+
+	response := &protocol.ListBuildsResponse{
+		Builds: make([]*protocol.ListBuildsResponse_Build, 0, len(s.builds)),
+	}
+
+	for _, build := range s.builds {
+		response.Builds = append(response.Builds, &protocol.ListBuildsResponse_Build{
+			Id:     build.Id(),
+			Status: build.Status(),
+			Tasks:  make([]*protocol.ListBuildsResponse_Task, 0, len(build.tasks)),
+		})
+
+		for _, task := range build.tasks {
+			response.Builds[len(response.Builds)-1].Tasks = append(response.Builds[len(response.Builds)-1].Tasks, &protocol.ListBuildsResponse_Task{
+				Id:     task.Identity(),
+				Name:   task.Name(),
+				Status: task.Status(),
+			})
+		}
+	}
+
+	return response
+}
