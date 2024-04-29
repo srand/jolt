@@ -273,12 +273,19 @@ func (s *priorityScheduler) hasReadyWorker() bool {
 }
 
 // Select a task for a worker.
-func (s *priorityScheduler) selectTaskForWorkerNoLock(worker Worker, build *Build) *Task {
+func (s *priorityScheduler) selectTaskForWorkerNoLock(ctx context.Context, worker Worker, build *Build) *Task {
 	if build.IsDone() {
 		return nil
 	}
 
 	return build.FindQueuedTask(func(b *Build, t *Task) bool {
+		// Check if context is cancelled
+		select {
+		case <-ctx.Done():
+			return true
+		default:
+		}
+
 		// Must not be cancelled
 		if t.IsCompleted() {
 			return false
@@ -328,6 +335,7 @@ func (s *priorityScheduler) selectTaskAndWorker() {
 		s.RLock()
 		candidates := make([]*Task, s.readyBuilds.Len())
 		wg := sync.WaitGroup{}
+		ctx, cancel := context.WithCancel(context.Background())
 
 		// Select tasks for worker
 		for i, build := range s.readyBuilds.Items() {
@@ -338,15 +346,16 @@ func (s *priorityScheduler) selectTaskAndWorker() {
 			wg.Add(1)
 			go func(i int, build *Build) {
 				defer wg.Done()
-				if task := s.selectTaskForWorkerNoLock(worker, build); task != nil {
+				if task := s.selectTaskForWorkerNoLock(ctx, worker, build); task != nil {
 					candidates[i] = task
-
+					cancel()
 				}
 			}(i, build)
 		}
 
 		// Wait for all tasks to be selected
 		wg.Wait()
+		cancel()
 		s.RUnlock()
 
 		s.Lock()
