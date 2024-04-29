@@ -268,4 +268,7 @@ enum TaskStatus {
     // External circumstances prevented the task from running,
     // for example if the worker failed to deploy the Jolt client.
     TASK_ERROR = 9;
+
+    // Initial task state
+    TASK_CREATED = 10;
 }

@@ -225,6 +225,7 @@ func (s *workerService) GetInstructions(stream protocol.Worker_GetInstructionsSe
 					}
 				}
 
+				currentBuild.Cancel()
 				currentBuild = nil
 				currentBuildCtx = nil
 				currentTask = nil

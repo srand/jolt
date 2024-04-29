@@ -29,6 +29,7 @@ func (s *TaskTest) TestIsComplete() {
 		complete bool
 	}{
 		{protocol.TaskStatus_TASK_CANCELLED, true},
+		{protocol.TaskStatus_TASK_CREATED, false},
 		{protocol.TaskStatus_TASK_DOWNLOADED, true},
 		{protocol.TaskStatus_TASK_FAILED, true},
 		{protocol.TaskStatus_TASK_PASSED, true},

@@ -45,7 +45,7 @@ func NewTask(build *Build, task *protocol.Task) *Task {
 	newTask := &Task{
 		build:           build,
 		platform:        platform,
-		status:          protocol.TaskStatus_TASK_QUEUED,
+		status:          protocol.TaskStatus_TASK_CREATED,
 		task:            task,
 		updateObservers: NewTaskUpdateObservers(),
 	}
@@ -162,13 +162,13 @@ func (t *Task) setStatus(status protocol.TaskStatus) bool {
 	}
 
 	// Can only transition to cancelled from queued.
-	if status == protocol.TaskStatus_TASK_CANCELLED && t.status != protocol.TaskStatus_TASK_QUEUED {
+	if status == protocol.TaskStatus_TASK_CANCELLED && t.status != protocol.TaskStatus_TASK_CREATED && t.status != protocol.TaskStatus_TASK_QUEUED {
 		log.Debugf("err - task - id: %s, status: %v - new status rejected: %v", t.Identity(), t.status, status)
 		return false
 	}
 
 	switch t.status {
-	case protocol.TaskStatus_TASK_QUEUED, protocol.TaskStatus_TASK_RUNNING:
+	case protocol.TaskStatus_TASK_CREATED, protocol.TaskStatus_TASK_QUEUED, protocol.TaskStatus_TASK_RUNNING:
 		if t.status != status {
 			t.status = status
 			t.postStatusUpdated()
