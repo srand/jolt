@@ -30,7 +30,7 @@ var buildListCmd = &cobra.Command{
 			})
 
 			for taskIndex, task := range build.Tasks {
-				fmt.Printf("  %d: %s %-12s %s\n", taskIndex, task.Id, task.Status, task.Name)
+				fmt.Printf("  %4d: %s %-14s %s\n", taskIndex, task.Id, task.Status, task.Name)
 			}
 
 			fmt.Println()
