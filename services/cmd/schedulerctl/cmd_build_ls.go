@@ -22,10 +22,15 @@ var buildListCmd = &cobra.Command{
 			log.Fatal(err)
 		}
 
+		sort.Slice(response.Builds, func(i, j int) bool {
+			return response.Builds[i].ScheduledAt.AsTime().Before(response.Builds[j].ScheduledAt.AsTime())
+		})
+
 		buildCount := len(response.Builds)
+		buildPad := fmt.Sprint(len(fmt.Sprint(buildCount)))
 
 		for index, build := range response.Builds {
-			fmt.Printf("%d: %s %s %s\n", index, build.Id, build.Status, build.ScheduledAt.AsTime().Format("2006-01-02T15:04:05"))
+			fmt.Printf("%"+buildPad+"d: %s %-15s %s\n", index+1, build.Id, build.Status, build.ScheduledAt.AsTime().Format("2006-01-02T15:04:05"))
 
 			if !cmd.Flags().Changed("tasks") {
 				continue
@@ -36,11 +41,10 @@ var buildListCmd = &cobra.Command{
 			})
 
 			taskCount := len(build.Tasks)
-			maxCharCount := len(fmt.Sprint(buildCount)) + len(fmt.Sprint(taskCount)) + 2
+			taskPad := fmt.Sprint(len(fmt.Sprint(taskCount)))
 
 			for taskIndex, task := range build.Tasks {
-				taskIndexStr := fmt.Sprintf("%d.%d:", index, taskIndex)
-				taskIndexStr = fmt.Sprintf(fmt.Sprintf("%%-%ds", maxCharCount), taskIndexStr)
+				taskIndexStr := fmt.Sprintf("%"+buildPad+"d.%-"+taskPad+"d", index+1, taskIndex+1)
 				fmt.Printf("%s %s %-14s %s\n", taskIndexStr, task.Id, task.Status, task.Name)
 			}
 
