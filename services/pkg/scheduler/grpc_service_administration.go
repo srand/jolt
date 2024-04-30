@@ -21,8 +21,13 @@ func NewAdminService(scheduler Scheduler) *adminService {
 }
 
 func (s *adminService) CancelBuild(_ context.Context, req *protocol.CancelBuildRequest) (*protocol.CancelBuildResponse, error) {
-	// Not implemented
-	return nil, errors.New("not implemented")
+	build, err := s.scheduler.GetBuild(req.BuildId)
+	if err != nil {
+		return nil, err
+	}
+
+	build.Cancel()
+	return &protocol.CancelBuildResponse{Status: build.Status()}, nil
 }
 
 func (s *adminService) ListBuilds(_ context.Context, req *protocol.ListBuildsRequest) (*protocol.ListBuildsResponse, error) {
