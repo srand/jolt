@@ -2,7 +2,6 @@ package scheduler
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/srand/jolt/scheduler/pkg/protocol"
 	"github.com/srand/jolt/scheduler/pkg/utils"
@@ -30,8 +29,6 @@ func (s *schedulerService) ScheduleBuild(request *protocol.BuildRequest, stream 
 	if build, err = s.scheduler.GetBuild(id); err != nil {
 		build = s.scheduler.NewBuild(id, request)
 	}
-
-	fmt.Println("Build", build)
 
 	observer, err := s.scheduler.ScheduleBuild(build)
 	if err != nil {
