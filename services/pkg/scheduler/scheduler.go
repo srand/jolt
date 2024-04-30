@@ -11,11 +11,14 @@ type Scheduler interface {
 	// Cancel a build with the given identifier.
 	CancelBuild(build string) error
 
+	// Create a new build with the given identifier.
+	NewBuild(id string, request *protocol.BuildRequest) Build
+
 	// Get build with the given identifier.
-	GetBuild(buildId string) *Build
+	GetBuild(buildId string) (Build, error)
 
 	// Register a new build with the scheduler.
-	ScheduleBuild(*Build) (BuildUpdateObserver, error)
+	ScheduleBuild(Build) (BuildUpdateObserver, error)
 
 	// Schedule a task belonging to a build for execution.
 	// A build must have been registered first and its identifier must be provided.

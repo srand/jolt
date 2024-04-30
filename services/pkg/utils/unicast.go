@@ -1,8 +1,8 @@
 package utils
 
 import (
+	"container/list"
 	"context"
-	"slices"
 	"sync"
 
 	"github.com/google/uuid"
@@ -25,6 +25,24 @@ type UnicastWalkFunc[E comparable] func(unicast *Unicast[E], item E) bool
 // Callback to select the next item to be delivered to a consumer.
 // Return true to select the current item, or false to evaluate the next item.
 type UnicastSelectionFunc[E comparable] func(item E, consumer interface{}) bool
+
+type UnicastCallbacks[E comparable] interface {
+	// Callback when selecting the next item to be delivered to a consumer.
+	// Return true to select the current item, or false to evaluate the next item.
+	Select(item E, consumer interface{}) bool
+
+	// Callback invoked when an item has been selected for delivery to a consumer.
+	// The callback can be used to update the state of the unicast queue.
+	// The callback is invoked with the unicast queue and the selected item.
+	// Return true to continue processing, or false to stop.
+	Selected(item E, consumer interface{}) bool
+
+	// Callback invoked when an item could not be delivered to the consumer.
+	// The callback can be used to update the state of the unicast queue.
+	// The callback is invoked with the unicast queue and the item that could not be delivered.
+	// Return true to continue processing, or false to stop.
+	NotSelected(item E, consumer interface{}) bool
+}
 
 // A reliable unicast queue.
 // Items added to the queue are delivered to a single consumer.
@@ -49,19 +67,19 @@ type Unicast[E comparable] struct {
 	consumerItem map[string]E
 
 	// All items in the queue. New items are appended to the list.
-	queue []E
+	queue list.List
 
-	// Next item selection function.
-	selectionFn UnicastSelectionFunc[E]
+	// Callbacks for the unicast.
+	callbacks UnicastCallbacks[E]
 }
 
-func NewUnicast[E comparable](selectionFn UnicastSelectionFunc[E]) *Unicast[E] {
+func NewUnicast[E comparable](callbacks UnicastCallbacks[E]) *Unicast[E] {
 	return &Unicast[E]{
 		consumers:      map[string]*UnicastConsumer[E]{},
 		availConsumers: map[string]*UnicastConsumer[E]{},
 		consumerItem:   map[string]E{},
-		queue:          []E{},
-		selectionFn:    selectionFn,
+		queue:          list.List{},
+		callbacks:      callbacks,
 	}
 }
 
@@ -95,6 +113,36 @@ func (bc *Unicast[E]) NewConsumer(owner interface{}) *UnicastConsumer[E] {
 	return consumer
 }
 
+// Create a new consumer.
+func (bc *Unicast[E]) NewConsumerWithItem(owner interface{}) (*UnicastConsumer[E], error) {
+	bc.Lock()
+	defer bc.Unlock()
+
+	for data := bc.queue.Front(); data != nil; data = data.Next() {
+		if bc.callbacks.Select(data.Value.(E), owner) {
+			ctx, cancel := context.WithCancel(context.Background())
+			uuid, _ := uuid.NewRandom()
+			consumer := &UnicastConsumer[E]{
+				Chan:    make(chan E, 100),
+				ID:      uuid.String(),
+				ctx:     ctx,
+				cancel:  cancel,
+				unicast: bc,
+				owner:   owner,
+			}
+
+			bc.queue.Remove(data)
+			bc.consumers[consumer.ID] = consumer
+			bc.consumerItem[consumer.ID] = data.Value.(E)
+			bc.callbacks.Selected(data.Value.(E), consumer.owner)
+			consumer.send(data.Value.(E))
+			return consumer, nil
+		}
+	}
+
+	return nil, ErrNotFound
+}
+
 // Returns true if there are delivered items that have not yet been acknowledged.
 func (bc *Unicast[E]) HasUnackedData() bool {
 	bc.Lock()
@@ -118,7 +166,7 @@ func (bc *Unicast[E]) acknowledge(bcc *UnicastConsumer[E]) {
 }
 
 func (bc *Unicast[E]) send() {
-	if len(bc.queue) == 0 {
+	if bc.queue.Len() == 0 {
 		return
 	}
 
@@ -127,12 +175,13 @@ func (bc *Unicast[E]) send() {
 	}
 
 	for _, bcc := range bc.availConsumers {
-		for i, data := range bc.queue {
-			if bc.selectionFn(data, bcc.owner) {
-				bc.queue = append(bc.queue[:i], bc.queue[i+1:]...)
+		for data := bc.queue.Front(); data != nil; data = data.Next() {
+			if bc.callbacks.Select(data.Value.(E), bcc.owner) {
 				delete(bc.availConsumers, bcc.ID)
-				bc.consumerItem[bcc.ID] = data
-				bcc.send(data)
+				bc.queue.Remove(data)
+				bc.consumerItem[bcc.ID] = data.Value.(E)
+				bc.callbacks.Selected(data.Value.(E), bcc.owner)
+				bcc.send(data.Value.(E))
 				return
 			}
 		}
@@ -143,14 +192,14 @@ func (bc *Unicast[E]) send() {
 func (bc *Unicast[E]) Empty() bool {
 	bc.Lock()
 	defer bc.Unlock()
-	return len(bc.queue) == 0
+	return bc.queue.Len() == 0
 }
 
 // Returns the number of items in the queue.
 func (bc *Unicast[E]) Len() int {
 	bc.Lock()
 	defer bc.Unlock()
-	return len(bc.queue)
+	return bc.queue.Len()
 }
 
 func (bc *Unicast[E]) remove(bcc *UnicastConsumer[E]) {
@@ -160,9 +209,19 @@ func (bc *Unicast[E]) remove(bcc *UnicastConsumer[E]) {
 	delete(bc.availConsumers, bcc.ID)
 	if data, ok := bc.consumerItem[bcc.ID]; ok {
 		delete(bc.consumerItem, bcc.ID)
-		bc.queue = append(bc.queue, data)
+		bc.callbacks.NotSelected(data, bcc.owner)
+		bc.queue.PushFront(data)
 		bc.send()
 	}
+}
+
+func (bc *Unicast[E]) contains(item E) bool {
+	for data := bc.queue.Front(); data != nil; data = data.Next() {
+		if data.Value.(E) == item {
+			return true
+		}
+	}
+	return false
 }
 
 // Add item to queue.
@@ -171,7 +230,7 @@ func (bc *Unicast[E]) Send(data E) {
 	defer bc.Unlock()
 
 	// Don't add duplicate items to the queue.
-	if slices.Contains[[]E, E](bc.queue, data) {
+	if bc.contains(data) {
 		return
 	}
 
@@ -183,7 +242,7 @@ func (bc *Unicast[E]) Send(data E) {
 		}
 	}
 
-	bc.queue = append(bc.queue, data)
+	bc.queue.PushBack(data)
 	bc.send()
 }
 
@@ -192,8 +251,8 @@ func (bc *Unicast[E]) Send(data E) {
 func (bc *Unicast[E]) Walk(walker UnicastWalkFunc[E]) bool {
 	bc.RLock()
 	defer bc.RUnlock()
-	for _, item := range bc.queue {
-		if !walker(bc, item) {
+	for data := bc.queue.Front(); data != nil; data = data.Next() {
+		if !walker(bc, data.Value.(E)) {
 			return false
 		}
 	}

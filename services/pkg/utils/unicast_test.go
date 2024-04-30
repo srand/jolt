@@ -12,8 +12,23 @@ var unicastTestData = []string{
 	"test3",
 }
 
+// Implements UnicastCallbacks
+type MockUnicastCallbacks struct{}
+
+func (c *MockUnicastCallbacks) Select(item string, consumer interface{}) bool {
+	return true
+}
+
+func (c *MockUnicastCallbacks) Selected(item string, consumer interface{}) bool {
+	return true
+}
+
+func (c *MockUnicastCallbacks) NotSelected(item string, consumer interface{}) bool {
+	return true
+}
+
 func TestUnicast(t *testing.T) {
-	bc := NewUnicast[string](func(item string, consumer interface{}) bool { return true })
+	bc := NewUnicast[string](&MockUnicastCallbacks{})
 	c1 := bc.NewConsumer(nil)
 	c2 := bc.NewConsumer(nil)
 
@@ -35,15 +50,15 @@ func TestUnicast(t *testing.T) {
 	assert.True(t, unicastTestData[0] == msg || unicastTestData[1] == msg)
 
 	// Close consumers without acknowledging message
-	c1.Close()
 	c2.Close()
+	c1.Close()
 
 	c3 := bc.NewConsumer(nil)
 
 	expectedOrder := []string{
-		unicastTestData[2],
 		unicastTestData[0],
 		unicastTestData[1],
+		unicastTestData[2],
 	}
 
 	for i := range expectedOrder {
@@ -56,7 +71,7 @@ func TestUnicast(t *testing.T) {
 }
 
 func TestUnicastAck(t *testing.T) {
-	bc := NewUnicast[string](func(item string, consumer interface{}) bool { return true })
+	bc := NewUnicast[string](&MockUnicastCallbacks{})
 	c1 := bc.NewConsumer(nil)
 
 	for i := range unicastTestData {
@@ -79,7 +94,7 @@ func TestUnicastAck(t *testing.T) {
 }
 
 func TestDuplicate(t *testing.T) {
-	bc := NewUnicast[string](func(item string, consumer interface{}) bool { return true })
+	bc := NewUnicast[string](&MockUnicastCallbacks{})
 
 	bc.Send("test1")
 	bc.Send("test1")

@@ -12,7 +12,7 @@ type Task struct {
 	sync.RWMutex
 
 	// The build that the task belongs to.
-	build *Build
+	build Build
 
 	// The platform that the task should be executed on.
 	platform           *Platform
@@ -36,7 +36,7 @@ type Task struct {
 }
 
 // Create a new task.
-func NewTask(build *Build, task *protocol.Task) *Task {
+func NewTask(build Build, task *protocol.Task) *Task {
 	var platform *Platform
 
 	if task.Platform == nil {
@@ -84,7 +84,7 @@ func (t *Task) SetMatchedPlatform(platform *Platform) {
 }
 
 // Returns the build that the task belongs to.
-func (t *Task) Build() *Build {
+func (t *Task) Build() Build {
 	return t.build
 }
 
@@ -114,7 +114,7 @@ func (t *Task) NewUpdateObserver() TaskUpdateObserver {
 // Post a task update to all task observers.
 func (t *Task) PostUpdate(update *protocol.TaskUpdate) bool {
 	statusChanged := t.setStatus(update.Status)
-	if t.build.logstream {
+	if t.build.LogStreamEnabled() {
 		if !statusChanged {
 			if len(update.Loglines) <= 0 {
 				return statusChanged
@@ -132,7 +132,7 @@ func (t *Task) PostUpdate(update *protocol.TaskUpdate) bool {
 			Loglines: update.Loglines,
 		}
 
-		if !t.build.logstream {
+		if !t.build.LogStreamEnabled() {
 			update.Loglines = []*protocol.LogLine{}
 		}
 
@@ -226,8 +226,8 @@ func (t *Task) AssignToWorker(worker Worker) {
 	t.worker = worker
 }
 
-func (t *Task) AssignedWorker() Worker {
+func (t *Task) IsAssigned() bool {
 	t.RLock()
 	defer t.RUnlock()
-	return t.worker
+	return t.worker != nil
 }

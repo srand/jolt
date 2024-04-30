@@ -10,8 +10,6 @@ import (
 	"github.com/srand/jolt/scheduler/pkg/log"
 	"github.com/srand/jolt/scheduler/pkg/protocol"
 	"github.com/srand/jolt/scheduler/pkg/utils"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 )
 
 var mockBuildCmd = &cobra.Command{
@@ -48,18 +46,7 @@ var mockBuildCmd = &cobra.Command{
 			}
 		}
 
-		grpcHost, err := utils.ParseGrpcUrl(configData.SchedulerUri)
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		opts := grpc.WithTransportCredentials(insecure.NewCredentials())
-		conn, err := grpc.Dial(grpcHost, opts)
-		if err != nil {
-			panic(err)
-		}
-		defer conn.Close()
-
+		conn := NewSchedulerConn()
 		client := protocol.NewSchedulerClient(conn)
 
 		ctx, cancel := context.WithCancel(context.Background())

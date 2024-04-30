@@ -8,8 +8,6 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/srand/jolt/scheduler/pkg/protocol"
 	"github.com/srand/jolt/scheduler/pkg/utils"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 )
 
 var mockTaskCmd = &cobra.Command{
@@ -17,23 +15,12 @@ var mockTaskCmd = &cobra.Command{
 	Short: "Schedule task with scheduler service and then cancel it",
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		schedulerAddr, err := cmd.Flags().GetString("scheduler")
-		if err != nil {
-			panic(err)
-		}
-
 		buildId, err := cmd.Flags().GetString("build")
 		if err != nil {
 			panic(err)
 		}
 
-		opts := grpc.WithTransportCredentials(insecure.NewCredentials())
-		conn, err := grpc.Dial(schedulerAddr, opts)
-		if err != nil {
-			panic(err)
-		}
-		defer conn.Close()
-
+		conn := NewSchedulerConn()
 		client := protocol.NewSchedulerClient(conn)
 
 		ctx, cancel := context.WithCancel(context.Background())

@@ -34,8 +34,8 @@ type Worker interface {
 	// A channel where task execution requests are sent by the scheduler.
 	// The worker shall launch an executor to execute the task.
 	// The executor may execute additinonal compatible tasks.
-	Tasks() chan *Task
+	Builds() chan Build
 
 	// Post a task to the worker.
-	Post(*Task)
+	Post(Build)
 }

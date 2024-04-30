@@ -27,8 +27,8 @@ type priorityWorker struct {
 	// The scheduler that the worker belongs to.
 	scheduler *priorityScheduler
 
-	// The channel that receives tasks to be executed by the worker.
-	tasks chan *Task
+	// The channel that receives builds to be executed by the worker.
+	builds chan Build
 }
 
 // Acknowledge that the worker has received and handled the task.
@@ -45,7 +45,7 @@ func (w *priorityWorker) Cancel() {
 // Unregisters the worker from the scheduler.
 func (w *priorityWorker) Close() {
 	w.cancel()
-	close(w.tasks)
+	close(w.builds)
 	w.scheduler.removeWorker(w)
 }
 
@@ -82,17 +82,17 @@ func (w *priorityWorker) String() string {
 }
 
 // Returns a channel that receives tasks to be executed by the worker.
-func (w *priorityWorker) Tasks() chan *Task {
-	return w.tasks
+func (w *priorityWorker) Builds() chan Build {
+	return w.builds
 }
 
 // Post a task to the worker.
-func (w *priorityWorker) Post(task *Task) {
+func (w *priorityWorker) Post(build Build) {
 	defer func() {
 		if r := recover(); r != nil {
-			log.Errorf("task could not be delivered: %v", r)
+			log.Errorf("build could not be delivered: %v", r)
 		}
 	}()
 
-	w.tasks <- task
+	w.builds <- build
 }

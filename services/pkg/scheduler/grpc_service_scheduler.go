@@ -2,6 +2,7 @@ package scheduler
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/srand/jolt/scheduler/pkg/protocol"
 	"github.com/srand/jolt/scheduler/pkg/utils"
@@ -19,16 +20,18 @@ func NewSchedulerService(scheduler Scheduler) *schedulerService {
 }
 
 func (s *schedulerService) ScheduleBuild(request *protocol.BuildRequest, stream protocol.Scheduler_ScheduleBuildServer) error {
-	var build *Build
+	var build Build
 
 	id, err := utils.Sha1String(request.String())
 	if err != nil {
 		return utils.GrpcError(err)
 	}
 
-	if build = s.scheduler.GetBuild(id); build == nil {
-		build = NewBuildFromRequest(id, request)
+	if build, err = s.scheduler.GetBuild(id); err != nil {
+		build = s.scheduler.NewBuild(id, request)
 	}
+
+	fmt.Println("Build", build)
 
 	observer, err := s.scheduler.ScheduleBuild(build)
 	if err != nil {

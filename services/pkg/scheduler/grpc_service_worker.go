@@ -63,7 +63,7 @@ func (s *workerService) GetInstructions(stream protocol.Worker_GetInstructionsSe
 		}
 	}()
 
-	var currentBuild *Build
+	var currentBuild Build
 	var currentBuildCtx <-chan struct{}
 	var currentTask *Task
 
@@ -89,8 +89,8 @@ func (s *workerService) GetInstructions(stream protocol.Worker_GetInstructionsSe
 			log.Debug("Worker cancelled")
 			return nil
 
-		case task := <-worker.Tasks():
-			if task == nil {
+		case build := <-worker.Builds():
+			if build == nil {
 				return nil
 			}
 
@@ -98,21 +98,19 @@ func (s *workerService) GetInstructions(stream protocol.Worker_GetInstructionsSe
 				panic("Got a new build assignment while another build is in progress")
 			}
 
-			if task.build.IsDone() {
+			if build.IsDone() {
 				log.Debug("Got a new build assignment for a build that is already done")
-				task.Cancel()
 				worker.Acknowledge()
 				continue
 			}
 
-			currentBuild = task.build
-			currentBuildCtx = task.build.Done()
-			currentTask = task
+			currentBuild = build
+			currentBuildCtx = build.Done()
 
 			request := &protocol.WorkerRequest{
 				Action: protocol.WorkerRequest_BUILD,
 				Build: &protocol.BuildRequest{
-					Environment: currentBuild.environment,
+					Environment: currentBuild.Environment(),
 				},
 				WorkerId: worker.Id(),
 				BuildId:  currentBuild.Id(),
@@ -328,7 +326,7 @@ func (s *workerService) GetTasks(stream protocol.Worker_GetTasksServer) error {
 			}
 
 			request := &protocol.TaskRequest{
-				BuildId: currentTask.Build().id,
+				BuildId: currentTask.Build().Id(),
 				TaskId:  currentTask.Identity(),
 			}
 
