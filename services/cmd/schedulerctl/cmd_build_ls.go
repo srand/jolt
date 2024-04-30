@@ -23,7 +23,7 @@ var buildListCmd = &cobra.Command{
 		}
 
 		for index, build := range response.Builds {
-			fmt.Printf("Build %d: %s %s\n", index, build.Id, build.Status)
+			fmt.Printf("%d: %s %s %s\n", index, build.Id, build.Status, build.ScheduledAt.AsTime().Format("2006-01-02T15:04:05"))
 
 			sort.Slice(build.Tasks, func(i, j int) bool {
 				return build.Tasks[i].Name < build.Tasks[j].Name

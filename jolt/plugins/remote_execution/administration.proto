@@ -3,6 +3,7 @@ syntax = "proto3";
 option go_package = "pkg/protocol";
 
 import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
 import "jolt/common.proto";
 import "jolt/plugins/remote_execution/scheduler.proto";
 
@@ -11,20 +12,28 @@ message ListBuildsRequest {}
 
 message ListBuildsResponse {
     message Task {
+        // Task identity
         string id = 1;
 
+        // Task name
         string name = 2;
 
+        // Current status of the task
         TaskStatus status = 3;
     }
 
     message Build {
+        // Build identifier
         string id = 1;
 
         // Status
         BuildStatus status = 2;
 
+        // List of build tasks
         repeated Task tasks = 3;
+
+        // Time when build was scheduled
+        google.protobuf.Timestamp scheduledAt = 4;
     }
 
     repeated Build builds = 1;

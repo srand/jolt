@@ -11,6 +11,7 @@ import (
 	"github.com/srand/jolt/scheduler/pkg/log"
 	"github.com/srand/jolt/scheduler/pkg/protocol"
 	"github.com/srand/jolt/scheduler/pkg/utils"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type priorityUnicastCallbacks struct{}
@@ -622,9 +623,10 @@ func (s *priorityScheduler) ListBuilds() *protocol.ListBuildsResponse {
 
 	for _, build := range s.builds {
 		response.Builds = append(response.Builds, &protocol.ListBuildsResponse_Build{
-			Id:     build.Id(),
-			Status: build.Status(),
-			Tasks:  make([]*protocol.ListBuildsResponse_Task, 0, len(build.tasks)),
+			Id:          build.Id(),
+			ScheduledAt: timestamppb.New(build.scheduledAt),
+			Status:      build.Status(),
+			Tasks:       make([]*protocol.ListBuildsResponse_Task, 0, len(build.tasks)),
 		})
 
 		for _, task := range build.tasks {
