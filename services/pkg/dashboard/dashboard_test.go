@@ -64,7 +64,9 @@ func TestDashboard(t *testing.T) {
 		},
 	}
 
-	build := scheduler.NewBuildFromRequest("build1", buildR)
+	sched := scheduler.NewPriorityScheduler()
+
+	build := sched.NewBuild("id", buildR)
 	task := scheduler.NewTask(build, taskR)
 
 	d := NewDashboardTelemetryHook(c)
