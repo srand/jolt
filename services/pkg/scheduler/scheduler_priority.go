@@ -388,6 +388,8 @@ func (s *priorityScheduler) selectTaskAndWorker() {
 	s.RUnlock()
 
 	s.Lock()
+	defer s.Unlock()
+
 	// Send builds to workers
 	for _, assign := range assignments {
 		if !assign.build.HasQueuedTask() {
@@ -398,7 +400,6 @@ func (s *priorityScheduler) selectTaskAndWorker() {
 		assign.worker.Post(assign.build)
 		log.Debugf("run - build - id: %s, worker: %s", assign.build.Id(), assign.worker.Id())
 	}
-	s.Unlock()
 }
 
 // Remove a build from the ready queue.
@@ -432,10 +433,16 @@ func (s *priorityScheduler) associateExecutorWithWorker(worker Worker, executor 
 
 // Deassociate a task with a worker.
 func (s *priorityScheduler) deassociateExecutorWithWorker(worker Worker) {
+	s.RLock()
 	executor, ok := s.workerExecutors[worker]
+	s.RUnlock()
+
 	if ok {
-		delete(s.workerExecutors, worker)
 		executor.Close()
+
+		s.Lock()
+		delete(s.workerExecutors, worker)
+		s.Unlock()
 	}
 }
 
@@ -511,8 +518,9 @@ func (s *priorityScheduler) NewWorker(platform, taskPlatform *Platform) (Worker,
 
 // Release a worker back to the scheduler after it has completed a task.
 func (s *priorityScheduler) releaseWorker(worker Worker) error {
-	s.Lock()
 	s.deassociateExecutorWithWorker(worker)
+
+	s.Lock()
 	s.enqueueWorkerNoLock(worker)
 	s.Unlock()
 
@@ -524,8 +532,9 @@ func (s *priorityScheduler) releaseWorker(worker Worker) error {
 func (s *priorityScheduler) removeWorker(worker Worker) error {
 	log.Info("del - worker", worker.Id())
 
-	s.Lock()
 	s.deassociateExecutorWithWorker(worker)
+
+	s.Lock()
 	delete(s.availWorkers, worker.Id())
 	delete(s.workers, worker.Id())
 	s.Unlock()
