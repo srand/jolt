@@ -28,7 +28,7 @@ from jolt import colors
 from jolt import common_pb2 as common_pb
 
 
-current_time = datetime.now().strftime("%Y-%m-%dT%H:%M:%S.%f")
+current_time = datetime.now().strftime("%Y-%m-%dT%H%M%S.%f")
 logpath = config.get_logpath()
 logfile = fs.path.join(logpath, f"{current_time}.log")
 logcount = config.getint("jolt", "logcount", os.environ.get("JOLT_LOGCOUNT", 100))
