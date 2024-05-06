@@ -150,7 +150,7 @@ def gdb(ctx, task, default, machine_interface, no_binary, gdb_args):
             cmd += gdb_args
 
             if isinstance(goal.task, ninja.CXXProject):
-                cwd = goal.tools.builddir("ninja", incremental=True)
+                cwd = goal.tools.wsroot
             else:
                 cwd = goal.task.joltdir
 

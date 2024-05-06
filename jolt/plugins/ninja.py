@@ -210,8 +210,6 @@ class attributes:
                             tools.run("{} {}{}-p -s {covdatadir} {}",
                                       gcov, branchflag, demangleflag, infile, output_on_error=True)
 
-                        wsdir = get_workspacedir()
-
                         for file in tools.glob("^#^#*.gcov"):
                             # Patch paths in gcov files.
                             tools.replace_in_file(file, "Source:../../", "Source:")
@@ -219,7 +217,7 @@ class attributes:
 
                             # Demangle and rename files into a tree directory structure.
                             newfile = file.replace("^", "..").replace("#", os.sep)
-                            newfile = tools.expand_relpath(newfile, wsdir)
+                            newfile = tools.expand_relpath(newfile, tools.wsroot)
                             tools.mkdirname(newfile)
                             tools.move(file, newfile)
 
@@ -760,11 +758,11 @@ class GNUPCHVariables(Variable):
             "multiple precompiled headers found, only one is allowed")
 
         if len(pch) <= 0:
-            writer.variable("pch_out", "$binary.dir/")
+            writer.variable("pch_out", tools.expand_relpath("{outdir}/{binary}.dir/", tools.wsroot))
             return
 
         project._pch = fs.path.basename(pch[0])
-        project._pch_out = "$binary.dir/" + project._pch + self.gch_ext
+        project._pch_out = tools.expand_relpath("{outdir}/{binary}.dir/{_pch}" + self.gch_ext, tools.wsroot)
 
         writer.variable("pch", project._pch)
         writer.variable("pch_flags", "")
@@ -921,8 +919,8 @@ class Rule(HashInfluenceProvider):
         in_base, in_ext = fs.path.splitext(in_basename)
 
         if in_dirname and fs.path.isabs(in_dirname):
-            in_dirname_outdir = fs.path.relpath(in_dirname, project.outdir)
-            in_dirname = fs.path.relpath(in_dirname, project.joltdir)
+            in_dirname_outdir = fs.path.relpath(in_dirname, project.tools.wsroot)
+            in_dirname = fs.path.relpath(in_dirname, project.tools.wsroot)
 
         result_files = []
         for outfile in outfiles or self.outfiles:
@@ -965,17 +963,17 @@ class Rule(HashInfluenceProvider):
     def build(self, project, writer, infiles, implicit=None, implicit_outputs=None, order_only=None):
         result = []
         infiles = utils.as_list(infiles)
-        infiles_rel = [fs.path.relpath(infile, project.outdir) for infile in infiles]
+        infiles_rel = [fs.path.relpath(infile, project.tools.wsroot) for infile in infiles]
         implicit = (self.implicit or []) + (implicit or [])
         implicit_outputs = (self.implicit_outputs or []) + (implicit_outputs or [])
         order_only = (self.order_only or []) + (order_only or [])
 
         if self.aggregate:
             outfiles, variables = self._out(project, infiles[0])
-            outfiles_rel = [fs.path.relpath(outfile, project.outdir) for outfile in outfiles]
+            outfiles_rel = [fs.path.relpath(outfile, project.tools.wsroot) for outfile in outfiles]
             if implicit_outputs:
                 implicit_outfiles, _ = self._out(project, infiles[0], implicit_outputs)
-                implicit_outfiles_rel = [fs.path.relpath(outfile, project.outdir) for outfile in implicit_outfiles]
+                implicit_outfiles_rel = [fs.path.relpath(outfile, project.tools.wsroot) for outfile in implicit_outfiles]
             else:
                 implicit_outfiles_rel = []
             writer.build(outfiles_rel, self.name, infiles_rel, variables=variables, implicit=implicit, implicit_outputs=implicit_outfiles_rel, order_only=self.order_only + order_only)
@@ -983,10 +981,10 @@ class Rule(HashInfluenceProvider):
         else:
             for infile, infile_rel in zip(infiles, infiles_rel):
                 outfiles, variables = self._out(project, infile)
-                outfiles_rel = [fs.path.relpath(outfile, project.outdir) for outfile in outfiles]
+                outfiles_rel = [fs.path.relpath(outfile, project.tools.wsroot) for outfile in outfiles]
                 if implicit_outputs:
                     implicit_outfiles, _ = self._out(project, infile, implicit_outputs)
-                    implicit_outfiles_rel = [fs.path.relpath(outfile, project.outdir) for outfile in implicit_outfiles]
+                    implicit_outfiles_rel = [fs.path.relpath(outfile, project.tools.wsroot) for outfile in implicit_outfiles]
                 else:
                     implicit_outfiles_rel = []
                 writer.build(outfiles_rel, self.name, infile_rel, variables=variables, implicit=implicit, implicit_outputs=implicit_outfiles_rel, order_only=order_only)
@@ -1021,8 +1019,8 @@ class ProtobufCompiler(Rule):
             **kwargs):
         variables_final = OrderedDict([
             ("desc", "[PROTOC] {in_base}{in_ext}"),
-            ("out_depfile", "{binary}.dir/{in_base}.pb.d"),
-            ("outdir_proto", os.path.dirname(outfiles[0])),
+            ("out_depfile", "{outdir_rel}/{binary}.dir/{in_base}.pb.d"),
+            ("outdir_proto", "{outdir_rel}/{binary}.dir"),
             ("in_path_outdir", "{in_path_outdir}"),
         ])
         variables_final.update(variables or {})
@@ -1065,8 +1063,8 @@ class GRPCProtobufCompiler(ProtobufCompiler):
             variables=None,
             **kwargs):
         variables_final = {
-            "out_depfile": "{binary}.dir/{in_base}.pb.d",
-            "out_depfile_grpc": "{binary}.dir/{in_base}.grpc.pb.d",
+            "out_depfile": "{outdir_rel}/{binary}.dir/{in_base}.pb.d",
+            "out_depfile_grpc": "{outdir_rel}/{binary}.dir/{in_base}.grpc.pb.d",
         }
         variables_final.update(variables or {})
         super().__init__(command=command, depfile=depfile, outfiles=outfiles, variables=variables_final, **kwargs)
@@ -1208,7 +1206,9 @@ class FileListWriter(Rule):
     def build(self, project, writer, infiles, implicit=None, order_only=None):
         infiles = [fs.as_posix(infile) for infile in infiles] if self.posix else infiles
         file_list_path = fs.path.join(project.outdir, "{0}.list".format(self.name))
+        file_list_path = project.tools.expand_path(file_list_path)
         file_list_hash_path = fs.path.join(project.outdir, "{0}.hash".format(self.name))
+        file_list_hash_path = project.tools.expand_path(file_list_hash_path)
         data, digest = self._data(project, infiles)
         if not self._identical(file_list_path, file_list_hash_path, data, digest):
             self._write(file_list_path, file_list_hash_path, data, digest)
@@ -1291,6 +1291,7 @@ class GNUDepImporter(Rule):
         for name, artifact in deps.items():
             if artifact.cxxinfo.libpaths.items():
                 sandbox = project.tools.sandbox(artifact, project.incremental)
+                sandbox = project.tools.expand_relpath(sandbox, project.tools.wsroot)
             for lib in artifact.cxxinfo.libraries.items():
                 name = "{0}{1}{2}".format(self.prefix, lib, self.suffix)
                 for path in artifact.cxxinfo.libpaths.items():
@@ -1391,18 +1392,18 @@ class IncludePaths(Variable):
                 return tools.expand(path)
             if path[0] in ['-']:
                 path = tools.expand_path(path[1:])
-            return tools.expand_relpath(path, project.outdir)
+            return tools.expand_relpath(path, project.tools.wsroot)
 
         def expand_artifact(sandbox, path):
             if path[0] in ['=', fs.sep]:
                 return path
             if path[0] in ['-']:
                 path = fs.path.join(project.joltdir, path[1:])
-            return tools.expand_relpath(fs.path.join(sandbox, path), project.outdir)
+            return tools.expand_relpath(fs.path.join(sandbox, path), project.tools.wsroot)
 
         incpaths = []
         if self.outdir:
-            incpaths += ["$binary.dir"]
+            incpaths += [tools.expand_relpath("{outdir}/{binary}.dir", project.tools.wsroot)]
         if self.attrib:
             incpaths += [expand(path) for path in getattr(project, self.attrib)]
         if self.imported:
@@ -1431,12 +1432,13 @@ class LibraryPaths(Variable):
             return
         libpaths = []
         if self.attrib:
-            libpaths = [tools.expand_relpath(path, project.outdir) for path in getattr(project, self.attrib)]
+            libpaths = [tools.expand_relpath(path, project.tools.wsroot) for path in getattr(project, self.attrib)]
         if self.imported:
             for _, artifact in deps.items():
                 libs = artifact.cxxinfo.libpaths.items()
                 if libs:
                     sandbox = tools.sandbox(artifact, project.incremental)
+                    sandbox = tools.expand_relpath(sandbox, project.tools.wsroot)
                     libpaths += [fs.path.join(sandbox, path) for path in libs]
         libpaths = ["{0}{1}".format(self.prefix, path) for path in libpaths]
         writer.variable(self.name, " ".join(libpaths))
@@ -1499,6 +1501,7 @@ class GNUToolchain(Toolchain):
 
     joltdir = ProjectVariable()
     outdir = ProjectVariable()
+    outdir_rel = ProjectVariable()
     binary = ProjectVariable()
 
     ar = ToolEnvironmentVariable(default="ar", abspath=True)
@@ -1539,7 +1542,7 @@ class GNUToolchain(Toolchain):
     libpaths = LibraryPaths(prefix="-L")
     libraries = Libraries(prefix="-l")
 
-    mkdir_debug = MakeDirectory(name=".debug")
+    mkdir_debug = MakeDirectory(name="$outdir_rel/.debug")
 
     compile_pch = GNUCompiler(
         command="$cxxwrap $cxx -x c++-header $cxxflags $shared_flags $imported_cxxflags $extra_cxxflags $covflags $macros $incpaths -MMD -MF $out.d -c $in -o $out",
@@ -1596,34 +1599,34 @@ class GNUToolchain(Toolchain):
 
     linker = GNULinker(
         command=" && ".join([
-            "$ld $ldflags $imported_ldflags $extra_ldflags $covflags $libpaths -Wl,--start-group @objects.list -Wl,--end-group -o $out -Wl,--start-group $libraries -Wl,--end-group",
-            "$objcopy_path --only-keep-debug $out .debug/$binary",
+            "$ld $ldflags $imported_ldflags $extra_ldflags $covflags $libpaths -Wl,--start-group @$outdir_rel/objects.list -Wl,--end-group -o $out -Wl,--start-group $libraries -Wl,--end-group",
+            "$objcopy_path --only-keep-debug $out $outdir_rel/.debug/$binary",
             "$objcopy_path --strip-all $out",
-            "$objcopy_path --add-gnu-debuglink=.debug/$binary $out"
+            "$objcopy_path --add-gnu-debuglink=$outdir_rel/.debug/$binary $out"
         ]),
         infiles=[".o", ".obj", ".a"],
         outfiles=["{outdir}/{binary}"],
         variables={"desc": "[LINK] {binary}"},
-        implicit=["$ld_path", "$objcopy_path", ".debug"])
+        implicit=["$ld_path", "$objcopy_path", "$outdir_rel/.debug"])
 
     dynlinker = GNULinker(
         command=" && ".join([
-            "$ld $ldflags -shared $imported_ldflags $extra_ldflags $covflags $libpaths -Wl,--start-group @objects.list -Wl,--end-group -o $out -Wl,--start-group $libraries -Wl,--end-group",
-            "$objcopy_path --only-keep-debug $out .debug/lib$binary.so",
+            "$ld $ldflags -shared $imported_ldflags $extra_ldflags $covflags $libpaths -Wl,--start-group @$outdir_rel/objects.list -Wl,--end-group -o $out -Wl,--start-group $libraries -Wl,--end-group",
+            "$objcopy_path --only-keep-debug $out $outdir_rel/.debug/lib$binary.so",
             "$objcopy_path --strip-all $out",
-            "$objcopy_path --add-gnu-debuglink=.debug/lib$binary.so $out"
+            "$objcopy_path --add-gnu-debuglink=$outdir_rel/.debug/lib$binary.so $out"
         ]),
         infiles=[".o", ".obj", ".a"],
         outfiles=["{outdir}/lib{binary}.so"],
         variables={"desc": "[LINK] {binary}"},
-        implicit=["$ld_path", "$objcopy_path", ".debug"])
+        implicit=["$ld_path", "$objcopy_path", "$outdir_rel/.debug"])
 
     archiver = GNUArchiver(
-        command="$ar -M < objects.list && $ranlib $out",
+        command="$ar -M < $outdir_rel/objects.list && $ranlib $out",
         infiles=[".o", ".obj", ".a"],
         outfiles=["{outdir}/lib{binary}.a"],
         variables={"desc": "[AR] lib{binary}.a"},
-        implicit=["$ld_path", "$ar_path"])
+        implicit=["$ld_path", "$ar_path", "$ranlib_path"])
 
     depimport = GNUDepImporter(
         prefix="lib",
@@ -1633,14 +1636,14 @@ class GNUToolchain(Toolchain):
 class MinGWToolchain(GNUToolchain):
     linker = GNULinker(
         command=" && ".join([
-            "$ld $ldflags $imported_ldflags $extra_ldflags $libpaths -Wl,--start-group @objects.list -Wl,--end-group -o $out -Wl,--start-group $libraries -Wl,--end-group",
-            "$objcopy --only-keep-debug $out .debug/$binary.exe",
+            "$ld $ldflags $imported_ldflags $extra_ldflags $libpaths -Wl,--start-group @$outdir_rel/objects.list -Wl,--end-group -o $out -Wl,--start-group $libraries -Wl,--end-group",
+            "$objcopy --only-keep-debug $out $outdir_rel/.debug/$binary.exe",
             "$objcopy --strip-all $out",
-            "$objcopy --add-gnu-debuglink=.debug/$binary.exe $out"
+            "$objcopy --add-gnu-debuglink=$outdir_rel/.debug/$binary.exe $out"
         ]),
         outfiles=["{outdir}/{binary}.exe"],
         variables={"desc": "[LINK] {binary}"},
-        implicit=["$ld_path", "$objcopy_path", ".debug"])
+        implicit=["$ld_path", "$objcopy_path", "$outdir_rel/.debug"])
 
 
 class MSVCArchiver(Rule):
@@ -1725,14 +1728,14 @@ class MSVCToolchain(Toolchain):
     compile_proto = ProtobufCompiler(generator="cpp")
 
     linker = MSVCLinker(
-        command="$link /nologo $ldflags $extra_ldflags $libpaths @objects.list $libraries /out:$out",
+        command="$link /nologo $ldflags $extra_ldflags $libpaths @$outdir_rel/objects.list $libraries /out:$out",
         infiles=[".o", ".obj", ".lib"],
         outfiles=["{outdir}/{binary}.exe"],
         variables={"desc": "[LINK] {binary}"},
         implicit=["$link_path"])
 
     archiver = MSVCArchiver(
-        command="$lib /nologo /out:$out @objects.list",
+        command="$lib /nologo /out:$out @$outdir_rel/objects.list",
         infiles=[".o", ".obj", ".lib"],
         outfiles=["{outdir}/{binary}.lib"],
         variables={"desc": "[LIB] {binary}"},
@@ -1962,7 +1965,7 @@ class CXXProject(Task):
     def _verify_influence(self, deps, artifact, tools):
         # Verify that listed sources and their dependencies are influencing
         sources = set(self.sources + getattr(self, "headers", []))
-        with tools.cwd(self.outdir):
+        with tools.cwd(tools.wsroot):
             depfiles = [obj + ".d" for obj in getattr(self._writer, "_objects", [])]
             for depfile in depfiles:
                 try:
@@ -1976,7 +1979,7 @@ class CXXProject(Task):
                 depsrcs = data[1]
                 depsrcs = depsrcs.split()
                 depsrcs = [f.rstrip("\\").strip() for f in depsrcs]
-                depsrcs = [tools.expand_relpath(dep, self.joltdir) for dep in filter(lambda n: n, depsrcs)]
+                depsrcs = [tools.expand_relpath(dep, self.tools.wsroot) for dep in filter(lambda n: n, depsrcs)]
                 sources = sources.union(depsrcs)
         super()._verify_influence(deps, artifact, tools, sources)
 
@@ -1997,7 +2000,7 @@ class CXXProject(Task):
             if sources:
                 sandbox = tools.sandbox(artifact, self.incremental)
                 imported_sources += [
-                    tools.expand_relpath(fs.path.join(sandbox, path), self.joltdir)
+                    tools.expand_relpath(fs.path.join(sandbox, path), self.tools.wsroot)
                     for path in sources
                 ]
 
@@ -2011,10 +2014,11 @@ class CXXProject(Task):
         self.sources = sources
 
     def _write_ninja_file(self, basedir, deps, tools, filename="build.ninja"):
-        with open(fs.path.join(basedir, filename), "w") as fobj:
+        with open(tools.expand_path(fs.path.join(basedir, filename)), "w") as fobj:
             writer = ninja.Writer(fobj)
-            writer.depimports = [tools.expand_relpath(dep, self.outdir)
-                                 for dep in self.depimports]
+            writer.depimports = [
+                tools.expand_relpath(dep, tools.wsroot)
+                for dep in self.depimports]
             writer.objects = []
             writer.sources = copy.copy(self.sources)
             self._populate_rules_and_variables(writer, deps, tools)
@@ -2045,7 +2049,7 @@ def main():
         for object in objects:
             print(object)
     elif [arg for arg in sys.argv[1:] if arg == "-a"]:
-        subprocess.call(["ninja", "-v"])
+        subprocess.call(["ninja", "-f", "{outdir}/build.ninja", "-v"])
     else:
         targets = []
         for arg in sys.argv[1:]:
@@ -2055,7 +2059,7 @@ def main():
             targets.extend(matches)
         if not targets:
             return
-        subprocess.call(["ninja", "-v"] + targets)
+        subprocess.call(["ninja", "-f", "{outdir}/build.ninja",  "-v"] + targets)
 
 if __name__ == "__main__":
     main()
@@ -2064,7 +2068,8 @@ if __name__ == "__main__":
             fobj.write(
                 data.format(
                     executable=sys.executable,
-                    objects=[fs.path.relpath(o, self.outdir) for o in writer.objects]))
+                    objects=[fs.path.relpath(o, tools.wsroot) for o in writer.objects],
+                    outdir=self.outdir))
         tools.chmod(filepath, 0o777)
 
     def find_rule(self, ext):
@@ -2206,8 +2211,8 @@ if __name__ == "__main__":
         incrementally. The behavior can be changed with the ``incremental``
         class attribute.
         """
-
         self.outdir = tools.builddir("ninja", self.incremental)
+        self.outdir_rel = self.tools.expand_relpath(self.outdir, tools.wsroot)
         self._expand_headers()
         self._expand_sources(deps, tools)
         self._writer = self._write_ninja_file(self.outdir, deps, tools)
@@ -2216,7 +2221,7 @@ if __name__ == "__main__":
         threads = " -j" + threads if threads else ""
         depsfile = self._get_keepdepfile(tools)
         try:
-            tools.run("ninja{3}{2} -C {0} {1}", self.outdir, verbose, threads, depsfile)
+            tools.run("ninja{3}{2} -C {0} -f {4} {1}", tools.wsroot, verbose, threads, depsfile, fs.path.join(self.outdir, "build.ninja"), output=True)
         except JoltCommandError as e:
             with self.report() as report:
                 with utils.ignore_exception():
@@ -2225,7 +2230,7 @@ if __name__ == "__main__":
 
         if bool(getattr(self, "coverage", False)):
             self.covdatadir = tools.builddir("coverage-data")
-            with tools.cwd(self.outdir):
+            with tools.cwd(tools.wsroot):
                 for obj in getattr(self._writer, "_objects", []):
                     obj, ext = os.path.splitext(obj)
                     obj = obj + ".gcno"
@@ -2264,10 +2269,11 @@ if __name__ == "__main__":
         self._expand_headers()
         self._expand_sources(deps, tools)
         self.outdir = tools.builddir("ninja", self.incremental)
+        self.outdir_rel = self.tools.expand_relpath(self.outdir, tools.wsroot)
         writer = self._write_ninja_file(self.outdir, deps, tools)
         self._write_shell_file(self.outdir, deps, tools, writer)
         pathenv = self.outdir + os.pathsep + tools.getenv("PATH")
-        with tools.cwd(self.outdir), tools.environ(PATH=pathenv):
+        with tools.cwd(tools.wsroot), tools.environ(PATH=pathenv):
             print()
             print("Use the 'compile' command to build individual compilation targets")
             super().debugshell(deps, tools)

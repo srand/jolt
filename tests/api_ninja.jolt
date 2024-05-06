@@ -536,12 +536,12 @@ class NinjaApi(JoltTest):
         r = self.jolt("-v build lib")
         self.assertCompiled(r, "precompiled.pch")
         self.assertCompiled(r, "main.cpp")
-        self.assertIn("! lib.dir/precompiled.pch.gch", r)
+        self.assertIn("! build/ninja-lib/lib.dir/precompiled.pch.gch", r)
 
         r = self.jolt("-v build exe")
         self.assertCompiled(r, "precompiled.pch")
         self.assertCompiled(r, "main.cpp")
-        self.assertIn("! exe.dir/precompiled.pch.gch", r)
+        self.assertIn("! build/ninja-exe/exe.dir/precompiled.pch.gch", r)
 
     def test_precompiled_header_multiple(self):
         """

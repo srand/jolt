@@ -106,8 +106,8 @@ class CompDBHooks(TaskHook):
     def task_postrun(self, task, deps, tools):
         if not isinstance(task.task, ninja.CXXProject):
             return
-        with tools.cwd(task.task.outdir):
-            utils.call_and_catch(tools.run, "ninja -f build.ninja -t compdb > compile_commands.json")
+        with tools.cwd(tools.wsroot):
+            utils.call_and_catch(tools.run, "ninja -f {outdir}/build.ninja -t compdb > {outdir}/compile_commands.json")
 
     def task_postpublish(self, task, artifact, tools):
         if isinstance(task.task, ninja.CXXProject):

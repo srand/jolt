@@ -67,16 +67,16 @@ class CompDBExtension(JoltTest):
         with open(db[0]) as f:
             commands = json.load(f)
 
+        print(json.dumps(commands, indent=2))
+
         files = {fs.path.basename(command["file"]): command for command in commands}
         self.assertTrue(len(files) >= 3)
         self.assertIn("custom.x", files)
         self.assertIn("lib.cpp", files)
         self.assertIn("test.cpp", files)
 
-        self.tools.run("mkdir {}", files["test.cpp"]["directory"])
         with self.tools.cwd(files["test.cpp"]["directory"]):
-            self.tools.run("mkdir exe.dir")
-            self.tools.run("mkdir exe.dir/test")
+            self.tools.run("mkdir -p {}", fs.path.dirname(files["test.cpp"]["output"]))
             self.tools.run(files["test.cpp"]["command"])
 
         with self.tools.cwd(self.ws):
