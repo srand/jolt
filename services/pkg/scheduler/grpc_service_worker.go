@@ -65,7 +65,6 @@ func (s *workerService) GetInstructions(stream protocol.Worker_GetInstructionsSe
 
 	var currentBuild Build
 	var currentBuildCtx <-chan struct{}
-	var currentTask *Task
 
 	for {
 		select {
@@ -131,7 +130,6 @@ func (s *workerService) GetInstructions(stream protocol.Worker_GetInstructionsSe
 			case protocol.WorkerUpdate_BUILD_ENDED:
 				currentBuild = nil
 				currentBuildCtx = nil
-				currentTask = nil
 				worker.Acknowledge()
 
 			case protocol.WorkerUpdate_DEPLOY_FAILED, protocol.WorkerUpdate_EXECUTOR_FAILED:
@@ -161,7 +159,17 @@ func (s *workerService) GetInstructions(stream protocol.Worker_GetInstructionsSe
 					errType = "Worker Error"
 				}
 
-				if currentTask.PostUpdate(&protocol.TaskUpdate{
+				// Create a new executor to send the error to the build
+				var currentTask *Task
+
+				executor, err := s.scheduler.NewExecutor(worker.Id(), currentBuild.Id())
+				if err != nil {
+					log.Errorf("err - executor - failed to enlist: %v - build_id: %s", err, currentBuild.Id())
+				} else {
+					currentTask = <-executor.Tasks()
+				}
+
+				if currentTask != nil && currentTask.PostUpdate(&protocol.TaskUpdate{
 					Status: protocol.TaskStatus_TASK_ERROR,
 					Request: &protocol.TaskRequest{
 						BuildId: currentBuild.Id(),
@@ -223,10 +231,13 @@ func (s *workerService) GetInstructions(stream protocol.Worker_GetInstructionsSe
 					}
 				}
 
+				if executor != nil {
+					executor.Close()
+				}
+
 				currentBuild.Cancel()
 				currentBuild = nil
 				currentBuildCtx = nil
-				currentTask = nil
 
 				// Ready to accept new work
 				worker.Acknowledge()
