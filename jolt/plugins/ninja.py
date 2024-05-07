@@ -2006,7 +2006,7 @@ class CXXProject(Task):
             if sources:
                 sandbox = tools.sandbox(artifact, self.incremental)
                 imported_sources += [
-                    tools.expand_relpath(fs.path.join(sandbox, path), self.tools.wsroot)
+                    tools.expand_relpath(fs.path.join(sandbox, path), self.joltdir)
                     for path in sources
                 ]
 
