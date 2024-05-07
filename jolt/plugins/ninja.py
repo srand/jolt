@@ -1974,15 +1974,19 @@ class CXXProject(Task):
                     data = tools.read_file(depfile)
                 except Exception:
                     continue
-                data = data.split(":", 1)
-                if len(data) <= 1:
-                    continue
 
-                depsrcs = data[1]
-                depsrcs = depsrcs.split()
-                depsrcs = [f.rstrip("\\").strip() for f in depsrcs]
-                depsrcs = [tools.expand_relpath(dep, self.joltdir) for dep in filter(lambda n: n, depsrcs)]
-                sources = sources.union(depsrcs)
+                data = data.replace("\\\n", "")
+                for depline in data.splitlines():
+                    depline = depline.strip()
+                    depline = depline.split(":", 1)
+                    if len(depline) <= 1:
+                        continue
+
+                    inputs = depline[1]
+                    inputs = inputs.replace("\\ ", "\x00")
+                    inputs = [dep.strip().replace("\x00", " ") for dep in inputs.split()]
+                    inputs = [tools.expand_relpath(input, self.joltdir) for input in filter(lambda n: n, inputs)]
+                    sources = sources.union(inputs)
         super()._verify_influence(deps, artifact, tools, sources)
 
     def _expand_headers(self):
