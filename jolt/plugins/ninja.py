@@ -4,6 +4,7 @@ import copy
 import functools
 from ninja import ninja_syntax as ninja
 import os
+import re
 import sys
 
 from jolt.tasks import Task, attributes as task_attributes
@@ -202,24 +203,25 @@ class attributes:
                     with tools.cwd(self.covdatadir):
                         datafiles = tools.glob("**/*.gcda")
 
-                    with tools.cwd(tools.builddir("coverage-report-gcov")):
+                    reportdir = tools.builddir("coverage-report-gcov")
+
+                    with tools.cwd(tools.wsroot):
                         for file in datafiles:
                             infile = os.path.join(self.covdatadir, file)
                             branchflag = "-b " if bool(getattr(self, "gcov_branches", branches)) else ""
                             demangleflag = "-m " if bool(getattr(self, "gcov_demangle", demangle)) else ""
-                            tools.run("{} {}{}-p -s {covdatadir} {}",
-                                      gcov, branchflag, demangleflag, infile, output_on_error=True)
-
-                        for file in tools.glob("^#^#*.gcov"):
-                            # Patch paths in gcov files.
-                            tools.replace_in_file(file, "Source:../../", "Source:")
-                            tools.replace_in_file(file, self.covdatadir, "")
-
-                            # Demangle and rename files into a tree directory structure.
-                            newfile = file.replace("^", "..").replace("#", os.sep)
-                            newfile = tools.expand_relpath(newfile, tools.wsroot)
-                            tools.mkdirname(newfile)
-                            tools.move(file, newfile)
+                            output = tools.run(
+                                "{} {}{}-t -p -s {covdatadir} {}",
+                                gcov, branchflag, demangleflag, infile, output_on_error=True)
+                            output = output.replace(self.covdatadir, "")
+                            source = re.search(r"0:Source:(.*)", output)
+                            if not source:
+                                self.warning(f"No source file found in gcov output for {file}")
+                                continue
+                            report = source.group(1) + ".gcov"
+                            report_path = os.path.join(reportdir, report)
+                            tools.mkdirname(report_path)
+                            tools.write_file(report_path, output, expand=False)
 
                 @utils.cached.instance
                 def publish_coverage_data(self, artifact, tools):
