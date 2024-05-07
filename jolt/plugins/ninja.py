@@ -2225,9 +2225,19 @@ if __name__ == "__main__":
         verbose = " -v" if log.is_verbose() else ""
         threads = config.get("jolt", "threads", tools.getenv("JOLT_THREADS", None))
         threads = " -j" + threads if threads else ""
+        keep_going = " -k 0" if config.get_keep_going() else ""
         depsfile = self._get_keepdepfile(tools)
         try:
-            tools.run("ninja{3}{2} -C {0} -f {4} {1}", tools.wsroot, verbose, threads, depsfile, fs.path.join(self.outdir, "build.ninja"), output=True)
+            tools.run(
+                "ninja{3}{2}{5} -C {0} -f {4} {1}",
+                tools.wsroot,
+                verbose,
+                threads,
+                depsfile,
+                fs.path.join(self.outdir, "build.ninja"),
+                keep_going,
+                output=True,
+            )
         except JoltCommandError as e:
             with self.report() as report:
                 with utils.ignore_exception():

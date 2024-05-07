@@ -299,6 +299,9 @@ def build(ctx, task, network, keep_going, default, local,
         if upload:
             _upload = True
 
+    if keep_going:
+        config.set_keep_going(True)
+
     options = JoltOptions(
         network=network,
         local=local,

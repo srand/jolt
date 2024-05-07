@@ -232,6 +232,14 @@ def get_shell():
     return get("jolt", "shell", cmd)
 
 
+def get_keep_going():
+    return getboolean("params", "keep_going", False)
+
+
+def set_keep_going(value=False):
+    return set("params", "keep_going", str(value).lower())
+
+
 def set(section, key, value, alias=None):
     _config.set(section, key, value, alias or "user")
 

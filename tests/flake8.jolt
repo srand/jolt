@@ -1,6 +1,7 @@
 from jolt import *
+from jolt.plugins import git
 
-
+@git.influence("..")
 class Flake8(Task):
     def run(self, deps, tools):
         with tools.cwd(".."):

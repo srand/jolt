@@ -877,3 +877,64 @@ class NinjaApi(JoltTest):
             self.tools.write_file("lib.cpp", "int func() {{return 1;}}")
         with self.assertRaises(Exception):
             self.build("run")
+
+
+    def test_keep_going(self):
+        """
+        --- file: lib0.cpp
+        int func() {{return 0;}}
+        --- file: lib1.cpp
+        int func() {{return 0;}}
+        --- file: lib2.cpp
+        int func() {{return 0;}}
+        --- file: lib3.cpp
+        int func() {{return 0;}}
+        --- file: lib4.cpp
+        int func() {{return 0;}}
+        --- file: lib5.cpp
+        int func() {{return 0;}}
+        --- file: lib6.cpp
+        int func() {{return 0;}}
+        --- file: lib7.cpp
+        int func() {{return 0;}}
+        --- file: lib8.cpp
+        int func() {{return 0;}}
+        --- file: lib9.cpp
+        int func() {{return 0;}}
+        --- file: lib10.cpp
+        int func() {{return 0;}}
+        --- file: lib11.cpp
+        int func() {{return 0;}}
+        --- file: lib12.cpp
+        int func() {{return 0;}}
+        --- file: lib13.cpp
+        int func() {{return 0;}}
+        --- file: lib14.cpp
+        int func() {{return 0;}}
+        --- file: lib15.cpp
+        int func() {{return 0;}}
+        --- file: lib16.cpp
+        int func() {{return 0;}}
+        --- file: lib17.cpp
+        int func() {{return 0;}}
+        --- file: lib18.cpp
+        int func() {{return 0;}}
+        --- file: lib19.cpp
+        #error "lib19.cpp"
+
+        --- tasks:
+        class Lib(CXXLibrary):
+            sources = ["lib*.cpp"]
+        ---
+        """
+        with self.assertRaises(Exception):
+            self.build("lib -k")
+        r = self.lastLog()
+
+        assert all([f"lib{i}.cpp" in r for i in range(19)])
+
+        with self.assertRaises(Exception):
+            self.build("lib")
+        r = self.lastLog()
+
+        assert not all([f"lib{i}.cpp" in r for i in range(19)])
