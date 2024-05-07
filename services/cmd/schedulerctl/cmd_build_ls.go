@@ -7,6 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/srand/jolt/scheduler/pkg/protocol"
+	"google.golang.org/grpc"
 )
 
 var buildListCmd = &cobra.Command{
@@ -16,8 +17,10 @@ var buildListCmd = &cobra.Command{
 		ctx, cancel := DefaultDeadlineContext()
 		defer cancel()
 
+		maxSizeOption := grpc.MaxCallRecvMsgSize(32 * 10e6)
+
 		client := NewAdminClient()
-		response, err := client.ListBuilds(ctx, &protocol.ListBuildsRequest{})
+		response, err := client.ListBuilds(ctx, &protocol.ListBuildsRequest{}, maxSizeOption)
 		if err != nil {
 			log.Fatal(err)
 		}
