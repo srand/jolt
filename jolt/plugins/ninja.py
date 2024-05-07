@@ -1981,7 +1981,7 @@ class CXXProject(Task):
                 depsrcs = data[1]
                 depsrcs = depsrcs.split()
                 depsrcs = [f.rstrip("\\").strip() for f in depsrcs]
-                depsrcs = [tools.expand_relpath(dep, self.tools.wsroot) for dep in filter(lambda n: n, depsrcs)]
+                depsrcs = [tools.expand_relpath(dep, self.joltdir) for dep in filter(lambda n: n, depsrcs)]
                 sources = sources.union(depsrcs)
         super()._verify_influence(deps, artifact, tools, sources)
 
