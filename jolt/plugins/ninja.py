@@ -1502,6 +1502,7 @@ class GNUToolchain(Toolchain):
     bin = Skip(infiles=[".dll", ".elf", ".exe", ".out", ".so"])
 
     joltdir = ProjectVariable()
+    builddir = ProjectVariable(attrib="outdir")
     outdir = ProjectVariable()
     outdir_rel = ProjectVariable()
     binary = ProjectVariable()
@@ -1672,6 +1673,7 @@ class MSVCToolchain(Toolchain):
     hh = Skip(infiles=[".h", ".hh", ".hpp", ".hxx"])
     bin = Skip(infiles=[".dll", ".exe"])
 
+    builddir = ProjectVariable(attrib="outdir")
     joltdir = ProjectVariable()
     outdir = ProjectVariable()
     binary = ProjectVariable()
