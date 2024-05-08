@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -174,7 +175,6 @@ func (w *worker) run() error {
 					clientWsName = request.Build.Environment.Workspace.Name
 				}
 
-				log.Info("Deploying client", request.Build.Environment.Client)
 				clientDigest, err := w.deployClient(request.Build.Environment.Client, request.Build.Environment.Workspace)
 				if err != nil {
 					log.Error("Failed to deploy client:", err)
@@ -257,6 +257,8 @@ func (w *worker) deployClient(client *protocol.Client, workspace *protocol.Works
 	if client == nil {
 		return "", errors.New("Client information is missing")
 	}
+
+	log.Info("Deploying client", client)
 
 	clientWs := workspace.Rootdir
 
@@ -375,6 +377,19 @@ func (w *worker) activateVEnvPath(clientDigest string) string {
 	return filepath.Join(w.cwd, w.vEnvPath(clientDigest), "bin", "activate")
 }
 
+func (w *worker) nixWrapperCmd(clientWsName string, cmdline []string) ([]string, error) {
+	if runtime.GOOS == "windows" {
+		return nil, errors.New("nix-shell is not supported on Windows")
+	}
+
+	if _, err := os.Stat(filepath.Join(w.cwd, clientWsName, "shell.nix")); err != nil {
+		return nil, err
+	}
+
+	log.Info("Running in nix-shell:", cmdline)
+	return []string{"nix-shell", "--pure", "--run", strings.Join(cmdline, " ")}, nil
+}
+
 // If bubblewrap is installed, returns a command prefix that
 // will setup a namespace with workspace and cache mounted
 // at the same paths as on the client.
@@ -461,7 +476,7 @@ func (w *worker) startExecutor(clientDigest, clientWs, clientWsName, clientCache
 
 	// Build bubblewrap command prefix to run the executor in a namespace.
 	// If a namespace cannot be used, the command prefix will be empty.
-	cmd, config := w.nsWrapperCmd(clientWs, clientCache)
+	nsCmd, config := w.nsWrapperCmd(clientWs, clientCache)
 
 	// Build the executor command.
 	jolt := []string{"jolt", "-vv"}
@@ -470,8 +485,17 @@ func (w *worker) startExecutor(clientDigest, clientWs, clientWsName, clientCache
 	}
 	jolt = append(jolt, "executor", "-w", worker, "-b", build, request)
 
+	// If the client has a shell.nix file, run the executor in a nix-shell.
+	cmd, err := w.nixWrapperCmd(clientWsName, jolt)
+	if err != nil {
+		// Otherwise, run the executor in a virtualenv.
+		cmd = []string{"/bin/sh", "-c", fmt.Sprintf(". %s && %s", activate, strings.Join(jolt, " "))}
+	}
+
 	// Run the executor in a namespace if possible.
-	cmd = append(cmd, "/bin/sh", "-c", fmt.Sprintf(". %s && %s", activate, strings.Join(jolt, " ")))
+	cmd = append(nsCmd, cmd...)
+
+	// Go
 	return utils.RunOptions(filepath.Join(w.cwd, clientWsName), cmd...)
 }
 
