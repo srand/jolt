@@ -15,6 +15,7 @@ from jolt import log
 from jolt import utils
 from jolt.manifest import ManifestExtension
 from jolt.manifest import ManifestExtensionRegistry
+from jolt.tools import Tools
 
 
 class Recipe(object):
@@ -362,10 +363,28 @@ def get_workspacedir():
 
 def export_workspace(tasks=None):
     loader = JoltLoader.get()
+    tools = Tools()
+    tree = None
+
+    # Push workspace to remote cache if possiblefstree
+    if tools.which("fstree"):
+        address = config.geturi("cache", "grpc_uri", "tcp://cache:9090")
+        raise_error_if(address.scheme not in ["tcp"], "Invalid scheme in cache gRPC URI config: {}", address.scheme)
+        raise_error_if(not address.netloc, "Invalid network address in cache gRPC URI config: {}", address.netloc)
+        if address:
+            with tools.cwd(loader.workspace_path):
+                log.info("Pushing {} to remote cache", tools.getcwd())
+                tree = tools.run(
+                    "fstree write-tree-push --cache {} --remote {}",
+                    config.get_cachedir(),
+                    address.geturl(),
+                    output_on_error=True)
+
     workspace = common_pb.Workspace(
         cachedir=config.get_cachedir(),
         rootdir=loader.workspace_path,
         name=loader.workspace_name,
+        tree=tree,
     )
 
     for recipe in loader.recipes:

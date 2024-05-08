@@ -149,6 +149,31 @@ func (w *worker) run() error {
 					panic(err)
 				}
 
+				var clientWsName string
+
+				if request.Build.Environment.Workspace.Tree != "" {
+					log.Info("Deploying workspace tree", request.Build.Environment.Workspace.Tree, "for", request.Build.Environment.Workspace.Name)
+					err = w.runCmd(
+						request.Build.Environment.Workspace.Rootdir,
+						"fstree",
+						"pull-checkout",
+						"--cache",
+						w.config.CacheDir,
+						"--remote",
+						w.config.CacheGrpcUri,
+						request.Build.Environment.Workspace.Tree,
+						request.Build.Environment.Workspace.Name,
+					)
+					if err != nil {
+						log.Error("Failed to deploy workspace tree:", err)
+						reply(protocol.WorkerUpdate_DEPLOY_FAILED, err)
+						os.RemoveAll(currentBuildFile)
+						continue
+					}
+
+					clientWsName = request.Build.Environment.Workspace.Name
+				}
+
 				log.Info("Deploying client", request.Build.Environment.Client)
 				clientDigest, err := w.deployClient(request.Build.Environment.Client, request.Build.Environment.Workspace)
 				if err != nil {
@@ -161,7 +186,7 @@ func (w *worker) run() error {
 				clientCache := request.Build.Environment.Workspace.Cachedir
 				clientWs := request.Build.Environment.Workspace.Rootdir
 
-				currentCmd, currentProc, err = w.startExecutor(clientDigest, clientWs, clientCache, request.WorkerId, request.BuildId, currentBuildFile)
+				currentCmd, currentProc, err = w.startExecutor(clientDigest, clientWs, clientWsName, clientCache, request.WorkerId, request.BuildId, currentBuildFile)
 				if err != nil {
 					reply(protocol.WorkerUpdate_EXECUTOR_FAILED, err)
 					os.RemoveAll(currentBuildFile)
@@ -347,7 +372,7 @@ func (w *worker) vEnvPath(clientDigest string) string {
 }
 
 func (w *worker) activateVEnvPath(clientDigest string) string {
-	return filepath.Join(w.vEnvPath(clientDigest), "bin", "activate")
+	return filepath.Join(w.cwd, w.vEnvPath(clientDigest), "bin", "activate")
 }
 
 // If bubblewrap is installed, returns a command prefix that
@@ -431,7 +456,7 @@ func (w *worker) runClientCmd(clientDigest, clientWs string, args ...string) err
 	return w.runCmd(clientWs, cmd...)
 }
 
-func (w *worker) startExecutor(clientDigest, clientWs, clientCache, worker, build, request string) (chan error, *os.Process, error) {
+func (w *worker) startExecutor(clientDigest, clientWs, clientWsName, clientCache, worker, build, request string) (chan error, *os.Process, error) {
 	activate := w.activateVEnvPath(clientDigest)
 
 	// Build bubblewrap command prefix to run the executor in a namespace.
@@ -447,7 +472,7 @@ func (w *worker) startExecutor(clientDigest, clientWs, clientCache, worker, buil
 
 	// Run the executor in a namespace if possible.
 	cmd = append(cmd, "/bin/sh", "-c", fmt.Sprintf(". %s && %s", activate, strings.Join(jolt, " ")))
-	return utils.RunOptions(w.cwd, cmd...)
+	return utils.RunOptions(filepath.Join(w.cwd, clientWsName), cmd...)
 }
 
 func (w *worker) enlist(stream protocol.Worker_GetInstructionsClient) error {

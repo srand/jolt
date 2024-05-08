@@ -74,6 +74,7 @@ var rootCmd = &cobra.Command{
 func main() {
 	rootCmd.Flags().StringP("cache-dir", "d", "", "Cache directory")
 	rootCmd.Flags().StringP("cache-uri", "u", "http://cache", "Cache service URI")
+	rootCmd.Flags().StringP("cache-grpc-uri", "g", "tcp://cache:9090", "Cache service gRPC URI")
 	rootCmd.Flags().StringSliceP("platform", "p", []string{}, "Platform property (repeatable)")
 	rootCmd.Flags().StringSliceP("task-platform", "t", []string{}, "Task platform property (repeatable)")
 	rootCmd.Flags().StringP("scheduler-uri", "s", "tcp://scheduler:9090", "Scheduler service URI")
@@ -81,6 +82,7 @@ func main() {
 
 	viper.BindPFlag("cache_dir", rootCmd.Flags().Lookup("cache-dir"))
 	viper.BindPFlag("cache_uri", rootCmd.Flags().Lookup("cache-uri"))
+	viper.BindPFlag("cache_grpc_uri", rootCmd.Flags().Lookup("cache-grpc-uri"))
 	viper.BindPFlag("platform", rootCmd.Flags().Lookup("platform"))
 	viper.BindPFlag("task_platform", rootCmd.Flags().Lookup("task-platform"))
 	viper.BindPFlag("scheduler_uri", rootCmd.Flags().Lookup("scheduler-uri"))
