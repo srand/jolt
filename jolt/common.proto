@@ -170,6 +170,10 @@ message Workspace {
 
     // List of projects to load tasks from.
     repeated Project projects = 4;
+
+    // Name of the workspace.
+    // May affect where on a worker the workspace is materialized.
+    string name = 5;
 }
 
 // Description of the Jolt client that initiated the build.

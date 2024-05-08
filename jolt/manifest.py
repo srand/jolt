@@ -113,6 +113,7 @@ class _JoltNetworkParameter(SubElement):
 @Attribute("stderr", child=True, zlib=True)
 @Attribute("result", child=True)
 @Attribute("duration", child=True)
+@Attribute("name")
 @Attribute("workspace")
 @Attribute("version")
 @Composition(_JoltRecipe, "recipe")
@@ -127,14 +128,23 @@ class JoltManifest(ElementTree):
         self._elem = self.getroot()
         self.path = None
 
-    @property
-    def joltdir(self):
+    def is_valid(self):
+        return self.path is not None
+
+    def get_workspace_path(self):
         if self.path is None:
             return None
         joltdir = fs.path.dirname(self.path)
         if self.workspace:
             joltdir = fs.path.normpath(fs.path.join(joltdir, self.workspace))
         return joltdir
+
+    def get_workspace_name(self):
+        if self.name:
+            return self.name
+        if self.path is None:
+            return None
+        return fs.path.basename(fs.path.dirname(self.path))
 
     @property
     def attrib(self):
@@ -256,6 +266,8 @@ class ManifestExtensionRegistry(object):
 
     @staticmethod
     def import_manifest(manifest):
+        if not manifest.is_valid():
+            return
         for extension, _ in ManifestExtensionRegistry.extensions:
             extension.import_manifest(manifest)
 

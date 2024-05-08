@@ -132,6 +132,7 @@ class JoltLoader(object):
         self._project_modules = {}
         self._project_recipes = {}
         self._project_resources = {}
+        self._workspace_name = None
 
     def _add_project_module(self, project, src):
         modules = self._project_modules.get(project, [])
@@ -174,7 +175,7 @@ class JoltLoader(object):
                     attributes.requires("_resources")(task)
                 self._tasks += recipe.tasks
 
-    def _find_joltdir(self, searchdir):
+    def _find_workspace_path(self, searchdir):
         for factory in _loaders:
             loader = factory().create(searchdir)
             if loader.recipes:
@@ -184,16 +185,16 @@ class JoltLoader(object):
         if searchdir == parentdir:
             return os.getcwd()
 
-        return self._find_joltdir(parentdir)
+        return self._find_workspace_path(parentdir)
 
     def _get_searchpaths(self):
-        return [self.joltdir]
+        return [self.workspace_path]
 
     def load(self, manifest=None):
-        if not self.joltdir:
-            self.set_joltdir(self._find_joltdir(os.getcwd()))
+        if not self.workspace_path:
+            self.set_workspace_path(self._find_workspace_path(os.getcwd()))
 
-        if not self.joltdir:
+        if not self.workspace_path:
             return []
 
         for searchpath in self._get_searchpaths():
@@ -249,9 +250,20 @@ class JoltLoader(object):
     def joltdir(self):
         return self._path
 
-    def set_joltdir(self, value):
-        if not self._path or len(value) < len(self._path):
-            self._path = os.path.normpath(value) if value is not None else None
+    @property
+    def workspace_name(self):
+        return self._workspace_name or os.path.basename(self.workspace_path)
+
+    def set_workspace_name(self, name):
+        self._workspace_name = name
+
+    @property
+    def workspace_path(self):
+        return self._path
+
+    def set_workspace_path(self, path):
+        if not self._path or len(path) < len(self._path):
+            self._path = os.path.normpath(path) if path is not None else None
 
 
 class RecipeExtension(ManifestExtension):
@@ -285,7 +297,8 @@ class RecipeExtension(ManifestExtension):
 
     def import_manifest(self, manifest):
         loader = JoltLoader.get()
-        loader.set_joltdir(manifest.joltdir)
+        loader.set_workspace_path(manifest.get_workspace_path() or os.getcwd())
+        loader.set_workspace_name(manifest.get_workspace_name())
 
         for recipe in manifest.recipes:
             recipe = Recipe(recipe.path, source=recipe.source)
@@ -306,11 +319,12 @@ class RecipeExtension(ManifestExtension):
 
             for module in project.modules:
                 loader._add_project_module(project.name, module.src)
-                sys.path.append(fs.path.join(manifest.joltdir, module.src))
+                sys.path.append(fs.path.join(manifest.get_workspace_path(), module.src))
 
     def import_protobuf(self, buildenv):
         loader = JoltLoader.get()
-        loader.set_joltdir(os.getcwd())
+        loader.set_workspace_path(os.getcwd())
+        loader.set_workspace_name(buildenv.workspace.name)
 
         # Write .jolt files into workspace
         for file in buildenv.workspace.files:
@@ -334,14 +348,14 @@ class RecipeExtension(ManifestExtension):
 
             for path in project.paths:
                 loader._add_project_module(project.name, path.path)
-                sys.path.append(fs.path.join(loader.joltdir, path.path))
+                sys.path.append(fs.path.join(loader.workspace_path, path.path))
 
 
 ManifestExtensionRegistry.add(RecipeExtension())
 
 
 def get_workspacedir():
-    workspacedir = JoltLoader.get().joltdir
+    workspacedir = JoltLoader.get().workspace_path
     assert workspacedir is not None, "No workspace present"
     return workspacedir
 
@@ -350,7 +364,8 @@ def export_workspace(tasks=None):
     loader = JoltLoader.get()
     workspace = common_pb.Workspace(
         cachedir=config.get_cachedir(),
-        rootdir=loader.joltdir,
+        rootdir=loader.workspace_path,
+        name=loader.workspace_name,
     )
 
     for recipe in loader.recipes:

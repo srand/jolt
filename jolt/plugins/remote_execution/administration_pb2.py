@@ -12,10 +12,12 @@ _sym_db = _symbol_database.Default()
 
 
 from google.protobuf import empty_pb2 as google_dot_protobuf_dot_empty__pb2
+from google.protobuf import timestamp_pb2 as google_dot_protobuf_dot_timestamp__pb2
+from jolt import common_pb2 as jolt_dot_common__pb2
 from jolt.plugins.remote_execution import scheduler_pb2 as jolt_dot_plugins_dot_remote__execution_dot_scheduler__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n2jolt/plugins/remote_execution/administration.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a-jolt/plugins/remote_execution/scheduler.proto\"\x13\n\x11ListBuildsRequest\"T\n\x12ListBuildsResponse\x12)\n\x06\x62uilds\x18\x01 \x03(\x0b\x32\x19.ListBuildsResponse.Build\x1a\x13\n\x05\x42uild\x12\n\n\x02id\x18\x01 \x01(\t\"\x14\n\x12ListWorkersRequest\"\x15\n\x13ListWorkersResponse2\xf9\x01\n\x0e\x41\x64ministration\x12\x38\n\x0b\x43\x61ncelBuild\x12\x13.CancelBuildRequest\x1a\x14.CancelBuildResponse\x12\x35\n\nListBuilds\x12\x12.ListBuildsRequest\x1a\x13.ListBuildsResponse\x12\x38\n\x0bListWorkers\x12\x13.ListWorkersRequest\x1a\x14.ListWorkersResponse\x12<\n\nReschedule\x12\x16.google.protobuf.Empty\x1a\x16.google.protobuf.EmptyB\x0eZ\x0cpkg/protocolb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n2jolt/plugins/remote_execution/administration.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x11jolt/common.proto\x1a-jolt/plugins/remote_execution/scheduler.proto\"\x13\n\x11ListBuildsRequest\"\x8c\x02\n\x12ListBuildsResponse\x12)\n\x06\x62uilds\x18\x01 \x03(\x0b\x32\x19.ListBuildsResponse.Build\x1a=\n\x04Task\x12\n\n\x02id\x18\x01 \x01(\t\x12\x0c\n\x04name\x18\x02 \x01(\t\x12\x1b\n\x06status\x18\x03 \x01(\x0e\x32\x0b.TaskStatus\x1a\x8b\x01\n\x05\x42uild\x12\n\n\x02id\x18\x01 \x01(\t\x12\x1c\n\x06status\x18\x02 \x01(\x0e\x32\x0c.BuildStatus\x12\'\n\x05tasks\x18\x03 \x03(\x0b\x32\x18.ListBuildsResponse.Task\x12/\n\x0bscheduledAt\x18\x04 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\"\x14\n\x12ListWorkersRequest\"\x15\n\x13ListWorkersResponse2\xf9\x01\n\x0e\x41\x64ministration\x12\x38\n\x0b\x43\x61ncelBuild\x12\x13.CancelBuildRequest\x1a\x14.CancelBuildResponse\x12\x35\n\nListBuilds\x12\x12.ListBuildsRequest\x1a\x13.ListBuildsResponse\x12\x38\n\x0bListWorkers\x12\x13.ListWorkersRequest\x1a\x14.ListWorkersResponse\x12<\n\nReschedule\x12\x16.google.protobuf.Empty\x1a\x16.google.protobuf.EmptyB\x0eZ\x0cpkg/protocolb\x06proto3')
 
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, globals())
 _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'jolt.plugins.remote_execution.administration_pb2', globals())
@@ -23,16 +25,18 @@ if _descriptor._USE_C_DESCRIPTORS == False:
 
   DESCRIPTOR._options = None
   DESCRIPTOR._serialized_options = b'Z\014pkg/protocol'
-  _LISTBUILDSREQUEST._serialized_start=130
-  _LISTBUILDSREQUEST._serialized_end=149
-  _LISTBUILDSRESPONSE._serialized_start=151
-  _LISTBUILDSRESPONSE._serialized_end=235
-  _LISTBUILDSRESPONSE_BUILD._serialized_start=216
-  _LISTBUILDSRESPONSE_BUILD._serialized_end=235
-  _LISTWORKERSREQUEST._serialized_start=237
-  _LISTWORKERSREQUEST._serialized_end=257
-  _LISTWORKERSRESPONSE._serialized_start=259
-  _LISTWORKERSRESPONSE._serialized_end=280
-  _ADMINISTRATION._serialized_start=283
-  _ADMINISTRATION._serialized_end=532
+  _LISTBUILDSREQUEST._serialized_start=182
+  _LISTBUILDSREQUEST._serialized_end=201
+  _LISTBUILDSRESPONSE._serialized_start=204
+  _LISTBUILDSRESPONSE._serialized_end=472
+  _LISTBUILDSRESPONSE_TASK._serialized_start=269
+  _LISTBUILDSRESPONSE_TASK._serialized_end=330
+  _LISTBUILDSRESPONSE_BUILD._serialized_start=333
+  _LISTBUILDSRESPONSE_BUILD._serialized_end=472
+  _LISTWORKERSREQUEST._serialized_start=474
+  _LISTWORKERSREQUEST._serialized_end=494
+  _LISTWORKERSRESPONSE._serialized_start=496
+  _LISTWORKERSRESPONSE._serialized_end=517
+  _ADMINISTRATION._serialized_start=520
+  _ADMINISTRATION._serialized_end=769
 # @@protoc_insertion_point(module_scope)
