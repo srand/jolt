@@ -133,6 +133,7 @@ class JoltLoader(object):
         self._project_modules = {}
         self._project_recipes = {}
         self._project_resources = {}
+        self._build_path = None
         self._workspace_name = None
 
     def _add_project_module(self, project, src):
@@ -266,6 +267,14 @@ class JoltLoader(object):
         if not self._path or len(path) < len(self._path):
             self._path = os.path.normpath(path) if path is not None else None
 
+    @property
+    def build_path(self):
+        return self._build_path or os.path.join(self.workspace_path, "build")
+
+    def set_build_path(self, path):
+        self._build_path = os.path.normpath(os.path.join(self.workspace_path, path))
+        log.debug("Jolt build path: {}", self._build_path)
+
 
 class RecipeExtension(ManifestExtension):
     def export_manifest(self, manifest, tasks):
@@ -300,6 +309,8 @@ class RecipeExtension(ManifestExtension):
         loader = JoltLoader.get()
         loader.set_workspace_path(manifest.get_workspace_path() or os.getcwd())
         loader.set_workspace_name(manifest.get_workspace_name())
+        if manifest.build:
+            loader.set_build_path(manifest.build)
 
         for recipe in manifest.recipes:
             recipe = Recipe(recipe.path, source=recipe.source)

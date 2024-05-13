@@ -163,7 +163,7 @@ def cli(ctx, verbose, config_file, debugger, profile,
 
     if ctx.invoked_subcommand in ["build", "clean"] and loader.joltdir:
         ctx.obj["workspace_lock"] = utils.LockFile(
-            fs.path.join(loader.joltdir, "build"),
+            loader.build_path,
             log.info, "Workspace is locked by another process, please wait...")
         atexit.register(ctx.obj["workspace_lock"].close)
 

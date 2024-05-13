@@ -636,7 +636,8 @@ class Tools(object):
     @property
     def buildroot(self):
         """ Return the root path of all build directories """
-        return fs.path.normpath(fs.path.join(self.wsroot, "build"))
+        from jolt.loader import JoltLoader
+        return fs.path.normpath(JoltLoader.get().build_path)
 
     def checksum_file(self, filelist, concat=False, hashfn=hashlib.sha1, filterfn=None):
         """ Calculate a checksum of one or multiple files.
