@@ -18,6 +18,15 @@ class SymlinkTaskHooks(TaskHook):
         self._path = config.get("symlinks", "path", "artifacts")
         raise_error_if(not self._path, "symlinks.path not configured")
 
+    @property
+    def rootpath(self):
+        return fs.path.normpath(
+            fs.path.join(
+                fs.path.dirname(loader.JoltLoader.get().build_path),
+                self._path
+            )
+        )
+
     def task_finished(self, task):
         if not task.has_artifact():
             return
@@ -26,14 +35,12 @@ class SymlinkTaskHooks(TaskHook):
             srcpath = artifact.final_path
             if artifact.name == "main":
                 destpath = fs.path.join(
-                    loader.get_workspacedir(),
-                    self._path,
+                    self.rootpath,
                     utils.canonical(task.short_qualified_name),
                 )
             else:
                 destpath = fs.path.join(
-                    loader.get_workspacedir(),
-                    self._path,
+                    self.rootpath,
                     artifact.name + "@" + utils.canonical(task.short_qualified_name),
                 )
 
