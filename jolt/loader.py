@@ -386,9 +386,10 @@ def export_workspace(tasks=None):
             with tools.cwd(loader.workspace_path):
                 log.info("Pushing {} to remote cache", tools.getcwd())
                 tree = tools.run(
-                    "fstree write-tree-push --cache {} --remote {}",
+                    "fstree write-tree-push --cache {} --index .jolt/index --remote {} --threads {}",
                     config.get_cachedir(),
                     address.geturl(),
+                    tools.thread_count(),
                     output_on_error=True)
 
     workspace = common_pb.Workspace(
