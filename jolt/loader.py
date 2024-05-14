@@ -384,6 +384,14 @@ def export_workspace(tasks=None):
         raise_error_if(not address.netloc, "Invalid network address in cache gRPC URI config: {}", address.netloc)
         if address:
             with tools.cwd(loader.workspace_path):
+                if not os.path.exists(tools.expand_path(".jolt/index")):
+                    log.info("Indexing workspace for the first time, please wait")
+                    tree = tools.run(
+                        "fstree write-tree --cache {} --index .jolt/index --threads {}",
+                        config.get_cachedir(),
+                        tools.thread_count(),
+                        output_on_error=True)
+
                 log.info("Pushing {} to remote cache", tools.getcwd())
                 tree = tools.run(
                     "fstree write-tree-push --cache {} --index .jolt/index --remote {} --threads {}",
