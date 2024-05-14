@@ -259,9 +259,17 @@ func (suite *SchedulerTest) TestScheduleTaskWithRestartDueToWorkerFailure() {
 	assert.NotNil(suite.T(), scheduledTask)
 	assert.Equal(suite.T(), task1, scheduledTask)
 
+	scheduledTask.PostStatusUpdate(protocol.TaskStatus_TASK_RUNNING)
+
+	// Task should be running
+	assert.Equal(suite.T(), protocol.TaskStatus_TASK_RUNNING, task1.Status())
+
 	// Simulate disconnection
 	executor.Close()
 	worker.Close()
+
+	// Task should be rescheduled
+	assert.Equal(suite.T(), protocol.TaskStatus_TASK_QUEUED, task1.Status())
 
 	worker, err = suite.newWorker()
 	assert.NoError(suite.T(), err)
