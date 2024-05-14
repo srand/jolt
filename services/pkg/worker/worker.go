@@ -160,8 +160,12 @@ func (w *worker) run() error {
 						"pull-checkout",
 						"--cache",
 						w.config.CacheDir,
+						"--index",
+						".jolt/index",
 						"--remote",
 						w.config.CacheGrpcUri,
+						"--threads",
+						fmt.Sprint(w.config.ThreadCount),
 						request.Build.Environment.Workspace.Tree,
 						request.Build.Environment.Workspace.Name,
 					)

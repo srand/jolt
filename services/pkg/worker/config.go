@@ -3,6 +3,7 @@ package worker
 import (
 	"errors"
 	"net/url"
+	"runtime"
 )
 
 type WorkerConfig struct {
@@ -16,6 +17,9 @@ type WorkerConfig struct {
 
 	// Base URL to the scheduler service.
 	SchedulerUri string `mapstructure:"scheduler_uri"`
+
+	// Thread count for the worker.
+	ThreadCount int `mapstructure:"threads"`
 }
 
 // Checks if the worker configuration is valid.
@@ -43,6 +47,14 @@ func (c *WorkerConfig) Validate() error {
 	// Validate the scheduler URI is a valid URL.
 	if _, err := url.Parse(c.SchedulerUri); err != nil {
 		return errors.New("The scheduler URI is not a valid URI")
+	}
+
+	// Validate the thread count.
+	if c.ThreadCount <= 0 {
+		return errors.New("The thread count must be greater than zero")
+	}
+	if c.ThreadCount > runtime.NumCPU() {
+		return errors.New("The thread count must be less than or equal to the number of CPUs")
 	}
 
 	return nil

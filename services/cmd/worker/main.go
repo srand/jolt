@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"runtime"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -78,6 +79,7 @@ func main() {
 	rootCmd.Flags().StringSliceP("platform", "p", []string{}, "Platform property (repeatable)")
 	rootCmd.Flags().StringSliceP("task-platform", "t", []string{}, "Task platform property (repeatable)")
 	rootCmd.Flags().StringP("scheduler-uri", "s", "tcp://scheduler:9090", "Scheduler service URI")
+	rootCmd.Flags().StringP("threads", "j", fmt.Sprint(runtime.NumCPU()), "Maximum thread count")
 	rootCmd.Flags().CountP("verbose", "v", "Verbosity (repeatable)")
 
 	viper.BindPFlag("cache_dir", rootCmd.Flags().Lookup("cache-dir"))
@@ -86,6 +88,7 @@ func main() {
 	viper.BindPFlag("platform", rootCmd.Flags().Lookup("platform"))
 	viper.BindPFlag("task_platform", rootCmd.Flags().Lookup("task-platform"))
 	viper.BindPFlag("scheduler_uri", rootCmd.Flags().Lookup("scheduler-uri"))
+	viper.BindPFlag("threads", rootCmd.Flags().Lookup("threads"))
 	viper.SetEnvPrefix("jolt")
 	viper.AutomaticEnv()
 
