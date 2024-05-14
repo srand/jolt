@@ -85,7 +85,7 @@ class Cache(cache.StorageProvider):
         except ConnectTimeout:
             self._disabled = True
             log.warning(NAME_LOG + " failed to establish server connection, disabled")
-            return []
+            return [], []
 
         if response.status_code != 200:
             log.debug(NAME_LOG + " POST ({}): {}", response.status_code, self._file_uri)
