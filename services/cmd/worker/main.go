@@ -29,6 +29,19 @@ var rootCmd = &cobra.Command{
 			log.SetLevel(log.DebugLevel)
 		}
 
+		// Load worker configuration from file or environment.
+		workerConfig, err := LoadConfig()
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		log.Info("Worker configuration:")
+		log.Infof("  Cache directory: %s", workerConfig.CacheDir)
+		log.Infof("  Cache URI: %s", workerConfig.CacheUri)
+		log.Infof("  Cache gRPC URI: %s", workerConfig.CacheGrpcUri)
+		log.Infof("  Scheduler URI: %s", workerConfig.SchedulerUri)
+		log.Infof("  Thread count: %d", workerConfig.ThreadCount)
+
 		platform := scheduler.NewPlatformWithDefaults()
 		platform.LoadConfig()
 		log.Info("Properties:")
@@ -49,12 +62,6 @@ var rootCmd = &cobra.Command{
 			for prop := range *taskPlatform {
 				log.Infof("  %s", prop)
 			}
-		}
-
-		// Load worker configuration from file or environment.
-		workerConfig, err := LoadConfig()
-		if err != nil {
-			log.Fatal(err)
 		}
 
 		// Validate the worker configuration.
