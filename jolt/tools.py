@@ -461,6 +461,7 @@ class Tools(object):
     def __init__(self, task=None, cwd=None, env=None):
         self._chroot = None
         self._chroot_prefix = []
+        self._chroot_path = []
         self._run_prefix = []
         self._preexec_fn = None
         self._cwd = fs.path.normpath(fs.path.join(config.get_workdir(), cwd or config.get_workdir()))
@@ -1681,7 +1682,7 @@ class Tools(object):
         return fs.unlink(pathname, ignore_errors=kwargs.get("ignore_errors", False))
 
     @contextmanager
-    def chroot(self, chroot, *args, **kwargs):
+    def chroot(self, chroot, *args, path=None, **kwargs):
         """
         Experimental: Use chroot as root filesystem when running commands.
 
@@ -1693,6 +1694,9 @@ class Tools(object):
         Args:
             chroot (str, artifact): Path to rootfs directory, or an artifact
                 with a 'rootfs' metadata path (artifact.paths.rootfs).
+            path (list): List of directory paths within the chroot to add to
+                the PATH environment variable, e.g. ["/usr/bin", "/bin"].
+                By default, the current PATH is used also within the chroot.
 
         Example:
 
@@ -1771,8 +1775,16 @@ class Tools(object):
         unshare = os.path.join(os.path.dirname(__file__), "chroot.py")
 
         old_chroot = self._chroot
+        old_chroot_path = self._chroot_path
         old_chroot_prefix = self._chroot_prefix
         self._chroot = chroot
+
+        if path:
+            self._chroot_path = path
+        else:
+            self._chroot_path = self._env.get("PATH")
+            self._chroot_path = self._chroot_path.split(fs.pathsep) if self._chroot_path else []
+
         self._chroot_prefix = [
             sys.executable,
             unshare,
@@ -1787,6 +1799,7 @@ class Tools(object):
             yield
         finally:
             self._chroot = old_chroot
+            self._chroot_path = old_chroot_path
             self._chroot_prefix = old_chroot_prefix
 
     def _unshare(self, uidmap, gidmap):
@@ -2002,8 +2015,9 @@ class Tools(object):
         path = self._env.get("PATH")
 
         if self._chroot:
-            path = fs.pathsep.join(
-                [self._chroot + p for p in path.split(fs.pathsep)]) + fs.pathsep + path
+            path = path.split(fs.pathsep) if path else []
+            path += [os.path.join(self._chroot, p) for p in self._chroot_path]
+            path = fs.pathsep.join(path)
 
         result = shutil.which(executable, path=path)
         if result and self._chroot and result.startswith(self._chroot):
