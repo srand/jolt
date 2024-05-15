@@ -267,8 +267,14 @@ func (bcc *UnicastConsumer[E]) Acknowledge() {
 
 // Close the consumer and unregister from the unicast.
 func (bcc *UnicastConsumer[E]) Close() {
+	// Unregister from the unicast unless already done.
+	if bcc.unicast == nil {
+		return
+	}
+
 	bcc.cancel()
 	bcc.unicast.remove(bcc)
+	bcc.unicast = nil
 	close(bcc.Chan)
 }
 
