@@ -1,6 +1,7 @@
 import glob
 from importlib.machinery import SourceFileLoader
 import os
+import platform
 import sys
 from types import ModuleType
 
@@ -377,28 +378,43 @@ def export_workspace(tasks=None):
     tools = Tools()
     tree = None
 
-    # Push workspace to remote cache if possiblefstree
-    if tools.which("fstree"):
-        address = config.geturi("cache", "grpc_uri", "tcp://cache:9090")
-        raise_error_if(address.scheme not in ["tcp"], "Invalid scheme in cache gRPC URI config: {}", address.scheme)
-        raise_error_if(not address.netloc, "Invalid network address in cache gRPC URI config: {}", address.netloc)
-        if address:
-            with tools.cwd(loader.workspace_path):
-                if not os.path.exists(tools.expand_path(".jolt/index")):
-                    log.info("Indexing workspace for the first time, please wait")
-                    tree = tools.run(
-                        "fstree write-tree --cache {} --index .jolt/index --threads {}",
-                        config.get_cachedir(),
-                        tools.thread_count(),
-                        output_on_error=True)
+    cache_grpc_uri = config.geturi("cache", "grpc_uri")
+    if not cache_grpc_uri:
+        log.warning("No cache gRPC URI configured, will not push workspace to remote cache")
+    else:
+        raise_error_if(cache_grpc_uri.scheme not in ["tcp"], "Invalid scheme in cache gRPC URI config: {}", cache_grpc_uri.scheme)
+        raise_error_if(not cache_grpc_uri.netloc, "Invalid network address in cache gRPC URI config: {}", cache_grpc_uri.netloc)
 
-                log.info("Pushing {} to remote cache", tools.getcwd())
+    fstree_enabled = config.getboolean("jolt", "fstree", True)
+    if fstree_enabled:
+        fstree = tools.which("fstree")
+        if not fstree:
+            host = platform.system().lower()
+            arch = platform.machine().lower()
+            fstree = os.path.join(os.path.dirname(__file__), "bin", f"fstree-{host}-{arch}")
+        if not os.path.exists(fstree):
+            log.warning("fstree not found, will not push workspace to remote cache")
+
+    # Push workspace to remote cache if possible
+    if fstree_enabled and fstree and cache_grpc_uri:
+        with tools.cwd(loader.workspace_path):
+            if not os.path.exists(tools.expand_path(".jolt/index")):
+                log.info("Indexing workspace for the first time, please wait")
                 tree = tools.run(
-                    "fstree write-tree-push --cache {} --index .jolt/index --remote {} --threads {}",
+                    "{} write-tree --cache {} --ignore .joltignore --index .jolt/index --threads {}",
+                    fstree,
                     config.get_cachedir(),
-                    address.geturl(),
                     tools.thread_count(),
                     output_on_error=True)
+
+            log.info("Pushing {} to remote cache", tools.getcwd())
+            tree = tools.run(
+                "{} write-tree-push --cache {} --ignore .joltignore --index .jolt/index --remote {} --threads {}",
+                fstree,
+                config.get_cachedir(),
+                cache_grpc_uri.geturl(),
+                tools.thread_count(),
+                output_on_error=True)
 
     workspace = common_pb.Workspace(
         cachedir=config.get_cachedir(),

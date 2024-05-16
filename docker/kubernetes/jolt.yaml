@@ -33,13 +33,14 @@ data:
       [cache]
       # Location of the Jolt cache inside the build cluster:
       uri = http://jolt-cache:8080
+      grpc_uri = http://jolt-cache:9090
 
       [scheduler]
       # URI of the Jolt scheduler inside the build cluster:
       uri = tcp://jolt-scheduler:9090
 ---
 apiVersion: apps/v1
-kind: Deployment
+kind: Deployment8080
 metadata:
   name: jolt-cache
 spec:
@@ -69,6 +70,7 @@ spec:
           image: robrt/jolt-cache:latest
           ports:
             - containerPort: 8080
+            - containerPort: 9090
           volumeMounts:
             - name: jolt-cache
               mountPath: /data
@@ -125,6 +127,7 @@ spec:
           image: robrt/jolt-scheduler:latest
           ports:
             - containerPort: 8080
+            - containerPort: 9090
           volumeMounts:
             - name: jolt-config
               mountPath: /etc/jolt
@@ -158,8 +161,6 @@ spec:
             - name: JOLT_SCHEDULER_URI
               value: "tcp://jolt-scheduler:9090"
           image: robrt/jolt-worker:latest
-          ports:
-            - containerPort: 8080
           volumeMounts:
             - name: jolt-cache
               mountPath: /data/cache
@@ -205,6 +206,9 @@ spec:
     - name: "http"
       port: 8080
       targetPort: 8080
+    - name: "http"
+      port: 9090
+      targetPort: 9090
   type: LoadBalancer
 ---
 apiVersion: v1

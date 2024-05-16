@@ -199,6 +199,8 @@ def getboolean(section, key, default=None, alias=None):
 
 def geturi(section, key, default=None, alias=None):
     value = get(section, key, default=default, alias=alias)
+    if value is None:
+        return None
     return urlparse(value)
 
 

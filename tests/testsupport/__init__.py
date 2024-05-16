@@ -22,7 +22,7 @@ def enable_network_testing(cls, storage_providers=None, schedulers=None):
                 for cache in storage_providers or ["cache", "http"]:
                     class Net(cls):
                         name = cls.name + "/" + scheduler + cache
-                        requires = [f"deployment=jolt/{scheduler}deployment:storage={cache}"]
+                        requires = [f"deployment=jolt/{scheduler}deployment:storage={cache}", "fstree"]
 
                         network = True
                         network_enabled = True

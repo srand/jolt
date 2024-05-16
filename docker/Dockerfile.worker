@@ -27,7 +27,10 @@ RUN go generate ./...
 RUN go build -ldflags '-s -w' ./cmd/worker
 
 FROM base
+ARG FSTREE_VERSION
 COPY --from=build /usr/src/services/worker /opt/jolt/worker
+ADD https://github.com/srand/fstree/releases/download/${FSTREE_VERSION}/fstree-linux-x86_64 /usr/bin/fstree
+RUN chmod 0755 /usr/bin/fstree
 RUN mkdir -p /data/cache /data/ws
 WORKDIR /data/ws
 ENTRYPOINT ["/opt/jolt/worker", "-v"]

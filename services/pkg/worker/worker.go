@@ -159,7 +159,7 @@ func (w *worker) run() error {
 						"fstree",
 						"pull-checkout",
 						"--cache",
-						w.config.CacheDir,
+						w.cachePath(),
 						"--index",
 						".jolt/index",
 						"--remote",
@@ -381,6 +381,20 @@ func (w *worker) activateVEnvPath(clientDigest string) string {
 	return filepath.Join(w.cwd, w.vEnvPath(clientDigest), "bin", "activate")
 }
 
+func (w *worker) cachePath() string {
+	if w.config.CacheDir != "" {
+		return w.config.CacheDir
+	} else {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			log.Warn("Current user's home directory unknown:", err)
+		}
+
+		// Default to ~/.cache/jolt if the worker cache is not specified.
+		return filepath.Join(home, ".cache", "jolt")
+	}
+}
+
 func (w *worker) nixWrapperCmd(clientWsName string, cmdline []string) ([]string, error) {
 	if runtime.GOOS == "windows" {
 		return nil, errors.New("nix-shell is not supported on Windows")
@@ -434,21 +448,7 @@ func (w *worker) nsWrapperCmd(clientWs, clientCache string) ([]string, []string)
 	// If the client cache is specified, bind it to the same path as on the client.
 	// Also set the jolt.cachedir config option to the client cache path.
 	if clientCache != "" {
-		var localCache string
-
-		if w.config.CacheDir != "" {
-			localCache = w.config.CacheDir
-		} else {
-			home, err := os.UserHomeDir()
-			if err != nil {
-				log.Warn("Current user's home directory unknown:", err)
-			}
-
-			// Default to ~/.cache/jolt if the worker cache is not specified.
-			localCache = filepath.Join(home, ".cache", "jolt")
-		}
-
-		cmd = append(cmd, "--bind", localCache, clientCache)
+		cmd = append(cmd, "--bind", w.cachePath(), clientCache)
 		config = append(config, "-c", "jolt.cachedir="+clientCache)
 		os.MkdirAll(clientCache, 0777)
 	}

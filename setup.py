@@ -97,7 +97,7 @@ setup(
         "test": ["coverage"],
     },
     package_data={
-        "jolt": ["**/*.sh", "**/*.xslt", "**/*.template"],
+        "jolt": ["**/*.sh", "**/*.xslt", "**/*.template", "**/fstree-linux-x86_64"],
     },
     entry_points={
         "console_scripts": [

@@ -8,6 +8,7 @@ services:
       - JOLT_CACHE_VERBOSITY=2
     ports:
       - "8080:8080"
+      - "9091:9090"
     volumes:
       - cache-http:/data
   dashboard:
@@ -21,6 +22,7 @@ services:
   worker:
     environment:
       - "JOLT_CACHE_URI=http://cache"
+      - "JOLT_CACHE_GRPC_URI=tcp://cache:9090"
     image: robrt/jolt-worker:latest
     deploy:
       replicas: 2

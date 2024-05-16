@@ -344,6 +344,9 @@ class GitApi(testsupport.JoltTest):
                     artifact.collect("*.txt")
         ---
         """
+        if self.network_enabled and self.storage in ["cache"]:
+            self.skipTest("network build not supported")
+
         with self.tools.cwd(self.ws):
             self.tools.run("git clone --bare https://github.com/gideont/hello_world.git hello_world_bare.git")
             with self.tools.cwd("hello_world_bare.git"):

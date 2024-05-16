@@ -90,6 +90,7 @@ class Jolt(Task):
             artifact.collect('jolt/*/*/*.py')
             artifact.collect('jolt/*/*.xslt')
             artifact.collect('jolt/*/*.template')
+            artifact.collect('jolt/bin')
             artifact.collect('jolt/plugins/selfdeploy/README.rst', flatten=True)
             artifact.collect('jolt/plugins/selfdeploy/setup.py', flatten=True)
             for e in self.extra_files:

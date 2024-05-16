@@ -6,6 +6,9 @@ from jolt.plugins import cxx, docker, git, selfdeploy
 from os import getenv
 
 
+fstree_version = "24.5.1"
+
+
 @influence.files("{dockerfile}")
 @attributes.requires("requires_push_{push}")
 @git.influence("services")
@@ -23,8 +26,26 @@ class CacheImage(docker.DockerImage):
     ]
 
 
+class Fstree(Task):
+    def publish(self, artifact, tools):
+        with tools.cwd(tools.builddir()):
+            tools.mkdir("jolt/bin")
+            tools.download(f"https://github.com/srand/fstree/releases/download/{fstree_version}/fstree-linux-x86_64", "jolt/bin/fstree-linux-x86_64")
+            tools.chmod("jolt/bin/fstree-linux-x86_64", 0o755)
+            artifact.collect("jolt/bin/fstree-linux-x86_64", "bin/fstree")
+            artifact.environ.PATH.append("bin")
+
+
 class Jolt(selfdeploy.Jolt):
     version = Parameter(__version__, influence=False)
+
+    def publish(self, artifact, tools):
+        super().publish(artifact, tools)
+        with tools.cwd(tools.builddir()):
+            tools.mkdir("jolt/bin")
+            tools.download(f"https://github.com/srand/fstree/releases/download/{fstree_version}/fstree-linux-x86_64", "jolt/bin/fstree-linux-x86_64")
+            tools.chmod("jolt/bin/fstree-linux-x86_64", 0o755)
+            artifact.collect("jolt/bin/fstree-linux-x86_64")
 
 
 @influence.files("{dockerfile}")
@@ -85,6 +106,7 @@ class SchedulerImage(docker.DockerImage):
 @git.influence("services")
 class WorkerImage(SchedulerImage):
     name = "jolt/worker"
+    buildargs = [f"FSTREE_VERSION={fstree_version}"]
     dockerfile = "docker/Dockerfile.worker"
     tags = [
         "robrt/jolt-worker:{identity}",
@@ -121,19 +143,19 @@ class JoltWheel(Task):
         tools.run("python3 -m pip install --upgrade twine")
         self.builddir = tools.sandbox(deps["jolt:version={version}"])
         with tools.cwd(self.builddir):
-             tools.run("python3 setup.py sdist bdist_wheel")
-             if self.release:
-                  tools.run("python3 -m twine upload dist/*")
+            tools.run("python3 setup.py sdist bdist_wheel")
+            if self.release:
+                tools.run("python3 -m twine upload dist/*")
 
     def publish(self, artifact, tools):
         with tools.cwd(self.builddir):
              artifact.collect("dist")
 
 
-
 @attributes.environ("TWINE_USERNAME")
 @attributes.environ("TWINE_PASSWORD")
 @git.influence("docker/wrapper")
+@git.influence("setup.py")
 class JoltWrapperWheel(Task):
     name = "jolt/docker/pypi"
 
