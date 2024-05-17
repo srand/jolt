@@ -378,13 +378,6 @@ def export_workspace(tasks=None):
     tools = Tools()
     tree = None
 
-    cache_grpc_uri = config.geturi("cache", "grpc_uri")
-    if not cache_grpc_uri:
-        log.warning("No cache gRPC URI configured, will not push workspace to remote cache")
-    else:
-        raise_error_if(cache_grpc_uri.scheme not in ["tcp"], "Invalid scheme in cache gRPC URI config: {}", cache_grpc_uri.scheme)
-        raise_error_if(not cache_grpc_uri.netloc, "Invalid network address in cache gRPC URI config: {}", cache_grpc_uri.netloc)
-
     fstree_enabled = config.getboolean("jolt", "fstree", True)
     if fstree_enabled:
         fstree = tools.which("fstree")
@@ -393,7 +386,15 @@ def export_workspace(tasks=None):
             arch = platform.machine().lower()
             fstree = os.path.join(os.path.dirname(__file__), "bin", f"fstree-{host}-{arch}")
         if not os.path.exists(fstree):
+            fstree_enabled = False
             log.warning("fstree not found, will not push workspace to remote cache")
+
+    cache_grpc_uri = config.geturi("cache", "grpc_uri")
+    if fstree_enabled and not cache_grpc_uri:
+        log.warning("No cache gRPC URI configured, will not push workspace to remote cache")
+    else:
+        raise_error_if(cache_grpc_uri.scheme not in ["tcp"], "Invalid scheme in cache gRPC URI config: {}", cache_grpc_uri.scheme)
+        raise_error_if(not cache_grpc_uri.netloc, "Invalid network address in cache gRPC URI config: {}", cache_grpc_uri.netloc)
 
     # Push workspace to remote cache if possible
     if fstree_enabled and fstree and cache_grpc_uri:
