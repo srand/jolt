@@ -20,6 +20,7 @@ const _ = grpc.SupportPackageIsVersion7
 
 const (
 	CacheService_HasObject_FullMethodName   = "/fstree.CacheService/HasObject"
+	CacheService_HasTree_FullMethodName     = "/fstree.CacheService/HasTree"
 	CacheService_ReadObject_FullMethodName  = "/fstree.CacheService/ReadObject"
 	CacheService_WriteObject_FullMethodName = "/fstree.CacheService/WriteObject"
 )
@@ -28,8 +29,10 @@ const (
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type CacheServiceClient interface {
-	// GetBlobPresence returns a list of blobs that are either missing or present in the cache.
+	// HasObject returns a list of objects that are either missing or present in the cache.
 	HasObject(ctx context.Context, in *HasObjectRequest, opts ...grpc.CallOption) (*HasObjectResponse, error)
+	// HasTree returns a list of objects and trees that are missing or present in the cache.
+	HasTree(ctx context.Context, in *HasTreeRequest, opts ...grpc.CallOption) (CacheService_HasTreeClient, error)
 	// Read a blob from the cache
 	ReadObject(ctx context.Context, in *ReadObjectRequest, opts ...grpc.CallOption) (CacheService_ReadObjectClient, error)
 	// Write a blob to the cache
@@ -53,8 +56,40 @@ func (c *cacheServiceClient) HasObject(ctx context.Context, in *HasObjectRequest
 	return out, nil
 }
 
+func (c *cacheServiceClient) HasTree(ctx context.Context, in *HasTreeRequest, opts ...grpc.CallOption) (CacheService_HasTreeClient, error) {
+	stream, err := c.cc.NewStream(ctx, &CacheService_ServiceDesc.Streams[0], CacheService_HasTree_FullMethodName, opts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &cacheServiceHasTreeClient{stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+type CacheService_HasTreeClient interface {
+	Recv() (*HasTreeResponse, error)
+	grpc.ClientStream
+}
+
+type cacheServiceHasTreeClient struct {
+	grpc.ClientStream
+}
+
+func (x *cacheServiceHasTreeClient) Recv() (*HasTreeResponse, error) {
+	m := new(HasTreeResponse)
+	if err := x.ClientStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
 func (c *cacheServiceClient) ReadObject(ctx context.Context, in *ReadObjectRequest, opts ...grpc.CallOption) (CacheService_ReadObjectClient, error) {
-	stream, err := c.cc.NewStream(ctx, &CacheService_ServiceDesc.Streams[0], CacheService_ReadObject_FullMethodName, opts...)
+	stream, err := c.cc.NewStream(ctx, &CacheService_ServiceDesc.Streams[1], CacheService_ReadObject_FullMethodName, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -86,7 +121,7 @@ func (x *cacheServiceReadObjectClient) Recv() (*ReadObjectResponse, error) {
 }
 
 func (c *cacheServiceClient) WriteObject(ctx context.Context, opts ...grpc.CallOption) (CacheService_WriteObjectClient, error) {
-	stream, err := c.cc.NewStream(ctx, &CacheService_ServiceDesc.Streams[1], CacheService_WriteObject_FullMethodName, opts...)
+	stream, err := c.cc.NewStream(ctx, &CacheService_ServiceDesc.Streams[2], CacheService_WriteObject_FullMethodName, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -123,8 +158,10 @@ func (x *cacheServiceWriteObjectClient) CloseAndRecv() (*WriteObjectResponse, er
 // All implementations must embed UnimplementedCacheServiceServer
 // for forward compatibility
 type CacheServiceServer interface {
-	// GetBlobPresence returns a list of blobs that are either missing or present in the cache.
+	// HasObject returns a list of objects that are either missing or present in the cache.
 	HasObject(context.Context, *HasObjectRequest) (*HasObjectResponse, error)
+	// HasTree returns a list of objects and trees that are missing or present in the cache.
+	HasTree(*HasTreeRequest, CacheService_HasTreeServer) error
 	// Read a blob from the cache
 	ReadObject(*ReadObjectRequest, CacheService_ReadObjectServer) error
 	// Write a blob to the cache
@@ -138,6 +175,9 @@ type UnimplementedCacheServiceServer struct {
 
 func (UnimplementedCacheServiceServer) HasObject(context.Context, *HasObjectRequest) (*HasObjectResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method HasObject not implemented")
+}
+func (UnimplementedCacheServiceServer) HasTree(*HasTreeRequest, CacheService_HasTreeServer) error {
+	return status.Errorf(codes.Unimplemented, "method HasTree not implemented")
 }
 func (UnimplementedCacheServiceServer) ReadObject(*ReadObjectRequest, CacheService_ReadObjectServer) error {
 	return status.Errorf(codes.Unimplemented, "method ReadObject not implemented")
@@ -174,6 +214,27 @@ func _CacheService_HasObject_Handler(srv interface{}, ctx context.Context, dec f
 		return srv.(CacheServiceServer).HasObject(ctx, req.(*HasObjectRequest))
 	}
 	return interceptor(ctx, in, info, handler)
+}
+
+func _CacheService_HasTree_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(HasTreeRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(CacheServiceServer).HasTree(m, &cacheServiceHasTreeServer{stream})
+}
+
+type CacheService_HasTreeServer interface {
+	Send(*HasTreeResponse) error
+	grpc.ServerStream
+}
+
+type cacheServiceHasTreeServer struct {
+	grpc.ServerStream
+}
+
+func (x *cacheServiceHasTreeServer) Send(m *HasTreeResponse) error {
+	return x.ServerStream.SendMsg(m)
 }
 
 func _CacheService_ReadObject_Handler(srv interface{}, stream grpc.ServerStream) error {
@@ -236,6 +297,11 @@ var CacheService_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams: []grpc.StreamDesc{
+		{
+			StreamName:    "HasTree",
+			Handler:       _CacheService_HasTree_Handler,
+			ServerStreams: true,
+		},
 		{
 			StreamName:    "ReadObject",
 			Handler:       _CacheService_ReadObject_Handler,

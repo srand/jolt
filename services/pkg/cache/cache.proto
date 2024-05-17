@@ -29,9 +29,21 @@ message HasObjectResponse {
     repeated bool present = 1;
 }
 
+message HasTreeRequest {
+    repeated string digest = 1;
+}
+
+message HasTreeResponse {
+    repeated string missing_trees = 1;
+    repeated string missing_objects = 2;
+}
+
 service CacheService {
-    // GetBlobPresence returns a list of blobs that are either missing or present in the cache.
+    // HasObject returns a list of objects that are either missing or present in the cache.
     rpc HasObject(HasObjectRequest) returns (HasObjectResponse);
+
+    // HasTree returns a list of objects and trees that are missing or present in the cache.
+    rpc HasTree(HasTreeRequest) returns (stream HasTreeResponse);
 
     // Read a blob from the cache
     rpc ReadObject(ReadObjectRequest) returns (stream ReadObjectResponse);

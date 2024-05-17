@@ -1,9 +1,11 @@
 package cache
 
 import (
+	"container/list"
 	context "context"
 	"io"
 
+	"github.com/srand/jolt/scheduler/pkg/fstree"
 	"github.com/srand/jolt/scheduler/pkg/log"
 	"github.com/srand/jolt/scheduler/pkg/utils"
 	codes "google.golang.org/grpc/codes"
@@ -40,6 +42,73 @@ func (svc *cacheService) HasObject(ctx context.Context, req *HasObjectRequest) (
 	return &HasObjectResponse{
 		Present: presence,
 	}, nil
+}
+
+func (svc *cacheService) HasTree(req *HasTreeRequest, srv CacheService_HasTreeServer) error {
+	response := &HasTreeResponse{
+		MissingTrees:   make([]string, 0),
+		MissingObjects: make([]string, 0),
+	}
+
+	trees := list.New()
+
+	for _, digest := range req.Digest {
+		d, err := utils.ParseDigest(digest)
+		if err != nil {
+			return status.Errorf(codes.InvalidArgument, "invalid digest: %v", err)
+		}
+
+		trees.PushBack(d)
+	}
+
+	for trees.Len() > 0 {
+		front := trees.Front()
+		trees.Remove(front)
+		digest := front.Value.(utils.Digest)
+
+		// Read the tree from the cache.
+		reader, err := svc.cache.ReadObject(digest)
+		if err != nil {
+			response.MissingTrees = append(response.MissingTrees, digest.Hex())
+			continue
+		}
+
+		tree, err := fstree.ReadTree(reader)
+		if err != nil {
+			response.MissingTrees = append(response.MissingTrees, digest.Hex())
+			continue
+		}
+
+		for _, child := range tree.Children {
+			switch child.Type() {
+			case fstree.InodeType_Directory:
+				trees.PushBack(child)
+
+			default:
+				digest := utils.NewDigest(utils.Sha1Algorithm, child.Digest())
+				if info := svc.cache.HasObject(digest); info == nil {
+					response.MissingObjects = append(response.MissingObjects, child.Digest())
+				}
+			}
+		}
+
+		err = srv.Send(response)
+		if err != nil {
+			return status.Errorf(codes.Internal, "failed to send response: %v", err)
+		}
+
+		response = &HasTreeResponse{
+			MissingTrees:   make([]string, 0),
+			MissingObjects: make([]string, 0),
+		}
+	}
+
+	err := srv.Send(response)
+	if err != nil {
+		return status.Errorf(codes.Internal, "failed to send response: %v", err)
+	}
+
+	return status.Errorf(codes.Unimplemented, "method HasTree not implemented")
 }
 
 // ReadObject reads a blob from the cache.
