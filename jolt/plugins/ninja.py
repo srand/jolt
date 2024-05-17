@@ -1298,7 +1298,7 @@ class GNUDepImporter(Rule):
                 name = "{0}{1}{2}".format(self.prefix, lib, self.suffix)
                 for path in artifact.cxxinfo.libpaths.items():
                     archive = fs.path.join(sandbox, path, name)
-                    if fs.path.exists(archive):
+                    if fs.path.exists(os.path.join(project.tools.wsroot, archive)):
                         archives.append(archive)
         return archives
 
@@ -1309,7 +1309,9 @@ class GNUDepImporter(Rule):
         if isinstance(project, CXXLibrary):
             imports += self._build_archives(project, writer, deps)
             if not project.shared and project.selfsustained:
-                writer.sources.extend(imports)
+                sources = [os.path.join(project.tools.wsroot, source) for source in imports]
+                sources = [os.path.relpath(source, project.joltdir) for source in sources]
+                writer.sources.extend(sources)
         return imports
 
     def get_influence(self, task):
