@@ -2,6 +2,7 @@ package fstree
 
 import (
 	"encoding/binary"
+	"fmt"
 	"io"
 )
 
@@ -9,6 +10,11 @@ const (
 	InodeType_Regular   = 1 << 24
 	InodeType_Directory = 2 << 24
 	InodeType_Symlink   = 4 << 24
+)
+
+const (
+	TreeMagic   = 0x3eee
+	TreeVersion = 1
 )
 
 type Inode interface {
@@ -79,8 +85,8 @@ func ReadTree(reader io.Reader) (*Tree, error) {
 	if err != nil {
 		return nil, err
 	}
-	if magic != 0x1234 {
-		return nil, nil
+	if magic != TreeMagic {
+		return nil, fmt.Errorf("invalid magic number: %x", magic)
 	}
 
 	var version uint16
@@ -88,8 +94,8 @@ func ReadTree(reader io.Reader) (*Tree, error) {
 	if err != nil {
 		return nil, err
 	}
-	if version != 1 {
-		return nil, nil
+	if version != TreeVersion {
+		return nil, fmt.Errorf("invalid version: %d", version)
 	}
 
 	tree := NewTree(InodeType_Directory)
@@ -98,6 +104,9 @@ func ReadTree(reader io.Reader) (*Tree, error) {
 		// Read the path.
 		var pathLength uint64
 		err = binary.Read(reader, binary.LittleEndian, &pathLength)
+		if err == io.EOF {
+			break
+		}
 		if err != nil {
 			return nil, err
 		}
@@ -146,9 +155,7 @@ func ReadTree(reader io.Reader) (*Tree, error) {
 			}
 		}
 
-		child := NewInode(status, string(digest))
-
-		tree.AddChild(child)
+		tree.AddChild(NewInode(status, string(digest)))
 	}
 
 	return tree, nil

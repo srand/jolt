@@ -4,6 +4,9 @@ import (
 	"container/list"
 	context "context"
 	"io"
+	"sync"
+
+	"golang.org/x/sync/errgroup"
 
 	"github.com/srand/jolt/scheduler/pkg/fstree"
 	"github.com/srand/jolt/scheduler/pkg/log"
@@ -44,12 +47,8 @@ func (svc *cacheService) HasObject(ctx context.Context, req *HasObjectRequest) (
 	}, nil
 }
 
-func (svc *cacheService) HasTree(req *HasTreeRequest, srv CacheService_HasTreeServer) error {
-	response := &HasTreeResponse{
-		MissingTrees:   make([]string, 0),
-		MissingObjects: make([]string, 0),
-	}
-
+func (svc *cacheService) HasTree(req *HasTreeRequest, server CacheService_HasTreeServer) error {
+	m := sync.Mutex{}
 	trees := list.New()
 
 	for _, digest := range req.Digest {
@@ -61,54 +60,74 @@ func (svc *cacheService) HasTree(req *HasTreeRequest, srv CacheService_HasTreeSe
 		trees.PushBack(d)
 	}
 
+	eg := errgroup.Group{}
+
 	for trees.Len() > 0 {
+		m.Lock()
 		front := trees.Front()
 		trees.Remove(front)
+		m.Unlock()
+
 		digest := front.Value.(utils.Digest)
 
-		// Read the tree from the cache.
-		reader, err := svc.cache.ReadObject(digest)
-		if err != nil {
-			response.MissingTrees = append(response.MissingTrees, digest.Hex())
-			continue
-		}
+		eg.Go(func() error {
+			var tree *fstree.Tree
 
-		tree, err := fstree.ReadTree(reader)
-		if err != nil {
-			response.MissingTrees = append(response.MissingTrees, digest.Hex())
-			continue
-		}
+			response := &HasTreeResponse{
+				MissingTrees:   make([]string, 0),
+				MissingObjects: make([]string, 0),
+			}
 
-		for _, child := range tree.Children {
-			switch child.Type() {
-			case fstree.InodeType_Directory:
-				trees.PushBack(child)
+			// Read the tree from the cache.
+			reader, err := svc.cache.ReadObject(digest)
+			if err != nil {
+				response.MissingTrees = append(response.MissingTrees, digest.Hex())
+				goto sendResponse
+			}
 
-			default:
+			tree, err = fstree.ReadTree(reader)
+			if err != nil {
+				return status.Errorf(codes.Internal, "failed to read tree: %v: %v", digest.Hex(), err)
+			}
+
+			for _, child := range tree.Children {
 				digest := utils.NewDigest(utils.Sha1Algorithm, child.Digest())
-				if info := svc.cache.HasObject(digest); info == nil {
-					response.MissingObjects = append(response.MissingObjects, child.Digest())
+
+				switch child.Type() {
+				case fstree.InodeType_Directory:
+					m.Lock()
+					trees.PushBack(digest)
+					m.Unlock()
+
+				case fstree.InodeType_Symlink:
+					// Skip symlinks.
+
+				default:
+					if info := svc.cache.HasObject(digest); info == nil {
+						response.MissingObjects = append(response.MissingObjects, child.Digest())
+					}
 				}
 			}
-		}
 
-		err = srv.Send(response)
-		if err != nil {
-			return status.Errorf(codes.Internal, "failed to send response: %v", err)
-		}
+		sendResponse:
+			if response.MissingObjects == nil && response.MissingTrees == nil {
+				return nil
+			}
 
-		response = &HasTreeResponse{
-			MissingTrees:   make([]string, 0),
-			MissingObjects: make([]string, 0),
+			err = server.Send(response)
+			if err != nil {
+				return status.Errorf(codes.Internal, "failed to send response: %v", err)
+			}
+
+			return nil
+		})
+
+		if err := eg.Wait(); err != nil {
+			return err
 		}
 	}
 
-	err := srv.Send(response)
-	if err != nil {
-		return status.Errorf(codes.Internal, "failed to send response: %v", err)
-	}
-
-	return status.Errorf(codes.Unimplemented, "method HasTree not implemented")
+	return nil
 }
 
 // ReadObject reads a blob from the cache.
