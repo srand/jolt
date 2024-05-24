@@ -59,6 +59,9 @@ class TaskProxy(object):
         self._artifacts = []
         self._status = None
 
+        # List of all artifacts that are produced by this task
+        self._artifacts = []
+
         hooks.task_created(self)
 
     def __hash__(self):
@@ -67,6 +70,15 @@ class TaskProxy(object):
     @property
     def artifacts(self):
         return self._artifacts
+
+    def add_artifact(self, artifact):
+        self._artifacts.append(artifact)
+
+    def get_artifact(self, name):
+        for artifact in self.artifacts:
+            if artifact.name == name:
+                return artifact
+        return None
 
     @property
     def tools(self):
@@ -387,7 +399,7 @@ class TaskProxy(object):
 
         self.task.influence += [TaskRequirementInfluence(n) for n in self.neighbors]
         self.identity
-        self._artifacts = self.task._artifacts(self.cache, self)
+        self._artifacts.extend(self.task._artifacts(self.cache, self))
 
         return self.identity
 

@@ -164,6 +164,14 @@ global_string("{test}")
             if fs.path.exists(fs.path.join(self.ws, artifact)):
                 self.fail("artifact {} does exist".format(artifact))
 
+    def assertHasArtifactName(self, r, name):
+        parts = name.split("@", 1)
+        artifacts = self.artifacts(r)
+        for artifact in artifacts:
+            if artifact.endswith("-" + parts[0]) and f"{os.sep}{parts[1]}{os.sep}" in artifact:
+                return
+        self.fail("artifact {} not found".format(name))
+
     def assertBuild(self, r, task):
         tasks = self.tasks(r)
         if len(tasks) <= 0:

@@ -55,7 +55,10 @@ class CompDBExtension(JoltTest):
 
         ---
         """
-        self.build("exe")
+        r = self.build("exe")
+        self.assertHasArtifactName(r, "compdb@exe")
+        self.assertHasArtifactName(r, "depfiles@exe")
+        self.assertHasArtifactName(r, "main@exe")
 
         with self.tools.cwd(self.ws):
             self.tools.rmtree("build")
@@ -92,3 +95,41 @@ class CompDBExtension(JoltTest):
         self.jolt("clean exe")
         with self.assertRaises(Exception, msg="must be built"):
             self.jolt("compdb exe")
+
+    def test_compdb_without_depfiles(self):
+        """
+        --- config:
+
+        [ninja-compdb]
+        depfiles = false
+
+        --- file: lib.h
+        int lib();
+
+        --- file: custom.x
+        Hello
+
+        --- file: lib.cpp
+        #include "lib.h"
+        int lib() {{return 0;}}
+
+        --- tasks:
+        class Lib(CXXLibrary):
+            headers = ["lib.h"]
+            sources = ["lib.cpp", "custom.x"]
+            cp = HostVariable({{"nt": "copy", "posix": "cp"}})
+            x_rule = Rule(infiles=[".x"], outfiles=["{{outdir}}/{{in_base}}.hpp"], command="$cp $in $out")
+
+            def publish(self, artifact, tools):
+                super().publish(artifact, tools)
+                with tools.cwd(self.outdir):
+                    artifact.collect("custom.hpp")
+
+        ---
+        """
+        r = self.build("lib")
+        self.assertHasArtifactName(r, "compdb@lib")
+        with self.assertRaises(AssertionError):
+            self.assertHasArtifactName(r, "depfiles@lib")
+        self.assertHasArtifactName(r, "main@lib")
+

@@ -30,7 +30,7 @@ def patch(command, attrib, search, replace):
 
 
 class CompDB(object):
-    def __init__(self, path="compile_commands.json", artifact=None):
+    def __init__(self, path="compdb/compile_commands.json", artifact=None):
         self.commands = []
         self.attribs = {}
         if artifact:
@@ -92,16 +92,51 @@ def stage_artifacts(artifacts, tools):
         tools.sandbox(artifact, incremental=True, reflect=fs.has_symlinks())
 
 
-def get_task_artifacts(task):
+def get_compdb_artifacts(task):
     artifacts = []
+
+    def select_compdb(artifacts):
+        return list(filter(lambda a: a.name == "compdb", artifacts))
+
     for dep in task.children:
         artifacts.extend(dep.artifacts)
-    return task.artifacts[0], artifacts
+    return select_compdb(task.artifacts)[0], select_compdb(artifacts)
+
+
+def get_task_artifacts(task):
+    compdb_artifact = task.get_artifact("compdb")
+    artifacts = task.artifacts
+    for dep in task.children:
+        artifacts.extend(dep.artifacts)
+    return compdb_artifact, artifacts
 
 
 class CompDBHooks(TaskHook):
+    def __init__(self):
+        self._depfiles = config.getboolean("ninja-compdb", "depfiles", True)
+
+    def publish_compdb(self, artifact, tools):
+        with tools.cwd(self.outdir):
+            artifact.collect("**/*compile_commands.json", "compdb/")
+
+    def publish_depfiles(self, artifact, tools):
+        with tools.cwd(self.outdir):
+            artifact.collect("**/*.d", "depfiles/")
+
     def task_created(self, task):
         task.task.influence.append(StringInfluence("NinjaCompDB: v3"))
+        if isinstance(task.task, ninja.CXXProject):
+            compdb_artifact = task.cache.get_artifact(task, "compdb")
+            task.add_artifact(compdb_artifact)
+            publish_compdb = getattr(task.task, "publish_compdb", None)
+            if not publish_compdb:
+                setattr(task.task, "publish_compdb", CompDBHooks.publish_compdb.__get__(task.task, task.task.__class__))
+            if self._depfiles:
+                depfile_artifact = task.cache.get_artifact(task, "depfiles")
+                task.add_artifact(depfile_artifact)
+                publish_depfiles = getattr(task.task, "publish_depfiles", None)
+                if not publish_depfiles:
+                    setattr(task.task, "publish_depfiles", CompDBHooks.publish_depfiles.__get__(task.task, task.task.__class__))
 
     def task_postrun(self, task, deps, tools):
         if not isinstance(task.task, ninja.CXXProject):
@@ -110,9 +145,8 @@ class CompDBHooks(TaskHook):
             utils.call_and_catch(tools.run, "ninja -f {outdir}/build.ninja -t compdb > {outdir}/compile_commands.json")
 
     def task_postpublish(self, task, artifact, tools):
-        if isinstance(task.task, ninja.CXXProject):
-            with tools.cwd(task.task.outdir):
-                artifact.collect("*compile_commands.json")
+        if artifact.name != "compdb":
+            return
 
         # Add information about the workspace and cachedir roots
         db = CompDB(artifact=artifact)
@@ -123,7 +157,7 @@ class CompDBHooks(TaskHook):
 
         if isinstance(task.task, ninja.CXXProject):
             dbpath = fs.path.join(task.task.outdir, "all_compile_commands.json")
-            _, deps = get_task_artifacts(task)
+            _, deps = get_compdb_artifacts(task)
             db = CompDB(dbpath)
             for dep in [artifact] + deps:
                 depdb = CompDB(artifact=dep)
@@ -131,7 +165,7 @@ class CompDBHooks(TaskHook):
                 depdb.relocate(task)
                 db.merge(depdb)
             db.write()
-            artifact.collect(dbpath, flatten=True)
+            artifact.collect(dbpath, "compdb/", flatten=True)
 
     def task_finished_execution(self, task):
         if task.options.network or task.options.worker:
@@ -139,8 +173,8 @@ class CompDBHooks(TaskHook):
         if not task.is_goal():
             return
         if isinstance(task.task, ninja.CXXProject):
-            artifact, deps = get_task_artifacts(task)
-            db = CompDB("all_compile_commands.json", artifact)
+            artifact, deps = get_compdb_artifacts(task)
+            db = CompDB("compdb/all_compile_commands.json", artifact)
             db.read()
             db.relocate(task)
             outdir = task.tools.builddir("compdb", incremental=True)
@@ -225,12 +259,12 @@ def compdb(ctx, task, default):
         queue.shutdown()
 
     for goal in dag.goals:
-        artifact, deps = get_task_artifacts(goal)
-        db = CompDB("all_compile_commands.json", artifact)
+        compdb_artifact, artifacts = get_task_artifacts(goal)
+        db = CompDB("compdb/all_compile_commands.json", compdb_artifact)
         db.read()
         db.relocate(goal, sandboxes=fs.has_symlinks())
         outdir = goal.tools.builddir("compdb", incremental=True)
         dbpath = fs.path.join(outdir, "all_compile_commands.json")
         db.write(dbpath, force=True)
-        stage_artifacts(deps + [artifact], goal.tools)
+        stage_artifacts(artifacts, goal.tools)
         log.info("Compilation DB: {}", dbpath)

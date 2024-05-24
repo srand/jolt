@@ -2268,6 +2268,7 @@ if __name__ == "__main__":
             self.publish_coverage_data(artifact, tools)
 
     def publish_coverage_data(self, artifact, tools):
+        """ Publishes code coverage data files. """
         with tools.cwd(self.covdatadir):
             if artifact.collect("**/*.gcno", "cov/"):
                 artifact.paths.coverage_data = "cov"
