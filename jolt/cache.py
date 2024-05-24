@@ -1328,16 +1328,24 @@ class ArtifactCache(StorageProvider):
         fs.rmtree(self._fs_get_artifact_tmppath(identity, task_name), ignore_errors=True, onerror=onerror)
         fs.unlink(fs.path.join(self.root, task_name), ignore_errors=True)
 
+    def _fs_identity(self, identity):
+        parts = identity.split("@", 1)
+        return parts[1] + "-" + utils.canonical(parts[0])
+
     def _fs_get_artifact_archivepath(self, identity, task_name):
+        identity = self._fs_identity(identity)
         return fs.get_archive(fs.path.join(self.root, task_name, identity))
 
     def _fs_get_artifact_lockpath(self, identity):
+        identity = self._fs_identity(identity)
         return fs.path.join(self.root, "locks", identity + ".lock")
 
     def _fs_get_artifact_tmppath(self, identity, task_name):
+        identity = self._fs_identity(identity)
         return fs.path.join(self.root, task_name, "." + identity)
 
     def _fs_get_artifact_path(self, identity, task_name):
+        identity = self._fs_identity(identity)
         return fs.path.join(self.root, task_name, identity)
 
     def _fs_get_artifact_manifest_path(self, identity, task_name):
