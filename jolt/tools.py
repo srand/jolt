@@ -26,7 +26,7 @@ from jinja2.runtime import Context
 from jinja2.utils import missing
 from requests import Session
 from requests.auth import HTTPBasicAuth
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urlunparse
 
 
 from jolt import cache
@@ -1977,9 +1977,15 @@ class Tools(object):
         if auth is None and url_parsed.username and url_parsed.password:
             auth = HTTPBasicAuth(url_parsed.username, url_parsed.password)
 
+        # Redact password from URL if present
+        if url_parsed.password:
+            url_parsed = url_parsed._replace(netloc=url_parsed.netloc.replace(url_parsed.password, "****"))
+
+        url_cleaned = urlunparse(url_parsed)
+
         with log.progress("Uploading " + utils.shorten(name), size, "B") as pbar, \
              open(pathname, 'rb') as fileobj:
-            log.verbose("{} -> {}", pathname, url)
+            log.verbose("{} -> {}", pathname, url_cleaned)
 
             def read():
                 data = fileobj.read(4096)
@@ -1989,7 +1995,7 @@ class Tools(object):
             response = http_session.put(url, data=iter(read, b''), auth=auth, **kwargs)
             raise_error_if(
                 exceptions and response.status_code not in [201, 204],
-                f"Upload to '{url}' failed with status '{response.status_code}'")
+                f"Upload to '{url_cleaned}' failed with status '{response.status_code}'")
         return response.status_code in [201, 204]
 
     def read_file(self, pathname, binary=False):
