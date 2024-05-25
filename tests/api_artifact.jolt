@@ -362,8 +362,9 @@ class ArtifactApi(JoltTest):
         from jolt.plugins import docker
 
         class Server(docker.DockerContainer):
-            image = "robrt/jolt-cache:latest"
             arguments = ["-i"]
+            image = "robrt/jolt-cache:latest"
+            requires = ["docker/cli"]
             volumes = ["{{joltdir}}/www:/data"]
 
         @attributes.artifact_upload("http://{{host}}:8080/files/")
@@ -394,8 +395,9 @@ class ArtifactApi(JoltTest):
         from jolt.plugins import docker
 
         class Server(docker.DockerContainer):
-            image = "robrt/jolt-cache:latest"
             arguments = ["-i"]
+            image = "robrt/jolt-cache:latest"
+            requires = ["docker/cli"]
             volumes = ["{{joltdir}}/www:/data"]
 
         @attributes.artifact_upload("http://user:pass@{{host}}:8080/files/archive.tgz")
