@@ -796,6 +796,15 @@ class Tools(object):
         """
         Downloads a file using HTTP.
 
+        Automatically expands any {keyword} arguments in the URL and pathname.
+
+        Basic authentication is supported by including the credentials in the URL.
+        Environment variables can be used to hide sensitive information. Specify
+        the environment variable name in the URI as e.g.
+        ``http://{environ[USER]}:{environ[PASS]}@host``.
+        Alternatively, the auth parameter can be used to provide an authentication
+        object that is passed to the requests.get() function.
+
         Throws a JoltError exception on failure.
 
         Args:
@@ -1967,6 +1976,15 @@ class Tools(object):
     def upload(self, pathname, url, exceptions=True, auth=None, **kwargs):
         """
         Uploads a file using HTTP (PUT).
+
+        Automatically expands any {keyword} arguments in the URL and pathname.
+
+        Basic authentication is supported by including the credentials in the URL.
+        Environment variables can be used to hide sensitive information. Specify
+        the environment variable name in the URI as e.g.
+        ``http://{environ[USER]}:{environ[PASS]}@host``.
+        Alternatively, the auth parameter can be used to provide an authentication
+        object that is passed to the requests.get() function.
 
         Throws a JoltError exception on failure.
 

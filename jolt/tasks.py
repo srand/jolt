@@ -957,7 +957,7 @@ class attributes:
         passwords. Specify the environment variable name in the
         URI as `protocol://{environ[USER]}:{environ[PASS]}@host/path`.
 
-        THe upload can be conditioned on the return value of a
+        The upload can be conditioned on the return value of a
         function. The function is passed the task instance as
         an argument and should return a boolean value. If the
         function returns ``False``, the upload is skipped. The value
