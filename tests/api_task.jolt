@@ -1177,3 +1177,4 @@ class TaskApi(JoltTest):
         self.build("all")
         with self.assertRaises(Exception):
             self.build("fail")
+

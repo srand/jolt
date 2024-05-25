@@ -1,0 +1,25 @@
+from jolt import Parameter, Task, attributes
+from jolt.plugins.docker import DockerContainer
+
+
+class Server(DockerContainer):
+    name = "server"
+    image = "robrt/jolt-cache:latest"
+    arguments = ["-i"]
+    user = "root"
+
+
+@attributes.artifact_upload("http://{server}:8080/files/artifact-{version}.zip")
+class Upload(Task):
+    """ Uploads the artifact to a server """
+
+    requires = ["server"]
+    version = Parameter(help="Version of the artifact to upload")
+
+    def run(self, deps, tools):
+    	self.server = deps["server"].info["NetworkSettings"]["IPAddress"]
+
+    def publish(self, artifact, tools):
+        with tools.cwd(tools.builddir()):
+            tools.write_file("hello.txt", "Hello, world!")
+            artifact.collect("hello.txt")

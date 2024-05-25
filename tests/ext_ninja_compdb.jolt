@@ -132,4 +132,3 @@ class CompDBExtension(JoltTest):
         with self.assertRaises(AssertionError):
             self.assertHasArtifactName(r, "depfiles@lib")
         self.assertHasArtifactName(r, "main@lib")
-

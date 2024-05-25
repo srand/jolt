@@ -12,6 +12,7 @@ import subprocess
 from os import environ
 import sys
 import unittest as ut
+from urllib.parse import urlparse
 import uuid
 import re
 import traceback
@@ -920,6 +921,130 @@ class attributes:
                 return artifacts
 
             cls._artifacts = _artifacts
+            return cls
+
+        return decorate
+
+    @staticmethod
+    def artifact_upload(uri, name="main", condition=None):
+        """
+        Decorator to add uploading of an artifact to a server.
+
+        Upon successful completion of the task, the resulting
+        artifact uploaded to the specified URI. The URI should
+        be in the format `protocol://user:password@host/path`.
+
+        The following protocols are supported:
+
+          - `http://`
+          - `https://`
+          - `file://`
+
+        Local path are also supported in which case the artifact
+        is copied to the specified location.
+
+        If the path ends with a slash, the artifact is treated as
+        a directory and copied into the root of the directory.
+
+        If the path ends with a supported archive extension, the
+        artifact is archived and optionally compressed before being
+        copied. See :func:`jolt.Tools.archive` for supported archive
+        and compression formats.
+
+        Usernames and passwords are optional. If omitted, the
+        artifact is uploaded anonymously. Environment variables
+        can be used to store sensitive information, such as
+        passwords. Specify the environment variable name in the
+        URI as `protocol://{environ[USER]}:{environ[PASS]}@host/path`.
+
+        THe upload can be conditioned on the return value of a
+        function. The function is passed the task instance as
+        an argument and should return a boolean value. If the
+        function returns ``False``, the upload is skipped. The value
+        of the condition influences the hash of the task.
+
+        Args:
+            condition (str): Condition function to evaluate before
+                uploading the artifact. The function is passed the
+                task instance as an argument and should return a
+                boolean value. By default, the artifact is always
+                uploaded.
+            name (str): Name of the artifact to upload.
+            uri (str): Destination URI for the artifact.
+
+        Example:
+
+            .. literalinclude:: ../examples/artifacts/upload.jolt
+                :language: python
+                :caption: examples/artifacts/upload.jolt
+        """
+
+        def decorate(cls):
+            if name == "main":
+                old_publish = cls.publish
+            else:
+                old_publish = getattr(cls, "publish_" + name, None)
+
+            raise_error_if(old_publish is None, f"Cannot upload artifact '{name}' from task '{cls.name or cls.__name__.lower()}', it does not exist")
+
+            def upload_file(self, tools, cwd, src, dst):
+                with tools.cwd(cwd):
+                    tools.upload(src, dst + src)
+
+            def copy_file(self, tools, cwd, src, dst):
+                with tools.cwd(cwd):
+                    tools.copy(src, dst + src)
+
+            def list_files(self, artifact, tools):
+                with tools.cwd(artifact.path):
+                    for path in tools.glob("**"):
+                        # Skip directories
+                        if tools.isdir(path):
+                            continue
+                        yield artifact.path, path
+
+            def archive_files(self, artifact, tools, filename):
+                out = tools.builddir(artifact.identity)
+                with tools.cwd(out):
+                    tools.archive(artifact.path, filename)
+                    yield out, filename
+
+            @functools.wraps(cls.publish)
+            def publish(self, artifact, tools):
+                old_publish(self, artifact, tools)
+
+                if condition and not bool(condition(self)):
+                    return
+
+                # Expand keywords
+                uri_exp = tools.expand(uri)
+
+                # Parse URI to determine protocol
+                uri_parsed = urlparse(uri_exp)
+                if uri_parsed.scheme in ["http", "https"]:
+                    action = upload_file
+                elif uri_parsed.scheme in ["", "file"]:
+                    uri_exp = uri_parsed.path
+                    action = copy_file
+                else:
+                    raise_task_error(self, f"Unsupported protocol '{uri_parsed.scheme}' in URI '{uri_exp}'")
+
+                if uri_exp.endswith("/"):
+                    generator = list_files
+                else:
+                    generator = functools.partial(archive_files, filename=fs.path.basename(uri_parsed.path))
+                    uri_exp = fs.path.dirname(uri_exp) + "/"
+
+                if action is copy_file:
+                    uri_exp = tools.expand_path(uri_exp) + "/"
+
+                for cwd, file in generator(self, artifact, tools):
+                    action(self, tools, cwd, file, uri_exp)
+
+            if name == "main":
+                setattr(cls, "publish", publish)
+            else:
+                setattr(cls, "publish_" + name, publish)
             return cls
 
         return decorate

@@ -319,3 +319,137 @@ class ArtifactApi(JoltTest):
         self.assertBuild(r, "session:fail=true")
         self.assertEqual(1, len(a))
         self.assertExists(a[0], "file.txt")
+
+    def test_artifact_upload_files_to_dir(self):
+        """
+        --- file: file1.txt
+        --- file: dir/file2.txt
+        --- tasks:
+
+        @attributes.artifact_upload("output/")
+        @influence.files("**/*.txt")
+        class Upload(Task):
+            def publish(self, a, t):
+                a.collect("**/*.txt")
+        ---
+        """
+        r = self.build("upload")
+        self.assertExists("output", "file1.txt")
+        self.assertExists("output", "dir", "file2.txt")
+
+    def test_artifact_upload_archive_to_dir(self):
+        """
+        --- file: file1.txt
+        --- file: dir/file2.txt
+        --- tasks:
+
+        @attributes.artifact_upload("output/artifact.zip")
+        @influence.files("**/*.txt")
+        class Upload(Task):
+            def publish(self, a, t):
+                a.collect("**/*.txt")
+        ---
+        """
+        r = self.build("upload")
+        self.assertExists("output", "artifact.zip")
+
+    def test_artifact_upload_files_to_http(self):
+        """
+        --- file: file1.txt
+        --- file: dir/file2.txt
+        --- tasks:
+        import time
+        from jolt.plugins import docker
+
+        class Server(docker.DockerContainer):
+            image = "robrt/jolt-cache:latest"
+            arguments = ["-i"]
+            volumes = ["{{joltdir}}/www:/data"]
+
+        @attributes.artifact_upload("http://{{host}}:8080/files/")
+        @influence.files("**/*.txt")
+        class Upload(Task):
+            requires = ["server"]
+
+            def run(self, d, t):
+                self.host = d["server"].info["NetworkSettings"]["IPAddress"]
+
+            def publish(self, a, t):
+                a.collect("**/*.txt")
+
+        ---
+        """
+        with self.tools.cwd(self.ws):
+            self.tools.mkdir("www")
+        r = self.build("upload")
+        self.assertExists("www", "files", "file1.txt")
+        self.assertExists("www", "files", "dir", "file2.txt")
+
+    def test_artifact_upload_archive_to_http(self):
+        """
+        --- file: file1.txt
+        --- file: dir/file2.txt
+        --- tasks:
+        import time
+        from jolt.plugins import docker
+
+        class Server(docker.DockerContainer):
+            image = "robrt/jolt-cache:latest"
+            arguments = ["-i"]
+            volumes = ["{{joltdir}}/www:/data"]
+
+        @attributes.artifact_upload("http://user:pass@{{host}}:8080/files/archive.tgz")
+        @influence.files("**/*.txt")
+        class Upload(Task):
+            requires = ["server"]
+
+            def run(self, d, t):
+                self.host = d["server"].info["NetworkSettings"]["IPAddress"]
+
+            def publish(self, a, t):
+                a.collect("**/*.txt")
+
+        ---
+        """
+        with self.tools.cwd(self.ws):
+            self.tools.mkdir("www")
+        self.build("upload")
+        self.assertExists("www", "files", "archive.tgz")
+
+    def test_artifact_upload_condition(self):
+        """
+        --- file: file1.txt
+        --- file: dir/file2.txt
+        --- tasks:
+
+        @attributes.artifact_upload("output/", condition=lambda self: self.upload)
+        @influence.files("**/*.txt")
+        class Upload(Task):
+            upload = BooleanParameter(True)
+            def publish(self, a, t):
+                a.collect("**/*.txt")
+        ---
+        """
+        r = self.build("upload:upload=false")
+        self.assertNotExists("output", "file1.txt")
+
+        r = self.build("upload:upload=true")
+        self.assertExists("output", "file1.txt")
+
+    def test_artifact_upload_named(self):
+        """
+        --- file: file1.txt
+        --- file: dir/file2.txt
+        --- tasks:
+
+        @attributes.artifact("logs")
+        @attributes.artifact_upload("output/", name="logs")
+        @influence.files("**/*.txt")
+        class Upload(Task):
+            def publish_logs(self, a, t):
+                a.collect("**/*.txt")
+        ---
+        """
+        r = self.build("upload")
+        self.assertExists("output", "file1.txt")
+        self.assertExists("output", "dir", "file2.txt")

@@ -25,6 +25,8 @@ from jinja2.exceptions import TemplateError
 from jinja2.runtime import Context
 from jinja2.utils import missing
 from requests import Session
+from requests.auth import HTTPBasicAuth
+from urllib.parse import urlparse
 
 
 from jolt import cache
@@ -863,6 +865,17 @@ class Tools(object):
                 del self._env[key]
         self._env.update(restore)
 
+    def exists(self, pathname):
+        """ Checks if a file or directory exists.
+
+        Args:
+            pathname (str): Path to file or directory.
+
+        Returns:
+            bool: True if the file or directory exists, False otherwise.
+        """
+        return fs.path.exists(self.expand_path(pathname))
+
     def expand(self, string, *args, **kwargs):
         """ Expands keyword arguments/macros in a format string.
 
@@ -1093,6 +1106,18 @@ class Tools(object):
         elif not fs.path.isabs(pathname):
             files = [self.expand_relpath(file, self.getcwd()) for file in files]
         return list(sorted(files))
+
+    def isdir(self, pathname):
+        """ Determines if a path is a directory.
+
+        Args:
+            pathname (str): Path to a file or directory.
+
+        Returns:
+            boolean: True if the path is a directory, False otherwise.
+        """
+        pathname = self.expand_path(pathname)
+        return fs.path.isdir(pathname)
 
     def mkdir(self, pathname, recursively=True):
         """ Create directory. """
@@ -1939,8 +1964,19 @@ class Tools(object):
 
         """
         pathname = self.expand_path(pathname)
+        url = self.expand(url)
         name = fs.path.basename(pathname)
         size = self.file_size(pathname)
+
+        url_parsed = urlparse(url)
+        raise_task_error_if(
+            not url_parsed.scheme or not url_parsed.netloc,
+            self._task,
+            "Invalid URL: '{}'", url)
+
+        if auth is None and url_parsed.username and url_parsed.password:
+            auth = HTTPBasicAuth(url_parsed.username, url_parsed.password)
+
         with log.progress("Uploading " + utils.shorten(name), size, "B") as pbar, \
              open(pathname, 'rb') as fileobj:
             log.verbose("{} -> {}", pathname, url)
