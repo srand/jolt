@@ -28,8 +28,8 @@ class Worker(Resource):
                 tools.replace_in_file(
                     "jolt.yaml", "robrt/jolt-worker:latest",
                     tools.expand("robrt/jolt-worker:{deps[jolt/worker].task.identity}", deps=deps))
+                tools.replace_in_file("jolt.yaml", "replicas: 2", "replicas: 1")
                 tools.run("docker stack deploy -c jolt.yaml jolt_test", output_on_error=True)
-                tools.run("docker service scale jolt_test_worker=1", output_on_error=True)
                 config = tools.read_file("client.conf")
                 config += "\n[selfdeploy]\nfloating = true\nbaseUri = http://cache:8080/files"
                 if self.storage in ["http"]:
