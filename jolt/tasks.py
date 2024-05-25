@@ -27,6 +27,7 @@ from jolt.error import JoltError, JoltCommandError, LoggedJoltError
 from jolt.expires import Immediately
 from jolt.influence import FileInfluence, TaintInfluenceProvider
 from jolt.influence import TaskClassSourceInfluence
+from jolt.influence import CallbackInfluence
 from jolt.influence import attribute as attribute_influence
 from jolt.influence import environ as environ_influence
 from jolt.influence import source as source_influence
@@ -1045,6 +1046,21 @@ class attributes:
                 setattr(cls, "publish", publish)
             else:
                 setattr(cls, "publish_" + name, publish)
+
+            if condition:
+                old_init = cls.__init__
+
+                @functools.wraps(cls.__init__)
+                def new_init(self, *args, **kwargs):
+                    old_init(self, *args, **kwargs)
+
+                    def make_bool(fn, *args, **kwargs):
+                        return bool(fn(*args, **kwargs))
+
+                    self.influence.append(CallbackInfluence(f"Upload {name}", make_bool, condition, self))
+
+                cls.__init__ = new_init
+
             return cls
 
         return decorate

@@ -223,6 +223,18 @@ class TaskClassSourceInfluence(HashInfluenceProvider):
         return result
 
 
+class CallbackInfluence(HashInfluenceProvider):
+    def __init__(self, desc, fn, *args, **kwargs):
+        self.name = "Callback"
+        self.desc = desc
+        self.fn = fn
+        self.args = args
+        self.kwargs = kwargs
+
+    def get_influence(self, task):
+        return self.desc + ": " + str(self.fn(*self.args, **self.kwargs))
+
+
 class TaskRequirementInfluence(HashInfluenceProvider):
     name = "Requirement"
 

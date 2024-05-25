@@ -9,7 +9,7 @@ class Server(DockerContainer):
     user = "root"
 
 
-@attributes.artifact_upload("http://{server}:8080/files/artifact-{version}.zip")
+@attributes.artifact_upload("http://{server}:8080/files/artifact-{version}.zip", condition=lambda self: self.tools.getenv("UPLOAD", None) is not None)
 class Upload(Task):
     """ Uploads the artifact to a server """
 

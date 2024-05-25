@@ -1093,7 +1093,7 @@ class Tools(object):
         """ Returns the current working directory. """
         return fs.path.normpath(self._cwd)
 
-    def getenv(self, key, default=""):
+    def getenv(self, key, default=None):
         """ Returns the value of an environment variable.
 
         Only child processes spawned by the same tools object can see
