@@ -792,7 +792,7 @@ class Tools(object):
         finally:
             self._cwd = prev
 
-    def download(self, url, pathname, exceptions=True, **kwargs):
+    def download(self, url, pathname, exceptions=True, auth=None, **kwargs):
         """
         Downloads a file using HTTP.
 
@@ -808,16 +808,32 @@ class Tools(object):
 
         url = self.expand(url)
         pathname = self.expand_path(pathname)
+
+        url_parsed = urlparse(url)
+        raise_task_error_if(
+            not url_parsed.scheme or not url_parsed.netloc,
+            self._task,
+            "Invalid URL: '{}'", url)
+
+        if auth is None and url_parsed.username and url_parsed.password:
+            auth = HTTPBasicAuth(url_parsed.username, url_parsed.password)
+
+        # Redact password from URL if present
+        if url_parsed.password:
+            url_parsed = url_parsed._replace(netloc=url_parsed.netloc.replace(url_parsed.password, "****"))
+
+        url_cleaned = urlunparse(url_parsed)
+
         try:
-            response = http_session.get(url, stream=True, **kwargs)
+            response = http_session.get(url, stream=True, auth=auth, **kwargs)
             raise_error_if(
                 exceptions and response.status_code not in [200],
-                f"Download from '{url}' failed with status '{response.status_code}'")
+                f"Download from '{url_cleaned}' failed with status '{response.status_code}'")
 
             name = fs.path.basename(pathname)
             size = int(response.headers.get('content-length', 0))
             with log.progress("Downloading {0}".format(utils.shorten(name)), size, "B") as pbar:
-                log.verbose("{} -> {}", url, pathname)
+                log.verbose("{} -> {}", url_cleaned, pathname)
                 with open(pathname, 'wb') as out_file:
                     chunk_size = 4096
                     for data in response.iter_content(chunk_size=chunk_size):
