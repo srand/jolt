@@ -358,6 +358,7 @@ class ArtifactApi(JoltTest):
         --- file: file1.txt
         --- file: dir/file2.txt
         --- tasks:
+        import os
         import time
         from jolt.plugins import docker
 
@@ -366,14 +367,17 @@ class ArtifactApi(JoltTest):
             image = "robrt/jolt-cache:latest"
             requires = ["docker/cli"]
             volumes = ["{{joltdir}}/www:/data"]
+            ports = ["8080"]
 
-        @attributes.artifact_upload("http://{{host}}:8080/files/")
+        @attributes.artifact_upload("http://{{host}}:{{port}}/files/")
         @influence.files("**/*.txt")
         class Upload(Task):
             requires = ["server"]
 
             def run(self, d, t):
-                self.host = d["server"].info["NetworkSettings"]["IPAddress"]
+                time.sleep(2)
+                self.host = os.getenv("DOCKER_PUBLIC_IP", "127.0.0.1")
+                self.port = d["server"].info["NetworkSettings"]["Ports"]["8080/tcp"][0]["HostPort"]
 
             def publish(self, a, t):
                 a.collect("**/*.txt")
@@ -391,6 +395,7 @@ class ArtifactApi(JoltTest):
         --- file: file1.txt
         --- file: dir/file2.txt
         --- tasks:
+        import os
         import time
         from jolt.plugins import docker
 
@@ -399,14 +404,17 @@ class ArtifactApi(JoltTest):
             image = "robrt/jolt-cache:latest"
             requires = ["docker/cli"]
             volumes = ["{{joltdir}}/www:/data"]
+            ports = ["8080"]
 
-        @attributes.artifact_upload("http://user:pass@{{host}}:8080/files/archive.tgz")
+        @attributes.artifact_upload("http://user:pass@{{host}}:{{port}}/files/archive.tgz")
         @influence.files("**/*.txt")
         class Upload(Task):
             requires = ["server"]
 
             def run(self, d, t):
-                self.host = d["server"].info["NetworkSettings"]["IPAddress"]
+                time.sleep(2)
+                self.host = os.getenv("DOCKER_PUBLIC_IP", "127.0.0.1")
+                self.port = d["server"].info["NetworkSettings"]["Ports"]["8080/tcp"][0]["HostPort"]
 
             def publish(self, a, t):
                 a.collect("**/*.txt")
