@@ -384,6 +384,8 @@ class ArtifactApi(JoltTest):
 
         ---
         """
+        self.skip("Currently can't run inside CI containers")
+
         with self.tools.cwd(self.ws):
             self.tools.mkdir("www")
         r = self.build("upload")
@@ -421,6 +423,8 @@ class ArtifactApi(JoltTest):
 
         ---
         """
+        self.skip("Currently can't run inside CI containers")
+
         with self.tools.cwd(self.ws):
             self.tools.mkdir("www")
         self.build("upload")
