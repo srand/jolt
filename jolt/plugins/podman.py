@@ -34,7 +34,7 @@ class PodmanImportListVariable(PodmanListVariable):
                 tag = artifact.tools.expand("{canonical_name}:{identity}")
             task.tools.run(
                 "podman import {} {}",
-                fs.path.join(artifact.path, tar, tag), output_on_error=True)
+                fs.path.join(artifact.path, tar), tag, output_on_error=True)
             for extra_tag in artifact.podman.tags[1:]:
                 task.tools.run("podman tag {} {}", tag, extra_tag, output_on_error=True)
 

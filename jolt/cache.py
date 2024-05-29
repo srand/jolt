@@ -251,6 +251,12 @@ class ArtifactListAttribute(ArtifactAttribute):
         self._name = name
         self._value = []
 
+    def __getitem__(self, key):
+        return self._value[key]
+
+    def __getslice__(self, i, j):
+        return self._value[i:j]
+
     def get_name(self):
         return self._name
 
