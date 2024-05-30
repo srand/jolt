@@ -110,7 +110,7 @@ func (svc *cacheService) HasTree(req *HasTreeRequest, server CacheService_HasTre
 			}
 
 		sendResponse:
-			if response.MissingObjects == nil && response.MissingTrees == nil {
+			if len(response.MissingObjects) == 0 && len(response.MissingTrees) == 0 {
 				return nil
 			}
 
