@@ -387,29 +387,14 @@ class RemoteSession(object):
         # Lock to ensure only one build is registered at a time.
         self.lock = Lock()
 
+        # The build environment: client, workspace, etc.
+        self.buildenv = None
+
+
     def initialize(self, graph):
         """ Initialize the session with the scheduler. """
+        self.graph = graph
 
-        registry = ExecutorRegistry.get()
-
-        # Create a list of parameters to send to the scheduler.
-        parameters = []
-        for key, value in registry.get_network_parameters(None).items():
-            parameters.append(common_pb.Property(key=key, value=value))
-
-        # Add parameters from the config / command line (-c params.key).
-        parameters.extend(config.export_params())
-
-        # Create the build environment.
-        self.buildenv = common_pb.BuildEnvironment(
-            client=selfdeploy.get_client(),
-            parameters=parameters,
-            task_default_parameters=scheduler.export_task_default_params(graph.tasks),
-            tasks=scheduler.export_tasks(graph.tasks + graph.pruned),
-            workspace=loader.export_workspace(graph.tasks),
-            loglevel=log.get_level_pb(),
-            config=config.export_config(),
-        )
 
     @locked
     def make_build_request(self):
@@ -418,6 +403,29 @@ class RemoteSession(object):
         # If a build is already registered, return.
         if self.build:
             return
+
+        registry = ExecutorRegistry.get()
+
+        if not self.buildenv:
+            # Create a list of parameters to send to the scheduler.
+            parameters = []
+            for key, value in registry.get_network_parameters(None).items():
+                parameters.append(common_pb.Property(key=key, value=value))
+
+            # Add parameters from the config / command line (-c params.key).
+            parameters.extend(config.export_params())
+
+
+            # Create the build environment.
+            self.buildenv = common_pb.BuildEnvironment(
+                client=selfdeploy.get_client(),
+                parameters=parameters,
+                task_default_parameters=scheduler.export_task_default_params(self.graph.tasks),
+                tasks=scheduler.export_tasks(self.graph.tasks + self.graph.pruned),
+                workspace=loader.export_workspace(self.graph.tasks),
+                loglevel=log.get_level_pb(),
+                config=config.export_config(),
+            )
 
         # Create the build request.
         req = scheduler_pb.BuildRequest(

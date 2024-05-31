@@ -400,22 +400,33 @@ def export_workspace(tasks=None):
     # Push workspace to remote cache if possible
     if fstree_enabled and fstree and cache_grpc_uri:
         with tools.cwd(loader.workspace_path):
-            if not os.path.exists(tools.expand_path(".jolt/index")):
+            cwd = tools.getcwd()
+            cachedir=config.get_cachedir()
+            indexhash = utils.sha1(cwd)
+            indexfile = tools.expand_path(
+                "{cachedir}/indexes/{}/{}",
+                indexhash[:2], indexhash[2:],
+                cwd=fs.posixpath.abspath(cwd),
+                cachedir=cachedir)
+
+            if not os.path.exists(indexfile):
                 log.info("Indexing workspace for the first time, please wait")
                 tree = tools.run(
-                    "{} write-tree --cache {} --ignore .joltignore --index .jolt/index --threads {}",
+                    "{} write-tree --cache {cachedir} --ignore .joltignore --index {indexfile} --threads {threads}",
                     fstree,
-                    config.get_cachedir(),
-                    tools.thread_count(),
+                    cachedir=cachedir,
+                    indexfile=indexfile,
+                    threads=tools.thread_count(),
                     output_on_error=True)
 
-            log.info("Pushing {} to remote cache", tools.getcwd())
+            log.info("Pushing {} to remote cache", cwd)
             tree = tools.run(
-                "{} write-tree-push --cache {} --ignore .joltignore --index .jolt/index --remote {} --threads {}",
+                "{} write-tree-push --cache {cachedir} --ignore .joltignore --index {indexfile} --remote {remote} --threads {threads}",
                 fstree,
-                config.get_cachedir(),
-                cache_grpc_uri.geturl(),
-                tools.thread_count(),
+                cachedir=cachedir,
+                indexfile=indexfile,
+                remote=cache_grpc_uri.geturl(),
+                threads=tools.thread_count(),
                 output_on_error=True)
 
     workspace = common_pb.Workspace(
