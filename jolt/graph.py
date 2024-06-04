@@ -269,7 +269,11 @@ class TaskProxy(object):
         return self.status() == common_pb.TaskStatus.TASK_RUNNING
 
     def is_unpackable(self):
-        return self.task.unpack.__func__ is not Task.unpack
+        tasks = [self] + self.extensions
+        artifacts = []
+        for task in tasks:
+            artifacts.extend(task._artifacts)
+        return any(map(lambda artifact: artifact.is_unpackable(), artifacts))
 
     def is_unpacked(self):
         tasks = [self] + self.extensions

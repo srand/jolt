@@ -424,7 +424,7 @@ class Artifact(object):
 
     This is useful as an abstraction when directories or filenames
     have varying names.
-
+class Artifact(
     Example:
 
         .. code-block:: python
@@ -819,7 +819,9 @@ class Artifact(object):
     def is_unpackable(self):
         if not self._node:
             return True
-        return self._node.is_unpackable()
+        if self.name == "main":
+            return self._task.unpack.__func__ is not tasks.Task.unpack
+        return getattr(self._task, "unpack_" + self.name, tasks.Task.unpack) is not tasks.Task.unpack
 
     def is_unpacked(self):
         return self._unpacked
@@ -1618,7 +1620,15 @@ class ArtifactCache(StorageProvider):
                     if task.unpack.__func__ is not tasks.Task.unpack:
                         task.info("Unpack started {}", artifact.get_node().log_name)
                     artifact._set_unpacked()
-                    task.unpack(artifact, t)
+                    if artifact.name == "main":
+                        task.unpack(artifact, t)
+                    else:
+                        unpack = getattr(task, "unpack_" + artifact.name, None)
+                        raise_task_error_if(
+                            unpack is None, task,
+                            "Artifact unpack method not found: unpack_{}", artifact.name)
+                        unpack(artifact, t)
+
                     self.commit(artifact, uploadable=False)
 
                 except NotImplementedError:

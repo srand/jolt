@@ -228,8 +228,14 @@ class ArtifactApi(JoltTest):
             def publish(self, a, t):
                 a.collect("main.txt")
 
+            def unpack(self, a, t):
+                self.info("Unpacking {{}}", a.name)
+
             def publish_files(self, a, t):
                 a.collect("file.txt")
+
+            def unpack_files(self, a, t):
+                self.info("Unpacking {{}}", a.name)
 
 
         class B(Task):
@@ -275,6 +281,8 @@ class ArtifactApi(JoltTest):
         self.assertExists(a[0], "main1.txt")
         self.assertExists(a[0], "main2.txt")
         self.assertExists(a[0], "file1.txt")
+        self.assertIn("Unpacking main", r)
+        self.assertIn("Unpacking files", r)
 
         # Test name of artifact
         self.build("canonical")
@@ -294,6 +302,39 @@ class ArtifactApi(JoltTest):
         a = self.artifacts(self.lastLog())
         self.assertEqual(1, len(a))
         self.assertExists(a[0], "file.txt")
+
+    def test_multiple_no_unpack(self):
+        """
+        --- file: main.txt
+        Main
+        --- file: file.txt
+        File
+        --- tasks:
+        @attributes.artifact("files")
+        @influence.files("*.txt")
+        class A(Task):
+            def publish(self, a, t):
+                a.collect("main.txt")
+
+            def unpack(self, a, t):
+                self.info("Unpacking {{}}", a.name)
+
+            def publish_files(self, a, t):
+                a.collect("file.txt")
+
+        class B(Task):
+            requires = ["c=a"]
+
+            def run(self, d, t):
+                assert d["main@a"].is_unpacked()
+                assert d["files@a"].is_unpacked()
+                assert not d["main@a"].is_uploadable()
+                assert d["files@a"].is_uploadable()
+        ---
+        """
+        r = self.build("b")
+        a = self.artifacts(r)
+
 
     def test_uncacheable_session_artifact(self):
         """
