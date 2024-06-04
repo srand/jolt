@@ -101,6 +101,11 @@ def gdb(ctx, task, default, machine_interface, no_binary, gdb_args):
                 if isinstance(task.task, WorkspaceResource):
                     task.task.acquire()
 
+                # Unpack the task if it is not a resource task and has a custom unpack method
+                if not task.is_resource():
+                    if task.is_unpackable():
+                        task.unpack()
+
                 p.update(1)
 
     except KeyboardInterrupt:

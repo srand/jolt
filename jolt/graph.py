@@ -680,6 +680,10 @@ class TaskProxy(object):
     def report(self):
         return self.task.report()
 
+    def unpack(self):
+        """ Unpacks all artifacts produced by this task. """
+        for artifact in self.artifacts:
+            self.cache.unpack(artifact)
 
 class Graph(object):
     def __init__(self):

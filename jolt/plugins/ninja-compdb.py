@@ -17,6 +17,7 @@ from jolt.influence import StringInfluence
 from jolt.options import JoltOptions
 from jolt.plugins import ninja
 from jolt.tasks import TaskRegistry
+from jolt.tasks import WorkspaceResource
 
 log.verbose("[NinjaCompDB] Loaded")
 
@@ -232,7 +233,7 @@ def compdb(ctx, task, default):
     dag = gb.build(task)
 
     try:
-        with log.progress("Progress", dag.number_of_tasks(), " tasks", estimates=False, debug=False) as p:
+        with log.progress("Progress", dag.number_of_tasks(), " tasks", estimates=False, debug=False) as progress:
             while dag.has_tasks() or not queue.empty():
                 leafs = dag.select(lambda graph, task: task.is_ready())
 
@@ -244,7 +245,19 @@ def compdb(ctx, task, default):
                     queue.submit(task)
 
                 task, error = queue.wait()
-                p.update(1)
+
+                # Materialize workspace resources so that
+                # source code is available to the debugger.
+                if isinstance(task.task, WorkspaceResource):
+                    task.task.acquire()
+
+                # Unpack the task if it is not a resource task and has a custom unpack method
+                if not task.is_resource():
+                    if task.is_unpackable():
+                        task.unpack()
+
+                progress.update(1)
+
 
     except KeyboardInterrupt:
         print()

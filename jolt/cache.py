@@ -879,7 +879,7 @@ class Context(object):
                     )
 
                     # Don't include session artifacts that don't exist,
-                    # i.e. were no build has taken place due to presence
+                    # i.e. where no build has taken place due to presence
                     # of the persistent artifacts.
                     if artifact.is_session() and not self._cache.is_available_locally(artifact):
                         continue
