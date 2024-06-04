@@ -274,6 +274,10 @@ def compdb(ctx, task, default):
         queue.shutdown()
 
     for goal in dag.goals:
+        if goal.is_resource():
+            continue
+        if goal.is_alias():
+            continue
         compdb_artifact, artifacts = get_task_artifacts(goal)
         db = CompDB("compdb/all_compile_commands.json", compdb_artifact)
         db.read()
