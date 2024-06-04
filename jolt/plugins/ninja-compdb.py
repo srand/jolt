@@ -258,7 +258,6 @@ def compdb(ctx, task, default):
 
                 progress.update(1)
 
-
     except KeyboardInterrupt:
         print()
         log.warning("Interrupted by user")

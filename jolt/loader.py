@@ -401,7 +401,7 @@ def export_workspace(tasks=None):
     if fstree_enabled and fstree and cache_grpc_uri:
         with tools.cwd(loader.workspace_path):
             cwd = tools.getcwd()
-            cachedir=config.get_cachedir()
+            cachedir = config.get_cachedir()
             indexhash = utils.sha1(cwd)
             indexfile = tools.expand_path(
                 "{cachedir}/indexes/{}/{}",

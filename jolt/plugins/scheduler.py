@@ -390,11 +390,9 @@ class RemoteSession(object):
         # The build environment: client, workspace, etc.
         self.buildenv = None
 
-
     def initialize(self, graph):
         """ Initialize the session with the scheduler. """
         self.graph = graph
-
 
     @locked
     def make_build_request(self):
@@ -414,7 +412,6 @@ class RemoteSession(object):
 
             # Add parameters from the config / command line (-c params.key).
             parameters.extend(config.export_params())
-
 
             # Create the build environment.
             self.buildenv = common_pb.BuildEnvironment(

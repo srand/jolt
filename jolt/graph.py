@@ -18,7 +18,7 @@ from jolt.error import raise_error_if
 from jolt.error import raise_task_error_if
 from jolt.influence import HashInfluenceRegistry, TaskRequirementInfluence
 from jolt.options import JoltOptions
-from jolt.tasks import Alias, Resource, WorkspaceResource, Task
+from jolt.tasks import Alias, Resource, WorkspaceResource
 
 
 class TaskProxy(object):
@@ -688,6 +688,7 @@ class TaskProxy(object):
         """ Unpacks all artifacts produced by this task. """
         for artifact in self.artifacts:
             self.cache.unpack(artifact)
+
 
 class Graph(object):
     def __init__(self):
