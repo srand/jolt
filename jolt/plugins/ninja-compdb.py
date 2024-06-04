@@ -89,7 +89,9 @@ def has_incpaths(artifact):
 
 def stage_artifacts(artifacts, tools):
     for artifact in filter(has_incpaths, artifacts):
-        tools.sandbox(artifact, incremental=True, reflect=fs.has_symlinks())
+        tools.sandbox(artifact, incremental=True)
+        if fs.has_symlinks:
+            tools.sandbox(artifact, incremental=True, reflect=True)
 
 
 def get_compdb_artifacts(task):
