@@ -392,7 +392,8 @@ class RemoteSession(object):
 
     def initialize(self, graph):
         """ Initialize the session with the scheduler. """
-        self.graph = graph
+        self.tasks = graph.tasks
+        self.pruned = graph.pruned
 
     @locked
     def make_build_request(self):
@@ -417,9 +418,9 @@ class RemoteSession(object):
             self.buildenv = common_pb.BuildEnvironment(
                 client=selfdeploy.get_client(),
                 parameters=parameters,
-                task_default_parameters=scheduler.export_task_default_params(self.graph.tasks),
-                tasks=scheduler.export_tasks(self.graph.tasks + self.graph.pruned),
-                workspace=loader.export_workspace(self.graph.tasks),
+                task_default_parameters=scheduler.export_task_default_params(self.tasks),
+                tasks=scheduler.export_tasks(self.tasks + self.pruned),
+                workspace=loader.export_workspace(self.tasks),
                 loglevel=log.get_level_pb(),
                 config=config.export_config(),
             )

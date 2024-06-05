@@ -798,7 +798,7 @@ class Graph(object):
 
     @property
     def pruned(self):
-        return self._pruned
+        return [p for p in self._pruned]
 
     @property
     def roots(self):
