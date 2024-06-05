@@ -321,7 +321,7 @@ class _AutoTools(object):
         with self.tools.cwd(self.builddir), self.tools.environ(DESTDIR=self.installdir):
             self.tools.run("{0}/configure --prefix={1} {2}",
                            sourcedir, prefix,
-                           self.tools.getenv("CONFIGURE_FLAGS"),
+                           self.tools.getenv("CONFIGURE_FLAGS", ""),
                            output=True)
 
     def build(self, *args, **kwargs):
