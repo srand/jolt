@@ -131,7 +131,7 @@ def cli(ctx, verbose, config_file, debugger, profile,
     log.verbose("Jolt host: {}", environ.get("HOSTNAME", "localhost"))
     log.verbose("Jolt install path: {}", fs.path.dirname(__file__))
 
-    if ctx.invoked_subcommand in ["config", "log"]:
+    if ctx.invoked_subcommand in ["config", "executor", "log"]:
         # Don't attempt to load any task recipes as they might require
         # plugins that are not yet configured.
         return
