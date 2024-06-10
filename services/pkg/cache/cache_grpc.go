@@ -1,16 +1,14 @@
 package cache
 
 import (
-	"container/list"
 	context "context"
 	"io"
-	"sync"
-
-	"golang.org/x/sync/errgroup"
+	sync "sync"
 
 	"github.com/srand/jolt/scheduler/pkg/fstree"
 	"github.com/srand/jolt/scheduler/pkg/log"
 	"github.com/srand/jolt/scheduler/pkg/utils"
+	"golang.org/x/sync/errgroup"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
 )
@@ -47,84 +45,84 @@ func (svc *cacheService) HasObject(ctx context.Context, req *HasObjectRequest) (
 	}, nil
 }
 
-func (svc *cacheService) HasTree(req *HasTreeRequest, server CacheService_HasTreeServer) error {
-	m := sync.Mutex{}
-	trees := list.New()
+func (svc *cacheService) checkTree(server CacheService_HasTreeServer, m *sync.Mutex, eg *errgroup.Group, digest utils.Digest) error {
+	var tree *fstree.Tree
 
+	response := &HasTreeResponse{
+		MissingTrees:   make([]string, 0),
+		MissingObjects: make([]string, 0),
+	}
+
+	// Read the tree from the cache.
+	reader, err := svc.cache.ReadObject(digest)
+	if err != nil {
+		response.MissingTrees = append(response.MissingTrees, digest.Hex())
+		goto sendResponse
+	}
+
+	tree, err = fstree.ReadTree(reader)
+	if err != nil {
+		return status.Errorf(codes.Internal, "failed to read tree: %v: %v", digest.Hex(), err)
+	}
+
+	for _, child := range tree.Children {
+		digest := utils.NewDigest(utils.Sha1Algorithm, child.Digest())
+
+		switch child.Type() {
+		case fstree.InodeType_Directory:
+			eg.Go(func() error {
+				return svc.checkTree(server, m, eg, digest)
+			})
+
+		case fstree.InodeType_Symlink:
+			// Skip symlinks.
+
+		default:
+			if info := svc.cache.HasObject(digest); info == nil {
+				response.MissingObjects = append(response.MissingObjects, child.Digest())
+			}
+		}
+	}
+
+sendResponse:
+	if len(response.MissingObjects) == 0 && len(response.MissingTrees) == 0 {
+		return nil
+	}
+
+	m.Lock()
+	defer m.Unlock()
+
+	err = server.Send(response)
+	if err != nil {
+		return status.Errorf(codes.Internal, "failed to send response: %v", err)
+	}
+
+	return nil
+}
+
+func (svc *cacheService) HasTree(req *HasTreeRequest, server CacheService_HasTreeServer) error {
+	eg := errgroup.Group{}
+	trees := []utils.Digest{}
+	m := sync.Mutex{}
+
+	// For each digest in the list
 	for _, digest := range req.Digest {
 		d, err := utils.ParseDigest(digest)
 		if err != nil {
 			return status.Errorf(codes.InvalidArgument, "invalid digest: %v", err)
 		}
-
-		trees.PushBack(d)
+		trees = append(trees, d)
 	}
 
-	eg := errgroup.Group{}
-
-	for trees.Len() > 0 {
-		m.Lock()
-		front := trees.Front()
-		trees.Remove(front)
-		m.Unlock()
-
-		digest := front.Value.(utils.Digest)
-
+	for i := range trees {
+		digest := trees[i]
 		eg.Go(func() error {
-			var tree *fstree.Tree
-
-			response := &HasTreeResponse{
-				MissingTrees:   make([]string, 0),
-				MissingObjects: make([]string, 0),
-			}
-
-			// Read the tree from the cache.
-			reader, err := svc.cache.ReadObject(digest)
-			if err != nil {
-				response.MissingTrees = append(response.MissingTrees, digest.Hex())
-				goto sendResponse
-			}
-
-			tree, err = fstree.ReadTree(reader)
-			if err != nil {
-				return status.Errorf(codes.Internal, "failed to read tree: %v: %v", digest.Hex(), err)
-			}
-
-			for _, child := range tree.Children {
-				digest := utils.NewDigest(utils.Sha1Algorithm, child.Digest())
-
-				switch child.Type() {
-				case fstree.InodeType_Directory:
-					m.Lock()
-					trees.PushBack(digest)
-					m.Unlock()
-
-				case fstree.InodeType_Symlink:
-					// Skip symlinks.
-
-				default:
-					if info := svc.cache.HasObject(digest); info == nil {
-						response.MissingObjects = append(response.MissingObjects, child.Digest())
-					}
-				}
-			}
-
-		sendResponse:
-			if len(response.MissingObjects) == 0 && len(response.MissingTrees) == 0 {
-				return nil
-			}
-
-			err = server.Send(response)
-			if err != nil {
-				return status.Errorf(codes.Internal, "failed to send response: %v", err)
-			}
-
-			return nil
+			return svc.checkTree(server, &m, &eg, digest)
 		})
+	}
 
-		if err := eg.Wait(); err != nil {
-			return err
-		}
+	if err := eg.Wait(); err != nil {
+		return err
 	}
 
 	return nil
