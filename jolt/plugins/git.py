@@ -360,9 +360,11 @@ class GitSrc(WorkspaceResource, FileInfluence):
     def acquire(self, artifact, deps, tools, owner):
         self._acquire_ws()
         artifact.worktree = self.abspath
-        if not hasattr(owner, "git"):
-            owner.git = {}
-        owner.git[self._get_name()] = self.abspath
+
+    def prepare_ws_for(self, task):
+        if not hasattr(task, "git"):
+            task.git = {}
+        task.git[self._get_name()] = self.abspath
 
     def acquire_ws(self):
         if self.defer is None or self.defer.is_false:
@@ -395,9 +397,6 @@ class GitSrc(WorkspaceResource, FileInfluence):
         return fs.is_relative_to(path, self.abspath) and self.sha.is_set()
 
 
-TaskRegistry.get().add_task_class(GitSrc)
-
-
 class Git(GitSrc):
     """ Clones a Git repo.
 
@@ -408,14 +407,15 @@ class Git(GitSrc):
     name = "git"
     url = Parameter(help="URL to the git repo to be cloned. Required.")
     sha = Parameter(required=False, help="Specific commit or tag to be checked out. Optional.")
+    hash = BooleanParameter(True, help="Let repo content influence the hash of consuming tasks.")
     path = Parameter(required=False, help="Local path where the repository should be cloned.")
     defer = None
     _revision = Export(value=lambda t: t._export_revision())
     _diff = Export(value=lambda t: t.git.diff(), encoded=True)
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.influence.append(self)
+    def _influence(self):
+        influence = super()._influence()
+        return influence + [self] if self.hash else influence
 
     @utils.cached.instance
     def get_influence(self, task):
