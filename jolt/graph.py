@@ -399,6 +399,12 @@ class TaskProxy(object):
             filter(lambda n: not n.is_alias() and (not n.is_resource() or dag.are_neighbors(self, n)),
                    utils.unique_list(self.children)))
 
+        # Prepare workspace resources for this task so that influence can be calculated
+        for child in self.children:
+            if not isinstance(child.task, WorkspaceResource):
+                continue
+            child.task.prepare_ws_for(self.task)
+
         self.descendants = list(self.descendants)
 
         self.task.influence += [TaskRequirementInfluence(n) for n in self.neighbors]

@@ -2742,6 +2742,14 @@ class WorkspaceResource(Resource):
     def release(self, **kwargs):
         return self.release_ws()
 
+    def prepare_ws_for(self, task):
+        """ Called to prepare the workspace for a task.
+
+        An implementor overrides this method in a subclass. The method
+        is called before the task influence is calculated and the workspace
+        resource is acquired.
+        """
+
     def acquire_ws(self):
         """ Called to acquire the resource.
 
