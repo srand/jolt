@@ -219,7 +219,7 @@ class GitRepository(object):
         if rev == self._last_rev:
             log.debug("Checkout skipped, already @ {}", rev)
             return False
-        log.info("Checking out {0} in {1}", rev, self.path)
+        log.verbose("Checking out {0} in {1}", rev, self.path)
         with self.tools.cwd(self.path):
             try:
                 self.tools.run("git checkout -f {rev}", rev=rev, output=False)
@@ -359,12 +359,12 @@ class GitSrc(WorkspaceResource, FileInfluence):
 
     def acquire(self, artifact, deps, tools, owner):
         self._acquire_ws()
-        artifact.worktree = self.abspath
+        artifact.worktree = fs.path.relpath(self.abspath, owner.joltdir)
 
     def prepare_ws_for(self, task):
         if not hasattr(task, "git"):
             task.git = {}
-        task.git[self._get_name()] = self.abspath
+        task.git[self._get_name()] = fs.path.relpath(self.abspath, task.joltdir)
 
     def acquire_ws(self):
         if self.defer is None or self.defer.is_false:
