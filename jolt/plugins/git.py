@@ -317,87 +317,7 @@ def influence(path, git_cls=GitInfluenceProvider):
     return _decorate
 
 
-class GitSrc(WorkspaceResource, FileInfluence):
-    """ Clones a Git repo.
-    """
-
-    name = "git-src"
-    url = Parameter(help="URL to the git repo to be cloned. Required.")
-    rev = Parameter(required=False, help="Specific commit or tag to be checked out. Optional.")
-    path = Parameter(required=False, help="Local path where the repository should be cloned.")
-    defer = BooleanParameter(False, help="Defer cloning until a consumer task must be built.")
-    _revision = Export(value=lambda t: t._export_revision())
-    _diff = Export(value=lambda t: t.git.diff(), encoded=True)
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.joltdir = JoltLoader.get().joltdir
-        if self.path.is_unset():
-            self.abspath = self.tools.builddir(utils.canonical(self.short_qualified_name), incremental=True, unique=False)
-            self.relpath = fs.path.relpath(self.abspath, self.tools.wsroot)
-        else:
-            self.abspath = fs.path.join(self.joltdir, str(self.path) or self._get_name())
-            self.relpath = fs.path.relpath(self.abspath, self.tools.wsroot)
-        self.refspecs = kwargs.get("refspecs", [])
-        self.git = new_git(self.url, self.abspath, self.relpath, self.refspecs)
-
-    @utils.cached.instance
-    def _get_name(self):
-        repo = fs.path.basename(self.url.get_value())
-        name, _ = fs.path.splitext(repo)
-        return name
-
-    def _export_revision(self):
-        return self.rev.value or self.git.head()
-
-    def _get_revision(self):
-        if self._revision.is_imported:
-            return self._revision.value
-        if not self.rev.is_unset():
-            return self.rev.get_value()
-        return None
-
-    def acquire(self, artifact, deps, tools, owner):
-        self._acquire_ws()
-        artifact.worktree = fs.path.relpath(self.abspath, owner.joltdir)
-
-    def prepare_ws_for(self, task):
-        if not hasattr(task, "git"):
-            task.git = {}
-        task.git[self._get_name()] = fs.path.relpath(self.abspath, task.joltdir)
-
-    def acquire_ws(self):
-        if self.defer is None or self.defer.is_false:
-            self._acquire_ws()
-
-    def _acquire_ws(self):
-        commit = None
-        if not self.git.is_cloned():
-            self.git.clone()
-        if not self._revision.is_imported:
-            self.git.diff_unchecked()
-        else:
-            commit = self._revision.value
-        rev = self._get_revision()
-        if rev is not None:
-            raise_task_error_if(
-                not self._revision.is_imported and not self.rev.is_unset() and self.git.diff(), self,
-                "Explicit revision requested but git repo '{0}' has local changes, refusing checkout", self.git.relpath)
-            # Should be safe to do this now
-            rev = self.git.rev_parse(rev)
-            if not self.git.is_head(rev) or self._revision.is_imported:
-                if self.git.checkout(rev, commit=commit):
-                    self.git.clean()
-                    self.git.patch(self._diff.value)
-
-    def get_influence(self, task):
-        return None
-
-    def is_influenced_by(self, task, path):
-        return fs.is_relative_to(path, self.abspath) and self.rev.is_set()
-
-
-class Git(GitSrc):
+class Git(WorkspaceResource, FileInfluence):
     """
     Resource that clones and monitors a Git repo.
 
@@ -445,19 +365,96 @@ class Git(GitSrc):
     rev = Parameter(required=False, help="Specific commit or tag to be checked out. Optional.")
     """ Specific commit or tag to be checked out. Optional. """
 
-    hash = BooleanParameter(True, help="Let repo content influence the hash of consuming tasks.")
+    hash = BooleanParameter(required=False, help="Let repo content influence the hash of consuming tasks.")
     """ Let repo content influence the hash of consuming tasks. Default ``True``. Optional. """
 
     path = Parameter(required=False, help="Local path where the repository should be cloned.")
     """ Alternative path where the repository should be cloned. Relative to ``joltdir``. Optional. """
 
-    defer = None
     _revision = Export(value=lambda t: t._export_revision())
+    """ To worker exported value of the revision to be checked out. """
+
     _diff = Export(value=lambda t: t.git.diff(), encoded=True)
+    """ To worker exported value of the diff of the repo. """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.joltdir = JoltLoader.get().joltdir
+
+        # Set the path to the repo
+        if self.path.is_unset():
+            self.abspath = self.tools.builddir(utils.canonical(self.short_qualified_name), incremental=True, unique=False)
+            self.relpath = fs.path.relpath(self.abspath, self.tools.wsroot)
+        else:
+            self.abspath = fs.path.join(self.joltdir, str(self.path) or self._get_name())
+            self.relpath = fs.path.relpath(self.abspath, self.tools.wsroot)
+
+        # Create the git repository
+        self.refspecs = kwargs.get("refspecs", [])
+        self.git = new_git(self.url, self.abspath, self.relpath, self.refspecs)
+
+    @utils.cached.instance
+    def _get_name(self):
+        repo = fs.path.basename(self.url.get_value())
+        name, _ = fs.path.splitext(repo)
+        return name
+
+    def _export_revision(self):
+        return self.rev.value or self.git.head()
+
+    def _get_revision(self):
+        if self._revision.is_imported:
+            return self._revision.value
+        if not self.rev.is_unset():
+            return self.rev.get_value()
+        return None
+
+    def acquire(self, artifact, deps, tools, owner):
+        self._acquire_ws()
+        artifact.worktree = fs.path.relpath(self.abspath, owner.joltdir)
+
+    def prepare_ws_for(self, task):
+        if not hasattr(task, "git"):
+            task.git = {}
+        task.git[self._get_name()] = fs.path.relpath(self.abspath, task.joltdir)
+
+    def acquire_ws(self):
+        if self._must_influence():
+            self._acquire_ws()
+
+    def _acquire_ws(self):
+        commit = None
+        if not self.git.is_cloned():
+            self.git.clone()
+        if not self._revision.is_imported:
+            self.git.diff_unchecked()
+        else:
+            commit = self._revision.value
+        rev = self._get_revision()
+        if rev is not None:
+            raise_task_error_if(
+                not self._revision.is_imported and not self.rev.is_unset() and self.git.diff(), self,
+                "Explicit revision requested but git repo '{0}' has local changes, refusing checkout", self.git.relpath)
+            # Should be safe to do this now
+            rev = self.git.rev_parse(rev)
+            if not self.git.is_head(rev) or self._revision.is_imported:
+                if self.git.checkout(rev, commit=commit):
+                    self.git.clean()
+                    self.git.patch(self._diff.value)
+
+    def _must_influence(self):
+        if self.hash.is_set():
+            return self.hash
+        if self.rev.is_unset():
+            return True
+        return False
+
+    def is_influenced_by(self, task, path):
+        return fs.is_relative_to(path, self.abspath) and self.rev.is_set()
 
     def _influence(self):
         influence = super()._influence()
-        return influence + [self] if self.hash else influence
+        return influence + [self] if self._must_influence() else influence
 
     @utils.cached.instance
     def get_influence(self, task):
