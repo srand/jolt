@@ -71,7 +71,7 @@ class GitRepository(object):
         log.info("Cloning into {0}", self.path)
         if fs.path.exists(self.path):
             with self.tools.cwd(self.path):
-                self.tools.run("git init && git remote add origin {} && git fetch",
+                self.tools.run("git init && git remote add origin {} && git fetch && git checkout FETCH_HEAD",
                                self.url, output_on_error=True)
         else:
             self.tools.run("git clone {0} {1}", self.url, self.path, output_on_error=True)
@@ -332,8 +332,12 @@ class GitSrc(WorkspaceResource, FileInfluence):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.joltdir = JoltLoader.get().joltdir
-        self.relpath = str(self.path) or self._get_name()
-        self.abspath = fs.path.join(self.joltdir, self.relpath)
+        if self.path.is_unset():
+            self.abspath = self.tools.builddir(utils.canonical(self.short_qualified_name), incremental=True, unique=False)
+            self.relpath = fs.path.relpath(self.abspath, self.tools.wsroot)
+        else:
+            self.abspath = fs.path.join(self.joltdir, str(self.path) or self._get_name())
+            self.relpath = fs.path.relpath(self.abspath, self.tools.wsroot)
         self.refspecs = kwargs.get("refspecs", [])
         self.git = new_git(self.url, self.abspath, self.relpath, self.refspecs)
 
@@ -353,8 +357,12 @@ class GitSrc(WorkspaceResource, FileInfluence):
             return self.sha.get_value()
         return None
 
-    def acquire(self, **kwargs):
+    def acquire(self, artifact, deps, tools, owner):
         self._acquire_ws()
+        artifact.worktree = self.abspath
+        if not hasattr(owner, "git"):
+            owner.git = {}
+        owner.git[self._get_name()] = self.abspath
 
     def acquire_ws(self):
         if self.defer is None or self.defer.is_false:
