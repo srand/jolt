@@ -317,6 +317,18 @@ def influence(path, git_cls=GitInfluenceProvider):
     return _decorate
 
 
+class ErrorDict(dict):
+    """ A dict that raises an error if the value of a key is None. """
+
+    def __init__(self, repo):
+        self.repo = repo
+
+    def __getitem__(self, key):
+        value = super().__getitem__(key)
+        raise_task_error_if(value is None, self.repo, "Git repository '{0}' referenced in influence collection before being cloned/checked out. Assign hash=true to the git requirement.", key)
+        return value
+
+
 class Git(WorkspaceResource, FileInfluence):
     """
     Resource that clones and monitors a Git repo.
@@ -409,16 +421,47 @@ class Git(WorkspaceResource, FileInfluence):
             return self.rev.get_value()
         return None
 
+    def _assign_git(self, task, none=False):
+        if not hasattr(task, "git"):
+            task.git = ErrorDict(self)
+        if none:
+            # None means the git repo is not cloned or checked out
+            # and should not be included in the git dictionary
+            # of the consuming task yet. If the consuming task
+            # requires the git repo for its influence collection,
+            # the dict will raise an error. The solution is to
+            # assign hash=true to the git requirement which
+            # will cause the git repo to be cloned and checked out
+            # before the influence collection is performed.
+            task.git[self._get_name()] = None
+        else:
+            # Assign the git repo to the consuming task.
+            # The git repo is cloned and checked out before
+            # any influence collection is performed.
+            task.git[self._get_name()] = fs.path.relpath(self.abspath, task.joltdir)
+
     def acquire(self, artifact, deps, tools, owner):
         self._acquire_ws()
+        self._assign_git(owner)
         artifact.worktree = fs.path.relpath(self.abspath, owner.joltdir)
 
     def prepare_ws_for(self, task):
-        if not hasattr(task, "git"):
-            task.git = {}
-        task.git[self._get_name()] = fs.path.relpath(self.abspath, task.joltdir)
+        """ Prepare the workspace for the task.
+
+        :param task: The task to prepare the workspace for.
+        """
+        if not self._must_influence():
+            # The content of the git repo is not required to influence the hash of the
+            # consumer task. The repo is therefore not cloned or checked out
+            # until the consumer is executed. Raise an error if the git repo
+            # is required for the influence collection of the consumer task.
+            self._assign_git(task, none=True)
+            return
+        # The content of the git repo is required to influence the hash of the consumer task.
+        self._assign_git(task)
 
     def acquire_ws(self):
+        """ Clone and/or checkout the git repo if required """
         if self._must_influence():
             self._acquire_ws()
 
@@ -443,14 +486,23 @@ class Git(WorkspaceResource, FileInfluence):
                     self.git.patch(self._diff.value)
 
     def _must_influence(self):
+        """ Check if the git repo must influence the hash of the consumer task."""
+
+        # If the hash parameter is set, honor it
         if self.hash.is_set():
             return self.hash
+
+        # If the revision parameter is not set, the git repo must influence the hash
         if self.rev.is_unset():
             return True
+
+        # If the revision parameter is set, no influence is needed since the
+        # revision is fixed and repository content will not change.
         return False
 
     def is_influenced_by(self, task, path):
-        return fs.is_relative_to(path, self.abspath) and self.rev.is_set()
+        influencing = self._must_influence() or self.rev.is_set()
+        return influencing and fs.is_relative_to(path, self.abspath)
 
     def _influence(self):
         influence = super()._influence()
@@ -473,9 +525,6 @@ class Git(WorkspaceResource, FileInfluence):
             th = "N/A"
 
         return "{0}: {1}".format(self.git.relpath, th)
-
-    def is_influenced_by(self, task, path):
-        return path.startswith(self.abspath + fs.sep)
 
 
 TaskRegistry.get().add_task_class(Git)
