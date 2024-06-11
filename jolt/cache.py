@@ -424,7 +424,7 @@ class Artifact(object):
 
     This is useful as an abstraction when directories or filenames
     have varying names.
-class Artifact(
+
     Example:
 
         .. code-block:: python

@@ -191,7 +191,7 @@ generic support for running any third-party build tool.
 
         def run(self, deps, tools):
             ac = tools.autotools()
-            ac.configure("e2fsprogs")
+            ac.configure(self.git["e2fsprogs"])
             ac.build()
             ac.install()
 
@@ -212,9 +212,11 @@ The task also extends the environment of consumer tasks by adding the artifact's
 explicitly referencing the artifact where they reside. Use this method to
 package tools required by other tasks.
 
-Also, note that the task requires a ``git`` repository hosted at ``kernel.org``.
-This git task, implemented by a builtin plugin, is actually not a
-task but a resource. You can read more about resources next.
+Also, note that the task requires a ``git`` repository hosted at
+``kernel.org``.  This git task, implemented by a builtin plugin, is
+actually not a task but a resource. It clones the repository and makes
+it available to the ``e2fsprogs`` task through its ``git``
+attribute. You can read more about resources next.
 
 
 Resources

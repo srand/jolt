@@ -73,6 +73,16 @@ Download
 .. reference-download-end
 
 
+Git
+---
+.. reference-git-start
+
+.. autoclass:: jolt.plugins.git.Git
+   :members: hash, sha, path, url
+
+.. reference-git-end
+
+
 Influence
 ---------
 

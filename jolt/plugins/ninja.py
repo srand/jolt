@@ -154,9 +154,9 @@ class attributes:
         The following class attributes may be set to control the behavior
         of lcov:
 
-          - ``gcov_branches`` - Enable branch coverage.
+        - ``gcov_branches`` - Enable branch coverage.
           Passed as ``-b`` on the command line. Default: ``True``
-          - ``gcov_demangle`` - Display demangled function names in output.
+        - ``gcov_demangle`` - Display demangled function names in output.
           Passed as ``-m`` on the command line. Default: ``True``
 
         The task artifact is annotated with

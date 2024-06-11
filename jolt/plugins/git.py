@@ -398,17 +398,59 @@ class GitSrc(WorkspaceResource, FileInfluence):
 
 
 class Git(GitSrc):
-    """ Clones a Git repo.
+    """
+    Resource that clones and monitors a Git repo.
 
-    Also influences the hash of consuming tasks, causing tasks to
-    be re-executed if the cloned repo is modified.
+    By default, the repo is cloned into a build directory named after
+    the resource. The 'path' parameter can be used to specify a different
+    location relative to the workspace root.
+
+    The path of the cloned repo is made available to consuming tasks
+    through their 'git' attribute. The 'git' attribute is a dictionary
+    where the key is the name of the git repository and the value is
+    the relative path to the repository from the consuming task's
+    workspace.
+
+    The resource influences the hash of consuming tasks, causing tasks
+    to be re-executed if the cloned repo is modified.
+
+    The plugin must be loaded before it can be used. This is done by
+    importing the module, or by adding the following line to the
+    configuration file:
+
+    .. code-block:: ini
+
+            [git]
+
+    Example:
+
+    .. code-block:: python
+
+            from jolt.plugins import git
+
+            class Example(Task):
+                requires = ["git:url=https://github.com/user/repo.git"]
+
+                def run(self, deps, tools):
+                    self.info("The git repo is located at: {git[repo]}")
+                    with tools.cwd(self.git["repo"]):
+                        tools.run("make")
 
     """
     name = "git"
+
     url = Parameter(help="URL to the git repo to be cloned. Required.")
+    """ URL to the git repo to be cloned. Required. """
+
     sha = Parameter(required=False, help="Specific commit or tag to be checked out. Optional.")
+    """ Specific commit or tag to be checked out. Optional. """
+
     hash = BooleanParameter(True, help="Let repo content influence the hash of consuming tasks.")
+    """ Let repo content influence the hash of consuming tasks. Default ``True``. Optional. """
+
     path = Parameter(required=False, help="Local path where the repository should be cloned.")
+    """ Alternative path where the repository should be cloned. Relative to ``joltdir``. Optional. """
+
     defer = None
     _revision = Export(value=lambda t: t._export_revision())
     _diff = Export(value=lambda t: t.git.diff(), encoded=True)

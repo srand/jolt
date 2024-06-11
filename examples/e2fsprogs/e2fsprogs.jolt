@@ -9,7 +9,7 @@ class E2fsprogs(Task):
 
     def run(self, deps, tools):
         ac = tools.autotools()
-        ac.configure("e2fsprogs")
+        ac.configure("{git[e2fsprogs]}")
         ac.build()
         ac.install()
 

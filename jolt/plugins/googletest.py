@@ -212,7 +212,7 @@ def filter(default: str = "*", param: bool = True, attr: str = "filter"):
     Task class decorator controlling the GTEST_FILTER environment variable.
 
     The variable instructs test applications to only run test-cases that matches
-    a wildcard filter string (default: *).
+    a wildcard filter string (default: ``*``).
 
     The value is taken from the parameter ``filter`` which is created
     by default. If no parameter is created, the value is instead taken from the class
