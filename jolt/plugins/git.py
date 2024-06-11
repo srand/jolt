@@ -155,30 +155,30 @@ class GitRepository(object):
                 output_on_error=True)
         return tree
 
-    def tree_hash(self, sha=None, path="/"):
-        # When sha is None, the caller want the tree hash of the repository's
+    def tree_hash(self, rev=None, path="/"):
+        # When rev is None, the caller want the tree hash of the repository's
         # current workspace state. If no checkout has been made, that would be the
         # tree that was written upon initialization of the repository as it
         # includes any uncommitted changes. If a checkout has been made since
         # the repo was initialized, make this an explicit request for the current
         # head - there can be no local changes.
-        if sha is None:
+        if rev is None:
             if self.is_original_head():
                 tree = self.repository.get(self.write_tree())
             else:
-                sha = self.head()
+                rev = self.head()
 
         path = fs.path.normpath(path)
         full_path = fs.path.join(self.path, path) if path != "/" else self.path
 
         # Lookup tree hash value in cache
-        value = self._tree_hash.get((full_path, sha))
+        value = self._tree_hash.get((full_path, rev))
         if value is not None:
             return value
 
-        # Translate explicit sha to tree
-        if sha is not None:
-            commit = self.rev_parse(sha)
+        # Translate explicit rev to tree
+        if rev is not None:
+            commit = self.rev_parse(rev)
             obj = self.repository.get(commit)
             try:
                 tree = obj.tree
@@ -190,7 +190,7 @@ class GitRepository(object):
             tree = tree[fs.as_posix(path)]
 
         # Update tree hash cache
-        self._tree_hash[(full_path, sha)] = value = tree.id
+        self._tree_hash[(full_path, rev)] = value = tree.id
 
         return value
 
@@ -323,7 +323,7 @@ class GitSrc(WorkspaceResource, FileInfluence):
 
     name = "git-src"
     url = Parameter(help="URL to the git repo to be cloned. Required.")
-    sha = Parameter(required=False, help="Specific commit or tag to be checked out. Optional.")
+    rev = Parameter(required=False, help="Specific commit or tag to be checked out. Optional.")
     path = Parameter(required=False, help="Local path where the repository should be cloned.")
     defer = BooleanParameter(False, help="Defer cloning until a consumer task must be built.")
     _revision = Export(value=lambda t: t._export_revision())
@@ -348,13 +348,13 @@ class GitSrc(WorkspaceResource, FileInfluence):
         return name
 
     def _export_revision(self):
-        return self.sha.value or self.git.head()
+        return self.rev.value or self.git.head()
 
     def _get_revision(self):
         if self._revision.is_imported:
             return self._revision.value
-        if not self.sha.is_unset():
-            return self.sha.get_value()
+        if not self.rev.is_unset():
+            return self.rev.get_value()
         return None
 
     def acquire(self, artifact, deps, tools, owner):
@@ -381,8 +381,8 @@ class GitSrc(WorkspaceResource, FileInfluence):
         rev = self._get_revision()
         if rev is not None:
             raise_task_error_if(
-                not self._revision.is_imported and not self.sha.is_unset() and self.git.diff(), self,
-                "explicit sha requested but git repo '{0}' has local changes", self.git.relpath)
+                not self._revision.is_imported and not self.rev.is_unset() and self.git.diff(), self,
+                "Explicit revision requested but git repo '{0}' has local changes, refusing checkout", self.git.relpath)
             # Should be safe to do this now
             rev = self.git.rev_parse(rev)
             if not self.git.is_head(rev) or self._revision.is_imported:
@@ -394,7 +394,7 @@ class GitSrc(WorkspaceResource, FileInfluence):
         return None
 
     def is_influenced_by(self, task, path):
-        return fs.is_relative_to(path, self.abspath) and self.sha.is_set()
+        return fs.is_relative_to(path, self.abspath) and self.rev.is_set()
 
 
 class Git(GitSrc):
@@ -442,7 +442,7 @@ class Git(GitSrc):
     url = Parameter(help="URL to the git repo to be cloned. Required.")
     """ URL to the git repo to be cloned. Required. """
 
-    sha = Parameter(required=False, help="Specific commit or tag to be checked out. Optional.")
+    rev = Parameter(required=False, help="Specific commit or tag to be checked out. Optional.")
     """ Specific commit or tag to be checked out. Optional. """
 
     hash = BooleanParameter(True, help="Let repo content influence the hash of consuming tasks.")

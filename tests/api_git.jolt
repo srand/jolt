@@ -138,11 +138,11 @@ class GitApi(testsupport.JoltTest):
         r = self.build("exe")
         self.assertBuild(r, "exe")
 
-    def test_sha_commit(self):
+    def test_rev_commit(self):
         """
         --- tasks:
         class Exe(CXXExecutable):
-            requires = ["git:url=https://github.com/gideont/hello_world.git,sha=74cf3e97a3"]
+            requires = ["git:url=https://github.com/gideont/hello_world.git,rev=74cf3e97a3"]
             sources = ["hello_world/01_hello_world/*.c"]
             source_influence = False
         ---
@@ -156,11 +156,11 @@ class GitApi(testsupport.JoltTest):
         with self.assertRaises(Exception, msg="has local changes"):
             self.build("exe")
 
-    def test_sha_commit_with_path(self):
+    def test_rev_commit_with_path(self):
         """
         --- tasks:
         class Exe(CXXExecutable):
-            requires = ["git:url=https://github.com/gideont/hello_world.git,sha=74cf3e97a3,path=hello_world"]
+            requires = ["git:url=https://github.com/gideont/hello_world.git,rev=74cf3e97a3,path=hello_world"]
             sources = ["hello_world/01_hello_world/*.c"]
             source_influence = False
         ---
@@ -173,11 +173,11 @@ class GitApi(testsupport.JoltTest):
         with self.assertRaises(Exception, msg="has local changes"):
             self.build("exe")
 
-    def test_sha_branch(self):
+    def test_rev_branch(self):
         """
         --- tasks:
         class Exe(CXXExecutable):
-            requires = ["git:url=https://github.com/gideont/hello_world.git,sha=origin/master"]
+            requires = ["git:url=https://github.com/gideont/hello_world.git,rev=origin/master"]
             sources = ["hello_world/01_hello_world/*.c"]
             source_influence = False
         ---
@@ -189,11 +189,11 @@ class GitApi(testsupport.JoltTest):
         with self.assertRaises(Exception, msg="has local changes"):
             self.build("exe")
 
-    def test_sha_branch_with_path(self):
+    def test_rev_branch_with_path(self):
         """
         --- tasks:
         class Exe(CXXExecutable):
-            requires = ["git:url=https://github.com/gideont/hello_world.git,sha=origin/master,path=hello_world"]
+            requires = ["git:url=https://github.com/gideont/hello_world.git,rev=origin/master,path=hello_world"]
             sources = ["hello_world/01_hello_world/*.c"]
             source_influence = False
         ---
@@ -203,11 +203,11 @@ class GitApi(testsupport.JoltTest):
         with self.assertRaises(Exception, msg="has local changes"):
             self.build("exe")
 
-    def test_sha_bad(self):
+    def test_rev_bad(self):
         """
         --- tasks:
         class Exe(CXXExecutable):
-            requires = ["git:url=https://github.com/gideont/hello_world.git,sha=bad"]
+            requires = ["git:url=https://github.com/gideont/hello_world.git,rev=bad"]
             sources = ["hello_world/01_hello_world/*.c"]
             source_influence = False
         ---
@@ -338,16 +338,16 @@ class GitApi(testsupport.JoltTest):
         reverted = self.artifacts(r4)
         self.assertEqual(orig, reverted)
 
-    def test_explicit_influence_explicit_sha(self):
+    def test_explicit_influence_explicit_rev(self):
         """
         --- tasks:
         @git.influence("{{git[hello_world]}}/LICENSE")
         class A(Task):
-            requires = ["git:url=https://github.com/gideont/hello_world.git,sha=c7cc6f08,path=hello_world"]
+            requires = ["git:url=https://github.com/gideont/hello_world.git,rev=c7cc6f08,path=hello_world"]
 
         @git.influence("{{git[hello_world]}}/LICENSE")
         class B(Task):
-            requires = ["git:url=https://github.com/gideont/hello_world.git,sha=90fe0a68,path=hello_world"]
+            requires = ["git:url=https://github.com/gideont/hello_world.git,rev=90fe0a68,path=hello_world"]
         ---
         """
         r1 = self.build("a")
@@ -368,16 +368,16 @@ class GitApi(testsupport.JoltTest):
         self.assertIn(self.artifacts(r1)[0], self.artifacts(r5))
         self.assertIn(self.artifacts(r3)[0], self.artifacts(r5))
 
-    def test_explicit_influence_explicit_sha_with_path(self):
+    def test_explicit_influence_explicit_rev_with_path(self):
         """
         --- tasks:
         @git.influence("hello_world/LICENSE")
         class A(Task):
-            requires = ["git:url=https://github.com/gideont/hello_world.git,sha=c7cc6f08,path=hello_world"]
+            requires = ["git:url=https://github.com/gideont/hello_world.git,rev=c7cc6f08,path=hello_world"]
 
         @git.influence("hello_world/LICENSE")
         class B(Task):
-            requires = ["git:url=https://github.com/gideont/hello_world.git,sha=90fe0a68,path=hello_world"]
+            requires = ["git:url=https://github.com/gideont/hello_world.git,rev=90fe0a68,path=hello_world"]
         ---
         """
         r1 = self.build("a")
@@ -402,10 +402,10 @@ class GitApi(testsupport.JoltTest):
         """
         --- tasks:
         class A(Task):
-            requires = ["git:url={ws}/hello_world_bare.git,sha=test_tag1"]
+            requires = ["git:url={ws}/hello_world_bare.git,rev=test_tag1"]
 
         class B(Task):
-            requires = ["git:url={ws}/hello_world_bare.git,sha=test_tag2"]
+            requires = ["git:url={ws}/hello_world_bare.git,rev=test_tag2"]
         ---
         """
         if self.network:
