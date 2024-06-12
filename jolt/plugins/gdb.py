@@ -29,7 +29,7 @@ def get_task_artifacts(task):
     artifacts = []
     for dep in task.children:
         artifacts.extend(dep.artifacts)
-    return task.artifacts[0], artifacts
+    return task.artifacts, artifacts
 
 
 @cli.cli.command(name="gdb", context_settings={"ignore_unknown_options": True})
@@ -99,7 +99,7 @@ def gdb(ctx, task, default, machine_interface, no_binary, gdb_args):
                 # Materialize workspace resources so that
                 # source code is available to the debugger.
                 if isinstance(task.task, WorkspaceResource):
-                    task.task.acquire()
+                    task.task.acquire_ws()
 
                 # Unpack the task if it is not a resource task and has a custom unpack method
                 if not task.is_resource():
@@ -130,11 +130,13 @@ def gdb(ctx, task, default, machine_interface, no_binary, gdb_args):
 
     for goal in dag.goals:
         main, deps = get_task_artifacts(goal)
-        stage_artifacts([main] + deps, goal.tools)
+        stage_artifacts(main + deps, goal.tools)
 
+        # Find an artifact with an executable
+        main = [artifact for artifact in main if artifact.strings.executable.get_value()]
         raise_task_error_if(
-            main.strings.executable.get_value() is None,
-            goal, "No executable found in task artifact")
+            not main, goal, "No executable found in task artifact")
+        main = main[0]
 
         with acache.get_context(goal):
             gdb = goal.tools.getenv("GDB", "gdb")
