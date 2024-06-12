@@ -374,7 +374,7 @@ class attributes:
                         lcov_configs.append("no_exception_branch=1")
 
                     if lcov_excludes:
-                        lcov_excludes = ["--exclude " + exclude for exclude in lcov_excludes]
+                        lcov_excludes = ["--exclude " + f"'{exclude}'" for exclude in lcov_excludes]
                         lcov_info_flags.extend(lcov_excludes)
 
                     if lcov_filters:
