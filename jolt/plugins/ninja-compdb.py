@@ -249,7 +249,7 @@ def compdb(ctx, task, default):
                 # Materialize workspace resources so that
                 # source code is available to the debugger.
                 if isinstance(task.task, WorkspaceResource):
-                    task.task.acquire()
+                    task.task.acquire_ws()
 
                 # Unpack the task if it is not a resource task and has a custom unpack method
                 if not task.is_resource():
