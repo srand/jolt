@@ -58,11 +58,10 @@ class TaskProxy(object):
         self._network = False
         self._artifacts = []
         self._status = None
+        self._finalized = False
 
         # List of all artifacts that are produced by this task
         self._artifacts = []
-
-        hooks.task_created(self)
 
     def __hash__(self):
         return id(self)
@@ -121,6 +120,8 @@ class TaskProxy(object):
 
     @property
     def identity(self):
+        raise_task_error_if(not self._finalized, self, "Task identity read prematurely")
+
         if self.task.identity is not None:
             return self.task.identity
 
@@ -408,8 +409,12 @@ class TaskProxy(object):
         self.descendants = list(self.descendants)
 
         self.task.influence += [TaskRequirementInfluence(n) for n in self.neighbors]
+        self._finalized = True
         self.identity
+
         self._artifacts.extend(self.task._artifacts(self.cache, self))
+
+        hooks.task_created(self)
 
         return self.identity
 
