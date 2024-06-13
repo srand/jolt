@@ -12,7 +12,6 @@ from jolt import config
 from jolt.influence import attribute as influence_attribute
 from jolt.influence import DirectoryInfluence, FileInfluence
 from jolt.influence import HashInfluenceProvider, TaskAttributeInfluence
-from jolt.loader import get_workspacedir
 from jolt.config import get_cachedir
 from jolt import log
 from jolt import utils
@@ -353,7 +352,6 @@ class attributes:
                     reportdir = tools.builddir("coverage-report-lcov")
                     htmldir = tools.builddir("coverage-report-lcov-html")
                     cachedir = get_cachedir()
-                    wsdir = get_workspacedir()
 
                     lcov_configs = list(getattr(self, "lcov_configs", []))
                     lcov_excludes = list(getattr(self, "lcov_excludes", []))
@@ -361,7 +359,7 @@ class attributes:
                     lcov_ignore_errors = list(getattr(self, "lcov_ignore_errors", ["empty", "mismatch", "source", "source", "unused"]))
                     lcov_substitutes = list(getattr(self, "lcov_substitutes", []))
 
-                    lcov_html_flags = ["-p", wsdir]
+                    lcov_html_flags = ["-p", tools.wsroot]
                     if bool(getattr(self, "lcov_demangle", demangle)):
                         lcov_html_flags.append("--demangle-cpp")
                         lcov_html_flags.append(f"--rc demangle_cpp={cxxfilt}")
@@ -396,8 +394,8 @@ class attributes:
                         lcov_html_flags.extend(lcov_substitutes)
 
                     self.info("Generating LCOV code coverage report")
-                    tools.run("{} -c -d {covdatadir} -o {}/coverage.info --gcov-tool={} {}",
-                              lcov, reportdir, gcov, " ".join(lcov_info_flags), output_on_error=True)
+                    tools.run("{} -b {} -c -d {covdatadir} -o {}/coverage.info --gcov-tool={} {}",
+                              lcov, tools.wsroot, reportdir, gcov, " ".join(lcov_info_flags), output_on_error=True)
 
                     reports = []
                     for _, artifact in deps.items():
@@ -410,11 +408,11 @@ class attributes:
                                   lcov, " ".join(reports), reportdir, gcov, " ".join(lcov_info_flags), output_on_error=True)
 
                     with tools.cwd(reportdir):
-                        tools.replace_in_file("coverage.info", f"{wsdir}/", "")
+                        tools.replace_in_file("coverage.info", f"{tools.wsroot}/", "")
                         tools.replace_in_file("coverage.info", f"{cachedir}/", "{{cachedir}}/")
                         tools.copy("coverage.info", "coverage.info.abs")
-                        tools.replace_in_file("coverage.info.abs", "SF:", f"SF:{wsdir}/")
-                        tools.replace_in_file("coverage.info.abs", f"SF:{wsdir}/" + "{{cachedir}}/", f"SF:{cachedir}/")
+                        tools.replace_in_file("coverage.info.abs", "SF:", f"SF:{tools.wsroot}/")
+                        tools.replace_in_file("coverage.info.abs", f"SF:{tools.wsroot}/" + "{{cachedir}}/", f"SF:{cachedir}/")
 
                         if tools.file_size("coverage.info") <= 0:
                             tools.unlink("coverage.info")
