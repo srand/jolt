@@ -53,6 +53,17 @@ func (pq *PriorityQueue[T]) Remove(item T) {
 	}
 }
 
+// Returns true if an item is in the priority queue.
+func (pq *PriorityQueue[T]) Contains(item T) bool {
+	for _, x := range pq.heap.items {
+		if pq.equals(x, item) {
+			return true
+		}
+	}
+	return false
+}
+
+// Returns the items in the priority queue as a list.
 func (pq *PriorityQueue[T]) Items() []T {
 	return pq.heap.Items()
 }

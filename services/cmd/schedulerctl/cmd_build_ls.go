@@ -37,11 +37,12 @@ var buildListCmd = &cobra.Command{
 		buildPad := fmt.Sprint(len(fmt.Sprint(buildCount)))
 
 		for index, build := range response.Builds {
-			fmt.Printf("%"+buildPad+"d: %s %-15s %s O:%t Q:%t R:%t \n",
+			fmt.Printf("%"+buildPad+"d: %s %-15s %s Rdy:%t O:%t Q:%t R:%t\n",
 				index+1,
 				build.Id,
 				build.Status,
 				build.ScheduledAt.AsTime().Local().Format("2006-01-02T15:04:05"),
+				build.Ready,
 				build.HasObserver,
 				build.HasQueuedTask,
 				build.HasRunningTask)

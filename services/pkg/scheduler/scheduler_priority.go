@@ -640,6 +640,7 @@ func (s *priorityScheduler) ListBuilds(tasks bool) *protocol.ListBuildsResponse 
 			HasObserver:    build.HasObserver(),
 			HasRunningTask: build.HasRunningTask(),
 			HasQueuedTask:  build.HasQueuedTask(),
+			Ready:          s.readyBuilds.Contains(build),
 		})
 
 		if !tasks {

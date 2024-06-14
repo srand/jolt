@@ -49,6 +49,9 @@ message ListBuildsResponse {
 
         // Build has queued task
         bool hasQueuedTask = 7;
+
+        // Is ready / in scheduler ready queue
+        bool ready = 8;
     }
 
     repeated Build builds = 1;
