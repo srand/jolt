@@ -28,7 +28,7 @@ class Recipe(object):
         self.source = source
         self.tasks = []
 
-    def load(self):
+    def load(self, joltdir=None):
         raise_error_if(self.source is not None, "recipe already loaded: {}", self.path)
 
         with open(self.path) as f:
@@ -52,7 +52,7 @@ class NativeRecipe(Recipe):
             issubclass(cls, Task) and \
             not NativeRecipe._is_abstract(cls)
 
-    def load(self):
+    def load(self, joltdir=None):
         super(NativeRecipe, self).load()
 
         name = utils.canonical(self.path)
@@ -66,7 +66,7 @@ class NativeRecipe(Recipe):
         generators = []
 
         for cls in classes[TaskGenerator]:
-            cls.joltdir = os.path.normpath(self.joltdir or os.path.dirname(self.path))
+            cls.joltdir = os.path.normpath(joltdir or self.joltdir or os.path.dirname(self.path))
             generators.append(cls())
 
         for generator in generators:
@@ -75,7 +75,7 @@ class NativeRecipe(Recipe):
 
         for task in classes[Task]:
             task.name = task.name or task.__name__.lower()
-            task.joltdir = os.path.normpath(self.joltdir or os.path.dirname(self.path))
+            task.joltdir = os.path.normpath(joltdir or self.joltdir or os.path.dirname(self.path))
             task.joltproject = self.project
             self.tasks.append(task)
 
@@ -98,7 +98,15 @@ class NativeLoader(Loader):
         self._find_files(searchpath)
 
     def _find_files(self, searchpath):
-        files = glob.glob(fs.path.join(searchpath, "*.jolt"))
+        # If the searchpath is a file, load it directly
+        if fs.path.isdir(searchpath):
+            return self._load_files(glob.glob(fs.path.join(searchpath, "*.jolt")))
+
+        _, ext = fs.path.splitext(searchpath)
+        if ext in [".jolt", ".py"]:
+            return self._load_files([searchpath])
+
+    def _load_files(self, files):
         for filepath in files:
             recipe = NativeRecipe(filepath)
             self._recipes.append(recipe)
@@ -211,6 +219,15 @@ class JoltLoader(object):
         self._load_project_recipes()
 
         return self._tasks
+
+    def load_file(self, path, joltdir=None):
+        for factory in _loaders:
+            loader = factory().create(path)
+            for recipe in loader.recipes:
+                joltdir = fs.path.join(self.joltdir, joltdir) if joltdir else self.joltdir
+                recipe.load(joltdir=joltdir)
+                self._recipes.append(recipe)
+                self._tasks += recipe.tasks
 
     def load_plugin(self, filepath):
         plugin, ext = os.path.splitext(fs.path.basename(filepath))

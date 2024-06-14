@@ -54,16 +54,30 @@ __all__ = (
 name = "jolt"
 
 
-def include(joltfile):
-    """ Include another Python file """
+def include(joltfile, joltdir=None):
+    """ Include another Python file with Jolt tasks.
+
+      :param joltfile: The path to the Jolt file to include.
+      :type joltfile: str
+
+      :param joltdir: The directory to search for Jolt files.
+      :type joltdir: str
+
+    Example:
+
+      .. code-block:: python
+
+            from jolt import include
+
+            include("joltfile.py")
+
+      """
     try:
         from os import path
-        from sys import _getframe
         from jolt.loader import JoltLoader
-        filepath = _getframe().f_back.f_code.co_filename
-        filepath = path.dirname(filepath)
-        filepath = path.join(filepath, joltfile)
-        JoltLoader.get()._load_file(filepath)
+        dirpath = path.dirname(joltfile)
+        filepath = path.join(dirpath, joltfile)
+        JoltLoader.get().load_file(filepath, joltdir=joltdir)
     except Exception as e:
         from jolt.error import raise_error
         raise_error("Failed to load '{0}': {1}", joltfile, str(e))

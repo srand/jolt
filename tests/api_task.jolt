@@ -11,6 +11,32 @@ from testsupport import JoltTest
 class TaskApi(JoltTest):
     name = "api/task"
 
+    def test_include(self):
+        """
+        --- file: includes.jolt
+        from jolt import include
+
+        include("included.py")
+        include("included_joltdir.py", joltdir="joltdir")
+
+        --- file: included.py
+        from jolt import Task
+
+        class Test(Task):
+            pass
+
+        --- file: included_joltdir.py
+        from jolt import Task
+
+        class Read(Task):
+            def run(self, deps, tools):
+                tools.read_file("text.txt")
+
+        --- file: joltdir/text.txt
+        ---
+        """
+        self.build("test read")
+
     def test_name(self):
         """
         --- tasks:
