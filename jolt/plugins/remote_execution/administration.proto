@@ -8,7 +8,10 @@ import "jolt/common.proto";
 import "jolt/plugins/remote_execution/scheduler.proto";
 
 
-message ListBuildsRequest {}
+message ListBuildsRequest {
+    // Include tasks
+    bool tasks = 1;
+}
 
 message ListBuildsResponse {
     message Task {

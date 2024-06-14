@@ -623,7 +623,7 @@ func (s *priorityScheduler) Statistics() *SchedulerStatistics {
 }
 
 // Get information about running builds
-func (s *priorityScheduler) ListBuilds() *protocol.ListBuildsResponse {
+func (s *priorityScheduler) ListBuilds(tasks bool) *protocol.ListBuildsResponse {
 	s.RLock()
 	defer s.RUnlock()
 
@@ -641,6 +641,10 @@ func (s *priorityScheduler) ListBuilds() *protocol.ListBuildsResponse {
 			HasRunningTask: build.HasRunningTask(),
 			HasQueuedTask:  build.HasQueuedTask(),
 		})
+
+		if !tasks {
+			continue
+		}
 
 		for _, task := range build.tasks {
 			response.Builds[len(response.Builds)-1].Tasks = append(response.Builds[len(response.Builds)-1].Tasks, &protocol.ListBuildsResponse_Task{

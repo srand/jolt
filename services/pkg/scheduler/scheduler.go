@@ -49,8 +49,9 @@ type Scheduler interface {
 	// Get scheduler statistics
 	Statistics() *SchedulerStatistics
 
-	// Get information about running builds
-	ListBuilds() *protocol.ListBuildsResponse
+	// Get information about running builds. If tasks is true, also include
+	// information about the tasks of each build.
+	ListBuilds(tasks bool) *protocol.ListBuildsResponse
 }
 
 // Scheduler statistics

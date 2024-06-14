@@ -32,7 +32,7 @@ func (s *adminService) CancelBuild(_ context.Context, req *protocol.CancelBuildR
 
 func (s *adminService) ListBuilds(_ context.Context, req *protocol.ListBuildsRequest) (*protocol.ListBuildsResponse, error) {
 	// Not implemented
-	return s.scheduler.ListBuilds(), nil
+	return s.scheduler.ListBuilds(req.Tasks), nil
 }
 
 func (s *adminService) ListWorkers(_ context.Context, req *protocol.ListWorkersRequest) (*protocol.ListWorkersResponse, error) {

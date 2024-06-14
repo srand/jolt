@@ -19,8 +19,12 @@ var buildListCmd = &cobra.Command{
 
 		maxSizeOption := grpc.MaxCallRecvMsgSize(32 * 10e6)
 
+		request := &protocol.ListBuildsRequest{
+			Tasks: cmd.Flags().Changed("tasks"),
+		}
+
 		client := NewAdminClient()
-		response, err := client.ListBuilds(ctx, &protocol.ListBuildsRequest{}, maxSizeOption)
+		response, err := client.ListBuilds(ctx, request, maxSizeOption)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -42,10 +46,6 @@ var buildListCmd = &cobra.Command{
 				build.HasQueuedTask,
 				build.HasRunningTask)
 
-			if !cmd.Flags().Changed("tasks") {
-				continue
-			}
-
 			sort.Slice(build.Tasks, func(i, j int) bool {
 				return build.Tasks[i].Name < build.Tasks[j].Name
 			})
@@ -55,7 +55,7 @@ var buildListCmd = &cobra.Command{
 
 			for taskIndex, task := range build.Tasks {
 				taskIndexStr := fmt.Sprintf("%"+buildPad+"d.%-"+taskPad+"d", index+1, taskIndex+1)
-				fmt.Printf("%s %s %-14s %s O:%t\n", taskIndexStr, task.Id, task.Status, task.Name, task.HasObserver)
+				fmt.Printf("%s %s %-14s O:%t %s\n", taskIndexStr, task.Id, task.Status, task.HasObserver, task.Name)
 			}
 
 			fmt.Println()
