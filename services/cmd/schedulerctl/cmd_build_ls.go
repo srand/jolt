@@ -37,7 +37,8 @@ var buildListCmd = &cobra.Command{
 		buildPad := fmt.Sprint(len(fmt.Sprint(buildCount)))
 
 		for index, build := range response.Builds {
-			fmt.Printf("%"+buildPad+"d: %s %-15s %s Rdy:%t O:%t Q:%t R:%t\n",
+			// Print build
+			fmt.Printf("%"+buildPad+"d: %s %-15s %s Rdy:%-5t O:%-5t Q:%-5t R:%-5t\n",
 				index+1,
 				build.Id,
 				build.Status,
@@ -47,16 +48,22 @@ var buildListCmd = &cobra.Command{
 				build.HasQueuedTask,
 				build.HasRunningTask)
 
+			// Skip tasks if not requested
+			if !cmd.Flags().Changed("tasks") {
+				continue
+			}
+
+			// Sort tasks by name
 			sort.Slice(build.Tasks, func(i, j int) bool {
 				return build.Tasks[i].Name < build.Tasks[j].Name
 			})
 
+			// Print tasks
 			taskCount := len(build.Tasks)
 			taskPad := fmt.Sprint(len(fmt.Sprint(taskCount)))
-
 			for taskIndex, task := range build.Tasks {
 				taskIndexStr := fmt.Sprintf("%"+buildPad+"d.%-"+taskPad+"d", index+1, taskIndex+1)
-				fmt.Printf("%s %s %-14s O:%t %s\n", taskIndexStr, task.Id, task.Status, task.HasObserver, task.Name)
+				fmt.Printf("%s %s %-14s O:%-5t %s\n", taskIndexStr, task.Id, task.Status, task.HasObserver, task.Name)
 			}
 
 			fmt.Println()
