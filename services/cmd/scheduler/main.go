@@ -91,6 +91,7 @@ var rootCmd = &cobra.Command{
 			r := echo.New()
 			r.HideBanner = true
 			r.Use(utils.HttpLogger)
+			r.Add(echo.GET, "/debug/pprof/*", echo.WrapHandler(http.DefaultServeMux))
 
 			logstash.NewHttpHandler(stash, r)
 			scheduler.NewHttpHandler(sched, r)
