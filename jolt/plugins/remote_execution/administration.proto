@@ -20,6 +20,9 @@ message ListBuildsResponse {
 
         // Current status of the task
         TaskStatus status = 3;
+
+        // Task has observer
+        bool hasObserver = 4;
     }
 
     message Build {
@@ -34,6 +37,15 @@ message ListBuildsResponse {
 
         // Time when build was scheduled
         google.protobuf.Timestamp scheduledAt = 4;
+
+        // Build has observer
+        bool hasObserver = 5;
+
+        // Build has running task
+        bool hasRunningTask = 6;
+
+        // Build has queued task
+        bool hasQueuedTask = 7;
     }
 
     repeated Build builds = 1;

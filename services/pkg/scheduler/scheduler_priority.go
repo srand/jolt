@@ -633,17 +633,21 @@ func (s *priorityScheduler) ListBuilds() *protocol.ListBuildsResponse {
 
 	for _, build := range s.builds {
 		response.Builds = append(response.Builds, &protocol.ListBuildsResponse_Build{
-			Id:          build.Id(),
-			ScheduledAt: timestamppb.New(build.scheduledAt),
-			Status:      build.Status(),
-			Tasks:       make([]*protocol.ListBuildsResponse_Task, 0, len(build.tasks)),
+			Id:             build.Id(),
+			ScheduledAt:    timestamppb.New(build.scheduledAt),
+			Status:         build.Status(),
+			Tasks:          make([]*protocol.ListBuildsResponse_Task, 0, len(build.tasks)),
+			HasObserver:    build.HasObserver(),
+			HasRunningTask: build.HasRunningTask(),
+			HasQueuedTask:  build.HasQueuedTask(),
 		})
 
 		for _, task := range build.tasks {
 			response.Builds[len(response.Builds)-1].Tasks = append(response.Builds[len(response.Builds)-1].Tasks, &protocol.ListBuildsResponse_Task{
-				Id:     task.Identity(),
-				Name:   task.Name(),
-				Status: task.Status(),
+				Id:          task.Identity(),
+				Name:        task.Name(),
+				Status:      task.Status(),
+				HasObserver: task.HasObserver(),
 			})
 		}
 	}
