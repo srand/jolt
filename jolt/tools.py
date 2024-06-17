@@ -879,16 +879,21 @@ class Tools(object):
                 with tools.environ(CC="clang"):
                     tools.run("make all")
         """
-        for key, value in kwargs.items():
-            kwargs[key] = self.expand(value)
-
         restore = {key: value for key, value in self._env.items()}
-        self._env.update(kwargs)
+
+        for key, value in kwargs.items():
+            if value is not None:
+                self._env[key] = self.expand(value)
+            else:
+                self._env.pop(key, None)
+
         yield self._env
+
         for key, value in kwargs.items():
             if key not in restore:
                 del self._env[key]
-        self._env.update(restore)
+
+        self._env = restore
 
     def exists(self, pathname):
         """ Checks if a file or directory exists.

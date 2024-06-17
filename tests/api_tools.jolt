@@ -409,6 +409,15 @@ class ToolsApi(JoltTest):
             with self.assertRaises(Exception):
                 self.tools.upload("index.html", "https://www.example.com/invalid")
 
+    def test_environ(self):
+        with self.tools.environ(FOO="bar"):
+            self.assertEqual(self.tools.run("echo $FOO"), "bar")
+            with self.tools.environ(FOO="baz"):
+                self.assertEqual(self.tools.run("echo $FOO"), "baz")
+            with self.tools.environ(FOO=None):
+                self.assertEqual(self.tools.run("echo $FOO"), "")
+        self.assertEqual(self.tools.run("echo $FOO"), "")
+
     def test_expand(self):
         """
         --- tasks:
