@@ -497,7 +497,7 @@ class TaskProxy(object):
         except KeyError:
             self.warning("Pruned task was executed")
         self.task.info(colors.green(what + " finished after {0} {1}" + self.log_name),
-                       self.duration_running,
+                       self.duration_running or "00s",
                        self.duration_queued.diff(self.duration_running))
         hooks.task_finished(self)
 
