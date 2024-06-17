@@ -993,6 +993,20 @@ The worker can be configured using environment variables and/or a configuration 
 
         | See ``JOLT_CACHE_URI`` for format. The default is ``tcp://scheduler.:9090``.
 
+    * - ``JOLT_NIX``
+      - ``nix``
+      - | Enables the worker to execute tasks in a pure Nix shell.
+
+        | A pure Nix shell is a shell environment where only the Nix package manager
+          is available. This is useful for building software in a controlled environment
+          where the host environment is not allowed to leak into the build.
+
+        | A ``shell.nix`` file must be present in the workspace root directory, containing
+          the Nix environment to enter. If not present, the worker will execute tasks
+          in the host environment.
+
+        | The default is ``false``.
+
     * - ``JOLT_NIX_KEEP``
       - ``nix_keep``
       - | A list of worker host environment variables to keep when entering

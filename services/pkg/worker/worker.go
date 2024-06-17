@@ -397,6 +397,10 @@ func (w *worker) cachePath() string {
 
 // If the client has a shell.nix file, run the command in a nix-shell.
 func (w *worker) nixWrapperCmd(clientWsName string, cmdline []string) ([]string, error) {
+	if !w.config.Nix {
+		return nil, errors.New("nix is not enabled")
+	}
+
 	if runtime.GOOS == "windows" {
 		return nil, errors.New("nix-shell is not supported on Windows")
 	}
