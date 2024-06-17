@@ -127,40 +127,6 @@ func (suite *SchedulerTest) TestCancelScheduler() {
 	executor.Close()
 }
 
-func (suite *SchedulerTest) TestScheduleBuildWhileNoWorkerConnected() {
-	build := suite.newBuild(0)
-
-	observer, err := suite.scheduler.ScheduleBuild(build)
-	assert.Nil(suite.T(), observer)
-	assert.Error(suite.T(), err)
-}
-
-func (suite *SchedulerTest) TestScheduleBuildWithNoEligibleWorker() {
-	build := suite.newBuild(0)
-	addTask(build, "task", "label=label")
-
-	worker, err := suite.newWorker()
-	assert.NoError(suite.T(), err)
-	defer worker.Close()
-
-	observer, err := suite.scheduler.ScheduleBuild(build)
-	assert.Nil(suite.T(), observer)
-	assert.Error(suite.T(), err)
-}
-
-func (suite *SchedulerTest) TestScheduleBuildWithNoEligibleWorker_TaskPlatformNotFulfilled() {
-	build := suite.newBuild(0)
-	addTask(build, "task")
-
-	worker, err := suite.newWorkerWithProps([]string{}, []string{"label=one"})
-	assert.NoError(suite.T(), err)
-	defer worker.Close()
-
-	observer, err := suite.scheduler.ScheduleBuild(build)
-	assert.Nil(suite.T(), observer)
-	assert.Error(suite.T(), err)
-}
-
 func (suite *SchedulerTest) TestScheduleBuildWithOneWorker() {
 	build := suite.newBuild(0)
 	addTask(build, "task")

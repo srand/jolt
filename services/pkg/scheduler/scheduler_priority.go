@@ -155,11 +155,6 @@ func (s *priorityScheduler) ScheduleBuild(b Build) (BuildUpdateObserver, error) 
 	s.Lock()
 	defer s.Unlock()
 
-	if err := s.checkWorkerEligibility(build); err != nil {
-		log.Info("nok - build, no eligible worker:", err)
-		return nil, err
-	}
-
 	if build.IsDone() {
 		log.Debugf("exe - task - request denied, build is done - id: %s", build.Id())
 		return nil, utils.GrpcError(utils.ErrTerminalBuild)
@@ -310,28 +305,6 @@ func (s *priorityScheduler) cancelAllWorkers() error {
 		worker.Cancel()
 	}
 
-	return nil
-}
-
-// Check if there are any workers which can execute the given build.
-func (s *priorityScheduler) checkWorkerEligibility(build *priorityBuild) error {
-	if len(s.workers) == 0 {
-		return fmt.Errorf("There are currently no workers connected")
-	}
-
-	var badTask *Task
-
-	if !build.WalkTasks(func(b *priorityBuild, task *Task) bool {
-		for _, worker := range s.workers {
-			if worker.Platform().Fulfills(task.Platform()) && task.Platform().Fulfills(worker.TaskPlatform()) {
-				return true
-			}
-		}
-		badTask = task
-		return false
-	}) {
-		return fmt.Errorf("No eligible worker available for task %s", badTask.Name())
-	}
 	return nil
 }
 
