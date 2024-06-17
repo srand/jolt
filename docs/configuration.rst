@@ -993,6 +993,20 @@ The worker can be configured using environment variables and/or a configuration 
 
         | See ``JOLT_CACHE_URI`` for format. The default is ``tcp://scheduler.:9090``.
 
+    * - ``JOLT_NIX_KEEP``
+      - ``nix_keep``
+      - | A list of worker host environment variables to keep when entering
+          a pure Nix shell.
+
+        | When a task is executed in a pure Nix shell, the worker environment
+          is sanitized to prevent leaking host environment variables into the
+          task. This list allows certain variables to be kept.
+
+        | The format is a comma separated list of variable names.
+
+        | By default, all variables with a ``JOLT_`` prefix are kept, as well as
+          ``HOSTNAME``.
+
 
 Example configuration:
 

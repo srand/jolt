@@ -15,6 +15,8 @@ type WorkerConfig struct {
 	// Directory to use for caching.
 	CacheDir string `mapstructure:"cache_dir"`
 
+	NixEnvironmentToKeep []string `mapstructure:"nix_keep"`
+
 	// Base URL to the scheduler service.
 	SchedulerUri string `mapstructure:"scheduler_uri"`
 

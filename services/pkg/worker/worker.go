@@ -395,6 +395,7 @@ func (w *worker) cachePath() string {
 	}
 }
 
+// If the client has a shell.nix file, run the command in a nix-shell.
 func (w *worker) nixWrapperCmd(clientWsName string, cmdline []string) ([]string, error) {
 	if runtime.GOOS == "windows" {
 		return nil, errors.New("nix-shell is not supported on Windows")
@@ -405,7 +406,26 @@ func (w *worker) nixWrapperCmd(clientWsName string, cmdline []string) ([]string,
 	}
 
 	log.Info("Running in nix-shell:", cmdline)
-	return []string{"nix-shell", "--pure", "--run", strings.Join(cmdline, " ")}, nil
+
+	nixCmd := []string{"nix-shell", "--pure", "--run", strings.Join(cmdline, " ")}
+
+	// Add default environment variables to the nix-shell.
+	nixCmd = append(nixCmd, "--keep", "HOSTNAME")
+
+	// Add all environment variables with a JOLT prefix to the nix-shell.
+	for _, env := range os.Environ() {
+		if strings.HasPrefix(env, "JOLT_") {
+			nixCmd = append(nixCmd, "--keep", strings.Split(env, "=")[0])
+		}
+	}
+
+	// Add configured host environment variables to the nix-shell.
+	for _, env := range w.config.NixEnvironmentToKeep {
+		nixCmd = append(nixCmd, "--keep", env)
+	}
+
+	// Run the command in a nix-shell with the client's shell.nix file.
+	return nixCmd, nil
 }
 
 // If bubblewrap is installed, returns a command prefix that
