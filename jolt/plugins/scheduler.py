@@ -198,9 +198,13 @@ class RemoteExecutor(NetworkExecutor):
     def run(self, env):
         """ Run the task. """
         try:
-            self.run_build(env)
-        except grpc.RpcError as rpc_error:
-            raise_task_error(self.task, "Scheduler error: {}", rpc_error.details())
+            with hooks.task_run([self.task] + self.task.extensions):
+                try:
+                    self.run_build(env)
+                except (grpc.RpcError, grpc._channel._MultiThreadedRendezvous) as rpc_error:
+                    raise_task_error(self.task, rpc_error.details(), type="Scheduler error")
+        finally:
+            self.download_session_artifacts(self.task)
 
     @utils.retried.on_exception(grpc.RpcError)
     def run_build(self, env):
@@ -220,10 +224,7 @@ class RemoteExecutor(NetworkExecutor):
             response = self.session.exec.ScheduleTask(request)
 
             self.update_logstash(self.task)
-
-            with hooks.task_run([self.task] + self.task.extensions):
-                self.run_task(env, response)
-
+            self.run_task(env, response)
             self.download_persistent_artifacts(self.task)
 
             self.task.finished_execution(remote=True)
@@ -233,9 +234,9 @@ class RemoteExecutor(NetworkExecutor):
         except TaskCancelledException:
             pass
 
-        except grpc.RpcError as rpc_error:
+        except (grpc.RpcError, grpc._channel._MultiThreadedRendezvous) as rpc_error:
             if rpc_error.code() != grpc.StatusCode.UNAVAILABLE:
-                raise_task_error(self.task, "Scheduler error: {}", rpc_error.details())
+                raise_task_error(self.task, rpc_error.details(), type="Scheduler error")
             log.warning("Scheduler error: {}", rpc_error.details())
             self.session.clear_build_request()
             raise rpc_error
@@ -255,9 +256,6 @@ class RemoteExecutor(NetworkExecutor):
                 extension.failed_execution(remote=True)
             if not self.task.is_unstable:
                 raise e
-
-        finally:
-            self.download_session_artifacts(self.task)
 
     def run_task(self, env, response):
         """ Run the task.
@@ -448,6 +446,7 @@ class RemoteSession(object):
         log.info(colors.blue("Build registered with scheduler, waiting for worker"))
         return self.build
 
+    @locked
     def clear_build_request(self):
         """ Clear the build request. Called when a build fails. """
 

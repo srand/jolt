@@ -270,6 +270,8 @@ func (suite *SchedulerTest) TestScheduleTaskWithRestartDueToWorkerFailure() {
 
 	// Task should be rescheduled
 	assert.Equal(suite.T(), protocol.TaskStatus_TASK_QUEUED, task1.Status())
+	assert.False(suite.T(), build.HasRunningTask())
+	assert.True(suite.T(), build.HasQueuedTask())
 
 	worker, err = suite.newWorker()
 	assert.NoError(suite.T(), err)
