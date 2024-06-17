@@ -442,6 +442,11 @@ class TaskProxy(object):
         hooks.task_started_execution(self)
         self.running(what="Remote execution" if remote else "Execution")
 
+    def interrupted_execution(self, remote=False):
+        hooks.task_finished_execution(self)
+        self.task.warning("Remote execution interrupted {}" if remote else "Execution interrupted {}", self.log_name)
+        self.queued(remote=remote)
+
     def started_execution(self, remote=False):
         self.queued()
         self.running_execution(remote=remote)
