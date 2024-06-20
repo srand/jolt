@@ -2097,7 +2097,7 @@ class Tools(object):
 
         if self._chroot:
             path = path.split(fs.pathsep) if path else []
-            path += [os.path.join(self._chroot, p) for p in self._chroot_path]
+            path = [os.path.join(self._chroot, p.lstrip(fs.sep)) for p in self._chroot_path] + path
             path = fs.pathsep.join(path)
 
         result = shutil.which(executable, path=path)

@@ -74,7 +74,7 @@ setup(
         "click>=8.1",
         "colorama",
         "fasteners",
-        "grpcio",
+        "grpcio>=1.64.1",
         "jinja2",
         "keyring",
         "keyrings.alt",

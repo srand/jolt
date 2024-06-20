@@ -179,6 +179,10 @@ message Workspace {
     // This is a hash digest <algo>:<digest>.
     // SHA1 is assumed if the algorithm is omitted.
     string tree = 6;
+
+    // Workspace build directory, relative to rootdir.
+    // This is where temporary intermediate build output is stored.
+    string builddir = 7;
 }
 
 // Description of the Jolt client that initiated the build.

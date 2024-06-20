@@ -289,6 +289,10 @@ class JoltLoader(object):
     def build_path(self):
         return self._build_path or os.path.join(self.workspace_path, "build")
 
+    @property
+    def build_path_rel(self):
+        return os.path.relpath(self.build_path, self.workspace_path)
+
     def set_build_path(self, path):
         self._build_path = os.path.normpath(os.path.join(self.workspace_path, path))
         log.debug("Jolt build path: {}", self._build_path)
@@ -355,6 +359,8 @@ class RecipeExtension(ManifestExtension):
         loader = JoltLoader.get()
         loader.set_workspace_path(os.getcwd())
         loader.set_workspace_name(buildenv.workspace.name)
+        if buildenv.workspace.builddir:
+            loader.set_build_path(buildenv.workspace.builddir)
 
         # Write .jolt files into workspace
         for file in buildenv.workspace.files:
@@ -447,6 +453,7 @@ def export_workspace(tasks=None):
                 output_on_error=True)
 
     workspace = common_pb.Workspace(
+        builddir=loader.build_path_rel,
         cachedir=config.get_cachedir(),
         rootdir=loader.workspace_path,
         name=loader.workspace_name,
