@@ -1,7 +1,6 @@
 import click
 import os
 import sys
-import subprocess
 
 from jolt import cache
 from jolt import cli
@@ -9,6 +8,7 @@ from jolt import filesystem as fs
 from jolt import graph
 from jolt import log
 from jolt import scheduler
+from jolt.error import raise_error
 from jolt.error import raise_task_error_if
 from jolt.hooks import TaskHookRegistry
 from jolt.options import JoltOptions
@@ -140,6 +140,9 @@ def gdb(ctx, task, default, machine_interface, no_binary, gdb_args):
 
         with acache.get_context(goal):
             gdb = goal.tools.getenv("GDB", "gdb")
+            gdb = goal.tools.which(gdb)
+            if not gdb:
+                raise_error("GDB not found in PATH")
             cmd = [gdb]
             sysroot = goal.tools.getenv("SDKTARGETSYSROOT", goal.tools.getenv("SYSROOT"))
             if sysroot:
@@ -162,4 +165,5 @@ def gdb(ctx, task, default, machine_interface, no_binary, gdb_args):
                 cwd = goal.task.joltdir
 
             with goal.tools.environ() as env:
-                subprocess.call(cmd, env=env, cwd=cwd)
+                os.chdir(cwd)
+                os.execve(cmd[0], cmd, env)
