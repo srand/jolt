@@ -1,3 +1,4 @@
+import os
 import pkg_resources
 
 from jolt import config
@@ -190,8 +191,32 @@ def get_pinned_version():
     )
 
 
+def get_nix_version():
+    return common_pb.Client(
+        version=version.__version__,
+        nix=True,
+    )
+
+
 def get_client():
+    # Floating version is a special case where we want to deploy the Jolt
+    # source code to a remote cache and use that URL as the client URL
+    # for workers.
     floating = config.getboolean("selfdeploy", "floating", False)
     if floating:
         return get_floating_version()
+
+    # If Nix has been explicitly disabled, we want to pin versions.
+    if not config.getboolean("selfdeploy", "nix", True):
+        return get_pinned_version()
+
+    # If Nix has been explicitly enabled, we want to use the Nix shell.
+    if config.getboolean("selfdeploy", "nix", False):
+        return get_nix_version()
+
+    # If we are in a Nix shell, we want to use the Nix shell.
+    if os.environ.get("IN_NIX_SHELL"):
+        return get_nix_version()
+
+    # Default to pinned version
     return get_pinned_version()

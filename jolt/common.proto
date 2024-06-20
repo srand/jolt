@@ -205,6 +205,9 @@ message Client {
     //  - "pytest>=6"
     //  - "requests==2.28.0"
     repeated string requirements = 5;
+
+    // Use client from Nix environment
+    bool nix = 6;
 }
 
 // Full description of a build.

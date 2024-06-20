@@ -150,8 +150,6 @@ func (w *worker) run() error {
 					panic(err)
 				}
 
-				var clientWsName string
-
 				if request.Build.Environment.Workspace.Tree != "" {
 					log.Info("Deploying workspace tree", request.Build.Environment.Workspace.Tree, "for", request.Build.Environment.Workspace.Name)
 					err = w.runCmd(
@@ -175,8 +173,6 @@ func (w *worker) run() error {
 						os.RemoveAll(currentBuildFile)
 						continue
 					}
-
-					clientWsName = request.Build.Environment.Workspace.Name
 				}
 
 				clientDigest, err := w.deployClient(request.Build.Environment.Client, request.Build.Environment.Workspace)
@@ -187,10 +183,7 @@ func (w *worker) run() error {
 					continue
 				}
 
-				clientCache := request.Build.Environment.Workspace.Cachedir
-				clientWs := request.Build.Environment.Workspace.Rootdir
-
-				currentCmd, currentProc, err = w.startExecutor(clientDigest, clientWs, clientWsName, clientCache, request.WorkerId, request.BuildId, currentBuildFile)
+				currentCmd, currentProc, err = w.startExecutor(clientDigest, request.Build.Environment.Client, request.Build.Environment.Workspace, request.WorkerId, request.BuildId, currentBuildFile)
 				if err != nil {
 					reply(protocol.WorkerUpdate_EXECUTOR_FAILED, err)
 					os.RemoveAll(currentBuildFile)
@@ -260,6 +253,15 @@ func (w *worker) writeBuildRequest(request *protocol.BuildRequest) (string, erro
 func (w *worker) deployClient(client *protocol.Client, workspace *protocol.Workspace) (string, error) {
 	if client == nil {
 		return "", errors.New("Client information is missing")
+	}
+
+	if client.Nix {
+		if w.config.Nix {
+			log.Info("Nix is enabled for this client")
+			return "", nil
+		} else {
+			return "", errors.New("Nix shell requested by client but not enabled in worker")
+		}
 	}
 
 	log.Info("Deploying client", client)
@@ -398,15 +400,15 @@ func (w *worker) cachePath() string {
 // If the client has a shell.nix file, run the command in a nix-shell.
 func (w *worker) nixWrapperCmd(clientWsName string, cmdline []string) ([]string, error) {
 	if !w.config.Nix {
-		return nil, errors.New("nix is not enabled")
+		return nil, errors.New("Nix is not enabled on the worker")
 	}
 
 	if runtime.GOOS == "windows" {
-		return nil, errors.New("nix-shell is not supported on Windows")
+		return nil, errors.New("Nix is not supported on Windows")
 	}
 
 	if _, err := os.Stat(filepath.Join(w.cwd, clientWsName, "shell.nix")); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("No shell.nix file found in workspace")
 	}
 
 	log.Info("Running in nix-shell:", cmdline)
@@ -499,12 +501,12 @@ func (w *worker) runClientCmd(clientDigest, clientWs string, args ...string) err
 	return w.runCmd(clientWs, cmd...)
 }
 
-func (w *worker) startExecutor(clientDigest, clientWs, clientWsName, clientCache, worker, build, request string) (chan error, *os.Process, error) {
+func (w *worker) startExecutor(clientDigest string, client *protocol.Client, workspace *protocol.Workspace, worker, build, request string) (chan error, *os.Process, error) {
 	activate := w.activateVEnvPath(clientDigest)
 
 	// Build bubblewrap command prefix to run the executor in a namespace.
 	// If a namespace cannot be used, the command prefix will be empty.
-	nsCmd, config := w.nsWrapperCmd(clientWs, clientCache)
+	nsCmd, config := w.nsWrapperCmd(workspace.Rootdir, workspace.Cachedir)
 
 	// Build the executor command.
 	jolt := []string{"jolt", "-vv"}
@@ -513,10 +515,17 @@ func (w *worker) startExecutor(clientDigest, clientWs, clientWsName, clientCache
 	}
 	jolt = append(jolt, "executor", "-w", worker, "-b", build, request)
 
-	// If the client has a shell.nix file, run the executor in a nix-shell.
-	cmd, err := w.nixWrapperCmd(clientWsName, jolt)
-	if err != nil {
-		// Otherwise, run the executor in a virtualenv.
+	var cmd []string
+	var err error
+
+	// If the client has a shell.nix file, run the executor in a nix-shell,
+	// unless the host is Windows.
+	if client.Nix && runtime.GOOS != "windows" {
+		cmd, err = w.nixWrapperCmd(workspace.Name, jolt)
+		if err != nil {
+			return nil, nil, err
+		}
+	} else {
 		cmd = []string{"/bin/sh", "-c", fmt.Sprintf(". %s && %s", activate, strings.Join(jolt, " "))}
 	}
 
@@ -524,7 +533,7 @@ func (w *worker) startExecutor(clientDigest, clientWs, clientWsName, clientCache
 	cmd = append(nsCmd, cmd...)
 
 	// Go
-	return utils.RunOptions(filepath.Join(w.cwd, clientWsName), cmd...)
+	return utils.RunOptions(filepath.Join(w.cwd, workspace.Name), cmd...)
 }
 
 func (w *worker) enlist(stream protocol.Worker_GetInstructionsClient) error {
