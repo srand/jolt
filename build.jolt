@@ -217,7 +217,7 @@ class GenerateProtobufs(cxx.Compilation):
     protogenerator = ["python", "python_grpc"]
 
     def run(self, deps, tools):
-        with tools.chroot(deps["tools"]):
+        with tools.nixpkgs(nixfile="shell.nix"):
             super().run(deps, tools)
 
     def publish(self, artifact, tools):
