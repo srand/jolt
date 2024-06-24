@@ -1338,6 +1338,8 @@ class ArtifactCache(StorageProvider):
 
     def _fs_identity(self, identity):
         parts = identity.split("@", 1)
+        if len(parts) <= 1:
+            parts = ["main"] + parts
         return parts[1] + "-" + utils.canonical(parts[0])
 
     def _fs_get_artifact_archivepath(self, identity, task_name):
