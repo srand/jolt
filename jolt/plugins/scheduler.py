@@ -429,6 +429,8 @@ class RemoteSession(object):
                 config=config.export_config(),
             )
 
+            print(self.buildenv.client)
+
         # Create the build request.
         req = scheduler_pb.BuildRequest(
             environment=self.buildenv,

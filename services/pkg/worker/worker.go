@@ -157,6 +157,7 @@ func (w *worker) run() error {
 				if request.Build.Environment.Workspace.Tree != "" {
 					log.Info("Deploying workspace tree", request.Build.Environment.Workspace.Tree, "for", request.Build.Environment.Workspace.Name)
 					err = w.runCmd(
+						w.cwd,
 						"fstree",
 						"pull-checkout",
 						"--cache",
@@ -278,7 +279,7 @@ func (w *worker) deployClient(client *protocol.Client, workspace *protocol.Works
 
 	venv := w.vEnvPath(clientDigest)
 	if _, err := os.Stat(venv); err == nil {
-		if err := w.runClientCmd(clientDigest, "jolt", "--version"); err == nil {
+		if err := w.runClientCmd(clientDigest, w.cwd, "jolt", "--version"); err == nil {
 			return clientDigest, nil
 		} else {
 			os.RemoveAll(deployPath)
@@ -292,13 +293,13 @@ func (w *worker) deployClient(client *protocol.Client, workspace *protocol.Works
 		return "", err
 	}
 
-	err = w.runCmd("virtualenv", venv)
+	err = w.runCmd(w.cwd, "virtualenv", venv)
 	if err != nil {
 		os.RemoveAll(deployPath)
 		return "", err
 	}
 
-	err = w.runClientCmd(clientDigest, "pip", "install", "--upgrade", "pip")
+	err = w.runClientCmd(clientDigest, w.cwd, "pip", "install", "--upgrade", "pip")
 	if err != nil {
 		os.RemoveAll(deployPath)
 		return "", err
@@ -353,7 +354,7 @@ func (w *worker) deployClient(client *protocol.Client, workspace *protocol.Works
 			log.Fatal("Unsupported file extension:", url)
 		}
 
-		err = w.runClientCmd(clientDigest, "pip", "install", srcPath)
+		err = w.runClientCmd(clientDigest, w.cwd, "pip", "install", srcPath)
 		if err != nil {
 			os.RemoveAll(deployPath)
 			return "", err
@@ -362,7 +363,7 @@ func (w *worker) deployClient(client *protocol.Client, workspace *protocol.Works
 		log.Info("Deploying client from the Python Package Index:", client.Version)
 
 		args := append([]string{"pip", "install", "jolt==" + client.Version}, client.Requirements...)
-		err = w.runClientCmd(clientDigest, args...)
+		err = w.runClientCmd(clientDigest, w.cwd, args...)
 		if err != nil {
 			os.RemoveAll(deployPath)
 			return "", err
@@ -373,7 +374,7 @@ func (w *worker) deployClient(client *protocol.Client, workspace *protocol.Works
 }
 
 func (w *worker) deployPath(clientDigest string) string {
-	return filepath.Join("build", "selfdeploy", clientDigest)
+	return filepath.Join(w.cwd, "build", "selfdeploy", clientDigest)
 }
 
 func (w *worker) vEnvPath(clientDigest string) string {
@@ -381,7 +382,7 @@ func (w *worker) vEnvPath(clientDigest string) string {
 }
 
 func (w *worker) activateVEnvPath(clientDigest string) string {
-	return filepath.Join(w.cwd, w.vEnvPath(clientDigest), "bin", "activate")
+	return filepath.Join(w.vEnvPath(clientDigest), "bin", "activate")
 }
 
 func (w *worker) cachePath() string {
@@ -485,21 +486,28 @@ func (w *worker) nsWrapperCmd(clientWs, clientCache string) ([]string, []string)
 	return cmd, config
 }
 
-func (w *worker) runCmd(args ...string) error {
+func (w *worker) runCmd(workdir string, args ...string) error {
 	// Build bubblewrap command prefix to run the executor in a namespace.
 	// If a namespace cannot be used, the command prefix will be empty.
 	cmd, _ := w.nsWrapperCmd("", "")
 	cmd = append(cmd, "/bin/sh", "-c", strings.Join(args, " "))
-	return utils.RunWaitCwd(w.cwd, cmd...)
+
+	if workdir != "" && !filepath.IsAbs(workdir) {
+		workdir = filepath.Join(w.cwd, workdir)
+	} else if workdir == "" {
+		workdir = w.cwd
+	}
+
+	return utils.RunWaitCwd(workdir, cmd...)
 }
 
-func (w *worker) runClientCmd(clientDigest string, args ...string) error {
+func (w *worker) runClientCmd(clientDigest, workdir string, args ...string) error {
 	activate := w.activateVEnvPath(clientDigest)
 
 	// Build bubblewrap command prefix to run the executor in a namespace.
 	// If a namespace cannot be used, the command prefix will be empty.
 	cmd := []string{fmt.Sprintf(". %s && %s", activate, strings.Join(args, " "))}
-	return w.runCmd(cmd...)
+	return w.runCmd(workdir, cmd...)
 }
 
 func (w *worker) startExecutor(clientDigest string, client *protocol.Client, workspace *protocol.Workspace, worker, build, request string) (chan error, *os.Process, error) {
@@ -533,7 +541,15 @@ func (w *worker) startExecutor(clientDigest string, client *protocol.Client, wor
 	// Run the executor in a namespace if possible.
 	cmd = append(nsCmd, cmd...)
 
-	runPath := filepath.Join(w.cwd, workspace.Name)
+	// If the client version is less than 0.9.242, the executor must be run
+	// in the anonymous workspace directory.
+	var runPath string
+	if client.Version == "" || utils.VersionLessThan(client.Version, "0.9.242") {
+		runPath = filepath.Join(w.cwd, "anonymous")
+	} else {
+		runPath = filepath.Join(w.cwd, workspace.Name)
+	}
+
 	// Create run directory if it does not exist
 	if _, err := os.Stat(runPath); os.IsNotExist(err) {
 		if err := os.MkdirAll(runPath, 0777); err != nil {
@@ -541,7 +557,7 @@ func (w *worker) startExecutor(clientDigest string, client *protocol.Client, wor
 		}
 	}
 
-	// Go
+	log.Infof("Starting %s executor in workspace %s", client.Version, runPath)
 	return utils.RunOptions(runPath, cmd...)
 }
 
