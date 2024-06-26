@@ -58,7 +58,34 @@ message ListBuildsResponse {
 }
 
 message ListWorkersRequest {}
-message ListWorkersResponse {}
+
+message ListWorkersResponse {
+    message Task {
+        // Task identity
+        string id = 1;
+
+        // Task name
+        string name = 2;
+
+        // Current status of the task
+        TaskStatus status = 3;
+    }
+
+    message Worker {
+        string id = 1;
+
+        // The worker platform
+        Platform platform = 2;
+
+        // Task platform requirements
+        Platform task_platform = 3;
+
+        // Currently assigned task
+        Task task = 4;
+    }
+
+    repeated Worker workers = 1;
+}
 
 // This service is not yet implemented.
 service Administration {

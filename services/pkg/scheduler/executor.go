@@ -16,6 +16,10 @@ type Executor interface {
 	// is terminated.
 	Acknowledge()
 
+	// Return the task that has been delivered to the consumer but not yet acknowledged.
+	// If no task is pending, nil is returned.
+	Unacknowledged() *Task
+
 	// Unregister this executor.
 	// If a task is in progress, that task is redistributed to another executor.
 	Close()

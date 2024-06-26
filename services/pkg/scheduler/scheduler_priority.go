@@ -632,3 +632,41 @@ func (s *priorityScheduler) ListBuilds(tasks bool) *protocol.ListBuildsResponse 
 
 	return response
 }
+
+// Get information about connected workers.
+func (s *priorityScheduler) ListWorkers() *protocol.ListWorkersResponse {
+	s.RLock()
+	defer s.RUnlock()
+
+	response := &protocol.ListWorkersResponse{
+		Workers: make([]*protocol.ListWorkersResponse_Worker, 0, len(s.workers)),
+	}
+
+	for _, worker := range s.workers {
+		response.Workers = append(response.Workers, &protocol.ListWorkersResponse_Worker{
+			Id:           worker.Id(),
+			Platform:     worker.Platform().Protobuf(),
+			TaskPlatform: worker.TaskPlatform().Protobuf(),
+			Task:         nil,
+		})
+
+		// Get task
+		executor := s.workerExecutors[worker]
+		if executor == nil {
+			continue
+		}
+
+		task := executor.Unacknowledged()
+		if task == nil {
+			continue
+		}
+
+		response.Workers[len(response.Workers)-1].Task = &protocol.ListWorkersResponse_Task{
+			Id:     task.Identity(),
+			Name:   task.Name(),
+			Status: task.Status(),
+		}
+	}
+
+	return response
+}

@@ -2,7 +2,6 @@ package scheduler
 
 import (
 	"context"
-	"errors"
 
 	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/srand/jolt/scheduler/pkg/protocol"
@@ -37,7 +36,7 @@ func (s *adminService) ListBuilds(_ context.Context, req *protocol.ListBuildsReq
 
 func (s *adminService) ListWorkers(_ context.Context, req *protocol.ListWorkersRequest) (*protocol.ListWorkersResponse, error) {
 	// Not implemented
-	return nil, errors.New("not implemented")
+	return s.scheduler.ListWorkers(), nil
 }
 
 func (s *adminService) Reschedule(_ context.Context, _ *empty.Empty) (*empty.Empty, error) {

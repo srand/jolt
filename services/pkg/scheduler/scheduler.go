@@ -52,6 +52,9 @@ type Scheduler interface {
 	// Get information about running builds. If tasks is true, also include
 	// information about the tasks of each build.
 	ListBuilds(tasks bool) *protocol.ListBuildsResponse
+
+	// Get information about connected workers.
+	ListWorkers() *protocol.ListWorkersResponse
 }
 
 // Scheduler statistics

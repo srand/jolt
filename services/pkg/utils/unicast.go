@@ -265,6 +265,13 @@ func (bcc *UnicastConsumer[E]) Acknowledge() {
 	bcc.unicast.acknowledge(bcc)
 }
 
+// Return the item that has been delivered to the consumer but not yet acknowledged.
+func (bcc *UnicastConsumer[E]) Unacknowledged() E {
+	bcc.unicast.RLock()
+	defer bcc.unicast.RUnlock()
+	return bcc.unicast.consumerItem[bcc.ID]
+}
+
 // Close the consumer and unregister from the unicast.
 func (bcc *UnicastConsumer[E]) Close() {
 	// Unregister from the unicast unless already done.
