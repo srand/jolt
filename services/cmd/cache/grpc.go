@@ -8,6 +8,7 @@ import (
 	"github.com/srand/jolt/scheduler/pkg/cache"
 	"github.com/srand/jolt/scheduler/pkg/log"
 	"google.golang.org/grpc"
+	_ "google.golang.org/grpc/encoding/gzip"
 )
 
 // Sets up a gRPC server on a specific listening address and starts it.
