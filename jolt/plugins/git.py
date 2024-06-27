@@ -462,7 +462,7 @@ class Git(WorkspaceResource, FileInfluence):
 
     def acquire_ws(self):
         """ Clone and/or checkout the git repo if required """
-        if self._must_influence():
+        if self._must_influence() or self._revision.is_imported:
             self._acquire_ws()
 
     def _acquire_ws(self):
