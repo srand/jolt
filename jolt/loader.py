@@ -1,7 +1,9 @@
+import json
 import glob
 from importlib.machinery import SourceFileLoader
 import os
 import platform
+import subprocess
 import sys
 from types import ModuleType
 
@@ -433,24 +435,67 @@ def export_workspace(tasks=None):
                 cachedir=cachedir)
 
             if not os.path.exists(indexfile):
-                log.info("Indexing workspace for the first time, please wait")
-                tree = tools.run(
-                    "{} write-tree --cache {cachedir} --ignore .joltignore --index {indexfile} --threads {threads}",
-                    fstree,
-                    cachedir=cachedir,
-                    indexfile=indexfile,
-                    threads=tools.thread_count(),
-                    output_on_error=True)
+                process = None
+                try:
+                    with log.progress("Indexing workspace for the first time", count=None, unit=" objects", estimates=False) as progress:
+                        process = subprocess.Popen(
+                            [fstree, "write-tree", "--json", "--cache", cachedir, "--ignore", ".joltignore", "--index", indexfile, "--remote", cache_grpc_uri.geturl(), "--threads", str(tools.thread_count())],
+                            stdout=subprocess.DEVNULL,
+                            stderr=subprocess.PIPE)
 
-            log.info("Pushing {} to remote cache", cwd)
-            tree = tools.run(
-                "{} write-tree-push --cache {cachedir} --ignore .joltignore --index {indexfile} --remote {remote} --threads {threads}",
-                fstree,
-                cachedir=cachedir,
-                indexfile=indexfile,
-                remote=cache_grpc_uri.geturl(),
-                threads=tools.thread_count(),
-                output_on_error=True)
+                        for line in iter(process.stderr.readline, b''):
+                            event = json.loads(line.decode())
+
+                            if event.get("type") in ["cache::add"]:
+                                progress.update(1)
+
+                except Exception as exc:
+                    if process:
+                        process.terminate()
+                    raise exc
+                finally:
+                    if process:
+                        process.wait()
+                        process.stderr.close()
+                        raise_error_if(process.returncode != 0, "Failed to index workspace")
+
+            process = None
+            try:
+                with log.progress("Pushing workspace to remote cache", count=0, unit=" objects", estimates=False) as progress:
+                    process = subprocess.Popen(
+                        [fstree, "write-tree-push", "--json", "--cache", cachedir, "--ignore", ".joltignore", "--index", indexfile, "--remote", cache_grpc_uri.geturl(), "--threads", str(tools.thread_count())],
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.PIPE)
+
+                    total = 0
+                    count = 0
+
+                    for line in iter(process.stderr.readline, b''):
+                        event = json.loads(line.decode())
+
+                        if event.get("type") in ["cache::push"]:
+                            tree = event.get("path")
+                            log.info("Workspace tree: {} ({} objects)", tree, event.get("value"))
+
+                        if event.get("type") in ["cache::remote_missing_object", "cache::remote_missing_tree"]:
+                            total += 1
+                            progress.reset(total)
+                            progress.update(count)
+                            progress.refresh()
+
+                        if event.get("type") in ["cache::push_object", "cache::push_tree"]:
+                            progress.update(1)
+                            count += 1
+            except Exception as exc:
+                if process:
+                    process.terminate()
+                raise exc
+
+            finally:
+                if process:
+                    process.wait()
+                    process.stderr.close()
+                    raise_error_if(process.returncode != 0, "Failed to push workspace to remote cache")
 
     workspace = common_pb.Workspace(
         builddir=loader.build_path_rel,
