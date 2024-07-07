@@ -6,7 +6,7 @@ from jolt.plugins import cxx, docker, git, selfdeploy
 from os import getenv
 
 
-fstree_version = "24.6.2"
+fstree_version = "24.7.1"
 
 
 @influence.files("{dockerfile}")
@@ -43,9 +43,15 @@ class Jolt(selfdeploy.Jolt):
         super().publish(artifact, tools)
         with tools.cwd(tools.builddir()):
             tools.mkdir("jolt/bin")
+            tools.download(f"https://github.com/srand/fstree/releases/download/{fstree_version}/fstree-darwin-x86_64", "jolt/bin/fstree-darwin-x86_64")
             tools.download(f"https://github.com/srand/fstree/releases/download/{fstree_version}/fstree-linux-x86_64", "jolt/bin/fstree-linux-x86_64")
+            tools.download(f"https://github.com/srand/fstree/releases/download/{fstree_version}/fstree-windows-x86_64.exe", "jolt/bin/fstree-windows-x86_64.exe")
+            tools.chmod("jolt/bin/fstree-darwin-x86_64", 0o755)
             tools.chmod("jolt/bin/fstree-linux-x86_64", 0o755)
+            tools.chmod("jolt/bin/fstree-windows-x86_64.exe", 0o755)
+            artifact.collect("jolt/bin/fstree-darwin-x86_64")
             artifact.collect("jolt/bin/fstree-linux-x86_64")
+            artifact.collect("jolt/bin/fstree-windows-x86_64")
 
 
 @influence.files("{dockerfile}")
