@@ -444,7 +444,11 @@ def export_workspace(tasks=None):
                             stderr=subprocess.PIPE)
 
                         for line in iter(process.stderr.readline, b''):
-                            event = json.loads(line.decode())
+                            try:
+                                event = json.loads(line.decode())
+                            except json.JSONDecodeError as exc:
+                                log.error("Failed to decode fstree event: {}", line.decode())
+                                raise exc
 
                             if event.get("type") in ["cache::add"]:
                                 progress.update(1)
@@ -471,7 +475,11 @@ def export_workspace(tasks=None):
                     count = 0
 
                     for line in iter(process.stderr.readline, b''):
-                        event = json.loads(line.decode())
+                        try:
+                            event = json.loads(line.decode())
+                        except json.JSONDecodeError as exc:
+                            log.error("Failed to decode fstree event: {}", line.decode())
+                            raise exc
 
                         if event.get("type") in ["cache::push"]:
                             tree = event.get("path")

@@ -26,6 +26,7 @@ class CacheImage(docker.DockerImage):
     ]
 
 
+@influence.string(fstree_version)
 class Fstree(Task):
     def publish(self, artifact, tools):
         with tools.cwd(tools.builddir()):

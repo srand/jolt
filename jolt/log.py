@@ -332,6 +332,12 @@ class _Progress(object):
     def update(self, *args, **kwargs):
         pass
 
+    def refresh(self, *args, **kwargs):
+        pass
+
+    def reset(self, *args, **kwargs):
+        pass
+
 
 def progress_log(desc, count, unit):
     return _Progress(desc)
