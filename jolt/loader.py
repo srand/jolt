@@ -437,11 +437,12 @@ def export_workspace(tasks=None):
             if not os.path.exists(indexfile):
                 process = None
                 try:
-                    with log.progress("Indexing workspace for the first time", count=None, unit=" objects", estimates=False) as progress:
+                    with log.progress("Indexing workspace for the first time", count=None, unit="objects", estimates=False) as progress:
                         process = subprocess.Popen(
                             [fstree, "write-tree", "--json", "--cache", cachedir, "--ignore", ".joltignore", "--index", indexfile, "--remote", cache_grpc_uri.geturl(), "--threads", str(tools.thread_count())],
                             stdout=subprocess.DEVNULL,
-                            stderr=subprocess.PIPE)
+                            stderr=subprocess.PIPE,
+                            cwd=tools.getcwd())
 
                         for line in iter(process.stderr.readline, b''):
                             try:
@@ -465,14 +466,12 @@ def export_workspace(tasks=None):
 
             process = None
             try:
-                with log.progress("Pushing workspace to remote cache", count=0, unit=" objects", estimates=False) as progress:
+                with log.progress("Pushing workspace to remote cache", count=None, unit="objects", estimates=False) as progress:
                     process = subprocess.Popen(
                         [fstree, "write-tree-push", "--json", "--cache", cachedir, "--ignore", ".joltignore", "--index", indexfile, "--remote", cache_grpc_uri.geturl(), "--threads", str(tools.thread_count())],
                         stdout=subprocess.DEVNULL,
-                        stderr=subprocess.PIPE)
-
-                    total = 0
-                    count = 0
+                        stderr=subprocess.PIPE,
+                        cwd=tools.getcwd())
 
                     for line in iter(process.stderr.readline, b''):
                         try:
@@ -486,14 +485,11 @@ def export_workspace(tasks=None):
                             log.info("Workspace tree: {} ({} objects)", tree, event.get("value"))
 
                         if event.get("type") in ["cache::remote_missing_object", "cache::remote_missing_tree"]:
-                            total += 1
-                            progress.reset(total)
-                            progress.update(count)
                             progress.refresh()
 
                         if event.get("type") in ["cache::push_object", "cache::push_tree"]:
                             progress.update(1)
-                            count += 1
+
             except Exception as exc:
                 if process:
                     process.terminate()

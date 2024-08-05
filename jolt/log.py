@@ -344,8 +344,11 @@ def progress_log(desc, count, unit):
 
 
 def progress(desc, count, unit, estimates=True, debug=False):
-    bar_format = '{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}]' \
-                 if not estimates else None
+    if count:
+        bar_format = '{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}]' \
+                     if not estimates else None
+    else:
+        bar_format = '{desc}{n_fmt} {unit} [{elapsed}]'
     if not debug and is_interactive() and not is_verbose():
         p = tqdm.tqdm(total=count, unit=unit, unit_scale=True, bar_format=bar_format, dynamic_ncols=True)
         p.set_description("[   INFO] " + desc)
