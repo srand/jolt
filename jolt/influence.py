@@ -620,6 +620,37 @@ class StringInfluence(HashInfluenceProvider):
         return self.value
 
 
+def string(string, selfdeploy=False):
+    """ Add string hash influence.
+
+    Args:
+        string (str): A string that will influence the hash of the task.
+
+    Example:
+
+    .. code-block:: python
+
+            from jolt import influence
+
+            @influence.string("example")
+            class Example(Task):
+
+    """
+
+    def _decorate(cls):
+        _old_influence = cls._influence
+
+        def _influence(self, *args, **kwargs):
+            influence = _old_influence(self, *args, **kwargs)
+            influence.append(StringInfluence(string, selfdeploy=selfdeploy))
+            return influence
+
+        cls._influence = _influence
+        return cls
+
+    return _decorate
+
+
 def global_string(string, selfdeploy=False):
     HashInfluenceRegistry.get().register(StringInfluence(string, selfdeploy=selfdeploy))
 
