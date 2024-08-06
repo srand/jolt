@@ -316,19 +316,24 @@ class cached:
 
     @staticmethod
     def instance(f):
+        f.__cached_mutex = RLock()
+
         def _f(self, *args, **kwargs):
             attr = "__cached_result_" + str(id(f))
-            with cached.mutex:
+            with f.__cached_mutex:
                 if not hasattr(self, attr):
                     setattr(self, attr, f(self, *args, **kwargs))
             return getattr(self, attr)
+
         return _f
 
     @staticmethod
     def method(f):
+        f.__cached_mutex = RLock()
+
         def _f(*args, **kwargs):
             attr = "__cached_result_" + str(id(f))
-            with cached.mutex:
+            with f.__cached_mutex:
                 if not hasattr(f, attr):
                     setattr(f, attr, f(*args, **kwargs))
             return getattr(f, attr)
