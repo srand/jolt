@@ -1750,7 +1750,14 @@ class ArtifactCache(StorageProvider):
         return Context(self, node)
 
     def get_artifact(self, node, name, tools=None, session=False):
-        return self._fs_get_artifact(node, name=name, tools=tools, session=session)
+        artifact = self._fs_get_artifact(node, name=name, tools=tools, session=session)
+        if not artifact.is_temporary():
+            with self._cache_lock(), self._db() as db:
+                if not self._db_select_artifact(db, artifact.identity) and not self._db_select_reference(db, artifact.identity):
+                    log.verbose("Artifact not present in db, discarding archive ({} )", artifact.task.short_qualified_name, artifact.identity)
+                    fs.rmtree(artifact.final_path, ignore_errors=True)
+                    artifact.reload()
+        return artifact
 
     @contextlib.contextmanager
     def lock_artifact(self, artifact, discard=False):
