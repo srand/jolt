@@ -1465,13 +1465,6 @@ class ArtifactCache(StorageProvider):
                 self._db_insert_reference(db, artifact.identity)
                 self._local_presence_cache.add(artifact.identity)
                 return True
-
-            if not artifact.is_temporary():
-                fs.rmtree(artifact.final_path, ignore_errors=True)
-                artifact.reload()
-                log.debug("Artifact missing in db, discarded in fs ({} {})", artifact.task.short_qualified_name, artifact.name)
-                return False
-
         return False
 
     def is_available_remotely(self, artifact, cache=True):
