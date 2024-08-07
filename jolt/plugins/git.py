@@ -395,7 +395,7 @@ class Git(WorkspaceResource, FileInfluence):
 
         # Set the path to the repo
         if self.path.is_unset():
-            self.abspath = self.tools.builddir(utils.canonical(self.short_qualified_name), incremental=True, unique=False)
+            self.abspath = self.tools.builddir(utils.canonical(self.short_qualified_name), incremental="always", unique=False)
             self.relpath = fs.path.relpath(self.abspath, self.tools.wsroot)
         else:
             self.abspath = fs.path.join(self.joltdir, str(self.path) or self._get_name())

@@ -605,7 +605,7 @@ class Tools(object):
         dirname = fs.path.join(self.getcwd(), name)
 
         # Check if incremental build directories are disabled in the configuration
-        if not config.is_incremental_build():
+        if incremental not in ["always"] and not config.is_incremental_build():
             incremental = False
 
         if incremental:
