@@ -604,7 +604,13 @@ class Tools(object):
 
         dirname = fs.path.join(self.getcwd(), name)
 
+        # Check if incremental build directories are disabled in the configuration
+        if not config.is_incremental_build():
+            incremental = False
+
         if incremental:
+            # Create a unique build directory for each task
+            # and store the task name in a hidden file.
             if self._task is not None and unique:
                 meta_task = fs.path.join(dirname, ".task")
                 if not fs.path.exists(meta_task) \
@@ -612,6 +618,7 @@ class Tools(object):
                     fs.rmtree(dirname, ignore_errors=True)
                     fs.makedirs(dirname)
 
+                # Remove the build directory if the task taint has changed (--force or --salt)
                 if self._task.taint is not None:
                     meta = fs.path.join(dirname, ".taint")
                     if not fs.path.exists(meta) or self.read_file(meta) != str(self._task.taint):

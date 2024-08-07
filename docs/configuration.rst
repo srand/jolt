@@ -77,6 +77,14 @@ The ``[jolt]`` config section contains global configuration:
           distributed executions.
         | Default: ``true``
 
+    * - ``incremental_dirs``
+      - Boolean
+      - | Allow tasks to use incremental build directories. Incremental directories
+          are used to store intermediate build files and are reused between builds.
+          This can speed up builds significantly.
+          If disabled, incremental directories are always removed when a task finishes.
+        | Default: ``true``
+
     * - ``logcount``
       - Integer
       - | Number of log files to keep.

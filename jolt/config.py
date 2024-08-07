@@ -238,6 +238,15 @@ def get_keep_going():
     return getboolean("params", "keep_going", False)
 
 
+def is_incremental_build():
+    """
+    Whether to enable incremental builds.
+
+    If disabled, all build directories are deleted upon completion of tasks.
+    """
+    return getboolean("jolt", "incremental_dirs", True)
+
+
 def set_keep_going(value=False):
     return set("params", "keep_going", str(value).lower())
 
