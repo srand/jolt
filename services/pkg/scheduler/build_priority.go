@@ -121,7 +121,11 @@ func (b *priorityBuild) Close() {
 	for _, task := range tasks {
 		task.Close()
 	}
+
 	b.queue.Close()
+	b.queue = nil
+	b.environment = nil
+	b.tasks = nil
 }
 
 // Returns a channel that is closed when the build is cancelled.
@@ -157,6 +161,10 @@ func (b *priorityBuild) HasObserver() bool {
 	b.RLock()
 	defer b.RUnlock()
 
+	if b.buildObservers == nil {
+		return false
+	}
+
 	if b.buildObservers.HasObserver() {
 		return true
 	}
@@ -172,6 +180,9 @@ func (b *priorityBuild) HasObserver() bool {
 func (b *priorityBuild) HasQueuedTask() bool {
 	b.RLock()
 	defer b.RUnlock()
+	if b.queue == nil {
+		return false
+	}
 	return !b.queue.Empty()
 }
 
@@ -179,6 +190,9 @@ func (b *priorityBuild) HasQueuedTask() bool {
 func (b *priorityBuild) HasRunningTask() bool {
 	b.RLock()
 	defer b.RUnlock()
+	if b.queue == nil {
+		return false
+	}
 	return b.queue.HasUnackedData()
 }
 
@@ -287,7 +301,7 @@ func (b *priorityBuild) WalkQueuedTasks(walkFn TaskWalkFunc) bool {
 
 // Creates a new task executor for the build.
 func (b *priorityBuild) NewExecutor(scheduler Scheduler, worker Worker) (Executor, error) {
-	if b.IsCancelled() {
+	if b.IsCancelled() || b.queue == nil {
 		return nil, errors.New("Build is cancelled")
 	}
 	consumer, err := b.queue.NewConsumerWithItem(worker)

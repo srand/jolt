@@ -52,7 +52,7 @@ func (bc *Broadcast[E]) Close() {
 		close(consumer.Chan)
 	}
 
-	bc.consumers = map[string]*BroadcastConsumer[E]{}
+	bc.consumers = nil
 }
 
 func (bc *Broadcast[E]) Remove(bcc *BroadcastConsumer[E]) bool {

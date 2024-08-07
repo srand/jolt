@@ -91,6 +91,17 @@ func (bc *Unicast[E]) Close() {
 	for _, consumer := range bc.consumers {
 		consumer.cancel()
 	}
+
+	bc.consumers = nil
+
+	for _, consumer := range bc.availConsumers {
+		consumer.cancel()
+	}
+
+	bc.availConsumers = nil
+	bc.consumerItem = nil
+	bc.callbacks = nil
+	bc.queue.Init()
 }
 
 // Create a new consumer.
@@ -283,6 +294,8 @@ func (bcc *UnicastConsumer[E]) Close() {
 	bcc.unicast.remove(bcc)
 	bcc.unicast = nil
 	close(bcc.Chan)
+	bcc.owner = nil
+	bcc.unicast = nil
 }
 
 // Channel indicating that the consumer is cancelled
