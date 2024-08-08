@@ -4,6 +4,7 @@ from jolt import config
 from jolt import graph
 from jolt import log
 from jolt import scheduler
+from jolt.loader import JoltLoader
 from jolt.manifest import JoltManifest
 from jolt.options import JoltOptions
 from jolt.tasks import TaskRegistry
@@ -49,6 +50,7 @@ def snap(ctx, task, default):
     options = JoltOptions(default=default)
     acache = cache.ArtifactCache.get(options)
     registry = TaskRegistry.get()
+    loader = JoltLoader.get(options)
 
     for params in default:
         registry.set_default_parameters(params)
@@ -57,6 +59,7 @@ def snap(ctx, task, default):
     dag = gb.build([task])
 
     manifest = JoltManifest.export(dag.requested_goals)
+    manifest.name = loader.workspace_name
     manifest.config = ""
     build = manifest.create_build()
 
