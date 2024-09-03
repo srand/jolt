@@ -127,6 +127,7 @@ def cli(ctx, verbose, config_file, debugger, profile,
     if ctx.invoked_subcommand not in ["log", "report"]:
         log.start_file_log()
 
+    log.verbose("Jolt version: {}", __version__)
     log.verbose("Jolt command: {}", " ".join([fs.path.basename(sys.argv[0])] + sys.argv[1:]))
     log.verbose("Jolt host: {}", environ.get("HOSTNAME", "localhost"))
     log.verbose("Jolt install path: {}", fs.path.dirname(__file__))
