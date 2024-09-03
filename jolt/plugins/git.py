@@ -5,7 +5,7 @@ import re
 from jolt.tasks import BooleanParameter, Export, Parameter, TaskRegistry, WorkspaceResource
 from jolt.influence import FileInfluence, HashInfluenceRegistry
 from jolt.tools import Tools
-from jolt.loader import JoltLoader
+from jolt.loader import JoltLoader, workspace_locked
 from jolt import config
 from jolt import filesystem as fs
 from jolt import log
@@ -145,6 +145,7 @@ class GitRepository(object):
                 return str(commit)
 
     @utils.cached.instance
+    @workspace_locked
     def write_tree(self):
         tools = Tools()
         with tools.cwd(self._git_folder()):

@@ -1,3 +1,6 @@
+from collections import OrderedDict
+from contextlib import contextmanager
+import fasteners
 import json
 import glob
 from importlib.machinery import SourceFileLoader
@@ -138,12 +141,13 @@ class JoltLoader(object):
     filename = "*.jolt"
 
     def __init__(self):
+        self._lock = None
         self._recipes = []
         self._tasks = []
         self._path = None
-        self._project_modules = {}
-        self._project_recipes = {}
-        self._project_resources = {}
+        self._project_modules = OrderedDict()
+        self._project_recipes = OrderedDict()
+        self._project_resources = OrderedDict()
         self._build_path = None
         self._workspace_name = None
 
@@ -162,6 +166,14 @@ class JoltLoader(object):
 
     def _get_project_recipes(self, project):
         return self._project_recipes.get(project, [])
+
+    def _get_first_recipe_path(self):
+        for recipe in self.recipes:
+            return recipe.path
+        for project, recipes in self._project_recipes.items():
+            for joltdir, src in recipes:
+                return fs.path.join(self._path, src)
+        return None
 
     def _add_project_resource(self, project, resource_name, resource_task):
         class ProjectResource(Alias):
@@ -219,6 +231,12 @@ class JoltLoader(object):
                     self._tasks += recipe.tasks
 
         self._load_project_recipes()
+
+        # Create workspace lock on the first loaded recipe
+        if not self._lock:
+            path = self._get_first_recipe_path()
+            if path:
+                self._lock = fasteners.InterProcessLock(path)
 
         return self._tasks
 
@@ -282,6 +300,14 @@ class JoltLoader(object):
     @property
     def workspace_path(self):
         return self._path
+
+    @contextmanager
+    @utils.locked
+    def workspace_lock(self):
+        if not self._lock:
+            yield
+        with self._lock:
+            yield
 
     def set_workspace_path(self, path):
         if not self._path or len(path) < len(self._path):
@@ -398,6 +424,20 @@ def get_workspacedir():
     return workspacedir
 
 
+@contextmanager
+def workspace_lock():
+    with JoltLoader.get().workspace_lock():
+        yield
+
+
+def workspace_locked(func):
+    def wrapper(*args, **kwargs):
+        with workspace_lock():
+            return func(*args, **kwargs)
+    return wrapper
+
+
+@workspace_locked
 def export_workspace(tasks=None):
     loader = JoltLoader.get()
     tools = Tools()

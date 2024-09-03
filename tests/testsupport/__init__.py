@@ -141,10 +141,10 @@ global_string("{test}")
 
     def tasks(self, output, remote=False, local=False):
         if local:
-            return list(filter(lambda t: t != "jolt", re.findall("INFO] Execution started.*?\((.*) [^ ]*\)", output)))
+            return list(filter(lambda t: t != "jolt", re.findall(r"INFO] Execution started.*?\((.*) [^ ]*\)", output)))
         if remote:
-            return re.findall("Remote execution started.*?\((.*) [^ ]*\)", output)
-        return re.findall("xecution started.*?\((.*) [^ ]*\)", output)
+            return re.findall(r"Remote execution started.*?\((.*) [^ ]*\)", output)
+        return re.findall(r"xecution started.*?\((.*) [^ ]*\)", output)
 
     def artifacts(self, output):
         return re.findall("Location: (.*)\n", output, re.M)
@@ -185,14 +185,14 @@ global_string("{test}")
             self.fail("tasks were executed: {}".format(" ".join(tasks)))
 
     def assertDownload(self, r, task):
-        tasks = re.findall("Download started.*?\((.*) [^ ]*\)", r)
+        tasks = re.findall(r"Download started.*?\((.*) [^ ]*\)", r)
         if len(tasks) <= 0:
             self.fail("no artifacts were downloaded")
         elif task not in tasks:
             self.fail("{} was not downloaded".format(task))
 
     def assertUpload(self, r, task):
-        tasks = re.findall("Upload started.*?\((.*) [^ ]*\)", r)
+        tasks = re.findall(r"Upload started.*?\((.*) [^ ]*\)", r)
         if len(tasks) <= 0:
             self.fail("no artifacts were downloaded")
         elif task not in tasks:
