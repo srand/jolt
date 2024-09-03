@@ -2,6 +2,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed, Future
 import copy
 import os
 import queue
+from threading import Lock
 
 from jolt import common_pb2 as common_pb
 from jolt import config
@@ -27,6 +28,7 @@ class JoltEnvironment(object):
 class TaskQueue(object):
     def __init__(self, strategy, cache, session):
         self.futures = {}
+        self.futures_lock = Lock()
         self.strategy = strategy
         self.cache = cache
         self.session = session
@@ -36,8 +38,9 @@ class TaskQueue(object):
         self._timer.start()
 
     def _log_task_running_time(self):
-        for future in self.futures:
-            self.futures[future].task.log_running_time()
+        with self.futures_lock:
+            for future in self.futures:
+                self.futures[future].task.log_running_time()
 
     def submit(self, task):
         if self._aborted:
@@ -64,17 +67,19 @@ class TaskQueue(object):
                 return task, error
             finally:
                 self.duration_acc += task.duration_running or 0
-                del self.futures[future]
+                with self.futures_lock:
+                    del self.futures[future]
             return task, None
         return None, None
 
     def abort(self):
         self._aborted = True
-        for future, executor in self.futures.items():
-            executor.cancel()
-            future.cancel()
-        if len(self.futures):
-            log.info("Waiting for tasks to finish, please be patient")
+        with self.futures_lock:
+            for future, executor in self.futures.items():
+                executor.cancel()
+                future.cancel()
+            if len(self.futures):
+                log.info("Waiting for tasks to finish, please be patient")
         self.strategy.executors.shutdown()
         self._timer.cancel()
 
@@ -85,10 +90,12 @@ class TaskQueue(object):
         return self._aborted
 
     def in_progress(self, task):
-        return task in self.futures.values()
+        with self.futures_lock:
+            return task in self.futures.values()
 
     def empty(self):
-        return len(self.futures) == 0
+        with self.futures_lock:
+            return len(self.futures) == 0
 
 
 class Executor(object):
