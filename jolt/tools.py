@@ -61,7 +61,8 @@ def _run(cmd, cwd, env, preexec_fn, *args, **kwargs):
     output = output if output is not None else True
     output = False if output_on_error else output
     shell = kwargs.get("shell", True)
-    timeout = kwargs.get("timeout", None)
+    timeout = kwargs.get("timeout", config.getint("jolt", "command_timeout", 0))
+    timeout = timeout if type(timeout) is int and timeout > 0 else None
 
     log.debug("Running: '{0}' (CWD: {1})", cmd, cwd)
 
