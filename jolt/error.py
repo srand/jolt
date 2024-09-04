@@ -4,16 +4,23 @@ from jolt import utils
 
 class JoltError(Exception):
     def __init__(self, *args, **kwargs):
-        super(JoltError, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
 
 class JoltCommandError(JoltError):
     def __init__(self, what, stdout=[], stderr=[], returncode=None, *args, **kwargs):
-        super(JoltCommandError, self).__init__(what, *args, **kwargs)
+        super().__init__(what, *args, **kwargs)
         self.stdout = stdout
         self.stderr = stderr
         self.returncode = returncode
 
+
+class JoltTimeoutError(JoltError):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def __str__(self):
+        return super().__str__() or "Timeout"
 
 class LoggedJoltError(JoltError):
     def __init__(self, exc):

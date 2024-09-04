@@ -8,6 +8,7 @@ import os
 import platform
 import sys
 import threading
+import time
 if os.name != "nt":
     import termios
 import glob
@@ -34,7 +35,7 @@ from jolt import filesystem as fs
 from jolt import log
 from jolt import utils
 from jolt import config
-from jolt.error import JoltCommandError
+from jolt.error import JoltCommandError, JoltTimeoutError
 from jolt.error import raise_error_if
 from jolt.error import raise_task_error, raise_task_error_if
 
@@ -167,11 +168,15 @@ def _run(cmd, cwd, env, preexec_fn, *args, **kwargs):
 
     if p.returncode != 0:
         stderrbuf = [line for reader, line in logbuf if reader is stderr]
-        raise JoltCommandError(
-            "Command {0}: {1}".format(
-                "timeout" if timedout else "failed",
-                " ".join(cmd) if type(cmd) is list else cmd.format(*args, **kwargs)),
-            stdoutbuf, stderrbuf, p.returncode)
+        if timedout:
+            raise JoltTimeoutError(
+                "Command timeout: {0}".format(
+                    " ".join(cmd) if type(cmd) is list else cmd.format(*args, **kwargs)))
+        else:
+            raise JoltCommandError(
+                "Command failed: {0}".format(
+                    " ".join(cmd) if type(cmd) is list else cmd.format(*args, **kwargs)),
+                stdoutbuf, stderrbuf, p.returncode)
     if return_stderr:
         return "\n".join(stdoutbuf) if output_rstrip else "".join(stdoutbuf), \
             "\n".join(stderrbuf) if output_rstrip else "".join(stderrbuf)
@@ -465,6 +470,7 @@ class Tools(object):
         self._chroot = None
         self._chroot_prefix = []
         self._chroot_path = []
+        self._deadline = None
         self._run_prefix = []
         self._preexec_fn = None
         self._cwd = fs.path.normpath(fs.path.join(config.get_workdir(), cwd or config.get_workdir()))
@@ -1522,6 +1528,11 @@ class Tools(object):
             else:
                 cmd = " ".join(self._chroot_prefix + self._run_prefix) + " " + cmd
 
+        if self._deadline is not None:
+            remaining = int(self._deadline - time.time())
+            timeout = kwargs.get("timeout", remaining)
+            kwargs["timeout"] = min(remaining, timeout)
+
         cmd = self.expand(cmd, *args, **kwargs)
 
         stdi, stdo, stde = None, None, None
@@ -1710,6 +1721,32 @@ class Tools(object):
         if not fs.path.isdir(dstdir):
             fs.makedirs(dstdir)
         fs.symlink(src, dst)
+
+    @contextmanager
+    def timeout(self, seconds):
+        """ Context manager to set a timeout for a block of code.
+
+        A TimeoutError exception is raised if the block of code does not
+        complete within the specified time.
+
+        Args:
+            seconds (int): Timeout in seconds.
+
+        Example:
+
+                .. code-block:: python
+
+                    with tools.timeout(5):
+                        tools.run("sleep 10")
+
+        """
+        with utils.timeout(seconds, JoltTimeoutError):
+            old_deadline = self._deadline
+            try:
+                self._deadline = time.time() + seconds
+                yield
+            finally:
+                self._deadline = old_deadline
 
     def tmpdir(self, name):
         """ Creates a temporary directory.

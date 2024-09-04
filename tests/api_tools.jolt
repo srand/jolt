@@ -8,6 +8,7 @@ import time
 sys.path.append(".")
 
 from testsupport import JoltTest
+from jolt import JoltTimeoutError
 
 
 class TestException(Exception):
@@ -922,3 +923,21 @@ class ToolsApi(JoltTest):
         with self.assertRaises(Exception):
             self.build("a")
         self.assertIn("Command timeout: sleep 2", self.lastLog())
+
+    def test_block_timeout(self):
+        # Test that the block timeout is working
+        with self.assertRaises(JoltTimeoutError):
+            with self.tools.timeout(2):
+                while True:
+                    time.sleep(1)
+
+        # Test that the block timeout affects the command timeout
+        with self.assertRaises(JoltTimeoutError):
+            with self.tools.timeout(2):
+                self.tools.run("sleep 10")
+
+        # Test that the block timeout can be overridden by the command timeout
+        with self.tools.timeout(2):
+            with self.assertRaises(JoltTimeoutError):
+                    self.tools.run("sleep 10", timeout=1)
+

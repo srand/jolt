@@ -1,3 +1,7 @@
+from .error import JoltError
+from .error import JoltCommandError
+from .error import JoltTimeoutError
+
 from .tasks import Alias
 from .tasks import BooleanParameter
 from .tasks import Chroot
@@ -35,6 +39,9 @@ __all__ = (
     "EnvironExport",
     "Export",
     "IntParameter",
+    "JoltError",
+    "JoltCommandError",
+    "JoltTimeoutError",
     "ListParameter",
     "MultiTask",
     "Parameter",
