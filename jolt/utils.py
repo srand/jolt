@@ -10,6 +10,8 @@ import os
 import hashlib
 from fasteners import lock, process_lock
 import json
+import ctypes
+import threading
 
 
 read_input = input
@@ -542,3 +544,44 @@ def hostname():
     """ Returns the hostname of the machine. """
     import socket
     return socket.gethostname()
+
+
+def timeout(seconds, exception_type=TimeoutError):
+    """ A context manager that enforces a timeout.
+
+    If the block of code takes longer than the specified timeout,
+    the context manager will raise an asyncronous TimeoutError.
+    """
+
+    class TimeoutContext(object):
+        def __init__(self, timeout, exception_type=TimeoutError):
+            self._timer = threading.Timer(timeout, self._raise_timeout)
+            self._tid = threading.current_thread().ident
+            self._exc = exception_type()
+
+        def _raise_timeout(self):
+            print("Timeout")
+            tid = ctypes.c_ulong(self._tid)
+            ret = ctypes.pythonapi.PyThreadState_SetAsyncExc(
+                tid, ctypes.py_object(self._exc))
+
+            print("Timeout", tid, ret)
+
+            if ret == 0:
+                raise ValueError("Invalid thread ID {self._tid}")
+            elif ret > 1:
+                ctypes.pythonapi.PyThreadState_SetAsyncExc(tid, None)
+                raise SystemError("PyThreadState_SetAsyncExc failed")
+
+            for i in range(1000): pass
+
+        def __enter__(self):
+            self._timer.start()
+            return self
+
+        def __exit__(self, exc_type, exc_value, traceback):
+            for i in range(1000): pass
+            self._timer.cancel()
+            return exc_type is not None
+
+    return TimeoutContext(seconds, exception_type)

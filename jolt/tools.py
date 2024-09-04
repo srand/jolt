@@ -1711,6 +1711,25 @@ class Tools(object):
             fs.makedirs(dstdir)
         fs.symlink(src, dst)
 
+    def timeout(self, seconds):
+        """ Context manager to set a timeout for a block of code.
+
+        A TimeoutError exception is raised if the block of code does not
+        complete within the specified time.
+
+        Args:
+            seconds (int): Timeout in seconds.
+
+        Example:
+
+                .. code-block:: python
+
+                    with tools.timeout(5):
+                        tools.run("sleep 10")
+
+        """
+        return utils.timeout(seconds)
+
     def tmpdir(self, name):
         """ Creates a temporary directory.
 
