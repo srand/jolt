@@ -906,3 +906,19 @@ class ToolsApi(JoltTest):
                 pass
         except JoltError as e:
             assert "Invalid uid map" in str(e), e
+
+    def test_command_timeout_config(self):
+        """
+        --- config:
+        command_timeout = 1
+
+        --- tasks:
+        class A(Task):
+            def run(self, d, t):
+                t.run("sleep 2")
+        ---
+        """
+
+        with self.assertRaises(Exception):
+            self.build("a")
+        self.assertIn("Command timeout: sleep 2", self.lastLog())

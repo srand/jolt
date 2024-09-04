@@ -64,6 +64,12 @@ The ``[jolt]`` config section contains global configuration:
           read the console log and to spot errors.
         | Default: ``true``
 
+    * - ``command_timeout``
+      - Integer
+      - | The maximum time in seconds that a command launched with
+          :func:`Tools.run() <jolt.Tools.run>` is allowed to run before it is
+          terminated and an error is reported.
+
     * - ``default``
       - String
       - When invoked without any arguments, Jolt by default tries to build a
