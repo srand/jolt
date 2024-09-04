@@ -9,6 +9,7 @@ import sys
 
 from jolt import cli
 from jolt import common_pb2 as common_pb
+from jolt import config
 from jolt import log
 from jolt import utils
 from jolt import colors
@@ -614,7 +615,8 @@ class TaskProxy(object):
                                     # Run task
                                     try:
                                         hooks.task_prerun(self, context, self.tools)
-                                        self.task.run(context, self.tools)
+                                        with self.tools.timeout(seconds=config.getint("jolt", "task_timeout")):
+                                            self.task.run(context, self.tools)
                                     finally:
                                         hooks.task_postrun(self, context, self.tools)
 

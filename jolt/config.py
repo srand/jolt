@@ -147,7 +147,13 @@ def get(section, key, default=None, expand=True, alias=None):
 
 
 def getint(section, key, default=None, alias=None):
-    return int(get(section, key, default=default, alias=alias))
+    value = get(section, key, default=default, alias=alias)
+    if value is not None:
+        try:
+            return int(value)
+        except ValueError:
+            raise_error_if(True, "Config: value '{0}' invalid for '{1}.{2}', expected integer", value, section, key)
+    return None
 
 
 def getsize(section, key, default=None, alias=None):

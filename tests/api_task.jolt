@@ -1216,3 +1216,18 @@ class TaskApi(JoltTest):
         with self.assertRaises(Exception):
             self.build("timeout")
         self.assertIn("Command timeout", self.lastLog())
+
+    def test_timeout_config(self):
+        """
+        --- config:
+        task_timeout = 1
+
+        --- tasks:
+        class Timeout(Task):
+            def run(self, deps, tools):
+                tools.run("sleep 5")
+        ---
+        """
+        with self.assertRaises(Exception):
+            self.build("timeout")
+        self.assertIn("Command timeout", self.lastLog())

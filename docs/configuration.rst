@@ -126,6 +126,11 @@ The ``[jolt]`` config section contains global configuration:
       - String
       - The shell to use when entering the interactive task debug shell.
 
+    * - ``task_timeout``
+      - Integer
+      - | The maximum time in seconds that a task is allowed to run before it is
+          terminated and an error is reported.
+
     * - ``threads``
       - Integer
       - | Used to limit the number of threads used by third party tools such as Ninja.
