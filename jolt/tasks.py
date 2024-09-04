@@ -1253,7 +1253,7 @@ class attributes:
         return _decorate
 
     @staticmethod
-    def platform(cls, attrib):
+    def platform(attrib):
         """
         Decorates a task with an alternative ``platform`` attribute.
 
@@ -1276,6 +1276,40 @@ class attributes:
         cls._system = Export(lambda t: platform.system().lower())
         cls.system = property(lambda t: t._system.value)
         return cls
+
+    @staticmethod
+    def timeout(seconds):
+        """
+        Decorator setting a timeout for a task.
+
+        The timeout applies to the task's run method. A JoltTimeoutError
+        is raised if the task does not complete within the specified time.
+
+        Args:
+            seconds (int): Timeout in seconds.
+
+        Example:
+
+        .. code-block:: python
+
+            @attributes.timeout(5)
+            class Example(Task):
+                def run(self, deps, tools):
+                    time.sleep(10)
+
+        """
+        def decorate(cls):
+            _old_run = cls.run
+
+            @functools.wraps(cls.run)
+            def run(self, deps, tools):
+                with tools.timeout(seconds):
+                    _old_run(self, deps, tools)
+
+            cls.run = run
+            return cls
+
+        return decorate
 
 
 class TaskBase(object):

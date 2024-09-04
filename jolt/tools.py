@@ -136,7 +136,7 @@ def _run(cmd, cwd, env, preexec_fn, *args, **kwargs):
     timedout = False
     try:
         p.wait(timeout=timeout)
-    except subprocess.TimeoutExpired:
+    except (subprocess.TimeoutExpired, JoltTimeoutError):
         timedout = True
         try:
             terminate(p.pid)
@@ -1529,7 +1529,7 @@ class Tools(object):
                 cmd = " ".join(self._chroot_prefix + self._run_prefix) + " " + cmd
 
         if self._deadline is not None:
-            remaining = int(self._deadline - time.time())
+            remaining = int(self._deadline - time.time() + 0.5)
             timeout = kwargs.get("timeout", remaining)
             kwargs["timeout"] = min(remaining, timeout)
 
@@ -1740,10 +1740,17 @@ class Tools(object):
                         tools.run("sleep 10")
 
         """
+        if seconds is None:
+            yield
+            return
+
         with utils.timeout(seconds, JoltTimeoutError):
             old_deadline = self._deadline
             try:
-                self._deadline = time.time() + seconds
+                if old_deadline is None:
+                    self._deadline = time.time() + seconds
+                else:
+                    self._deadline = min(old_deadline, time.time() + seconds)
                 yield
             finally:
                 self._deadline = old_deadline
