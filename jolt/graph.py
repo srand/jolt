@@ -110,9 +110,9 @@ class TaskProxy(object):
         minutes = int(self.duration_running.seconds / 60)
         if (minutes % 5) == 0 and minutes > 0:
             if minutes >= 60:
-                fmt = f"{int(minutes/60)}h {int(minutes%60)}min"
+                fmt = f"{int(minutes / 60)}h {int(minutes % 60)}min"
             else:
-                fmt = f"{int(minutes%60)}min"
+                fmt = f"{int(minutes % 60)}min"
             if self.is_remotely_executed():
                 self.info("Remote execution still in progress after {}", fmt)
             else:
