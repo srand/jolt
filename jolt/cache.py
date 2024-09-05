@@ -1334,6 +1334,8 @@ class ArtifactCache(StorageProvider):
     def _fs_delete_artifact(self, identity, task_name, onerror=None):
         fs.rmtree(self._fs_get_artifact_path(identity, task_name), ignore_errors=True, onerror=onerror)
         fs.rmtree(self._fs_get_artifact_tmppath(identity, task_name), ignore_errors=True, onerror=onerror)
+        fs.rmtree(self._fs_get_artifact_path_legacy(identity, task_name), ignore_errors=True, onerror=onerror)
+        fs.rmtree(self._fs_get_artifact_tmppath_legacy(identity, task_name), ignore_errors=True, onerror=onerror)
         fs.unlink(fs.path.join(self.root, task_name), ignore_errors=True)
 
     def _fs_identity(self, identity):
@@ -1341,6 +1343,12 @@ class ArtifactCache(StorageProvider):
         if len(parts) <= 1:
             parts = ["main"] + parts
         return parts[1] + "-" + utils.canonical(parts[0])
+
+    def _fs_identity_legacy(self, identity):
+        parts = identity.split("@", 1)
+        if len(parts) <= 1:
+            parts = ["main"] + parts
+        return parts[0] + "@" + utils.canonical(parts[1])
 
     def _fs_get_artifact_archivepath(self, identity, task_name):
         identity = self._fs_identity(identity)
@@ -1356,6 +1364,14 @@ class ArtifactCache(StorageProvider):
 
     def _fs_get_artifact_path(self, identity, task_name):
         identity = self._fs_identity(identity)
+        return fs.path.join(self.root, task_name, identity)
+
+    def _fs_get_artifact_tmppath_legacy(self, identity, task_name):
+        identity = self._fs_identity_legacy(identity)
+        return fs.path.join(self.root, task_name, "." + identity)
+
+    def _fs_get_artifact_path_legacy(self, identity, task_name):
+        identity = self._fs_identity_legacy(identity)
         return fs.path.join(self.root, task_name, identity)
 
     def _fs_get_artifact_manifest_path(self, identity, task_name):
