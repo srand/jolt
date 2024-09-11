@@ -382,6 +382,9 @@ func (w *worker) vEnvPath(clientDigest string) string {
 }
 
 func (w *worker) activateVEnvPath(clientDigest string) string {
+	if runtime.GOOS == "windows" {
+		return filepath.Join(w.vEnvPath(clientDigest), "Scripts", "activate.bat")
+	}
 	return filepath.Join(w.vEnvPath(clientDigest), "bin", "activate")
 }
 
@@ -489,9 +492,25 @@ func (w *worker) nsWrapperCmd(clientWs, clientCache string) ([]string, []string)
 func (w *worker) runCmd(workdir string, args ...string) error {
 	// Build bubblewrap command prefix to run the executor in a namespace.
 	// If a namespace cannot be used, the command prefix will be empty.
+
+	if runtime.GOOS == "windows" {
+		return w.runCmdWindows(workdir, args...)
+	}
+
 	cmd, _ := w.nsWrapperCmd("", "")
 	cmd = append(cmd, "/bin/sh", "-c", strings.Join(args, " "))
 
+	if workdir != "" && !filepath.IsAbs(workdir) {
+		workdir = filepath.Join(w.cwd, workdir)
+	} else if workdir == "" {
+		workdir = w.cwd
+	}
+
+	return utils.RunWaitCwd(workdir, cmd...)
+}
+
+func (w *worker) runCmdWindows(workdir string, args ...string) error {
+	cmd := []string{"cmd", "/c", strings.Join(args, " ")}
 	if workdir != "" && !filepath.IsAbs(workdir) {
 		workdir = filepath.Join(w.cwd, workdir)
 	} else if workdir == "" {
@@ -506,8 +525,20 @@ func (w *worker) runClientCmd(clientDigest, workdir string, args ...string) erro
 
 	// Build bubblewrap command prefix to run the executor in a namespace.
 	// If a namespace cannot be used, the command prefix will be empty.
+
+	if runtime.GOOS == "windows" {
+		return w.runClientCmdWindows(clientDigest, workdir, args...)
+	}
+
 	cmd := []string{fmt.Sprintf(". %s && %s", activate, strings.Join(args, " "))}
 	return w.runCmd(workdir, cmd...)
+}
+
+func (w *worker) runClientCmdWindows(clientDigest, workdir string, args ...string) error {
+	activate := w.activateVEnvPath(clientDigest)
+
+	cmd := []string{fmt.Sprintf("%s && %s", activate, strings.Join(args, " "))}
+	return w.runCmdWindows(workdir, cmd...)
 }
 
 func (w *worker) startExecutor(clientDigest string, client *protocol.Client, workspace *protocol.Workspace, worker, build, request string) (chan error, *os.Process, error) {
@@ -534,6 +565,8 @@ func (w *worker) startExecutor(clientDigest string, client *protocol.Client, wor
 		if err != nil {
 			return nil, nil, err
 		}
+	} else if runtime.GOOS == "windows" {
+		cmd = []string{"cmd", "/c", fmt.Sprintf("%s && %s", activate, strings.Join(jolt, " "))}
 	} else {
 		cmd = []string{"/bin/sh", "-c", fmt.Sprintf(". %s && %s", activate, strings.Join(jolt, " "))}
 	}
