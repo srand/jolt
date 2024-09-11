@@ -203,6 +203,9 @@ class RemoteExecutor(NetworkExecutor):
                     self.run_build(env)
                 except (grpc.RpcError, grpc._channel._MultiThreadedRendezvous) as rpc_error:
                     raise_task_error(self.task, rpc_error.details(), type="Scheduler error")
+        except Exception as e:
+            if not self.task.is_unstable:
+                raise e
         finally:
             self.download_session_artifacts(self.task)
 
@@ -254,8 +257,8 @@ class RemoteExecutor(NetworkExecutor):
             self.task.failed_execution(remote=True)
             for extension in self.task.extensions:
                 extension.failed_execution(remote=True)
-            if not self.task.is_unstable:
-                raise e
+
+            raise e
 
     def run_task(self, env, response):
         """ Run the task.
