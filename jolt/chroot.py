@@ -20,27 +20,31 @@ MS_BIND = 4096
 MS_REC = 16384
 
 
-def mount_bind(src, dst, ro=False):
+def prepare_bind(root, src):
     src = os.path.normpath(src)
-    dst = os.path.normpath(dst)
+    dst = os.path.normpath(os.path.join(root, src.lstrip("/")))
 
     if os.path.isdir(src):
         os.makedirs(dst, exist_ok=True)
     else:
         os.makedirs(os.path.dirname(dst), exist_ok=True)
-        if not os.path.exists(dst):
-            with open(dst, "a"):
-                pass
+        with open(dst, "w"):
+            pass
+
+
+def mount_bind(src, dst, ro=False):
+    src = os.path.normpath(src)
+    dst = os.path.normpath(dst)
 
     assert libc.mount(
         c_char_p(src.encode("utf-8")),
         c_char_p(dst.encode("utf-8")),
         None,
         MS_BIND | MS_REC | (MS_RDONLY if ro else 0),
-        None) == 0
+        None) == 0, f"Failed to bind mount {src}"
 
 
-def mount_overlay(src, dst, temp):
+def mount_overlay(src, binds, dst, temp):
     src = os.path.normpath(src)
     dst = os.path.normpath(dst)
 
@@ -54,7 +58,7 @@ def mount_overlay(src, dst, temp):
         c_char_p(dst.encode("utf-8")),
         c_char_p("overlay".encode("utf-8")),
         0,
-        f"lowerdir={src},upperdir={upper},workdir={work}".encode("utf-8")) == 0
+        f"lowerdir={src}:{binds},upperdir={upper},workdir={work}".encode("utf-8")) == 0
 
 
 def mount_tmpfs(path):
@@ -71,10 +75,15 @@ def main():
         description='Runs a command in a chroot using linux namespaces')
     parser.add_argument('command', nargs='+')
     parser.add_argument('-b', '--bind', nargs="*")
+    parser.add_argument('-t', '--temp', required=True)
     parser.add_argument('-c', '--chroot', required=True)
     parser.add_argument('-d', '--chdir')
     parser.add_argument('--shell', default="True")
     args = parser.parse_args()
+
+    # Prepare bind mount targets outside userns
+    for path in args.bind or []:
+        prepare_bind(args.temp, path)
 
     cwd = os.getcwd()
     gid = os.getegid()
@@ -107,7 +116,7 @@ def main():
     assert status == 0, f"Failed to map GIDs: newgidmap exit status: {status}"
 
     mount_tmpfs("/mnt")
-    if not mount_overlay(args.chroot, "/mnt", "/mnt"):
+    if not mount_overlay(args.chroot, args.temp, "/mnt", "/mnt"):
         mount_bind(args.chroot, "/mnt", True)
     mount_bind("/proc", "/mnt/proc", True)
 
