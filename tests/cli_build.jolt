@@ -697,4 +697,3 @@ class BuildCli(testsupport.JoltTest):
         with self.tools.cwd(self.ws):
             data = self.tools.read_file("result.xml")
             self.assertIn("test1234", data)
-

@@ -335,6 +335,32 @@ class ArtifactApi(JoltTest):
         r = self.build("b")
         a = self.artifacts(r)
 
+    def test_multiple_one_removed(self):
+        """
+        --- file: main.txt
+        Main
+        --- file: file.txt
+        File
+        --- tasks:
+        @attributes.artifact("files")
+        @influence.files("*.txt")
+        class A(Task):
+            def publish(self, a, t):
+                a.collect("main.txt")
+
+            def publish_files(self, a, t):
+                a.collect("file.txt")
+        ---
+        """
+        r = self.build("a")
+        a = self.artifacts(r)
+        self.assertExists(a[0], "main.txt")
+        self.assertExists(a[1], "file.txt")
+
+        # Remove second artifact
+        self.tools.rmtree(a[1])
+
+        r = self.build("a")
 
     def test_uncacheable_session_artifact(self):
         """

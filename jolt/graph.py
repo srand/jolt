@@ -569,9 +569,18 @@ class TaskProxy(object):
             executor = ExecutorRegistry.get().create_local(child)
             executor.run(JoltEnvironment(cache=cache))
 
+    def _must_discard_artifacts(self, cache):
+        for artifact in self.artifacts:
+            if cache.is_available_locally(artifact):
+                return True
+        return False
+
     def run(self, cache, force_upload=False, force_build=False):
         with self.tools:
             available_locally = available_remotely = False
+
+            # Force discard of all artifacts if some are present but not all
+            force_build = force_build or self._must_discard_artifacts(cache)
 
             # Download dependency artifacts if not already done
             self._run_download_dependencies(cache, force_upload, force_build)
