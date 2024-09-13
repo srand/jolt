@@ -450,6 +450,8 @@ class ToolsApi(JoltTest):
                 self.assertEqual(self.tools.run("echo $FOO"), "baz")
             with self.tools.environ(FOO=None):
                 self.assertEqual(self.tools.run("echo $FOO"), "")
+        with self.tools.environ(FOO=None):
+            self.assertEqual(self.tools.run("echo $FOO"), "")
         self.assertEqual(self.tools.run("echo $FOO"), "")
 
     def test_expand(self):

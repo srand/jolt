@@ -901,13 +901,10 @@ class Tools(object):
             else:
                 self._env.pop(key, None)
 
-        yield self._env
-
-        for key, value in kwargs.items():
-            if key not in restore:
-                del self._env[key]
-
-        self._env = restore
+        try:
+            yield self._env
+        finally:
+            self._env = restore
 
     def exists(self, pathname):
         """ Checks if a file or directory exists.
