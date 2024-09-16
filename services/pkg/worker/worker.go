@@ -162,6 +162,8 @@ func (w *worker) run() error {
 						"pull-checkout",
 						"--cache",
 						w.cachePath(),
+						"--ignore",
+						".joltignore",
 						"--index",
 						".jolt/index",
 						"--remote",
