@@ -71,7 +71,7 @@ class GitRepository(object):
         log.info("Cloning into {0}", self.path)
         if fs.path.exists(self.path):
             with self.tools.cwd(self.path):
-                self.tools.run("git init && git remote add origin {} && git fetch && git checkout FETCH_HEAD",
+                self.tools.run("git init && git remote add origin {} && git fetch && git checkout -f FETCH_HEAD",
                                self.url, output_on_error=True)
         else:
             self.tools.run("git clone {0} {1}", self.url, self.path, output_on_error=True)
