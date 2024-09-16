@@ -590,13 +590,13 @@ class ToolsApi(JoltTest):
     def test_read_depfile(self):
         """
         --- file: test.d
-        output1: in\ put1 input2 \
-          input3 \
+        output1: in\\ put1 input2 \\
+          input3 \\
            input4
 
         output2: input1  input4
 
-        build.dir/proto/dog.pb.cc \
+        build.dir/proto/dog.pb.cc \\
         build.dir/proto/dog.pb.h: proto/dog.proto
         ---
         """
