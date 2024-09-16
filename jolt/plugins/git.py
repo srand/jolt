@@ -1,6 +1,7 @@
 import os
 import pygit2
 import re
+import urllib.parse
 
 from jolt.tasks import BooleanParameter, Export, Parameter, TaskRegistry, WorkspaceResource
 from jolt.influence import FileInfluence, HashInfluenceRegistry
@@ -69,12 +70,46 @@ class GitRepository(object):
 
     def clone(self):
         log.info("Cloning into {0}", self.path)
+
+        # Get reference repository path
+        refroot = config.get("git", "reference", None)
+        refpath = None
+        if refroot:
+            # Append <host>/<path> to the reference root
+            url = urllib.parse.urlparse(str(self.url))
+            refpath = fs.path.join(refroot, url.hostname, url.path.lstrip("/"))
+            refpath = fs.path.abspath(refpath)
+
+        # If the directory exists, initialize the repository instead of cloning
         if fs.path.exists(self.path):
             with self.tools.cwd(self.path):
-                self.tools.run("git init && git remote add origin {} && git fetch && git checkout -f FETCH_HEAD",
-                               self.url, output_on_error=True)
+                self.tools.run("git init", output_on_error=True)
+
+                # Set the reference repository if available
+                if refpath:
+                    # Check if the reference repository is a git repository
+                    objpath = os.path.join(refpath, ".git", "objects")
+                    objpath_bare = os.path.join(refpath, "objects")
+                    if os.path.isdir(objpath):
+                        refpath = objpath
+                    elif os.path.isdir(objpath_bare):
+                        refpath = objpath_bare
+                    else:
+                        refpath = None
+
+                if refpath:
+                    self.tools.mkdir(".git/objects/info")
+                    self.tools.write_file(".git/objects/info/alternates", refpath)
+
+                self.tools.run("git remote add origin {}", self.url, output_on_error=True)
+                self.tools.run("git fetch origin", output_on_error=True)
+                self.tools.run("git checkout -f FETCH_HEAD", output_on_error=True)
         else:
-            self.tools.run("git clone {0} {1}", self.url, self.path, output_on_error=True)
+            if refpath and os.path.isdir(refpath):
+                self.tools.run("git clone --reference-if-able {0} {1} {2}", refpath, self.url, self.path, output_on_error=True)
+            else:
+                self.tools.run("git clone  {0} {1}", self.url, self.path, output_on_error=True)
+
         self._init_repo()
         raise_error_if(
             self.repository is None,

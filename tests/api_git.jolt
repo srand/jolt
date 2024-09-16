@@ -499,3 +499,28 @@ class GitApi(testsupport.JoltTest):
         a1 = self.artifacts(r1)
         with self.tools.cwd(a1[0]):
             self.assertEqual("639", self.tools.read_file("size.txt"))
+
+    def test_reference_repo(self):
+        """
+        --- config:
+        [git]
+        reference = reference
+
+        --- tasks:
+        class A(Task):
+            requires = ["git:url=https://github.com/gideont/hello_world.git,path=hello_world"]
+        ---
+        """
+        with self.tools.cwd(self.ws):
+            self.tools.run("git clone --bare https://github.com/gideont/hello_world.git reference/github.com/gideont/hello_world.git")
+
+        self.build("a")
+        with self.tools.cwd(self.ws):
+            self.assertExists("hello_world/.git/objects/info/alternates")
+            self.assertEqual("4", self.tools.run("find hello_world/.git/objects | wc -l"))
+            self.tools.rmtree("hello_world/.git")
+
+        self.build("a")
+        with self.tools.cwd(self.ws):
+            self.assertExists("hello_world/.git/objects/info/alternates")
+            self.assertEqual("4", self.tools.run("find hello_world/.git/objects | wc -l"))

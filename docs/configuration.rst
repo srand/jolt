@@ -363,6 +363,34 @@ The plugin is enabled by adding a ``[gdb]`` section in
 the Jolt configuration. No additional dependencies have to be installed.
 
 
+Git
+^^^
+The git plugin enables a new Jolt resource type, ``git``. When used, the
+resource automatically clones a Git repository into the workspace before
+a task is executed.
+
+The plugin is enabled by adding a ``[git]`` section in
+the Jolt configuration. These configuration keys exist:
+
+  .. list-table::
+    :widths: 20 10 70
+    :header-rows: 1
+    :class: tight-table
+
+    * - Config Key
+      - Type
+      - Description
+
+    * - ``reference``
+      - String
+      - | The path to a directory containing reference repositories to use
+          when cloning. This is useful to speed up cloning by using a local
+          copy of the repository. Repository directories must be named after
+          the repository URL, with the format ``<host>/<path>``. For example,
+          the repository ``git://example.com/repo.git`` should be stored in
+          ``reference/example.com/repo.git``.
+
+
 HTTP
 ^^^^
 
