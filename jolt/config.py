@@ -16,13 +16,18 @@ _workdir = os.getcwd()
 if os.getenv("JOLT_CONFIG_PATH"):
     location = fs.path.join(os.getenv("JOLT_CONFIG_PATH"), "config")
     location_user = fs.path.join(os.getenv("JOLT_CONFIG_PATH"), "user")
+    location_overlay = os.getenv("JOLT_CONFIG_OVERLAY")
+    if location_overlay:
+        location_overlay = fs.path.join(os.getenv("JOLT_CONFIG_PATH"), location_overlay)
 elif os.name == "nt":
     appdata = os.getenv("APPDATA", fs.path.join(fs.userhome(), "AppData", "Roaming"))
     location = fs.path.join(appdata, "Jolt", "config")
     location_user = fs.path.join(appdata, "Jolt", "user")
+    location_overlay = os.getenv("JOLT_CONFIG_OVERLAY")
 else:
     location = fs.path.join(fs.userhome(), ".config", "jolt", "config")
     location_user = fs.path.join(fs.userhome(), ".config", "jolt", "user")
+    location_overlay = os.getenv("JOLT_CONFIG_OVERLAY")
 
 
 class ConfigFile(ConfigParser):
@@ -133,6 +138,8 @@ class Config(object):
 _config = Config()
 _config.add_file("global", location)
 _config.add_file("user", location_user)
+if location_overlay:
+    _config.add_file("overlay", location_overlay)
 _manifest = _config.add_file("manifest", None)
 # Note: cli configs are added next to last in the chain,
 # before manifest, and can therefore not override the

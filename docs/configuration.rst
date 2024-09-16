@@ -137,6 +137,26 @@ The ``[jolt]`` config section contains global configuration:
           The environment variable ``JOLT_THREADS`` can also be used.
         | The default value is the number of CPUs available.
 
+  The following environment variables can be used to override the configuration:
+
+  .. list-table::
+    :widths: 20 10 70
+    :header-rows: 1
+    :class: tight-table
+
+    * - Environment Variable
+      - Description
+
+    * - ``JOLT_CONFIG_OVERLAY``
+      - Path to a configuration file to overlay on top of the default configuration.
+        The file must be in the same format as the default configuration file.
+        A typical use-case is in workers where configuration such as cache size and
+        path may be different from the client.
+
+    * - ``JOLT_CONFIG_PATH``
+      - Alternate directory path to configuration files (config, user). By default,
+        Jolt uses ``$HOME/.config/jolt`` on Linux and ``%APPDATA%\Roaming\Jolt`` on Windows.
+
 Alias
 ^^^^^
 
