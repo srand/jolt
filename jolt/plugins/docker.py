@@ -215,6 +215,9 @@ class DockerContainer(Resource):
     Defaults to the current user.
     """
 
+    workdir = None
+    """ The container working directory. """
+
     @property
     def _arguments(self):
         return " ".join(self.arguments)
@@ -283,6 +286,10 @@ class DockerContainer(Resource):
         return " ".join([utils.option("-v ", self.tools.expand(vol))
                          for vol in self.volumes_default + self.volumes])
 
+    @property
+    def _workdir(self):
+        return "--workdir " + self.tools.expand(self.workdir) if self.workdir else ""
+
     def acquire(self, artifact, deps, tools, owner):
         self.joltcachedir = config.get_cachedir()
         try:
@@ -293,7 +300,7 @@ class DockerContainer(Resource):
 
         self._info(f"Creating container from image '{image}'")
         self.container = tools.run(
-            "docker run -i -d {_cap_adds} {_cap_drops} {_entrypoint} {_labels} {_ports} {_privileged} {_security_opts} {_user} {_environment} {_volumes} {image} {_arguments}",
+            "docker run -i -d {_cap_adds} {_cap_drops} {_entrypoint} {_labels} {_ports} {_privileged} {_security_opts} {_user} {_environment} {_volumes} {_workdir} {image} {_arguments}",
             image=image, output_on_error=True)
 
         self._info("Created container '{container}'")
