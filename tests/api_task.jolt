@@ -1227,3 +1227,41 @@ class TaskApi(JoltTest):
         with self.assertRaises(Exception):
             self.build("timeout")
         self.assertIn("Command timeout", self.lastLog())
+
+    def test_platform_os(self):
+        """
+        --- tasks:
+        class A(Task):
+            platform = {{
+                "node.os": "linux",
+            }}
+
+        class B(Task):
+            platform = {{
+                "node.os": "windows",
+            }}
+        ---
+        """
+        self.build("a")
+        with self.assertRaises(Exception):
+            self.build("b")
+        self.assertIn("Task is not runnable on current platform", self.lastLog())
+
+    def test_platform_arch(self):
+        """
+        --- tasks:
+        class A(Task):
+            platform = {{
+                "node.arch": "amd64",
+            }}
+
+        class B(Task):
+            platform = {{
+                "node.os": "arm64",
+            }}
+        ---
+        """
+        self.build("a")
+        with self.assertRaises(Exception):
+            self.build("b")
+        self.assertIn("Task is not runnable on current platform", self.lastLog())

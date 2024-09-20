@@ -12,6 +12,7 @@ from fasteners import lock, process_lock
 import json
 import ctypes
 import threading
+import platform
 
 
 read_input = input
@@ -579,3 +580,38 @@ def timeout(seconds, exception_type):
             return None
 
     return TimeoutContext(seconds, exception_type)
+
+
+def platform_os_arch():
+    """
+    Returns the name of the operating system and architecture.
+
+    The values match the GOOS and GOARCH environment variables used by Go.
+    """
+    _ARCHITECTURE_DICT = {
+        "Windows": {
+            "AMD64": "amd64",
+            "X86": "386",
+            "ARM64": "arm64",
+        },
+        "Linux": {
+            "x86_64": "amd64",
+            "i686": "386",
+            "i386": "386",
+            "aarch64": "arm64",
+            "armv7l": "armv7",
+        },
+        "Darwin": {
+            "x86_64": "amd64",
+            "arm64": "arm64",
+        },
+    }
+    uname = platform.uname()
+    try:
+        system = uname.system.lower()
+        architecture = _ARCHITECTURE_DICT[uname.system][uname.machine]
+    except KeyError:
+        raise RuntimeError(
+            f"Unsupported platform: {uname.system} {uname.machine}"
+        ) from None
+    return system, architecture

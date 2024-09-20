@@ -575,6 +575,24 @@ class TaskProxy(object):
                 return True
         return False
 
+    def _validate_platform(self):
+        """ Validates that the task is runnable on the current platform. """
+        platform_os, platform_arch = utils.platform_os_arch()
+
+        os = self.task.platform.get("node.os")
+        if os:
+            os = self.tools.expand(os)
+            raise_task_error_if(
+                os != platform_os,
+                self, f"Task is not runnable on current platform (wants node.os={os})")
+
+        arch = self.task.platform.get("node.arch")
+        if arch:
+            arch = self.tools.expand(arch)
+            raise_task_error_if(
+                arch != platform_arch,
+                self, f"Task is not runnable on current platform (wants node.arch={arch})")
+
     def run(self, cache, force_upload=False, force_build=False):
         with self.tools:
             available_locally = available_remotely = False
@@ -615,6 +633,9 @@ class TaskProxy(object):
                             exitstack.enter_context(context)
 
                             self.running_execution()
+
+                            self._validate_platform()
+
                             with self.tools.cwd(self.task.joltdir):
                                 if self.is_goal() and self.options.debug:
                                     log.info("Entering debug shell")
