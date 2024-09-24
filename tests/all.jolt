@@ -22,10 +22,10 @@ class All(Alias):
         "ext/alias",
         "ext/autoweight",
         "ext/conan",
-        "ext/docker",
+        # "ext/docker",  -- cannot run inside CI container
         "ext/googletest",
         "ext/ninja-compdb",
-        "ext/podman",
+        # "ext/podman",  -- cannot run inside CI container
         "ext/symlinks",
         "flake8",
         "int/utils",
