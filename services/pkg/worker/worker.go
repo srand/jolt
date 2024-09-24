@@ -265,7 +265,7 @@ func (w *worker) deployClient(client *protocol.Client, workspace *protocol.Works
 		if w.config.Nix {
 			log.Info("Nix is enabled for this client")
 			return "", nil
-		} else {
+		} else if runtime.GOOS != "windows" {
 			return "", errors.New("Nix shell requested by client but not enabled in worker")
 		}
 	}
