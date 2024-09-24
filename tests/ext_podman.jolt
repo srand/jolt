@@ -12,6 +12,10 @@ from testsupport import JoltTest
 class PodmanExt(JoltTest):
     name = "ext/podman"
 
+    def setup(self, deps, tools):
+        if tools.which("podman") is None:
+            self.skip("podman not found")
+
     def test_simple(self):
         """
         --- file: Dockerfile
