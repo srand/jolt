@@ -255,10 +255,7 @@ class DockerExt(JoltTest):
 
         class Busybox(DockerImage):
             imagefile = None
-
-            def run(self, d, t):
-                super().run(d, t)
-                t.run("docker rmi busybox:latest")
+            tags = ["mybusybox:latest"]
 
         class Consumer(Task):
             requires = ["busybox"]
@@ -269,7 +266,7 @@ class DockerExt(JoltTest):
         ---
         """
         self.build("consumer")
-        self.assertNotIn("busybox:latest", self.tools.run("docker image ls --format '{{{{.Repository}}}}:{{{{.Tag}}}}'"))
+        self.assertNotIn("mybusybox:latest", self.tools.run("docker image ls --format '{{{{.Repository}}}}:{{{{.Tag}}}}'"))
 
     def test_autoload_not_used_when_autoload_is_false(self):
         """
@@ -281,10 +278,7 @@ class DockerExt(JoltTest):
 
         class Busybox(DockerImage):
             autoload = False
-
-            def run(self, d, t):
-                super().run(d, t)
-                t.run("docker rmi busybox:latest")
+            tags = ["mybusybox:latest"]
 
         class Consumer(Task):
             requires = ["busybox"]
@@ -295,7 +289,7 @@ class DockerExt(JoltTest):
         ---
         """
         self.build("consumer")
-        self.assertNotIn("busybox:latest", self.tools.run("docker image ls --format '{{{{.Repository}}}}:{{{{.Tag}}}}'"))
+        self.assertNotIn("mybusybox:latest", self.tools.run("docker image ls --format '{{{{.Repository}}}}:{{{{.Tag}}}}'"))
 
     def test_artifact_pull_rmi(self):
         """
@@ -399,7 +393,7 @@ class DockerExt(JoltTest):
 
             def run(self, deps, tools):
                 a = deps[self.requires[0]]
-                assert a.info["Config"]["Labels"]["jolt.identity"] == a.identity
+                assert a.info["Config"]["Labels"]["jolt.identity"] == a.task.identity
 
         ---
         """
