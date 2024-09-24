@@ -1786,6 +1786,7 @@ class Tools(object):
         return fs.unlink(pathname, ignore_errors=kwargs.get("ignore_errors", False))
 
     @contextmanager
+    @utils.deprecated
     def chroot(self, chroot, *args, path=None, **kwargs):
         """
         Experimental: Use chroot as root filesystem when running commands.
