@@ -193,6 +193,7 @@ def get_pinned_version():
 
 def get_nix_version():
     return common_pb.Client(
+        requirements=get_extra_dependencies(),
         version=version.__version__,
         nix=True,
     )
