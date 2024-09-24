@@ -390,7 +390,7 @@ class PodmanExt(JoltTest):
 
             def run(self, deps, tools):
                 a = deps[self.requires[0]]
-                assert a.info["Config"]["Labels"]["jolt.identity"] == a.identity
+                assert a.info["Config"]["Labels"]["jolt.identity"] == a.task.identity
 
         ---
         """

@@ -25,6 +25,7 @@ class All(Alias):
         "ext/docker",
         "ext/googletest",
         "ext/ninja-compdb",
+        "ext/podman",
         "ext/symlinks",
         "flake8",
         "int/utils",
