@@ -530,3 +530,19 @@ class PodmanExt(JoltTest):
         ---
         """
         self.build("atest")
+
+    def test_stop_timeout(self):
+        """
+        --- tasks:
+        from jolt.plugins.podman import *
+
+        class A(Container):
+            image = "busybox:latest"
+            stop_timeout = 3
+
+        class ATest(Task):
+            requires = "a"
+        ---
+        """
+        r = self.build("atest")
+        self.assertIn("Resource release finished after 03s", r)

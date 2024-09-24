@@ -189,6 +189,21 @@ class DockerContainer(Resource):
 
     """
 
+    stop_timeout = 10
+    """ Timeout in seconds for stopping the container .
+
+    When stopping the container, the task will wait for the container to stop
+    for the specified number of seconds before forcefully killing it.
+
+    Default: 10 seconds.
+    """
+
+    stop_signal = "SIGTERM"
+    """ Signal to send to the container when stopping it.
+
+    Default: ``SIGTERM``.
+    """
+
     volumes = []
     """
     A list of volumes to mount.
@@ -272,6 +287,10 @@ class DockerContainer(Resource):
         return " ".join([utils.option("--security-opt ", self.tools.expand(opt)) for opt in self.security_opts])
 
     @property
+    def _stop_signal(self):
+        return f" -s {self.stop_signal}" if self.stop_signal else ""
+
+    @property
     def _user(self):
         if self.user:
             return f"--user {self.user}"
@@ -317,11 +336,12 @@ class DockerContainer(Resource):
         if self.chroot:
             self._context_stack.close()
 
-        self._info("Stopping container '{container}'")
-        tools.run("docker stop {container}", output_on_error=True)
-
-        self._info("Deleting container '{container}'")
-        tools.run("docker rm {container}", output_on_error=True)
+        try:
+            self._info("Stopping container '{container}'")
+            tools.run("docker stop{_stop_signal} -t {stop_timeout} {container}", output_on_error=True)
+        finally:
+            self._info("Deleting container '{container}'")
+            tools.run("docker rm -f {container}", output_on_error=True)
 
 
 class DockerLogin(Resource):

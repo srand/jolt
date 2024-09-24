@@ -193,6 +193,15 @@ class Container(Resource):
     Alternatively, assign ``True`` to publish all exposed ports to random ports.
     """
 
+    stop_timeout = 10
+    """ Timeout in seconds for stopping the container .
+
+    When stopping the container, the task will wait for the container to stop
+    for the specified number of seconds before forcefully killing it.
+
+    Default: 10 seconds.
+    """
+
     volumes = []
     """
     A list of volumes to mount.
@@ -310,11 +319,12 @@ class Container(Resource):
         if self.chroot:
             self._context_stack.close()
 
-        self._info("Stopping container '{container}'")
-        tools.run("podman stop {container}", output_on_error=True)
-
-        self._info("Deleting container '{container}'")
-        tools.run("podman rm {container}", output_on_error=True)
+        try:
+            self._info("Stopping container '{container}'")
+            tools.run("podman stop -t {stop_timeout} {container}", output_on_error=True)
+        finally:
+            self._info("Deleting container '{container}'")
+            tools.run("podman rm -f {container}", output_on_error=True)
 
 
 class PodmanLogin(Resource):
