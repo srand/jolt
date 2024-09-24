@@ -109,8 +109,8 @@ class DockerClient(Download):
     url = "https://download.docker.com/{host}/static/stable/{arch}/docker-{version}.tgz"
     """ URL of binaries """
 
-    version = Parameter("20.10.13", help="Docker version")
-    """ Docker version [20.10.13] """
+    version = Parameter("27.3.1", help="Docker version")
+    """ Docker version [27.3.1] """
 
     def publish(self, artifact, tools):
         super().publish(artifact, tools)
