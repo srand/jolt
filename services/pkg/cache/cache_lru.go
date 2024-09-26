@@ -183,7 +183,12 @@ func (c *lruCache) ReadObject(digest utils.Digest) (io.ReadCloser, error) {
 
 func (c *lruCache) WriteObject(digest utils.Digest) (WriteCloseDiscarder, error) {
 	path := c.pathFromDigest(digest)
-	return c.writeFile(path)
+	writer, err := c.writeFile(path)
+	if err != nil {
+		return nil, err
+	}
+
+	return newHashWriter(writer, digest)
 }
 
 func (c *lruCache) Statistics() CacheStats {

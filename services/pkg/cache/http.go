@@ -143,7 +143,10 @@ func NewHttpHandler(cache Cache) http.Handler {
 			return newError(c, err)
 		}
 
-		writer.Close()
+		if err := writer.Close(); err != nil {
+			return newError(c, err)
+		}
+
 		return c.JSON(http.StatusCreated, nil)
 	})
 
