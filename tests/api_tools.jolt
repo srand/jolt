@@ -298,6 +298,15 @@ class ToolsApi(JoltTest):
         o = self.build("b")
         self.assertIn("File# 0", o)
 
+    def test_tmpdir(self):
+        with self.tools.tmpdir() as tmpdir:
+            self.assertTrue(os.path.exists(tmpdir))
+        self.assertFalse(os.path.exists(tmpdir))
+
+        with self.tools.tmpdir("test") as tmpdir:
+            self.assertTrue(os.path.exists(tmpdir))
+        self.assertFalse(os.path.exists(tmpdir))
+
     def test_checksum(self):
         """
         --- file: test1.txt

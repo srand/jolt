@@ -1120,7 +1120,7 @@ def _report(ctx):
             session=True,
             tools=t)
 
-        with t.tmpdir("report") as tmp, t.cwd(tmp.path):
+        with t.tmpdir("report") as tmp, t.cwd(tmp):
             log.info("Collecting environment")
             env = ""
             for key, val in environ.items():
@@ -1128,7 +1128,7 @@ def _report(ctx):
             t.write_file("environ.txt", env, expand=False)
 
             log.info("Collecting configuration")
-            config.save(tmp.path)
+            config.save(tmp)
             artifact.collect("*.conf", "configs/")
 
             log.info("Collecting platform information")

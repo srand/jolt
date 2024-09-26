@@ -141,8 +141,8 @@ class GitRepository(object):
     def patch(self, patch):
         if not patch:
             return
-        with self.tools.cwd(self.path), self.tools.tmpdir("git") as t:
-            patchfile = fs.path.join(t.path, "jolt.diff")
+        with self.tools.cwd(self.path), self.tools.tmpdir("git") as tmp:
+            patchfile = fs.path.join(tmp, "jolt.diff")
             with open(patchfile, "wb") as f:
                 f.write(patch.encode())
             log.info("Applying patch to {0}", self.path)

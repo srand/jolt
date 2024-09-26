@@ -213,36 +213,6 @@ class _String(object):
         return self._str.startswith(substr)
 
 
-class _tmpdir(object):
-    def __init__(self, name, cwd=None):
-        self._name = name
-        self._path = None
-        self._cwd = cwd or os.getcwd()
-
-    def __enter__(self):
-        try:
-            dirname = self._cwd
-            fs.makedirs(fs.path.join(dirname, fs.path.dirname(self._name)))
-            self._path = fs.mkdtemp(prefix=self._name + "-", dir=dirname)
-        except KeyboardInterrupt as e:
-            raise e
-        except Exception as e:
-            raise e
-        raise_error_if(not self._path, "failed to create temporary directory")
-        return self
-
-    def __exit__(self, type, value, tb):
-        if self._path:
-            fs.rmtree(self._path, ignore_errors=True)
-
-    @property
-    def path(self):
-        return self.get_path()
-
-    def get_path(self):
-        return self._path
-
-
 class _CMake(object):
     def __init__(self, deps, tools, incremental=False):
         self.deps = deps
@@ -1746,7 +1716,8 @@ class Tools(object):
             finally:
                 self._deadline = old_deadline
 
-    def tmpdir(self, name):
+    @contextmanager
+    def tmpdir(self, name=None):
         """ Creates a temporary directory.
 
         The directory is only valid within a context and it is removed
@@ -1761,11 +1732,18 @@ class Tools(object):
 
             .. code-block:: python
 
-                with tools.tmpdir("temp") as tmp, tools.cwd(tmp.path):
+                with tools.tmpdir() as tmp, tools.cwd(tmp):
                     tools.write_file("tempfile", "tempdata")
 
         """
-        return _tmpdir(name, cwd=self._cwd)
+        dirname = None
+        try:
+            self.mkdir(self.buildroot)
+            dirname = fs.mkdtemp(prefix=(name or "tmpdir") + "-", dir=self.buildroot)
+            yield fs.path.normpath(dirname)
+        finally:
+            if dirname:
+                self.rmtree(dirname, ignore_errors=True)
 
     def unlink(self, pathname, *args, **kwargs):
         """Removes a file from disk.
@@ -1894,7 +1872,7 @@ class Tools(object):
                     "-c",
                     chroot,
                     "-t",
-                    bindroot.path,
+                    bindroot,
                     "--shell={shell}",
                     "--",
                 ]
