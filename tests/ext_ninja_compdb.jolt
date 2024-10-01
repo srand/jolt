@@ -90,7 +90,7 @@ class CompDBExtension(JoltTest):
                 self.tools.run(files["test.cpp"]["command"])
 
         with self.tools.cwd(self.ws):
-            self.assertIn("Hello", self.tools.read_file("build/ninja-lib/custom.hpp"))
+            self.assertIn("Hello", self.tools.read_file("build/ninja-lib-inc/custom.hpp"))
 
         self.jolt("clean exe")
         with self.assertRaises(Exception, msg="must be built"):

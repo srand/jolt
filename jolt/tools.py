@@ -580,6 +580,8 @@ class Tools(object):
             name += "-" + utils.canonical(self._task.short_qualified_name)
 
         dirname = fs.path.join(self.getcwd(), name)
+        if incremental:
+            dirname += "-inc"
 
         # Check if incremental build directories are disabled in the configuration
         if incremental not in ["always"] and not config.is_incremental_build():
