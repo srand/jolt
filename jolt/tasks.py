@@ -2620,19 +2620,20 @@ class ReportProxy(object):
             if not filterfn(error):
                 continue
             if error["location"] not in errors_by_location:
-                errors_by_location[error["location"]] = (error, [error["message"]])
+                errors_by_location[error["location"]] = (error, [error["message"]], error["details"])
             else:
                 errors_by_location[error["location"]][1].append(error["message"])
 
-        for error, msgs in errors_by_location.values():
+        for error, msgs, details in errors_by_location.values():
             message = "\n".join(utils.unique_list(msgs))
-            with self._task.tools.cwd(self._task.tools.wsroot):
-                try:
-                    details = self._task.tools.read_file(error["file"])
-                    details = details.splitlines()
-                    details = str(error["line"]) + ": " + details[int(error["line"]) - 1]
-                except Exception:
-                    details = ""
+            if not details:
+                with self._task.tools.cwd(self._task.tools.wsroot):
+                    try:
+                        details = self._task.tools.read_file(error["file"])
+                        details = details.splitlines()
+                        details = str(error["line"]) + ": " + details[int(error["line"]) - 1]
+                    except Exception:
+                        details = ""
 
             location = error.get("location", "")
             if location:

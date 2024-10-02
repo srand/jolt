@@ -2303,13 +2303,13 @@ if __name__ == "__main__":
             # GCC style errors
             report.add_regex_errors_with_file(
                 "Compiler Error",
-                r"^(?P<location>(?P<file>.*?):(?P<line>[0-9]+):(?P<col>[0-9]+)): (?P<message>error: .*)",
+                r"^(?P<location>(?P<file>.*?):(?P<line>[0-9]+):(?P<col>[0-9]+)): (?P<message>error: .*)\n(?P<details>( ( |[0-9])*\| .*\n)+)?",
                 logbuffer,
                 self.outdir)
 
             report.add_regex_errors_with_file(
                 "Compiler Warning",
-                r"^(?P<location>(?P<file>.*?):(?P<line>[0-9]+):(?P<col>[0-9]+)): (?P<message>warning: .*)",
+                r"^(?P<location>(?P<file>.*?):(?P<line>[0-9]+):(?P<col>[0-9]+)): (?P<message>warning: .*)\n(?P<details>( ( |[0-9])*\| .*\n)+)?",
                 logbuffer,
                 self.outdir)
 
