@@ -1546,6 +1546,10 @@ class ArtifactCache(StorageProvider):
         return self._options.download and \
             any([provider.download_enabled() for provider in self._storage_providers])
 
+    def download_session_enabled(self):
+        return self._options.download_session and \
+            any([provider.download_enabled() for provider in self._storage_providers])
+
     def upload_enabled(self):
         return self._options.upload and \
             any([provider.upload_enabled() for provider in self._storage_providers])
@@ -1559,8 +1563,11 @@ class ArtifactCache(StorageProvider):
 
         The artifact is interprocess locked during the operation.
         """
-        if not force and not self.download_enabled():
-            return False
+        if not force:
+            if not artifact.is_session() and not self.download_enabled():
+                return False
+            if artifact.is_session() and not self.download_session_enabled():
+                return False
         if not artifact.is_cacheable():
             return False
         with self.lock_artifact(artifact) as artifact:

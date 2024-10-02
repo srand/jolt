@@ -209,7 +209,9 @@ def _autocomplete_tasks(ctx, args, incomplete):
 @click.option("--result", type=click.Path(), hidden=True,
               help="Write result manifest to this file.")
 @click.option("--no-download", is_flag=True, default=False,
-              help="Don't download artifacts from remote storage")
+              help="Don't download any artifacts from remote storage")
+@click.option("--no-download-persistent", is_flag=True, default=False,
+              help="Don't download persistent artifacts from remote storage (only session artifacts)")
 @click.option("--no-upload", is_flag=True, default=False,
               help="Don't upload artifacts to remote storage")
 @click.option("--download", is_flag=True, default=False,
@@ -223,7 +225,7 @@ def _autocomplete_tasks(ctx, args, incomplete):
 @click.pass_context
 @hooks.cli_build
 def build(ctx, task, network, keep_going, default, local,
-          no_download, no_upload, download, upload, worker, force,
+          no_download, no_download_persistent, no_upload, download, upload, worker, force,
           salt, copy, debug, result, jobs, no_prune, verbose,
           mute):
     """
@@ -286,6 +288,7 @@ def build(ctx, task, network, keep_going, default, local,
     else:
         _download = config.getboolean("jolt", "download", True)
         _upload = config.getboolean("jolt", "upload", True)
+    _download_session = _download
 
     if local:
         _download = False
@@ -293,10 +296,14 @@ def build(ctx, task, network, keep_going, default, local,
     else:
         if no_download:
             _download = False
+            _download_session = False
+        if no_download_persistent:
+            _download = False
         if no_upload:
             _upload = False
         if download:
             _download = True
+            _download_session = True
         if upload:
             _upload = True
 
@@ -307,6 +314,7 @@ def build(ctx, task, network, keep_going, default, local,
         network=network,
         local=local,
         download=_download,
+        download_session=_download_session,
         upload=_upload,
         keep_going=keep_going,
         default=default,

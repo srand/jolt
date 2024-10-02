@@ -4,6 +4,7 @@ class JoltOptions(object):
         self.debug = False
         self.default = []
         self.download = True
+        self.download_session = True
         self.keep_going = False
         self.local = False
         self.network = False

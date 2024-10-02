@@ -54,6 +54,28 @@ class BuildCli(testsupport.JoltTest):
         r = self.jolt("build a")
         self.assertDownload(r, "a")
 
+    def test_no_download_persistent(self):
+        """
+        --- tasks:
+        @attributes.artifact("logs", session=True)
+        class A(Task):
+            def publish_logs(self, a, t):
+                pass
+        ---
+        """
+        if not self.network:
+            self.skipTest("only network build supported")
+
+        r = self.jolt("build -n --no-download-persistent a -vvv")
+        self.assertBuild(r, "a")
+        a = self.artifacts(r)
+        self.assertEqual(1, len(a))
+
+        r = self.jolt("build a")
+        self.assertDownload(r, "a")
+        a = self.artifacts(r)
+        self.assertEqual(1, len(a))
+
     def test_no_upload(self):
         """
         --- tasks:
@@ -658,7 +680,6 @@ class BuildCli(testsupport.JoltTest):
         a = self.artifacts(r)
         self.assertEqual(1, len(a))
 
-
     def test_session_artifact_with_resource_failure(self):
         """
         --- tasks:
@@ -681,7 +702,6 @@ class BuildCli(testsupport.JoltTest):
             self.build("a")
         r = self.lastLog()
         self.assertIn("Failed to download session artifact", r)
-
 
     def test_unstable_task_errors(self):
         """

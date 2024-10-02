@@ -170,7 +170,7 @@ class RemoteExecutor(NetworkExecutor):
             self.download_session_artifacts(extension)
         if not task.has_artifact():
             return
-        if not task.cache.download_enabled():
+        if not task.cache.download_session_enabled():
             return
         if not task.is_downloadable():
             return
