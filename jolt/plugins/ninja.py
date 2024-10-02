@@ -2303,10 +2303,15 @@ if __name__ == "__main__":
             # GCC style errors
             report.add_regex_errors_with_file(
                 "Compiler Error",
-                r"^(?P<location>(?P<file>.*?):(?P<line>[0-9]+):(?P<col>[0-9]+)): (?P<message>.*)",
+                r"^(?P<location>(?P<file>.*?):(?P<line>[0-9]+):(?P<col>[0-9]+)): (?P<message>error: .*)",
                 logbuffer,
-                self.outdir,
-                lambda err: not err["message"].startswith("note:"))
+                self.outdir)
+
+            report.add_regex_errors_with_file(
+                "Compiler Warning",
+                r"^(?P<location>(?P<file>.*?):(?P<line>[0-9]+):(?P<col>[0-9]+)): (?P<message>warning: .*)",
+                logbuffer,
+                self.outdir)
 
             # MSVC compiler errors
             report.add_regex_errors_with_file(
