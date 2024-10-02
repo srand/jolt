@@ -49,6 +49,9 @@ class SubElement(object):
     def iter(self, *args, **kwargs):
         return self._elem.iter(*args, **kwargs)
 
+    def remove(self, *args, **kwargs):
+        return self._elem.remove(*args, **kwargs)
+
 
 class Attribute(object):
     def __init__(self, attribute, varname=None, child=False, values=None, base64=False, zlib=False):
@@ -147,8 +150,8 @@ class Composition(object):
                 self.append(child)
                 return child
 
-            def remove(self, child, *args, **kwargs):
-                self.remove(child._elem)
+            def remove(self, *args, **kwargs):
+                self.remove(*args, **kwargs)
 
             @property
             def get(self):
@@ -156,6 +159,13 @@ class Composition(object):
                 children = [n for n in children if n.tag == name]
                 return [comp_cls(elem=child) for child in children]
 
+            def clear(self):
+                children = list(self.getroot()) if isinstance(self, ElementTree) else list(self._elem)
+                children = [n for n in children if n.tag == name]
+                for child in children:
+                    getattr(self, "remove_" + name)(child)
+
+            setattr(cls, 'clear_' + name + "s", clear)
             setattr(cls, 'create_' + name, create)
             setattr(cls, 'remove_' + name, remove)
             setattr(cls, name + 's', get)

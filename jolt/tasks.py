@@ -2626,7 +2626,7 @@ class ReportProxy(object):
 
         for error, msgs in errors_by_location.values():
             message = "\n".join(utils.unique_list(msgs))
-            with self._task.tools.cwd(reldir):
+            with self._task.tools.cwd(self._task.tools.wsroot):
                 try:
                     details = self._task.tools.read_file(error["file"])
                     details = details.splitlines()
@@ -2678,6 +2678,13 @@ class ReportProxy(object):
     @property
     def errors(self):
         return [ErrorProxy(error) for error in self._report.errors]
+
+    @errors.setter
+    def errors(self, errlist):
+        assert all(isinstance(err, ErrorProxy) for err in errlist), "Invalid error list"
+        self._report.clear_errors()
+        for err in errlist:
+            self.add_error(err.type, err.location, err.message, err.details)
 
     @property
     def manifest(self):
