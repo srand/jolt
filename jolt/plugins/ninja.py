@@ -2230,7 +2230,7 @@ if __name__ == "__main__":
         keep_going = " -k 0" if config.get_keep_going() else ""
         depsfile = self._get_keepdepfile(tools)
         try:
-            tools.run(
+            self.buildlog = tools.run(
                 "ninja{3}{2}{5} -C {0} -f {4} {1}",
                 tools.wsroot,
                 verbose,
@@ -2240,10 +2240,10 @@ if __name__ == "__main__":
                 keep_going,
                 output=True,
             )
+            self._report_errors(self.buildlog)
         except JoltCommandError as e:
-            with self.report() as report:
-                with utils.ignore_exception():
-                    self._report_errors(report, "\n".join(e.stdout))
+            self.buildlog = "\n".join(e.stdout)
+            report = self._report_errors(self.buildlog)
             raise CompileError(self._first_reported_error(report))
 
         if bool(getattr(self, "coverage", False)):
@@ -2297,35 +2297,37 @@ if __name__ == "__main__":
             print("Use the 'compile' command to build individual compilation targets")
             super().debugshell(deps, tools)
 
-    def _report_errors(self, report, logbuffer):
+    def _report_errors(self, logbuffer):
         """ Parses the build log and reports errors. """
+        with self.report() as report, utils.ignore_exception():
+            # GCC style errors
+            report.add_regex_errors_with_file(
+                "Compiler Error",
+                r"^(?P<location>(?P<file>.*?):(?P<line>[0-9]+):(?P<col>[0-9]+)): (?P<message>.*)",
+                logbuffer,
+                self.outdir,
+                lambda err: not err["message"].startswith("note:"))
 
-        # GCC style errors
-        report.add_regex_errors_with_file(
-            "Compiler Error",
-            r"^(?P<location>(?P<file>.*?):(?P<line>[0-9]+):(?P<col>[0-9]+)): (?P<message>.*)",
-            logbuffer,
-            self.outdir,
-            lambda err: not err["message"].startswith("note:"))
+            # MSVC compiler errors
+            report.add_regex_errors_with_file(
+                "Compiler Error",
+                r"^(?P<location>(?P<file>.*?)\((?P<line>[0-9]+)\)): (?P<message>(fatal )?error( C[0-9]*?): .*)",
+                logbuffer,
+                self.outdir)
 
-        # MSVC compiler errors
-        report.add_regex_errors_with_file(
-            "Compiler Error",
-            r"^(?P<location>(?P<file>.*?)\((?P<line>[0-9]+)\)): (?P<message>(fatal )?error( C[0-9]*?): .*)",
-            logbuffer,
-            self.outdir)
+            # Binutils/MSVC linker errors
+            report.add_regex_errors(
+                "Linker Error",
+                r"^(?P<location>(?P<file>.*?)(:.*?)?)( )?: (?P<message>(( fatal)?error LNK|warning LNK|undefined reference|multiple definition).*)",
+                logbuffer)
 
-        # Binutils/MSVC linker errors
-        report.add_regex_errors(
-            "Linker Error",
-            r"^(?P<location>(?P<file>.*?)(:.*?)?)( )?: (?P<message>(( fatal)?error LNK|warning LNK|undefined reference|multiple definition).*)",
-            logbuffer)
+            # LLVM linker errors
+            report.add_regex_errors(
+                "Linker Error",
+                r"^(?P<location>ld(\.lld)?): (error|warning): (?P<message>.*)",
+                logbuffer)
 
-        # LLVM linker errors
-        report.add_regex_errors(
-            "Linker Error",
-            r"^(?P<location>ld(\.lld)?): (error|warning): (?P<message>.*)",
-            logbuffer)
+            return report
 
     def _first_reported_error(self, report):
         """ Returns the first reported error or None if no errors were reported. """
