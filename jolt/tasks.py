@@ -2551,6 +2551,10 @@ class ErrorProxy(object):
     def type(self):
         return self._error.type
 
+    @type.setter
+    def type(self, value):
+        self._error.type = value
+
     @property
     def details(self):
         return self._error.details
@@ -2632,7 +2636,9 @@ class ReportProxy(object):
 
             location = error.get("location", "")
             if location:
-                location = self._task.tools.expand_relpath(location, self._task.joltdir)
+                with self._task.tools.cwd(self._task.tools.wsroot):
+                    location = self._task.tools.expand_path(location)
+                location = self._task.tools.expand_relpath(location, self._task.tools.wsroot)
 
             self.add_error(type, location, message, details)
 
