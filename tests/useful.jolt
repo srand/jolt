@@ -1,0 +1,17 @@
+from jolt import Task
+
+
+class Pass(Task):
+    pass
+
+
+class Fail(Task):
+    def run(self, deps, tools):
+        assert False, "Always fails"
+
+
+class Unstable(Task):
+    unstable = True
+
+    def run(self, deps, tools):
+        assert False, "Always fails"
