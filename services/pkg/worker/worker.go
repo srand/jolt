@@ -295,7 +295,7 @@ func (w *worker) deployClient(client *protocol.Client, workspace *protocol.Works
 		return "", err
 	}
 
-	err = w.runCmd(w.cwd, "virtualenv", venv)
+	err = w.runCmd(w.cwd, "python", "-m", "venv", venv)
 	if err != nil {
 		os.RemoveAll(deployPath)
 		return "", err
