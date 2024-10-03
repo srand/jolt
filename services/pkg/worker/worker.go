@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -156,6 +157,7 @@ func (w *worker) run() error {
 
 				if request.Build.Environment.Workspace.Tree != "" {
 					log.Info("Deploying workspace tree", request.Build.Environment.Workspace.Tree, "for", request.Build.Environment.Workspace.Name)
+					pathHash, _ := utils.Sha1String(filepath.Join(w.cachePath(), "indexes", request.Build.Environment.Workspace.Name))
 					err = w.runCmd(
 						w.cwd,
 						"fstree",
@@ -165,7 +167,7 @@ func (w *worker) run() error {
 						"--ignore",
 						".joltignore",
 						"--index",
-						".jolt/index",
+						path.Join(w.cachePath(), "indexes", pathHash),
 						"--remote",
 						w.config.CacheGrpcUri,
 						"--threads",
