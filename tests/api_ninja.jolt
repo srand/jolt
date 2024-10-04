@@ -938,3 +938,27 @@ class NinjaApi(JoltTest):
         r = self.lastLog()
 
         assert not all([f"lib{i}.cpp" in r for i in range(19)])
+
+    def test_error_parsing(self):
+        """
+        --- file: main.cpp
+        int main() {{
+          return a;
+        }}
+
+        --- tasks:
+        class Exe(CXXExecutable):
+            sources = ["main.cpp"]
+
+            def run(self, deps, tools):
+                try:
+                    super().run(deps, tools)
+                except Exception as e:
+                    with self.report() as r:
+                        assert "Compiler Error" == r.errors[0].type
+                        assert "not declared in this scope" in r.errors[0].message
+                        assert "main.cpp:2:10" == r.errors[0].location
+                        assert "return a" in r.errors[0].details
+        ---
+        """
+        self.build("exe")
