@@ -4,7 +4,7 @@ from jolt import config
 from jolt import graph
 from jolt import log
 from jolt import scheduler
-from jolt.loader import JoltLoader
+from jolt.loader import JoltLoader, export_workspace
 from jolt.manifest import JoltManifest
 from jolt.options import JoltOptions
 from jolt.tasks import TaskRegistry
@@ -110,6 +110,15 @@ def snap(ctx, task, default):
             },
         ]
     }
+
+    # If fstree is enabled, push workspace to remote cache and
+    # add the tree hash to the build parameters.
+    if config.get("jolt", "fstree", True):
+        workspace = export_workspace()
+        params["parameter"].append({
+            "name": "JOLT_FSTREE",
+            "value": workspace.tree,
+        })
 
     tools = Tools()
     data, content_type = urllib3.encode_multipart_formdata([
