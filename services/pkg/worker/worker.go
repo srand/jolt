@@ -167,7 +167,7 @@ func (w *worker) run() error {
 						"--ignore",
 						".joltignore",
 						"--index",
-						path.Join(w.cachePath(), "indexes", pathHash),
+						path.Join(w.cwd, ".indexes", pathHash),
 						"--remote",
 						w.config.CacheGrpcUri,
 						"--threads",
