@@ -941,24 +941,85 @@ class NinjaApi(JoltTest):
 
     def test_error_parsing(self):
         """
-        --- file: main.cpp
+        --- file: error.cpp
         int main() {{
           return a;
         }}
 
         --- tasks:
-        class Exe(CXXExecutable):
-            sources = ["main.cpp"]
+        class Error(CXXExecutable):
+            sources = ["error.cpp"]
 
             def run(self, deps, tools):
                 try:
                     super().run(deps, tools)
                 except Exception as e:
                     with self.report() as r:
+                        assert len(r.errors) == 1
                         assert "Compiler Error" == r.errors[0].type
                         assert "not declared in this scope" in r.errors[0].message
-                        assert "main.cpp:2:10" == r.errors[0].location
+                        assert "error.cpp:2:10" == r.errors[0].location
                         assert "return a" in r.errors[0].details
         ---
         """
-        self.build("exe")
+        self.build("error")
+
+    def test_warning_parsing(self):
+        """
+        --- file: warning.cpp
+        int main() {{
+        #warning "This is a warning"
+          return 0;
+        }}
+
+        --- tasks:
+        class Warning(CXXExecutable):
+            sources = ["warning.cpp"]
+
+            def run(self, deps, tools):
+                try:
+                    super().run(deps, tools)
+                finally:
+                    with self.report() as r:
+                        assert len(r.errors) == 1
+                        assert "Compiler Warning" == r.errors[0].type
+                        assert "This is a warning" in r.errors[0].message
+                        assert "warning.cpp:2:2" == r.errors[0].location
+                        assert "#warning" in r.errors[0].details
+        ---
+        """
+        self.build("warning")
+
+    def test_flake8_error(self):
+        """
+        --- file: file.py
+        import os
+
+        --- tasks:
+        class Flake(CXXProject):
+            sources = ["file.py"]
+
+            flake_rule = Rule(
+                command="flake8 $in && touch $out",
+                outfiles=["{{outdir}}/{{in_base}}.flake8"],
+                infiles=[".py"],
+            )
+            skip_rule = Skip(infiles=[".flake8"])
+
+            def run(self, deps, tools):
+                try:
+                    super().run(deps, tools)
+                except Exception as e:
+                    with self.report() as r:
+                        assert len(r.errors) == 2
+                        assert "Compiler Error" == r.errors[0].type
+                        assert "F401 'os' imported but unused" in r.errors[0].message
+                        assert "file.py:1:1" == r.errors[0].location
+                        assert "import os" in r.errors[0].details
+
+                        assert "Compiler Error" == r.errors[1].type
+                        assert "W391 blank line at end of file" in r.errors[1].message
+                        assert "file.py:2:1" == r.errors[1].location
+        ---
+        """
+        self.build("flake")
