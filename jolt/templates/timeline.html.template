@@ -1,48 +1,45 @@
 <html>
-  <head>
-    <style>
-      h1 {
-	  color: #f44336;
-      }
-    </style>
-    <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
-    <script type="text/javascript">
-      google.charts.load('current', {'packages':['gantt']});
-      google.charts.setOnLoadCallback(drawChart);
 
-      function drawChart() {
+<head>
+  <style>
+    h1 {
+      color: #f44336;
+    }
+  </style>
+  <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+  <script type="text/javascript">
+    google.charts.load('current', { 'packages': ['timeline'] });
+    google.charts.setOnLoadCallback(drawChart);
 
-	  var data = new google.visualization.DataTable();
-	  data.addColumn('string', 'Task ID');
-	  data.addColumn('string', 'Task Name');
-	  data.addColumn('date', 'Start');
-	  data.addColumn('date', 'End');
-	  data.addColumn('number', 'Duration');
-	  data.addColumn('number', 'Completion');
-	  data.addColumn('string', 'Dependencies');
+    function drawChart() {
+      var container = document.getElementById('chart_div');
+      var chart = new google.visualization.Timeline(container);
 
-	  data.addRows([
-	      {% for i, task in enumerate(tasks) %}
-              ['{{i}}', '{{task.short_qualified_name}}', new Date(Date.parse('{{task._timeline_started}}')), new Date(Date.parse('{{task._timeline_finished}}')), null, 100, {{ deps(task) }}],
-	      {% endfor %}
-	  ]);
+      var data = new google.visualization.DataTable();
+      data.addColumn('string', 'Worker');
+      data.addColumn('string', 'Task Name');
+      data.addColumn('date', 'Start');
+      data.addColumn('date', 'End');
 
-	  var options = {
-              height: {{ 200 + tasks|length * 30 }},
-              gantt: {
-		  trackHeight: 30
-              }
-	  };
+      data.addRows([
+        {% for i, task in enumerate(tasks) %}
+        ['{{task.worker}}', '{{task.short_qualified_name}}', new Date(Date.parse('{{task._timeline_started}}')), new Date(Date.parse('{{task._timeline_finished}}'))],
+        {% endfor %}
+	    ]);
 
-	  var chart = new google.visualization.Gantt(document.getElementById('chart_div'));
+      var options = {
+        height: {{ 200 + tasks | length * 30 }},
+	    };
 
-	  chart.draw(data, options);
-      }
-    </script>
-    <title>Jolt - Execution Timeline</title>
-  </head>
-  <body onresize="drawChart()">
-    <h1>Execution Timeline</h1>
-    <div id="chart_div"></div>
-  </body>
+      chart.draw(data, options);
+    }
+  </script>
+  <title>Jolt - Timeline</title>
+</head>
+
+<body onresize="drawChart()">
+  <h1>Jolt - Timeline</h1>
+  <div id="chart_div"></div>
+</body>
+
 </html>

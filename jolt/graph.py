@@ -5,6 +5,7 @@ from os import getenv
 from threading import RLock
 from collections import OrderedDict
 import uuid
+import socket
 import sys
 
 from jolt import cli
@@ -440,6 +441,7 @@ class TaskProxy(object):
         self.duration_running = utils.duration() if not when else when
 
     def running_execution(self, remote=False):
+        self.worker = socket.gethostname()
         hooks.task_started_execution(self)
         self.running(what="Remote execution" if remote else "Execution")
 

@@ -1,5 +1,5 @@
-from jolt import Task
-
+from jolt import Task, IntParameter
+import time
 
 class Pass(Task):
     pass
@@ -15,3 +15,10 @@ class Unstable(Task):
 
     def run(self, deps, tools):
         assert False, "Always fails"
+
+
+class Sleep(Task):
+    t = IntParameter()
+
+    def run(self, deps, tools):
+        time.sleep(int(self.t))
