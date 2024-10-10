@@ -285,6 +285,9 @@ class RemoteExecutor(NetworkExecutor):
                     context=line.context[:7],
                     prefix=True)
 
+            if progress.worker:
+                self.task.worker = progress.worker.hostname
+
             if progress.status in [common_pb.TaskStatus.TASK_RUNNING] \
                and progress.status != self.task.status():
                 self.task.running_execution(remote=True)

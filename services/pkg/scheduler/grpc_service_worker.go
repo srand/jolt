@@ -269,6 +269,7 @@ func (s *workerService) GetTasks(stream protocol.Worker_GetTasksServer) error {
 	updates := make(chan *protocol.TaskUpdate, 100)
 	go func() {
 		defer close(updates)
+		status := protocol.TaskStatus_TASK_CREATED
 		for {
 			update, err := stream.Recv()
 			if err == io.EOF {
@@ -277,6 +278,12 @@ func (s *workerService) GetTasks(stream protocol.Worker_GetTasksServer) error {
 			if err != nil {
 				log.Trace("Executor read error:", err)
 				return
+			}
+			// Only forward worker allocation on state transitions
+			// to avoid flooding observers with the same information
+			if update.Status != status {
+				update.Worker = execInfo.Worker
+				status = update.Status
 			}
 			updates <- update
 		}

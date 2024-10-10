@@ -1,15 +1,25 @@
 from datetime import datetime
 import os
 
+from jolt import log
+from jolt import tools
 from jolt import utils
 from jolt.hooks import TaskHook, TaskHookFactory
-from jolt.config import get_workdir
+from jolt import config
+
+
+NAME_LOG = "Timeline"
 
 
 class TimelineHooks(TaskHook):
     def __init__(self):
+        self.path = os.path.join(
+            config.get_workdir(),
+            config.get("timeline", "path", "timeline.html")
+        )
         self.tasks = []
         self.task_ids = {}
+        self.tools = tools.Tools()
 
     def started(self, task):
         task._timeline_started = datetime.now().isoformat()
@@ -27,8 +37,7 @@ class TimelineHooks(TaskHook):
             enumerate=enumerate,
             tasks=self.tasks)
 
-        with open(os.path.join(get_workdir(), "timeline.html"), "w") as f:
-            f.write(timeline)
+        self.tools.write_file(self.path, timeline, expand=False)
 
     def deps(self, task):
         ids = []
@@ -59,4 +68,5 @@ class TimelineHooks(TaskHook):
 @TaskHookFactory.register
 class TimelineFactory(TaskHookFactory):
     def create(self, env):
+        log.verbose(NAME_LOG + " Loaded")
         return TimelineHooks()
