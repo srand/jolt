@@ -1265,3 +1265,29 @@ class TaskApi(JoltTest):
         with self.assertRaises(Exception):
             self.build("b")
         self.assertIn("Task is not runnable on current platform", self.lastLog())
+
+    def test_include(self):
+        """
+        --- file: a.jolt
+        from jolt import include
+
+        include("dir/b.jolt")
+
+        --- file: dir/b.jolt
+        from jolt import include
+
+        include("c.jolt")
+
+        --- file: dir/c.jolt
+        from jolt import Task
+
+        class A(Task):
+            pass
+
+        --- tasks:
+        from jolt import include
+
+        include("a.jolt")
+        ---
+        """
+        self.build("a")

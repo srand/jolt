@@ -99,22 +99,24 @@ class LoaderFactory(object):
 
 class NativeLoader(Loader):
     def __init__(self, searchpath):
-        self._recipes = []
-        self._find_files(searchpath)
+        self._files = self._find_files(searchpath)
+        self._recipes = self._load_files(self._files)
 
     def _find_files(self, searchpath):
         # If the searchpath is a file, load it directly
         if fs.path.isdir(searchpath):
-            return self._load_files(glob.glob(fs.path.join(searchpath, "*.jolt")))
+            return glob.glob(fs.path.join(searchpath, "*.jolt"))
 
         _, ext = fs.path.splitext(searchpath)
         if ext in [".jolt", ".py"]:
-            return self._load_files([searchpath])
+            return [searchpath]
 
     def _load_files(self, files):
+        recipes = []
         for filepath in files:
             recipe = NativeRecipe(filepath)
-            self._recipes.append(recipe)
+            recipes.append(recipe)
+        return recipes
 
     @property
     def recipes(self):
