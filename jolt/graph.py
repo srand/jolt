@@ -624,7 +624,7 @@ class TaskProxy(object):
                     if self.task.is_runnable():
                         log.verbose("Host: {0}", getenv("HOSTNAME", "localhost"))
 
-                    with self.lock_artifacts(discard=force_build) as artifacts:
+                    with self.lock_artifacts(discard=True) as artifacts:
                         exitstack = ExitStack()
 
                         # Indicates whether session artifacts have been published
