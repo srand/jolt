@@ -1,7 +1,7 @@
-from os import _exit, environ, getcwd
 import atexit
 import click
 import datetime
+import os
 import platform
 import subprocess
 import sys
@@ -32,7 +32,7 @@ from jolt.error import raise_task_error_if
 from jolt.plugins import report
 
 debug_enabled = False
-workdir = getcwd()
+workdir = os.getcwd()
 
 
 class ArgRequiredUnless(click.Argument):
@@ -79,6 +79,9 @@ class PluginGroup(click.Group):
 @click.option("-v", "--verbose", count=True, help="Verbose output (repeat to raise verbosity).")
 @click.option("-c", "--config", "config_file", multiple=True, type=str,
               help="Load a configuration file or set a configuration key.")
+@click.option("-C", "--chdir", type=str,
+              help="Change working directory before executing command.")
+@click.option("--interpreter", "machine_interface", type=str, help="Used for debugging.", hidden=True)
 @click.option("-d", "--debugger", is_flag=True,
               help="Attach debugger on exception.")
 @click.option("-p", "--profile", is_flag=True, hidden=True,
@@ -100,7 +103,7 @@ class PluginGroup(click.Group):
 @click.option("-h", "--help", is_flag=True, help="Show this message and exit.")
 @click.pass_context
 def cli(ctx, verbose, config_file, debugger, profile,
-        force, salt, debug, network, local, keep_going, jobs, help):
+        force, salt, debug, network, local, keep_going, jobs, help, machine_interface, chdir):
     """
     A task execution tool.
 
@@ -124,13 +127,22 @@ def cli(ctx, verbose, config_file, debugger, profile,
     global debug_enabled
     debug_enabled = debugger
 
+    if machine_interface:
+        log.enable_gdb()
+
     if ctx.invoked_subcommand not in ["log", "report"]:
         log.start_file_log()
 
+    if chdir:
+        global workdir
+        workdir = chdir
+        os.chdir(workdir)
+
     log.verbose("Jolt version: {}", __version__)
     log.verbose("Jolt command: {}", " ".join([fs.path.basename(sys.argv[0])] + sys.argv[1:]))
-    log.verbose("Jolt host: {}", environ.get("HOSTNAME", "localhost"))
+    log.verbose("Jolt host: {}", os.environ.get("HOSTNAME", "localhost"))
     log.verbose("Jolt install path: {}", fs.path.dirname(__file__))
+    log.verbose("Jolt workdir: {}", workdir)
 
     if ctx.invoked_subcommand in ["config", "executor", "log"]:
         # Don't attempt to load any task recipes as they might require
@@ -436,7 +448,7 @@ def build(ctx, task, network, keep_going, default, local,
         except KeyboardInterrupt:
             print()
             log.warning("Interrupted again, exiting")
-            _exit(1)
+            os._exit(1)
     finally:
         queue.shutdown()
 
@@ -776,7 +788,7 @@ def download(ctx, task, deps, copy, copy_all):
         except KeyboardInterrupt:
             print()
             log.warning("Interrupted again, exiting")
-            _exit(1)
+            os._exit(1)
 
     except Exception as e:
         log.set_interactive(True)
@@ -914,7 +926,7 @@ def _log(follow, delete):
             fs.unlink(file)
     else:
         t = tools.Tools()
-        configured_pager = config.get("jolt", "pager", environ.get("PAGER", None))
+        configured_pager = config.get("jolt", "pager", os.environ.get("PAGER", None))
         for pager in [configured_pager, "less", "more", "cat"]:
             if pager and t.which(pager):
                 return subprocess.call("{1} {0}".format(log.logfiles[-1], pager), shell=True)
@@ -1131,7 +1143,7 @@ def _report(ctx):
         with t.tmpdir("report") as tmp, t.cwd(tmp):
             log.info("Collecting environment")
             env = ""
-            for key, val in environ.items():
+            for key, val in os.environ.items():
                 env += f"{key} = {val}\n"
             t.write_file("environ.txt", env, expand=False)
 
