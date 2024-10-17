@@ -424,6 +424,11 @@ func (w *worker) nixWrapperCmd(clientWsName string, cmdline []string) ([]string,
 
 	nixCmd := []string{"nix-shell", "--pure", "--run", strings.Join(cmdline, " ")}
 
+	// Use cached-nix-shell if available.
+	if _, err := exec.LookPath("cached-nix-shell"); err == nil {
+		nixCmd[0] = "cached-nix-shell"
+	}
+
 	// Add default environment variables to the nix-shell.
 	nixCmd = append(nixCmd, "--keep", "HOSTNAME")
 
