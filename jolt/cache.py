@@ -1810,9 +1810,7 @@ class ArtifactCache(StorageProvider):
                 fs.rmtree(artifact.temporary_path, ignore_errors=True)
                 fs.makedirs(artifact.temporary_path)
 
-            with contextlib.ExitStack() as stack:
-                stack.enter_context(artifact)
-                yield artifact
+            yield artifact
         finally:
             fs.rmtree(artifact.temporary_path, ignore_errors=True)
             with self._cache_lock():

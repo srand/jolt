@@ -17,7 +17,6 @@ from jolt.influence import StringInfluence
 from jolt.options import JoltOptions
 from jolt.plugins import ninja
 from jolt.tasks import TaskRegistry
-from jolt.tasks import WorkspaceResource
 
 log.verbose("[NinjaCompDB] Loaded")
 

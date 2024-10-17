@@ -209,7 +209,7 @@ class TaskProxy(object):
     def is_alias(self):
         return isinstance(self.task, Alias)
 
-    def is_available_locally(self, extensions=True, skip_session=False):
+    def is_available_locally(self, extensions=True):
         dep_artifacts = []
         if extensions:
             for dep in self.extensions:
@@ -295,9 +295,6 @@ class TaskProxy(object):
             for task in tasks:
                 artifacts.extend(task._artifacts)
         return all(map(lambda artifact: artifact.is_uploadable(), artifacts))
-
-    def is_workspace_resource(self):
-        return isinstance(self.task, WorkspaceResource)
 
     @contextmanager
     def lock_artifacts(self, discard=False):
@@ -574,11 +571,9 @@ class TaskProxy(object):
             executor = ExecutorRegistry.get().create_local(child)
             executor.run(JoltEnvironment(cache=cache))
 
-    def _must_discard_artifacts(self, cache):
-        for artifact in self.artifacts:
-            if cache.is_available_locally(artifact):
-                return True
-        return False
+    def partially_available_locally(self):
+        availability = map(lambda a: self.cache.is_available_locally(a), self.artifacts)
+        return any(availability) and not all(availability)
 
     def _validate_platform(self):
         """ Validates that the task is runnable on the current platform. """
@@ -602,9 +597,6 @@ class TaskProxy(object):
         with self.tools:
             available_locally = available_remotely = False
 
-            # Force discard of all artifacts if some are present but not all
-            force_build = force_build or self._must_discard_artifacts(cache)
-
             # Download dependency artifacts if not already done
             self._run_download_dependencies(cache, force_upload, force_build)
 
@@ -618,16 +610,20 @@ class TaskProxy(object):
                 if available_locally and not force_upload:
                     self.skipped()
                     return
+
                 available_remotely = cache.download_enabled() and self.is_available_remotely()
                 if not available_locally and available_remotely:
                     available_locally = self.download()
+
+                if not available_locally and self.partially_available_locally():
+                    force_build = True
 
             if force_build or not available_locally:
                 with log.threadsink() as buildlog:
                     if self.task.is_runnable():
                         log.verbose("Host: {0}", getenv("HOSTNAME", "localhost"))
 
-                    with self.lock_artifacts(discard=not self.is_resource()) as artifacts:
+                    with self.lock_artifacts(discard=force_build and not self.is_resource()) as artifacts:
                         exitstack = ExitStack()
 
                         # Indicates whether session artifacts have been published
