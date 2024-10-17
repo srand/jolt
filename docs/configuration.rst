@@ -567,6 +567,27 @@ dependencies.
 
 The plugin is enabled by adding a ``[ninja-compdb]`` section in
 the Jolt configuration. Ninja version >= 1.10.0 is required.
+These optional config keys are available:
+
+  .. list-table::
+    :widths: 20 10 70
+    :header-rows: 1
+    :class: tight-table
+
+    * - Config Key
+      - Type
+      - Description
+
+    * - ``path``
+      - String
+      - Optional. Write the last built compilation database to a file
+        at this path. The file is overwritten each time a task is built.
+        The path is relative to the workspace root.
+
+        .. code-block:: text
+
+          [ninja-compdb]
+          path = compile_commands.json
 
 
 Scheduler

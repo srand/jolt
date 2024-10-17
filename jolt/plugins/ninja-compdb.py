@@ -108,7 +108,7 @@ def get_compdb_artifacts(task):
 
 def get_task_artifacts(task):
     compdb_artifact = task.get_artifact("compdb")
-    artifacts = task.artifacts
+    artifacts = [a for a in task.artifacts]
     for dep in task.children:
         artifacts.extend(dep.artifacts)
     return compdb_artifact, artifacts
@@ -165,7 +165,7 @@ class CompDBHooks(TaskHook):
             for dep in [artifact] + deps:
                 depdb = CompDB(artifact=dep)
                 depdb.read()
-                depdb.relocate(task)
+                depdb.relocate(task, sandboxes=fs.has_symlinks())
                 db.merge(depdb)
             db.write()
             artifact.collect(dbpath, "compdb/", flatten=True)
@@ -179,11 +179,20 @@ class CompDBHooks(TaskHook):
             artifact, deps = get_compdb_artifacts(task)
             db = CompDB("compdb/all_compile_commands.json", artifact)
             db.read()
-            db.relocate(task)
+            db.relocate(task, sandboxes=fs.has_symlinks())
             outdir = task.tools.builddir("compdb", incremental=True)
             dbpath = fs.path.join(outdir, "all_compile_commands.json")
             db.write(dbpath, force=True)
-            stage_artifacts(deps + [artifact], task.tools)
+
+            # Save the compilation database to the configured path
+            last_path = config.get("ninja-compdb", "path")
+            if last_path:
+                last_path = os.path.join(task.tools.wsroot, last_path)
+                task.tools.mkdirname(last_path)
+                db.write(last_path, force=True)
+
+            artifact, deps = get_task_artifacts(task)
+            stage_artifacts(deps, task.tools)
 
     def task_finished_download(self, task):
         self.task_finished_execution(task)
