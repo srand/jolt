@@ -445,10 +445,10 @@ class TaskProxy(object):
         hooks.task_started_execution(self)
         self.running(what="Remote execution" if remote else "Execution")
 
-    def interrupted_execution(self, remote=False):
+    def restarted_execution(self, remote=False):
         hooks.task_finished_execution(self)
         self.task.warning("Remote execution interrupted {}" if remote else "Execution interrupted {}", self.log_name)
-        self.queued(remote=remote)
+        self.queued()
 
     def started_execution(self, remote=False):
         self.queued()
@@ -464,16 +464,18 @@ class TaskProxy(object):
         self.running(what="Upload")
         hooks.task_started_upload(self)
 
-    def _failed(self, what="Execution"):
+    def _failed(self, what="Execution", interrupt=False):
         self.set_failed()
+        how = "failed" if not interrupt else "interrupted"
+        logfn = self.task.error if not interrupt else self.task.warning
         if self.duration_queued and self.duration_running:
-            self.error("{0} failed after {1} {2}", what,
-                       self.duration_running,
-                       self.duration_queued.diff(self.duration_running))
+            logfn("{0} {1} after {2} {3}", what, how,
+                  self.duration_running,
+                  self.duration_queued.diff(self.duration_running))
         elif self.duration_queued:
-            self.error("{0} failed after {1}", what, self.duration_queued or utils.duration())
+            logfn("{0} {1} after {2}", what, how, self.duration_queued or utils.duration())
         else:
-            self.error("{0} failed immediately", what)
+            logfn("{0} {1} immediately", what, how)
 
         if self.is_unstable:
             try:
@@ -492,8 +494,8 @@ class TaskProxy(object):
     def failed_upload(self):
         self._failed("Upload")
 
-    def failed_execution(self, remote=False):
-        self._failed(what="Remote execution" if remote else "Execution")
+    def failed_execution(self, remote=False, interrupt=False):
+        self._failed(what="Remote execution" if remote else "Execution", interrupt=interrupt)
 
     def _finished(self, what="Execution"):
         raise_task_error_if(
@@ -665,6 +667,13 @@ class TaskProxy(object):
                                     # Publish session artifacts to local cache
                                     for artifact in filter(lambda a: a.is_session(), artifacts):
                                         self.publish(context, artifact)
+
+                        except KeyboardInterrupt as e:
+                            self.failed_execution(interrupt=True)
+                            with utils.ignore_exception():
+                                exitstack.close()
+
+                            raise e
 
                         except Exception as e:
                             self.failed_execution()

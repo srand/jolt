@@ -296,9 +296,9 @@ class RemoteExecutor(NetworkExecutor):
 
             if progress.status in [common_pb.TaskStatus.TASK_QUEUED]:
                 if last_status in [common_pb.TaskStatus.TASK_RUNNING]:
-                    self.task.interrupted_execution(remote=True)
+                    self.task.restarted_execution(remote=True)
                     for extension in self.task.extensions:
-                        extension.interrupted_execution(remote=True)
+                        extension.restarted_execution(remote=True)
 
             if progress.status in [
                     common_pb.TaskStatus.TASK_PASSED,

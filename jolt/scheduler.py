@@ -10,7 +10,6 @@ from jolt import hooks
 from jolt import log
 from jolt import utils
 from jolt import tools
-from jolt.error import raise_error
 from jolt.error import raise_task_error
 from jolt.error import raise_task_error_if
 from jolt.graph import PruneStrategy
@@ -351,7 +350,6 @@ class ExecutorFactory(object):
             if not self.is_aborted():
                 job.executor.run(job.env)
         except KeyboardInterrupt as e:
-            raise_error("Interrupted by user")
             self._aborted = True
             job.future.set_exception(e)
         except Exception as e:
