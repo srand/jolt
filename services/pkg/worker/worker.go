@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/srand/jolt/scheduler/pkg/log"
@@ -203,9 +204,18 @@ func (w *worker) run() error {
 			case protocol.WorkerRequest_CANCEL_BUILD:
 				log.Info("Sending interrupt signal to executor:", request.BuildId)
 				if currentProc != nil {
-					err = currentProc.Signal(os.Interrupt)
-					if err != nil {
-						log.Debug(err)
+					// On POSIX systems, send SIGINT to the process group
+					// to interrupt the executor and all its children.
+					if runtime.GOOS == "windows" {
+						err = currentProc.Signal(os.Interrupt)
+						if err != nil {
+							log.Debug(err)
+						}
+					} else {
+						err = syscall.Kill(-currentProc.Pid, syscall.SIGINT)
+						if err != nil {
+							log.Debug(err)
+						}
 					}
 				}
 

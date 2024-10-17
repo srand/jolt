@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"syscall"
 
 	"github.com/srand/jolt/scheduler/pkg/log"
 )
@@ -41,6 +42,7 @@ func RunOptions(cwd string, args ...string) (chan error, *os.Process, error) {
 	cmd := exec.Command(args[0], args[1:]...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = io.MultiWriter(os.Stderr, &output)
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true, Pgid: 0}
 	if cwd != "" {
 		cmd.Dir = cwd
 	}
