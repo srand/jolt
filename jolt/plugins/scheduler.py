@@ -310,12 +310,13 @@ class RemoteExecutor(NetworkExecutor):
 
             if progress.status in [
                     common_pb.TaskStatus.TASK_CANCELLED,
+            ]:
+                raise TaskCancelledException()
+
+            if progress.status in [
                     common_pb.TaskStatus.TASK_FAILED,
                     common_pb.TaskStatus.TASK_UNSTABLE,
             ]:
-                if last_status in [common_pb.TaskStatus.TASK_QUEUED]:
-                    raise TaskCancelledException()
-
                 for error in progress.errors:
                     with self.task.task.report() as report:
                         report.add_error(
