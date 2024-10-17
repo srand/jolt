@@ -268,6 +268,9 @@ class TaskProxy(object):
     def is_resource(self):
         return isinstance(self.task, Resource)
 
+    def is_workspace_resource(self):
+        return isinstance(self.task, WorkspaceResource)
+
     def is_running(self):
         return self.status() == common_pb.TaskStatus.TASK_RUNNING
 

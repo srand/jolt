@@ -417,12 +417,16 @@ def build(ctx, task, network, keep_going, default, local,
                 elif task.is_goal() and task.duration_running:
                     goal_task_duration += task.duration_running.seconds
 
+                # Unpack tasks with overridden unpack() method
                 if not task.is_resource():
                     if no_prune and task.task.unpack.__func__ is not Task.unpack:
                         with acache.get_context(task):
                             pass
 
                     progress.update(1)
+
+                if no_prune and task.is_workspace_resource():
+                    task.task.acquire_ws(force=True)
 
                 if not keep_going and error is not None:
                     queue.abort()

@@ -2798,7 +2798,7 @@ class WorkspaceResource(Resource):
         resource is acquired.
         """
 
-    def acquire_ws(self):
+    def acquire_ws(self, force=False):
         """ Called to acquire the resource.
 
         An implementor overrides this method in a subclass. The acquired

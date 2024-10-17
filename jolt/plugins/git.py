@@ -496,9 +496,9 @@ class Git(WorkspaceResource, FileInfluence):
         # The content of the git repo is required to influence the hash of the consumer task.
         self._assign_git(task)
 
-    def acquire_ws(self):
+    def acquire_ws(self, force=False):
         """ Clone and/or checkout the git repo if required """
-        if self._must_influence() or self._revision.is_imported:
+        if force or self._must_influence() or self._revision.is_imported:
             self._acquire_ws()
 
     def _acquire_ws(self):
