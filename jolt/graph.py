@@ -467,7 +467,7 @@ class TaskProxy(object):
     def _failed(self, what="Execution", interrupt=False):
         self.set_failed()
         how = "failed" if not interrupt else "interrupted"
-        logfn = self.task.error if not interrupt else self.task.warning
+        logfn = self.error if not interrupt else self.warning
         if self.duration_queued and self.duration_running:
             logfn("{0} {1} after {2} {3}", what, how,
                   self.duration_running,
