@@ -86,6 +86,7 @@ setup(
         "psutil",
         "pygit2",
         "requests",
+        "zstandard",
         "tqdm",
     ],
     dependency_links=[],

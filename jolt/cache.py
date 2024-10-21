@@ -23,7 +23,7 @@ from jolt.error import raise_task_error, raise_task_error_if
 from jolt.expires import ArtifactEvictionStrategyRegister
 
 
-DEFAULT_ARCHIVE_TYPE = ".tar.gz"
+DEFAULT_ARCHIVE_TYPE = ".tar.zst"
 
 
 def locked(func):
@@ -1352,7 +1352,7 @@ class ArtifactCache(StorageProvider):
 
     def _fs_get_artifact_archivepath(self, identity, task_name):
         identity = self._fs_identity(identity)
-        return fs.get_archive(fs.path.join(self.root, task_name, identity))
+        return fs.path.join(self.root, task_name, identity) + DEFAULT_ARCHIVE_TYPE
 
     def _fs_get_artifact_lockpath(self, identity):
         identity = self._fs_identity(identity)

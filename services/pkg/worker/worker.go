@@ -1,7 +1,6 @@
 package worker
 
 import (
-	"compress/gzip"
 	"context"
 	"errors"
 	"fmt"
@@ -16,6 +15,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/klauspost/compress/gzip"
+	"github.com/klauspost/compress/zstd"
 	"github.com/srand/jolt/scheduler/pkg/log"
 	"github.com/srand/jolt/scheduler/pkg/protocol"
 	"github.com/srand/jolt/scheduler/pkg/scheduler"
@@ -349,6 +350,19 @@ func (w *worker) deployClient(client *protocol.Client, workspace *protocol.Works
 		var reader io.Reader = response.Body
 
 		switch {
+		case strings.HasSuffix(url, ".tar.zst"):
+			reader, err = zstd.NewReader(reader)
+			if err != nil {
+				os.RemoveAll(deployPath)
+				return "", err
+			}
+
+			err = utils.Untar(reader, srcPath)
+			if err != nil {
+				os.RemoveAll(deployPath)
+				return "", err
+			}
+
 		case strings.HasSuffix(url, ".tar.gz"), strings.HasSuffix(url, ".tgz"):
 			reader, err = gzip.NewReader(reader)
 			if err != nil {

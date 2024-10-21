@@ -1,6 +1,8 @@
 module github.com/srand/jolt/scheduler
 
-go 1.18
+go 1.21
+
+toolchain go1.22.6
 
 require (
 	github.com/denisbrodbeck/machineid v1.0.1
@@ -20,6 +22,7 @@ require (
 	github.com/fsnotify/fsnotify v1.7.0 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
+	github.com/klauspost/compress v1.17.11 // indirect
 	github.com/labstack/gommon v0.4.2 // indirect
 	github.com/magiconair/properties v1.8.7 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect

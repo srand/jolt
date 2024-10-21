@@ -238,7 +238,3 @@ def scandir(scanpath, filterfn=lambda path: path[0] != ".", relative=False):
             for path, dirs, files in os.walk(scanpath)
             for f in files
             if filterfn(f)]
-
-
-def get_archive(path):
-    return path + ".tar.gz"
