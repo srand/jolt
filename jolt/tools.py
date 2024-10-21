@@ -19,6 +19,7 @@ import tarfile
 import zipfile
 import bz2file
 import hashlib
+import zstandard
 from contextlib import contextmanager
 from psutil import NoSuchProcess, Process
 from jinja2 import Environment, FileSystemLoader
@@ -492,12 +493,30 @@ class Tools(object):
         return filename
 
     def _make_tarfile(self, filename, fmt, rootdir):
-        dirname = os.path.dirname(filename)
-        if not os.path.exists(dirname):
-            fs.makedirs(dirname)
+        self.mkdirname(filename)
         with tarfile.open(filename, 'w|%s' % fmt) as tar:
             tar.add(rootdir, ".")
         return filename
+
+    def _make_tarzstd(self, filename, rootdir):
+        self.mkdirname(filename)
+        with open(filename, 'wb') as zstd_file:
+            compressor = zstandard.ZstdCompressor(threads=self.thread_count())
+            with compressor.stream_writer(zstd_file) as stream:
+                with tarfile.open(mode="w|", fileobj=stream) as tar:
+                    tar.add(rootdir, ".")
+        return filename
+
+    def _extract_tarzstd(self, filename, pathname, files=None):
+        with open(filename, 'rb') as zstd_file:
+            decompressor = zstandard.ZstdDecompressor()
+            with decompressor.stream_reader(zstd_file) as stream:
+                with tarfile.open(mode="r|", fileobj=stream) as tar:
+                    if files:
+                        for file in files:
+                            tar.extract(file, pathname)
+                    else:
+                        tar.extractall(pathname)
 
     def archive(self, pathname, filename):
         """ Creates a (compressed) archive.
@@ -509,6 +528,7 @@ class Tools(object):
         - tar.bz2
         - tar.gz
         - tar.xz
+        - tar.zst
         - zip
 
         Args:
@@ -528,6 +548,8 @@ class Tools(object):
                 self.run("tar -I pigz -cf {} -C {} .", filename, pathname)
                 return filename
             fmt = "targz"
+        elif filename.endswith(".tar.zst"):
+            return self._make_tarzstd(filename, rootdir=pathname)
         elif filename.endswith(".tgz"):
             if self.which("tar") and self.which("pigz"):
                 self.run("tar -I pigz -cf {} -C {} .", filename, pathname)
@@ -677,6 +699,7 @@ class Tools(object):
         - .bz2
         - .gz
         - .xz
+        - .zst
 
         Args:
             src (str): Source file to be compressed.
@@ -704,6 +727,13 @@ class Tools(object):
                 with lzma.open(dst, 'wb') as outfp:
                     for block in iter(lambda: infp.read(0x10000), b''):
                         outfp.write(block)
+        elif ext == "zst":
+            with open(src, 'rb') as infp:
+                with open(dst, 'wb') as outfp:
+                    compressor = zstandard.ZstdCompressor(threads=self.thread_count())
+                    with compressor.stream_writer(outfp) as stream:
+                        for block in iter(lambda: infp.read(0x10000), b''):
+                            stream.write(block)
 
     def copy(self, src, dst, symlinks=False):
         """ Copies file and directories (recursively).
@@ -993,6 +1023,7 @@ class Tools(object):
         - tar.bz2
         - tar.gz
         - tar.xz
+        - tar.zst
         - zip
 
         Args:
@@ -1046,6 +1077,11 @@ class Tools(object):
                             tar.extract(file, filepath)
                     else:
                         tar.extractall(filepath)
+            elif filename.endswith(".tar.zst"):
+                try:
+                    self._extract_tarzstd(filename, filepath, files)
+                except tarfile.StreamError as e:
+                    raise_task_error(self._task, "failed to extract archive '{0}': {1}", filename, str(e))
             else:
                 raise_task_error(self._task, "unknown archive type '{0}'", fs.path.basename(filename))
         except Exception:

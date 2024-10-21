@@ -126,6 +126,24 @@ class ToolsApi(JoltTest):
             self.assertEqual(self.tools.read_file(self.ws+"/original/subdir/tests2.txt"),
                              self.tools.read_file(self.ws+"/extracted/subdir/tests2.txt"))
 
+    def test_archive_tar_zstd(self):
+        """
+        --- file: original/tests.txt
+        testtesttesttest
+        --- file: original/subdir/tests2.txt
+        testtesttesttest2
+        ---
+        """
+        self.filename = "tests"
+        with self.tools.cwd(self.ws):
+            self.tools.archive(self.ws+"/original", "{filename}.tar.zst")
+            self.tools.run("mkdir {}/extracted", self.ws)
+            self.tools.run("tar -I zstd -xvf tests.tar.zst -C {}/extracted", self.ws)
+            self.assertEqual(self.tools.read_file(self.ws+"/original/tests.txt"),
+                             self.tools.read_file(self.ws+"/extracted/tests.txt"))
+            self.assertEqual(self.tools.read_file(self.ws+"/original/subdir/tests2.txt"),
+                             self.tools.read_file(self.ws+"/extracted/subdir/tests2.txt"))
+
     def test_builddir_unique(self):
         """
         --- tasks:
@@ -572,6 +590,27 @@ class ToolsApi(JoltTest):
         with self.tools.cwd(self.ws):
             self.tools.run("tar cJvf tests.tar.xz ./test1.txt ./test2.txt")
             self.tools.extract("tests.tar.xz", "extracted/", files=["./test1.txt"])
+            self.assertExists("extracted/test1.txt")
+            self.assertNotExists("extracted/test2.txt")
+
+    def test_extract_tar_zstd(self):
+        with self.tools.cwd(self.ws):
+            self.tools.run("tar -I zstd -cvf tests.tar.zst ../../api_tools.jolt")
+            self.tools.extract("tests.tar.zst", self.ws)
+            self.assertExists("api_tools.jolt")
+
+    def test_extract_tar_zstd_specific_file(self):
+        """
+        --- file: test1.txt
+        test
+        --- file: test2.txt
+        t e s t
+        ---
+        """
+        self.skip("requires seeking, which may not be possible")
+        with self.tools.cwd(self.ws):
+            self.tools.run("tar -Izstd -cvf tests.tar.zst ./test1.txt ./test2.txt")
+            self.tools.extract("tests.tar.zst", "extracted/", files=["./test1.txt"])
             self.assertExists("extracted/test1.txt")
             self.assertNotExists("extracted/test2.txt")
 
