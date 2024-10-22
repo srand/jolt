@@ -164,14 +164,16 @@ func (t *Task) setStatus(status protocol.TaskStatus) bool {
 		return false
 	}
 
-	// Can only transition to cancelled from queued.
-	if status == protocol.TaskStatus_TASK_CANCELLED && t.status != protocol.TaskStatus_TASK_CREATED && t.status != protocol.TaskStatus_TASK_QUEUED {
+	switch t.status {
+	case protocol.TaskStatus_TASK_CANCELLED:
 		log.Debugf("err - task - id: %s, status: %v - new status rejected: %v", t.Identity(), t.status, status)
 		return false
-	}
 
-	switch t.status {
-	case protocol.TaskStatus_TASK_CREATED, protocol.TaskStatus_TASK_QUEUED, protocol.TaskStatus_TASK_RUNNING:
+	case protocol.TaskStatus_TASK_CREATED:
+		fallthrough
+	case protocol.TaskStatus_TASK_QUEUED:
+		fallthrough
+	case protocol.TaskStatus_TASK_RUNNING:
 		if t.status != status {
 			t.status = status
 			t.postStatusUpdated()
@@ -180,7 +182,7 @@ func (t *Task) setStatus(status protocol.TaskStatus) bool {
 		return false
 
 	default:
-		// Allow the task to be restarted if it has completed.
+		// Attempt to restart the task if it has been interrupted.
 		if status == protocol.TaskStatus_TASK_QUEUED {
 			t.status = status
 			t.postStatusUpdated()
@@ -200,6 +202,12 @@ func (t *Task) Status() protocol.TaskStatus {
 
 // Cancel the task.
 func (t *Task) Cancel() error {
+	// Can only transition to cancelled from created/queued.
+	if t.status != protocol.TaskStatus_TASK_CREATED && t.status != protocol.TaskStatus_TASK_QUEUED {
+		log.Debugf("err - task - id: %s, status: %v - cancellation ignored", t.Identity(), t.status)
+		return nil
+	}
+
 	t.PostStatusUpdate(protocol.TaskStatus_TASK_CANCELLED)
 	return nil
 }

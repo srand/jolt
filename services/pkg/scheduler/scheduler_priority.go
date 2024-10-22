@@ -39,7 +39,9 @@ func (c *priorityUnicastCallbacks) Selected(item *Task, consumer interface{}) bo
 
 func (c *priorityUnicastCallbacks) NotSelected(item *Task, consumer interface{}) bool {
 	item.AssignToWorker(nil)
-	item.PostStatusUpdate(protocol.TaskStatus_TASK_QUEUED)
+	if !item.build.IsCancelled() {
+		item.PostStatusUpdate(protocol.TaskStatus_TASK_QUEUED)
+	}
 	return true
 }
 

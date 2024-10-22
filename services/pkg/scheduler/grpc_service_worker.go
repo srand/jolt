@@ -265,6 +265,7 @@ func (s *workerService) GetTasks(stream protocol.Worker_GetTasksServer) error {
 	defer executor.Close()
 
 	log.Infof("new - executor - build_id: %s, worker: %s", execInfo.Request.BuildId, execInfo.Worker.Id)
+	defer log.Debugf("del - executor - build_id: %s, worker: %s", execInfo.Request.BuildId, execInfo.Worker.Id)
 
 	updates := make(chan *protocol.TaskUpdate, 100)
 	go func() {
@@ -312,45 +313,7 @@ func (s *workerService) GetTasks(stream protocol.Worker_GetTasksServer) error {
 			// If no new task is received within this time, the executor will exit
 
 			if currentTask == nil {
-				log.Debugf("del - executor - build_id: %s, worker: %s", execInfo.Request.BuildId, execInfo.Worker.Id)
 				return nil
-			}
-
-		case <-executor.Done():
-			// If the executor is cancelled, exit
-
-			log.Infof("del - executor - build_id: %s, worker: %s", execInfo.Request.BuildId, execInfo.Worker.Id)
-			return nil
-
-		case task := <-executor.Tasks():
-			// If a new task is received, start processing it
-
-			if task == nil {
-				return nil
-			}
-
-			if currentTask != nil {
-				panic("Got a new task assignment while another task is in progress")
-			}
-
-			log.Debugf("run - task - id: %s (%s), worker: %s", task.Identity(), task.Instance(), execInfo.Worker.Id)
-
-			currentTask = task
-			currentTask.SetMatchedPlatform(executor.Platform())
-
-			currentLog, err = s.logs.Append(task.Instance())
-			if err != nil {
-				log.Debug("unable to append log: ", err)
-			}
-
-			request := &protocol.TaskRequest{
-				BuildId: currentTask.Build().Id(),
-				TaskId:  currentTask.Identity(),
-			}
-
-			if err := stream.Send(request); err != nil {
-				log.Trace("Executor write error:", err)
-				return utils.GrpcError(err)
 			}
 
 		case update := <-updates:
@@ -361,7 +324,6 @@ func (s *workerService) GetTasks(stream protocol.Worker_GetTasksServer) error {
 			}
 
 			if currentTask == nil {
-				log.Debug("Got task update with no task in progress")
 				continue
 			}
 
@@ -399,6 +361,41 @@ func (s *workerService) GetTasks(stream protocol.Worker_GetTasksServer) error {
 				// Reset the initial timeout. If no new task is received within this time,
 				// the executor will exit and allow the worker to be used for other builds.
 				initTimeout = time.After(initTimeoutPeriod)
+			}
+
+		case <-executor.Done():
+			// If the executor is cancelled, exit
+			return nil
+
+		case task := <-executor.Tasks():
+			// If a new task is received, start processing it
+
+			if task == nil {
+				return nil
+			}
+
+			if currentTask != nil {
+				panic("Got a new task assignment while another task is in progress")
+			}
+
+			log.Debugf("run - task - id: %s (%s), worker: %s", task.Identity(), task.Instance(), execInfo.Worker.Id)
+
+			currentTask = task
+			currentTask.SetMatchedPlatform(executor.Platform())
+
+			currentLog, err = s.logs.Append(task.Instance())
+			if err != nil {
+				log.Debug("unable to append log: ", err)
+			}
+
+			request := &protocol.TaskRequest{
+				BuildId: currentTask.Build().Id(),
+				TaskId:  currentTask.Identity(),
+			}
+
+			if err := stream.Send(request); err != nil {
+				log.Trace("Executor write error:", err)
+				return utils.GrpcError(err)
 			}
 		}
 	}

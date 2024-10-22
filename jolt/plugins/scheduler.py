@@ -109,11 +109,16 @@ class Queue(object):
     def __next__(self):
         """ Get the next item from the queue. """
         data = self.q.get()
+        if data is None:
+            raise StopIteration
         return data
 
     def push(self, item):
         """ Push an item to the queue. """
         self.q.put(item)
+
+    def close(self):
+        self.q.put(None)
 
 
 class RemoteExecutor(NetworkExecutor):
@@ -633,9 +638,7 @@ def executor(ctx, worker, build, request):
                     status=common_pb.TaskStatus.TASK_CANCELLED,
                 )
                 updates.push(update)
-
-                # Interrupt sent to process, not only the running task
-                raise interrupt
+                continue
 
             except Exception:
                 status = common_pb.TaskStatus.TASK_FAILED
