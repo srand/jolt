@@ -1,5 +1,6 @@
 from contextlib import contextmanager
 
+from jolt import common_pb2 as common_pb
 from jolt.hooks import TaskHook, TaskHookFactory
 from jolt.manifest import JoltManifest
 
@@ -37,7 +38,10 @@ class ReportHooks(TaskHook):
 
     def task_failed(self, task):
         with task.task.report() as report:
-            self.finalize_report(report.manifest, task, "FAILED")
+            if task.status() == common_pb.TaskStatus.TASK_FAILED:
+                self.finalize_report(report.manifest, task, "FAILED")
+            elif task.status() == common_pb.TaskStatus.TASK_CANCELLED:
+                self.finalize_report(report.manifest, task, "CANCELLED")
 
     def task_unstable(self, task):
         with task.task.report() as report:
@@ -54,7 +58,8 @@ class ReportHooks(TaskHook):
             raise e
         else:
             with task.task.report() as report:
-                self.finalize_report(report.manifest, task, "SUCCESS")
+                if task.status() == common_pb.TaskStatus.TASK_PASSED:
+                    self.finalize_report(report.manifest, task, "SUCCESS")
 
     def write(self, filename):
         self.manifest.write(filename)

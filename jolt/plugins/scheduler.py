@@ -313,9 +313,11 @@ class RemoteExecutor(NetworkExecutor):
             ]:
                 break
 
-            if progress.status in [
-                    common_pb.TaskStatus.TASK_CANCELLED,
-            ]:
+            if progress.status in [common_pb.TaskStatus.TASK_CANCELLED]:
+                if last_status in [common_pb.TaskStatus.TASK_RUNNING]:
+                    self.task.failed_execution(remote=True, interrupt=True)
+                    for extension in self.task.extensions:
+                        extension.failed_execution(remote=True, interrupt=True)
                 raise TaskCancelledException()
 
             if progress.status in [
@@ -629,9 +631,7 @@ def executor(ctx, worker, build, request):
                 with log.handler(LogHandler(updates, task)):
                     executor.run(JoltEnvironment(cache=acache, worker=True))
 
-            except KeyboardInterrupt as interrupt:
-                log.info("Task cancelled")
-
+            except KeyboardInterrupt:
                 # Send an update to the scheduler
                 update = scheduler_pb.TaskUpdate(
                     request=task,

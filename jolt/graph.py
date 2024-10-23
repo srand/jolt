@@ -339,6 +339,9 @@ class TaskProxy(object):
     def resolve_requirement_alias(self, name):
         return self.requirement_aliases.get(name)
 
+    def set_cancelled(self):
+        self.set_status(common_pb.TaskStatus.TASK_CANCELLED)
+
     def set_passed(self):
         self.set_status(common_pb.TaskStatus.TASK_PASSED)
 
@@ -465,9 +468,15 @@ class TaskProxy(object):
         hooks.task_started_upload(self)
 
     def _failed(self, what="Execution", interrupt=False):
-        self.set_failed()
-        how = "failed" if not interrupt else "interrupted"
-        logfn = self.error if not interrupt else self.warning
+        if interrupt:
+            how = "interrupted"
+            logfn = self.warning
+            self.set_cancelled()
+        else:
+            how = "failed"
+            logfn = self.error
+            self.set_failed()
+
         if self.duration_queued and self.duration_running:
             logfn("{0} {1} after {2} {3}", what, how,
                   self.duration_running,
