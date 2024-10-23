@@ -970,11 +970,10 @@ class Context(object):
 
 
 class PidProvider(object):
-    def __init__(self):
-        self._uuid = uuid.uuid4()
-
     def __call__(self):
-        return str(self._uuid)
+        pid = str(uuid.uuid4())
+        log.debug("New cache lock file: {0}", pid)
+        return pid
 
 
 @utils.Singleton
@@ -1060,7 +1059,8 @@ class ArtifactCache(StorageProvider):
 
         # Create process lock file
         with self._cache_lock():
-            self._pid = pidprovider() if pidprovider else PidProvider()()
+            self._pid_provider = pidprovider or PidProvider()
+            self._pid = self._pid_provider()
             self._pid_file = fasteners.InterProcessLock(self._fs_get_pid_file(self._pid))
             self._pid_file.acquire()
 
@@ -1455,6 +1455,25 @@ class ArtifactCache(StorageProvider):
     # Public API
     ############################################################################
 
+    def release(self):
+        """
+        Release references to artifacts held by the current process.
+
+        Effectively, a new pid lock file is created and the old one is deleted. This
+        allows other processes to detect termination of the current process and
+        garbage collect any references owned by the process.
+        """
+        with self._cache_lock(), self._db() as db:
+            self._db_invalidate_locks(db, try_all=True)
+            self._db_invalidate_references(db, try_all=True)
+            self._fs_invalidate_pids(db, try_all=True)
+            self._pid_file.release()
+            self._local_presence_cache.clear()
+
+            self._pid = self._pid_provider()
+            self._pid_file = fasteners.InterProcessLock(self._fs_get_pid_file(self._pid))
+            self._pid_file.acquire()
+
     def is_available_locally(self, artifact):
         """
         Check presence of task artifact in cache.
@@ -1466,11 +1485,8 @@ class ArtifactCache(StorageProvider):
         if not artifact.is_cacheable():
             return False
 
-        # Cache availability in node
-        try:
-            assert artifact.identity in self._local_presence_cache
-        except AssertionError:
-            pass
+        if artifact.identity in self._local_presence_cache:
+            return True
 
         with self._cache_lock(), self._db() as db:
             if self._db_select_artifact(db, artifact.identity) or self._db_select_reference(db, artifact.identity):

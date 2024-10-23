@@ -671,6 +671,9 @@ def executor(ctx, worker, build, request):
                 )
                 updates.push(update)
 
+                # Release references to cache artifacts
+                acache.release()
+
     except Exception as e:
         log.set_level(log.EXCEPTION)
         log.exception(e)
