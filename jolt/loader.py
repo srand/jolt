@@ -100,7 +100,7 @@ class LoaderFactory(object):
 class NativeLoader(Loader):
     def __init__(self, searchpath):
         self._files = self._find_files(searchpath)
-        self._recipes = self._load_files(self._files)
+        self._recipes = self._load_files(self._files) if self._files else []
 
     def _find_files(self, searchpath):
         # If the searchpath is a file, load it directly
@@ -108,8 +108,10 @@ class NativeLoader(Loader):
             return glob.glob(fs.path.join(searchpath, "*.jolt"))
 
         _, ext = fs.path.splitext(searchpath)
-        if ext in [".jolt", ".py"]:
-            return [searchpath]
+        raise_error_if(not fs.path.exists(searchpath), "File does not exist: {}", searchpath)
+        raise_error_if(ext not in [".jolt", ".py"], "Invalid file extension: {}", ext)
+
+        return [searchpath]
 
     def _load_files(self, files):
         recipes = []

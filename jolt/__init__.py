@@ -86,6 +86,8 @@ def include(joltfile, joltdir=None):
         caller_dir = path.dirname(sys._getframe().f_back.f_code.co_filename)
         if joltdir is not None:
             joltdir = path.join(caller_dir, joltdir)
+        else:
+            joltdir = caller_dir
         filepath = path.join(caller_dir, joltfile)
         JoltLoader.get().load_file(filepath, joltdir=joltdir)
     except Exception as e:

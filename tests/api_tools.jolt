@@ -3,13 +3,14 @@
 import errno
 import hashlib
 import os
+import signal
 import sys
 import time
 sys.path.append(".")
 
 from testsupport import JoltTest
 from jolt import JoltTimeoutError
-
+from jolt import utils
 
 class TestException(Exception):
     pass
@@ -991,3 +992,15 @@ class ToolsApi(JoltTest):
             with self.assertRaises(JoltTimeoutError):
                     self.tools.run("sleep 10", timeout=1)
 
+    def test_delayed_interrupt(self):
+        duration = utils.duration()
+        try:
+            with utils.delayed_interrupt():
+                os.kill(os.getpid(), signal.SIGINT)
+                time.sleep(2)
+        except KeyboardInterrupt:
+            self.assertGreaterEqual(duration.seconds, 2)
+        except:
+            self.fail("Expected KeyboardInterrupt")
+        else:
+            self.fail("Expected KeyboardInterrupt")

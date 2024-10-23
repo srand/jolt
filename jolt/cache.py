@@ -1445,10 +1445,11 @@ class ArtifactCache(StorageProvider):
         evicted = 0
         for identity, task_name, _, used in artifacts:
             if not if_expired or self._fs_is_artifact_expired(identity, task_name, used):
-                self._db_delete_artifact(db, identity)
-                self._fs_delete_artifact(identity, task_name, onerror=onerror)
-                evicted += 1
-                log.debug("Evicted {}: {}", identity, task_name)
+                with utils.delayed_interrupt():
+                    self._db_delete_artifact(db, identity)
+                    self._fs_delete_artifact(identity, task_name, onerror=onerror)
+                    evicted += 1
+                    log.debug("Evicted {}: {}", identity, task_name)
         return evicted == len(artifacts)
 
     ############################################################################
@@ -1474,6 +1475,7 @@ class ArtifactCache(StorageProvider):
             self._pid_file = fasteners.InterProcessLock(self._fs_get_pid_file(self._pid))
             self._pid_file.acquire()
 
+    @utils.delay_interrupt
     def is_available_locally(self, artifact):
         """
         Check presence of task artifact in cache.
@@ -1683,6 +1685,7 @@ class ArtifactCache(StorageProvider):
                     raise e
         return True
 
+    @utils.delay_interrupt
     def commit(self, artifact, uploadable=True):
         """
         Commits a task artifact to the cache.
@@ -1716,6 +1719,7 @@ class ArtifactCache(StorageProvider):
                 if self._discard(db, [candidate], True):
                     evict_size -= candidate[2]
 
+    @utils.delay_interrupt
     def discard(self, artifact, if_expired=False, onerror=None):
         with self._cache_lock(), self._db() as db:
             self._db_invalidate_locks(db)

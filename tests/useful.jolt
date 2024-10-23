@@ -1,4 +1,4 @@
-from jolt import Task, IntParameter
+from jolt import Task, IntParameter, utils
 import time
 
 class Pass(Task):
@@ -22,3 +22,11 @@ class Sleep(Task):
 
     def run(self, deps, tools):
         time.sleep(int(self.t))
+
+
+class Interrupt(Task):
+    t = IntParameter()
+
+    def run(self, deps, tools):
+        with utils.delay_interrupt():
+            time.sleep(int(self.t))

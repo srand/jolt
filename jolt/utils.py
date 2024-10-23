@@ -1,4 +1,5 @@
 import contextlib
+import ctypes
 import fnmatch
 import re
 import time
@@ -10,9 +11,9 @@ import os
 import hashlib
 from fasteners import lock, process_lock
 import json
-import ctypes
-import threading
 import platform
+import signal
+import threading
 
 
 read_input = input
@@ -366,6 +367,64 @@ class retried:
 
 def ignore_exception(exc=Exception):
     return contextlib.suppress(exc)
+
+
+class SignalHandler(object):
+    def __init__(self, signum):
+        self.original_handler = signal.signal(signum, self._handler)
+        self.handlers = []
+
+    def _handler(self, signum, frame):
+        for handler in self.handlers:
+            handler.add_signal(signum, frame)
+        if not self.handlers and self.original_handler:
+            self.original_handler(signum, frame)
+
+    def new_monitor(self):
+        class Finalizer(object):
+            def __init__(self, handler):
+                self.handler = handler
+                self.signals = []
+
+            def add_signal(self, signum, frame):
+                self.signals.append((signum, frame))
+
+            def __call__(self):
+                self.handler.handlers.remove(self)
+                for signum, frame in self.signals:
+                    self.handler.original_handler(signum, frame)
+
+        finalizer = Finalizer(self)
+        self.handlers.append(finalizer)
+        return finalizer
+
+
+sigint_handler = SignalHandler(signal.SIGINT)
+
+
+@contextlib.contextmanager
+def delayed_signal(signum):
+    """ A context manager that delays signals until after the code block. """
+
+    finalize = sigint_handler.new_monitor()
+    try:
+        yield
+    finally:
+        finalize()
+
+
+@contextlib.contextmanager
+def delayed_interrupt():
+    with delayed_signal(signum=signal.SIGINT):
+        yield
+
+
+def delay_interrupt(func):
+    @wraps(func)
+    def _f(*args, **kwargs):
+        with delayed_interrupt():
+            return func(*args, **kwargs)
+    return _f
 
 
 def Singleton(cls):
