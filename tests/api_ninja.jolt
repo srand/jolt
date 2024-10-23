@@ -946,6 +946,9 @@ class NinjaApi(JoltTest):
           return a;
         }}
 
+        --- file: fatal.cpp
+        #include "missing.h"
+
         --- tasks:
         class Error(CXXExecutable):
             sources = ["error.cpp"]
@@ -960,9 +963,24 @@ class NinjaApi(JoltTest):
                         assert "not declared in this scope" in r.errors[0].message
                         assert "error.cpp:2:10" == r.errors[0].location
                         assert "return a" in r.errors[0].details
+
+        class Fatal(CXXExecutable):
+            sources = ["fatal.cpp"]
+
+            def run(self, deps, tools):
+                try:
+                    super().run(deps, tools)
+                except Exception as e:
+                    with self.report() as r:
+                        assert len(r.errors) == 1
+                        assert "Compiler Error" == r.errors[0].type
+                        assert "fatal error: missing.h" in r.errors[0].message
+                        assert "fatal.cpp:1:10" == r.errors[0].location
+                        assert "#include \\"missing.h\\"" in r.errors[0].details
         ---
         """
         self.build("error")
+        self.build("fatal")
 
     def test_warning_parsing(self):
         """
