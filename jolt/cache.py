@@ -1677,7 +1677,7 @@ class ArtifactCache(StorageProvider):
                 except NotImplementedError:
                     self.commit(artifact)
 
-                except Exception as e:
+                except (Exception, KeyboardInterrupt) as e:
                     # Restore the temporary copy
                     fs.rmtree(artifact.path, ignore_errors=True)
                     fs.rename(artifact.temporary_path, artifact.path)
