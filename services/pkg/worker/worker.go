@@ -148,6 +148,8 @@ func (w *worker) run() error {
 					continue
 				}
 
+				currentClient = request.Build.Environment.Client
+
 				currentBuildFile, err = w.writeBuildRequest(request.Build)
 				if err != nil {
 					panic(err)
@@ -181,19 +183,23 @@ func (w *worker) run() error {
 						log.Error("Failed to deploy workspace tree:", err)
 						reply(protocol.WorkerUpdate_DEPLOY_FAILED, err)
 						os.RemoveAll(currentBuildFile)
+						currentBuildFile = ""
+						currentClient = nil
 						continue
 					}
 				}
 
-				clientDigest, err := w.deployClient(request.Build.Environment.Client, request.Build.Environment.Workspace)
+				clientDigest, err := w.deployClient(currentClient, request.Build.Environment.Workspace)
 				if err != nil {
 					log.Error("Failed to deploy client:", err)
 					reply(protocol.WorkerUpdate_DEPLOY_FAILED, err)
 					os.RemoveAll(currentBuildFile)
+					currentBuildFile = ""
+					currentClient = nil
 					continue
 				}
 
-				currentCmd, currentProc, err = w.startExecutor(clientDigest, request.Build.Environment.Client, request.Build.Environment.Workspace, request.WorkerId, request.BuildId, currentBuildFile)
+				currentCmd, currentProc, err = w.startExecutor(clientDigest, currentClient, request.Build.Environment.Workspace, request.WorkerId, request.BuildId, currentBuildFile)
 				if err != nil {
 					reply(protocol.WorkerUpdate_EXECUTOR_FAILED, err)
 					os.RemoveAll(currentBuildFile)
