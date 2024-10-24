@@ -133,7 +133,7 @@ func (w *worker) run() error {
 	var currentCmd chan error
 	var currentProc *os.Process
 	var currentBuildFile string
-	// var currentBuild *protocol.BuildRequest
+	var currentClient *protocol.Client
 
 	for {
 		select {
@@ -197,8 +197,10 @@ func (w *worker) run() error {
 				if err != nil {
 					reply(protocol.WorkerUpdate_EXECUTOR_FAILED, err)
 					os.RemoveAll(currentBuildFile)
+					currentClient = nil
 					currentCmd = nil
 					currentProc = nil
+					currentClient = nil
 					continue
 				}
 
@@ -213,7 +215,16 @@ func (w *worker) run() error {
 							log.Debug(err)
 						}
 					} else {
-						err = syscall.Kill(-currentProc.Pid, syscall.SIGINT)
+						// Only newer executors can handle interrupts correctly.
+						var pid int
+
+						if currentClient == nil || utils.VersionLessThan(currentClient.Version, "0.9.312") {
+							pid = currentProc.Pid
+						} else {
+							pid = -currentProc.Pid
+						}
+
+						err = syscall.Kill(pid, syscall.SIGINT)
 						if err != nil {
 							log.Debug(err)
 						}
@@ -235,6 +246,7 @@ func (w *worker) run() error {
 			}
 
 			os.Remove(currentBuildFile)
+			currentClient = nil
 			currentCmd = nil
 			currentProc = nil
 			currentBuildFile = ""
