@@ -173,6 +173,9 @@ class DockerContainer(Resource):
     Alternatively, assign ``True`` to publish all exposed ports to random ports.
     """
 
+    release_on_error = True
+    """ Stop and remove container on error to avoid resource leaks. """
+
     security_opts = []
     """
     A list of security options.
@@ -310,6 +313,8 @@ class DockerContainer(Resource):
         return "--workdir " + self.tools.expand(self.workdir) if self.workdir else ""
 
     def acquire(self, artifact, deps, tools, owner):
+        self._context_stack = None
+        self.container = None
         self.joltcachedir = config.get_cachedir()
         try:
             image = deps[self.image]
@@ -318,9 +323,10 @@ class DockerContainer(Resource):
             image = tools.expand(self.image)
 
         self._info(f"Creating container from image '{image}'")
-        self.container = tools.run(
-            "docker run -i -d {_cap_adds} {_cap_drops} {_entrypoint} {_labels} {_ports} {_privileged} {_security_opts} {_user} {_environment} {_volumes} {_workdir} {image} {_arguments}",
-            image=image, output_on_error=True)
+        with utils.delayed_interrupt():
+            self.container = tools.run(
+                "docker run -i -d {_cap_adds} {_cap_drops} {_entrypoint} {_labels} {_ports} {_privileged} {_security_opts} {_user} {_environment} {_volumes} {_workdir} {image} {_arguments}",
+                image=image, output_on_error=True)
 
         self._info("Created container '{container}'")
         info = tools.run("docker inspect {container}", output_on_error=True)
@@ -333,8 +339,11 @@ class DockerContainer(Resource):
                 owner.tools.runprefix(f"docker exec -i {artifact.container}"))
 
     def release(self, artifact, deps, tools, owner):
-        if self.chroot:
+        if self.chroot and self._context_stack:
             self._context_stack.close()
+
+        if not self.container:
+            return
 
         try:
             self._info("Stopping container '{container}'")

@@ -13,6 +13,7 @@ class PodmanExt(JoltTest):
     name = "ext/podman"
 
     def setup(self, deps, tools):
+        super().setup(deps, tools)
         if tools.which("podman") is None:
             self.skip("podman not found")
 
