@@ -897,7 +897,7 @@ class Context(object):
                     artifact.apply()
                     ArtifactAttributeSetRegistry.apply_all(self._node.task, artifact)
             ArtifactAttributeSetRegistry.apply_all_deps(self._node.task, self)
-        except Exception as e:
+        except (Exception, KeyboardInterrupt) as e:
             # Rollback all attributes/resources except the last failing one
             ArtifactAttributeSetRegistry.unapply_all_deps(self._node.task, self)
             for name, artifact in reversed(list(self._artifacts.items())[:-1]):

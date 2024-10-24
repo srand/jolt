@@ -1062,6 +1062,26 @@ class TaskApi(JoltTest):
             self.skip("required privileges not held")
         self.build("atest")
 
+    def test_resource_release_on_error(self):
+        """
+        --- tasks:
+        class R1(Resource):
+            release_on_error = True
+
+            def acquire(self, artifact, deps, tools):
+                raise Exception("Acquisition Error")
+
+            def release(self, artifact, deps, tools):
+                print("Release R1")
+
+        class A(Task):
+            requires = ["r1"]
+        ---
+        """
+        with self.assertRaises(Exception):
+            self.build("a")
+        self.assertIn("Release R1", self.lastLog())
+
     def test_runner(self):
         '''
         --- tasks:

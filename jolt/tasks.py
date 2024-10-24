@@ -2718,6 +2718,9 @@ class Resource(Task):
     abstract = True
     """ An abstract resource class indended to be subclassed. """
 
+    release_on_error = False
+    """ Call release if an exception occurs during acquire. """
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -3401,10 +3404,13 @@ class ResourceAttributeSetProvider(ArtifactAttributeSetProvider):
                 if not isinstance(resource, WorkspaceResource):
                     log.info(colors.green("Resource acquisition finished after {} ({})"),
                              ts, resource.short_qualified_name)
-            except Exception as e:
+            except (KeyboardInterrupt, Exception) as e:
                 if not isinstance(resource, WorkspaceResource):
                     log.error("Resource acquisition failed after {} ({})",
                               ts, resource.short_qualified_name)
+                    if resource.release_on_error:
+                        with utils.ignore_exception():
+                            self.unapply(task, artifact)
                 raise e
 
     def unapply(self, task, artifact):
