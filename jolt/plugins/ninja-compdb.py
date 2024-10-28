@@ -169,7 +169,7 @@ class CompDBHooks(TaskHook):
             db.write()
             artifact.collect(dbpath, "compdb/", flatten=True)
 
-    def task_finished_execution(self, task):
+    def task_finished_execution(self, task: graph.TaskProxy):
         if task.options.network or task.options.worker:
             return
         if not task.is_goal():
@@ -184,11 +184,12 @@ class CompDBHooks(TaskHook):
             db.write(dbpath, force=True)
 
             # Save the compilation database to the configured path
-            last_path = config.get("ninja-compdb", "path")
-            if last_path:
-                last_path = os.path.join(task.tools.wsroot, last_path)
-                task.tools.mkdirname(last_path)
-                db.write(last_path, force=True)
+            if task.is_goal():
+                last_path = config.get("ninja-compdb", "path")
+                if last_path:
+                    last_path = os.path.join(task.tools.wsroot, last_path)
+                    task.tools.mkdirname(last_path)
+                    db.write(last_path, force=True)
 
             artifact, deps = get_task_artifacts(task)
             stage_artifacts(deps, task.tools)
