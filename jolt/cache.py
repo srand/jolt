@@ -506,7 +506,7 @@ class Artifact(object):
     def __getattr__(self, name):
         raise_task_error(self._node, "Attempt to access invalid artifact attribute '{0}'", name)
 
-    def _write_manifest(self):
+    def _write_manifest(self, temporary=False):
         content = {}
         content["size"] = self._get_size()
         content["unpacked"] = self._unpacked
@@ -531,13 +531,19 @@ class Artifact(object):
 
         ArtifactAttributeSetRegistry.format_all(self, content)
 
-        manifest = fs.path.join(self.path, ".manifest.json")
+        if temporary:
+            manifest = fs.path.join(self.temporary_path, ".manifest.json")
+        else:
+            manifest = fs.path.join(self.final_path, ".manifest.json")
         with open(manifest, "wb") as f:
             f.write(json.dumps(content, indent=2, default=json_serializer).encode())
 
-    def _read_manifest(self):
+    def _read_manifest(self, temporary=False):
         try:
-            manifest_path = fs.path.join(self.path, ".manifest.json")
+            if temporary:
+                manifest_path = fs.path.join(self.temporary_path, ".manifest.json")
+            else:
+                manifest_path = fs.path.join(self.final_path, ".manifest.json")
             with open(manifest_path) as manifest_file:
                 content = json.load(manifest_file, object_hook=json_deserializer)
             self._valid = True
@@ -616,6 +622,17 @@ class Artifact(object):
         self._temporary = False
         self._read_manifest()
         self._temporary = not self._valid
+
+    def reset(self):
+        self._unpacked = False
+        self._uploadable = True
+        self._created = datetime.now()
+        self._modified = datetime.now()
+        self._expires = self._task.expires if not self._session else expires.Immediately()
+        self._size = 0
+        self._influence = None
+        self._valid = False
+        self._temporary = True
 
     @property
     def name(self):
@@ -813,10 +830,10 @@ class Artifact(object):
     def get_node(self):
         return self._node
 
-    def is_temporary(self):
+    def is_temporary(self) -> bool:
         return self._temporary
 
-    def is_unpackable(self):
+    def is_unpackable(self) -> bool:
         if not self._node:
             return True
         if self.name == "main":
@@ -1041,7 +1058,6 @@ class ArtifactCache(StorageProvider):
 
         # If no storage providers supports the availability method,
         # we will not only use the local presence cache.
-        self._local_presence_cache = set()
         self._remote_presence_cache = set()
         self._presence_cache_only = self.has_availability()
 
@@ -1289,14 +1305,16 @@ class ArtifactCache(StorageProvider):
     def _fs_get_artifact(self, node, name, tools=None, session=False):
         return Artifact(self, node, name=name, tools=tools, session=session)
 
-    def _fs_commit_artifact(self, artifact, uploadable):
+    def _fs_commit_artifact(self, artifact: Artifact, uploadable: bool, temporary: bool):
         artifact._set_uploadable(uploadable)
         if not artifact.is_unpackable():
             artifact._set_unpacked()
-        artifact._write_manifest()
-        if artifact.is_temporary():
+        if temporary:
+            artifact._write_manifest(temporary=True)
             fs.rmtree(artifact.final_path, ignore_errors=True)
-            fs.rename(artifact.path, artifact.final_path)
+            fs.rename(artifact.temporary_path, artifact.final_path)
+        else:
+            artifact._write_manifest(temporary=False)
 
     @contextlib.contextmanager
     def _fs_compress_artifact(self, artifact):
@@ -1323,13 +1341,15 @@ class ArtifactCache(StorageProvider):
         archive = artifact.get_archive_path()
         try:
             task.tools.extract(archive, artifact.temporary_path, ignore_owner=True)
+            artifact._read_manifest(temporary=True)
         except KeyboardInterrupt as e:
+            fs.rmtree(artifact.temporary_path, ignore_errors=True)
             raise e
         except Exception:
+            fs.rmtree(artifact.temporary_path, ignore_errors=True)
             raise_task_error(task, "Failed to extract task artifact archive")
         finally:
             fs.unlink(archive, ignore_errors=True)
-        artifact._read_manifest()
 
     def _fs_delete_artifact(self, identity, task_name, onerror=None):
         fs.rmtree(self._fs_get_artifact_path(identity, task_name), ignore_errors=True, onerror=onerror)
@@ -1469,7 +1489,6 @@ class ArtifactCache(StorageProvider):
             self._db_invalidate_references(db, try_all=True)
             self._fs_invalidate_pids(db, try_all=True)
             self._pid_file.release()
-            self._local_presence_cache.clear()
 
             self._pid = self._pid_provider()
             self._pid_file = fasteners.InterProcessLock(self._fs_get_pid_file(self._pid))
@@ -1487,9 +1506,6 @@ class ArtifactCache(StorageProvider):
         if not artifact.is_cacheable():
             return False
 
-        if artifact.identity in self._local_presence_cache:
-            return True
-
         with self._cache_lock(), self._db() as db:
             if self._db_select_artifact(db, artifact.identity) or self._db_select_reference(db, artifact.identity):
                 artifact.reload()
@@ -1497,7 +1513,6 @@ class ArtifactCache(StorageProvider):
                     self._db_delete_artifact(db, artifact.identity)
                     return False
                 self._db_insert_reference(db, artifact.identity)
-                self._local_presence_cache.add(artifact.identity)
                 return True
         return False
 
@@ -1572,9 +1587,6 @@ class ArtifactCache(StorageProvider):
         return self._options.upload and \
             any([provider.upload_enabled() for provider in self._storage_providers])
 
-    def download_all(self, node, force=False):
-        pass
-
     def download(self, artifact, force=False):
         """
         Downloads an artifact from a remote cache to the local cache.
@@ -1588,14 +1600,14 @@ class ArtifactCache(StorageProvider):
                 return False
         if not artifact.is_cacheable():
             return False
-        with self.lock_artifact(artifact) as artifact:
+        with self.lock_artifact(artifact, why="download") as artifact:
             if self.is_available_locally(artifact):
                 artifact.task.info("Download skipped, already in local cache ({name})")
                 return True
             for provider in self._storage_providers:
                 if provider.download(artifact, force):
                     self._fs_decompress_artifact(artifact)
-                    self.commit(artifact)
+                    self.commit(artifact, temporary=True)
                     return True
         return len(self._storage_providers) == 0
 
@@ -1612,7 +1624,7 @@ class ArtifactCache(StorageProvider):
         raise_task_error_if(
             not self.is_available_locally(artifact), artifact.task,
             "Can't upload task artifact, no artifact present in the local cache")
-        with self.lock_artifact(artifact) if locked else artifact as artifact:
+        with self.lock_artifact(artifact, why="upload") if locked else artifact as artifact:
             raise_task_error_if(
                 not artifact.is_uploadable(), artifact.task,
                 "Artifact was modified locally by another process and can no longer be uploaded, try again")
@@ -1642,18 +1654,24 @@ class ArtifactCache(StorageProvider):
         """
         if not artifact.is_unpackable():
             return True
-        with self._thread_lock, self.lock_artifact(artifact) as artifact:
-            if not self.is_available_locally(artifact):
-                raise_task_error(
-                    artifact.task,
-                    "Locked artifact is missing in cache (forcibly removed?)")
+        with self._thread_lock, self.lock_artifact(artifact, why="unpack") as artifact:
+            raise_task_error_if(
+                not self.is_available_locally(artifact),
+                artifact.task,
+                "Locked artifact is missing in cache (forcibly removed?)")
+
+            raise_task_error_if(
+                artifact.is_temporary(),
+                artifact.task,
+                "Can't unpack an unpublished task artifact")
+
             if artifact.is_unpacked():
                 return True
 
             # Keep a temporary copy of the artifact if the task
             # unpack() method fails. The copy is removed in
             # get_locked_artifact() if left unused.
-            fs.copy(artifact.path, artifact.temporary_path, symlinks=True)
+            fs.copy(artifact.final_path, artifact.temporary_path, symlinks=True)
 
             task = artifact.task
             with tools.Tools(task) as t:
@@ -1672,21 +1690,21 @@ class ArtifactCache(StorageProvider):
                             "Artifact unpack method not found: unpack_{}", artifact.name)
                         unpack(artifact, t)
 
-                    self.commit(artifact, uploadable=False)
+                    self.commit(artifact, uploadable=False, temporary=False)
 
                 except NotImplementedError:
-                    self.commit(artifact)
+                    self.commit(artifact, temporary=False)
 
                 except (Exception, KeyboardInterrupt) as e:
                     # Restore the temporary copy
-                    fs.rmtree(artifact.path, ignore_errors=True)
-                    fs.rename(artifact.temporary_path, artifact.path)
+                    fs.rmtree(artifact.final_path, ignore_errors=True)
+                    fs.rename(artifact.temporary_path, artifact.final_path)
                     artifact.task.error("Unpack failed {}", artifact.get_node().log_name)
                     raise e
         return True
 
     @utils.delay_interrupt
-    def commit(self, artifact, uploadable=True):
+    def commit(self, artifact, uploadable=True, temporary=True):
         """
         Commits a task artifact to the cache.
 
@@ -1702,7 +1720,7 @@ class ArtifactCache(StorageProvider):
             return
 
         with self._cache_lock(), self._db() as db:
-            self._fs_commit_artifact(artifact, uploadable)
+            self._fs_commit_artifact(artifact, uploadable, temporary)
             with utils.ignore_exception():  # Possibly already exists in DB, e.g. unpacked
                 self._db_insert_artifact(db, artifact.identity, artifact.task.canonical_name, artifact.get_size())
             self._db_update_artifact_size(db, artifact.identity, artifact.get_size())
@@ -1725,14 +1743,11 @@ class ArtifactCache(StorageProvider):
             self._db_invalidate_locks(db)
             self._db_invalidate_references(db)
             self._fs_invalidate_pids(db)
-            discarded = self._discard(
+            return self._discard(
                 db,
                 self._db_select_artifact_not_in_use(db, artifact.identity),
                 if_expired,
                 onerror=onerror)
-            if discarded:
-                self._local_presence_cache.discard(artifact.identity)
-            return discarded
 
     def _discard_wait(self, artifact):
         """
@@ -1774,8 +1789,7 @@ class ArtifactCache(StorageProvider):
 
         with self._cache_lock(), self._db() as db:
             assert self._discard(db, artifacts, False), "Failed to discard artifact"
-            self._local_presence_cache.discard(artifact.identity)
-            artifact.reload()
+            artifact.reset()
         return artifact
 
     def discard_all(self, if_expired=False, onerror=None):
@@ -1803,7 +1817,7 @@ class ArtifactCache(StorageProvider):
         return artifact
 
     @contextlib.contextmanager
-    def lock_artifact(self, artifact, discard=False):
+    def lock_artifact(self, artifact: Artifact, discard: bool = False, why: str = "publish"):
         """
         Locks the task artifact.
 
@@ -1819,19 +1833,24 @@ class ArtifactCache(StorageProvider):
             lock = fasteners.InterProcessLock(lock_path)
             is_locked = lock.acquire(blocking=False)
         if not is_locked:
-            artifact.task.info("Artifact is temporarily locked by another process ({name})")
+            artifact.get_node().info("Artifact is temporarily locked by another process")
             lock.acquire()
 
+        artifact.get_node().debug("Artifact locked for {}", why)
+
         try:
-            artifact.reload()
             if discard:
                 artifact = self._discard_wait(artifact)
+            else:
+                artifact.reload()
+
             if artifact.is_temporary():
                 fs.rmtree(artifact.temporary_path, ignore_errors=True)
                 fs.makedirs(artifact.temporary_path)
 
             yield artifact
         finally:
+            artifact.get_node().debug("Artifact unlocked for {}", why)
             fs.rmtree(artifact.temporary_path, ignore_errors=True)
             with self._cache_lock():
                 with self._db() as db:

@@ -164,6 +164,9 @@ class TaskProxy(object):
     def info(self, fmt, *args, **kwargs):
         self.task.info(fmt + " " + self.log_name, *args, **kwargs)
 
+    def debug(self, fmt, *args, **kwargs):
+        log.debug(fmt + " " + self.log_name, *args, **kwargs)
+
     def verbose(self, fmt, *args, **kwargs):
         log.verbose(fmt + " " + self.log_name, *args, **kwargs)
 
