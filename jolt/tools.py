@@ -1276,9 +1276,13 @@ class Tools(object):
         packages = self.expand(packages)
         pathflags = self.expand(pathflags)
 
+        # Use cached-nix-shell is available
+        nixshell = "cached-nix-shell" if self.which("cached-nix-shell") else "nix-shell"
+
         # Run nix-shell to stage packages and environment
         env = self.run(
-            "nix-shell {} {} {} --run 'env -0' {}",
+            "{} {} {} {} --run 'env -0' {}",
+            nixshell,
             pathflags,
             pureflag,
             packages,
