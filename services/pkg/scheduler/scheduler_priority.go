@@ -3,7 +3,6 @@ package scheduler
 import (
 	"context"
 	"fmt"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -49,7 +48,7 @@ func (c *priorityUnicastCallbacks) NotSelected(item *Task, consumer interface{})
 // Builds are scheduled in priority order, with builds of the same priority
 // being scheduled by the number of queued tasks, fewest first.
 type priorityScheduler struct {
-	sync.RWMutex
+	mu *utils.RWMutex
 
 	// Channel used to trigger rescheduling
 	rescheduleChan chan bool
@@ -83,6 +82,7 @@ type priorityScheduler struct {
 // Create a new round robin scheduler.
 func NewPriorityScheduler() *priorityScheduler {
 	return &priorityScheduler{
+		mu:              utils.NewRWMutex(),
 		rescheduleChan:  make(chan bool, 1),
 		builds:          map[string]*priorityBuild{},
 		readyBuilds:     utils.NewPriorityQueue[*priorityBuild](buildPriorityFunc, buildEqualityFunc),
@@ -121,6 +121,7 @@ func (s *priorityScheduler) NewBuild(id string, request *protocol.BuildRequest) 
 	ctx, cancel := context.WithCancel(context.Background())
 
 	build := &priorityBuild{
+		mu:             utils.NewRWMutex(),
 		ctx:            ctx,
 		ctxCancel:      cancel,
 		environment:    request.Environment,
@@ -671,4 +672,20 @@ func (s *priorityScheduler) ListWorkers() *protocol.ListWorkersResponse {
 	}
 
 	return response
+}
+
+func (s *priorityScheduler) Lock() {
+	s.mu.Lock()
+}
+
+func (s *priorityScheduler) Unlock() {
+	s.mu.Unlock()
+}
+
+func (s *priorityScheduler) RLock() {
+	s.mu.RLock()
+}
+
+func (s *priorityScheduler) RUnlock() {
+	s.mu.RUnlock()
 }

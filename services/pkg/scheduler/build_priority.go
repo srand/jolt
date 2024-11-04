@@ -3,7 +3,6 @@ package scheduler
 import (
 	"context"
 	"errors"
-	"sync"
 	"time"
 
 	"github.com/srand/jolt/scheduler/pkg/protocol"
@@ -13,7 +12,7 @@ import (
 type TaskWalkFunc func(*priorityBuild, *Task) bool
 
 type priorityBuild struct {
-	sync.RWMutex
+	mu *utils.RWMutex
 
 	// The context of the build.
 	// Cancel the context to cancel the build.
@@ -52,6 +51,22 @@ type priorityBuild struct {
 
 	// Build update observers
 	buildObservers BuildUpdateObservers
+}
+
+func (b *priorityBuild) Lock() {
+	b.mu.Lock()
+}
+
+func (b *priorityBuild) Unlock() {
+	b.mu.Unlock()
+}
+
+func (b *priorityBuild) RLock() {
+	b.mu.RLock()
+}
+
+func (b *priorityBuild) RUnlock() {
+	b.mu.RUnlock()
 }
 
 // Returns the build environment as provided by the client.
@@ -108,6 +123,10 @@ func (b *priorityBuild) Cancel() {
 func (b *priorityBuild) Close() {
 	b.RLock()
 	defer b.RUnlock()
+
+	if b.queue == nil {
+		return
+	}
 
 	b.ctxCancel()
 	b.buildObservers.Close()
@@ -252,9 +271,6 @@ func (b *priorityBuild) CancelTask(identity string) error {
 
 // Returns the queued task with the given identity, or nil.
 func (b *priorityBuild) FindQueuedTask(walkFn TaskWalkFunc) *Task {
-	b.RLock()
-	defer b.RUnlock()
-
 	var lastTask *Task
 
 	if b.WalkQueuedTasks(func(b *priorityBuild, t *Task) bool {
@@ -293,7 +309,9 @@ func (b *priorityBuild) WalkTasks(walkFn TaskWalkFunc) bool {
 func (b *priorityBuild) WalkQueuedTasks(walkFn TaskWalkFunc) bool {
 	b.RLock()
 	defer b.RUnlock()
-
+	if b.queue == nil {
+		return true
+	}
 	return b.queue.Walk(func(unicast *utils.Unicast[*Task], task *Task) bool {
 		return walkFn(b, task)
 	})

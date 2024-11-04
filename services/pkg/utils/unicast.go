@@ -3,7 +3,6 @@ package utils
 import (
 	"container/list"
 	"context"
-	"sync"
 
 	"github.com/google/uuid"
 	"github.com/srand/jolt/scheduler/pkg/log"
@@ -51,7 +50,7 @@ type UnicastCallbacks[E comparable] interface {
 // unsubscribes from the queue. There is no deadline for consumers to acknowledge
 // an item.
 type Unicast[E comparable] struct {
-	sync.RWMutex
+	mu *RWMutex
 
 	// All consumers
 	// Indexed by consumer ID.
@@ -75,12 +74,33 @@ type Unicast[E comparable] struct {
 
 func NewUnicast[E comparable](callbacks UnicastCallbacks[E]) *Unicast[E] {
 	return &Unicast[E]{
+		mu:             NewRWMutex(),
 		consumers:      map[string]*UnicastConsumer[E]{},
 		availConsumers: map[string]*UnicastConsumer[E]{},
 		consumerItem:   map[string]E{},
 		queue:          list.List{},
 		callbacks:      callbacks,
 	}
+}
+
+// Lock the unicast for writing.
+func (bc *Unicast[E]) Lock() {
+	bc.mu.Lock()
+}
+
+// Unlock the unicast after writing.
+func (bc *Unicast[E]) Unlock() {
+	bc.mu.Unlock()
+}
+
+// Lock the unicast for reading.
+func (bc *Unicast[E]) RLock() {
+	bc.mu.RLock()
+}
+
+// Unlock the unicast after reading.
+func (bc *Unicast[E]) RUnlock() {
+	bc.mu.RUnlock()
 }
 
 // Close the unicast and cancel all consumers.

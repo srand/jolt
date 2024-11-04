@@ -1,7 +1,6 @@
 package utils
 
 import (
-	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -15,14 +14,31 @@ type BroadcastConsumer[E any] struct {
 }
 
 type Broadcast[E any] struct {
-	sync.RWMutex
+	mu        *RWMutex
 	consumers map[string]*BroadcastConsumer[E]
 }
 
 func NewBroadcast[E any]() *Broadcast[E] {
 	return &Broadcast[E]{
+		mu:        NewRWMutex(),
 		consumers: map[string]*BroadcastConsumer[E]{},
 	}
+}
+
+func (bc *Broadcast[E]) Lock() {
+	bc.mu.Lock()
+}
+
+func (bc *Broadcast[E]) Unlock() {
+	bc.mu.Unlock()
+}
+
+func (bc *Broadcast[E]) RLock() {
+	bc.mu.RLock()
+}
+
+func (bc *Broadcast[E]) RUnlock() {
+	bc.mu.RUnlock()
 }
 
 func (bc *Broadcast[E]) NewConsumer() *BroadcastConsumer[E] {

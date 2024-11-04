@@ -61,7 +61,6 @@ func (o *taskUpdateObservers) Post(update *protocol.TaskUpdate) {
 // Close all observers.
 func (o *taskUpdateObservers) Close() {
 	o.broadcast.Close()
-	o.broadcast = nil
 }
 
 // Implementation of TaskUpdateObserver.
@@ -72,7 +71,6 @@ type taskUpdateObserver struct {
 // Close the observer.
 func (o *taskUpdateObserver) Close() {
 	o.consumer.Close()
-	o.consumer = nil
 }
 
 // Returns a channel of task updates.

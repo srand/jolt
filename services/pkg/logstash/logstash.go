@@ -3,7 +3,6 @@ package logstash
 import (
 	"io"
 	"os"
-	"sync"
 
 	"github.com/spf13/afero"
 	"github.com/srand/jolt/scheduler/pkg/log"
@@ -63,7 +62,7 @@ func (f *logFile) Unlink() error {
 }
 
 type logStash struct {
-	sync.RWMutex
+	mu     *utils.RWMutex
 	config LogStashConfig
 	fs     utils.Fs
 	lru    *utils.LRU[*logFile]
@@ -72,6 +71,7 @@ type logStash struct {
 // Create a new Logstash GRPC interface
 func NewLogStash(config LogStashConfig, fs utils.Fs) LogStash {
 	stash := &logStash{
+		mu:     utils.NewRWMutex(),
 		config: config,
 		fs:     fs,
 	}
@@ -99,6 +99,14 @@ func NewLogStash(config LogStashConfig, fs utils.Fs) LogStash {
 		logCount, utils.HumanByteSize(stash.lru.Size()), utils.HumanByteSize(config.MaxSize()))
 
 	return stash
+}
+
+func (s *logStash) Lock() {
+	s.mu.Lock()
+}
+
+func (s *logStash) Unlock() {
+	s.mu.Unlock()
 }
 
 // Append a log record to the logstash server
