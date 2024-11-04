@@ -53,14 +53,26 @@ func RunOptions(cwd string, args ...string) (chan error, *os.Process, error) {
 		return nil, nil, err
 	}
 
+	wait := func(pid int) {
+		// Wait for children in the process group to exit
+		for {
+			_, err := syscall.Wait4(-1*pid, nil, 0, nil)
+			if err != nil {
+				break
+			}
+		}
+	}
+
 	done := make(chan error)
 	go func() {
 		err := cmd.Wait()
 		if err != nil {
 			message := fmt.Sprintf("Command failed: %s (%v)", strings.Join(args, " "), err)
 			log.Error(message)
+			wait(cmd.Process.Pid)
 			done <- NewCmdError(message, output.String())
 		}
+		wait(cmd.Process.Pid)
 		close(done)
 	}()
 
