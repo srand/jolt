@@ -2,7 +2,6 @@ package scheduler
 
 type priorityExecutor struct {
 	scheduler *priorityScheduler
-	build     *priorityBuild
 	executor  Executor
 }
 
@@ -16,12 +15,6 @@ func (o *priorityExecutor) Unacknowledged() *Task {
 
 func (o *priorityExecutor) Close() {
 	o.executor.Close()
-
-	o.scheduler.Lock()
-	defer o.scheduler.Unlock()
-	if o.build.HasQueuedTask() {
-		o.scheduler.enqueueBuildNoLock(o.build)
-	}
 }
 
 func (o *priorityExecutor) Done() <-chan struct{} {

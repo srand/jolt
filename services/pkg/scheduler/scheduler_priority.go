@@ -355,7 +355,7 @@ func (s *priorityScheduler) selectTaskAndWorker() {
 
 			assignments = append(assignments, assignment{
 				build:    build,
-				executor: &priorityExecutor{scheduler: s, build: build, executor: executor},
+				executor: &priorityExecutor{scheduler: s, executor: executor},
 				worker:   worker,
 			})
 
