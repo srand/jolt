@@ -486,6 +486,7 @@ class Artifact(object):
             self._identity = name + "@" + self._identity
         self._main = name == "main"
         self._name = name or "main"
+        self._full_name = f"{name}@{node.short_qualified_name}"
         self._node = node
         self._session = session
         self._task = node.task if node else None
@@ -496,6 +497,18 @@ class Artifact(object):
         self._lock_path = cache._fs_get_artifact_lockpath(self._identity)
         ArtifactAttributeSetRegistry.create_all(self)
         self.reload()
+
+    def _info(self, fmt, *args, **kwargs):
+        log.info(fmt + f" ({self._full_name} {self._node.identity[:8]})", *args, **kwargs)
+
+    def _debug(self, fmt, *args, **kwargs):
+        log.debug(fmt + f" ({self._full_name} {self._node.identity[:8]})", *args, **kwargs)
+
+    def _warning(self, fmt, *args, **kwargs):
+        log.warning(fmt + f" ({self._full_name} {self._node.identity[:8]})", *args, **kwargs)
+
+    def _error(self, fmt, *args, **kwargs):
+        log.error(fmt + f" ({self._full_name} {self._node.identity[:8]})", *args, **kwargs)
 
     def __enter__(self):
         return self
@@ -1108,6 +1121,7 @@ class ArtifactCache(StorageProvider):
         db = sqlite3.connect(self._db_path, detect_types=sqlite3.PARSE_DECLTYPES)
         try:
             db.execute("PRAGMA journal_mode=OFF")
+            # db.set_trace_callback(log.warning)
             yield db
         finally:
             db.close()
@@ -1510,7 +1524,7 @@ class ArtifactCache(StorageProvider):
             if self._db_select_artifact(db, artifact.identity) or self._db_select_reference(db, artifact.identity):
                 artifact.reload()
                 if artifact.is_temporary():
-                    self._db_delete_artifact(db, artifact.identity)
+                    self._db_delete_artifact(db, artifact.identity, and_refs=False)
                     return False
                 self._db_insert_reference(db, artifact.identity)
                 return True
@@ -1602,7 +1616,7 @@ class ArtifactCache(StorageProvider):
             return False
         with self.lock_artifact(artifact, why="download") as artifact:
             if self.is_available_locally(artifact):
-                artifact.task.info("Download skipped, already in local cache ({name})")
+                artifact._info("Download skipped, already in local cache")
                 return True
             for provider in self._storage_providers:
                 if provider.download(artifact, force):
@@ -1679,7 +1693,7 @@ class ArtifactCache(StorageProvider):
                     # Note: unpack() will run on the original
                     # artifact, not in the temporary copy.
                     if task.unpack.__func__ is not tasks.Task.unpack:
-                        task.info("Unpack started {}", artifact.get_node().log_name)
+                        artifact._info("Unpack started")
                     artifact._set_unpacked()
                     if artifact.name == "main":
                         task.unpack(artifact, t)
@@ -1699,7 +1713,7 @@ class ArtifactCache(StorageProvider):
                     # Restore the temporary copy
                     fs.rmtree(artifact.final_path, ignore_errors=True)
                     fs.rename(artifact.temporary_path, artifact.final_path)
-                    artifact.task.error("Unpack failed {}", artifact.get_node().log_name)
+                    artifact._error("Unpack failed")
                     raise e
         return True
 
@@ -1766,10 +1780,11 @@ class ArtifactCache(StorageProvider):
             artifacts = self._db_select_artifact(db, artifact.identity)
             self._db_delete_artifact(db, artifact.identity, and_refs=False)
             refpids = self._db_select_artifact_reference_pids(db, artifact.identity)
+            refpids = list(filter(lambda pid: pid != self._pid, refpids))
             lockpids = self._db_select_artifact_lock_pids(db, artifact.identity)
 
-        if len(refpids) > 1:
-            artifact.task.info("Artifact is temporarily in use, forced discard on hold ({name})")
+        if len(refpids) > 0:
+            artifact._info("Artifact is temporarily in use, forced discard on hold")
             for pid in refpids:
                 # Loop waiting for other processes to surrender the artifact
                 while True:
@@ -1833,10 +1848,10 @@ class ArtifactCache(StorageProvider):
             lock = fasteners.InterProcessLock(lock_path)
             is_locked = lock.acquire(blocking=False)
         if not is_locked:
-            artifact.get_node().info("Artifact is temporarily locked by another process")
+            artifact._info("Artifact is temporarily locked by another process")
             lock.acquire()
 
-        artifact.get_node().debug("Artifact locked for {}", why)
+        artifact._debug("Artifact locked for {}", why)
 
         try:
             if discard:
@@ -1850,7 +1865,7 @@ class ArtifactCache(StorageProvider):
 
             yield artifact
         finally:
-            artifact.get_node().debug("Artifact unlocked for {}", why)
+            artifact._debug("Artifact unlocked for {}", why)
             fs.rmtree(artifact.temporary_path, ignore_errors=True)
             with self._cache_lock():
                 with self._db() as db:
