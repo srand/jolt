@@ -154,8 +154,6 @@ func (b *priorityBuild) Done() <-chan struct{} {
 
 // Returns true if the build is cancelled.
 func (b *priorityBuild) IsCancelled() bool {
-	b.RLock()
-	defer b.RUnlock()
 	return b.isCancelled()
 }
 
@@ -165,8 +163,6 @@ func (b *priorityBuild) isCancelled() bool {
 
 // Returns true if the build is in a terminal state, but may have outstanding work to complete.
 func (b *priorityBuild) IsDone() bool {
-	b.RLock()
-	defer b.RUnlock()
 	return b.status != protocol.BuildStatus_BUILD_ACCEPTED
 }
 

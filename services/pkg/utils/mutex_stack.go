@@ -104,7 +104,7 @@ func (m *RWMutex) Lock() {
 	go func() {
 		m.mu.Lock()
 		m.owner = id
-		locked <- struct{}{}
+		close(locked)
 	}()
 
 	select {
@@ -143,10 +143,8 @@ func (m *RWMutex) TryLock() bool {
 	go func() {
 		if m.mu.TryLock() {
 			m.owner = id
-			locked <- struct{}{}
-		} else {
-			locked <- struct{}{}
 		}
+		close(locked)
 	}()
 
 	select {
@@ -174,7 +172,7 @@ func (m *RWMutex) RLock() {
 	go func() {
 		m.mu.RLock()
 		m.owner = id
-		locked <- struct{}{}
+		close(locked)
 	}()
 
 	select {
