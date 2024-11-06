@@ -5,7 +5,7 @@ import (
 )
 
 func TestGetStack(t *testing.T) {
-	m := NewRWMutex()
+	m := NewDeadlockRWMutex()
 
 	stack := m.getStack()
 	if stack == "" {
@@ -14,7 +14,7 @@ func TestGetStack(t *testing.T) {
 }
 
 func TestGetGoroutineID(t *testing.T) {
-	m := NewRWMutex()
+	m := NewDeadlockRWMutex()
 
 	stack := "goroutine 1 [running]:\n" +
 		"runtime/pprof.writeGoroutineStacks(0x7f8f5c000000, 0xc0000b8000, 0x0, 0x0)\n" +
@@ -27,7 +27,7 @@ func TestGetGoroutineID(t *testing.T) {
 }
 
 func TestRWMutex(t *testing.T) {
-	m := NewRWMutex()
+	m := NewDeadlockRWMutex()
 
 	// Lock the mutex
 	m.Lock()
@@ -40,7 +40,7 @@ func TestRWMutex(t *testing.T) {
 }
 
 func TestRWMutexUnlock(t *testing.T) {
-	m := NewRWMutex()
+	m := NewDeadlockRWMutex()
 
 	// Lock the mutex
 	m.Lock()
@@ -56,7 +56,7 @@ func TestRWMutexUnlock(t *testing.T) {
 }
 
 func TestRWMutexRLock(t *testing.T) {
-	m := NewRWMutex()
+	m := NewDeadlockRWMutex()
 
 	// Lock the mutex
 	m.RLock()
@@ -69,7 +69,7 @@ func TestRWMutexRLock(t *testing.T) {
 }
 
 func TestRWMutexRUnlock(t *testing.T) {
-	m := NewRWMutex()
+	m := NewDeadlockRWMutex()
 
 	// Lock the mutex
 	m.RLock()

@@ -50,7 +50,7 @@ type UnicastCallbacks[E comparable] interface {
 // unsubscribes from the queue. There is no deadline for consumers to acknowledge
 // an item.
 type Unicast[E comparable] struct {
-	mu *RWMutex
+	mu RWMutex
 
 	// All consumers
 	// Indexed by consumer ID.

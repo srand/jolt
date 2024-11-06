@@ -13,7 +13,7 @@ type mutexLockInfo struct {
 	count int
 }
 
-type RWMutex struct {
+type deadlockMutex struct {
 	// Main mutex
 	mu sync.RWMutex
 
@@ -31,20 +31,20 @@ type RWMutex struct {
 }
 
 // NewRWMutex creates a new RWMutex with the given timeout.
-func NewRWMutex() *RWMutex {
-	return &RWMutex{
+func NewDeadlockRWMutex() *deadlockMutex {
+	return &deadlockMutex{
 		info:    make(map[int]*mutexLockInfo),
-		timeout: 30 * time.Second,
+		timeout: 3 * time.Minute,
 	}
 }
 
-func (m *RWMutex) getStack() string {
+func (m *deadlockMutex) getStack() string {
 	bytes := make([]byte, 0x10000)
 	n := runtime.Stack(bytes, false)
 	return string(bytes[:n])
 }
 
-func (m *RWMutex) getGoroutineID(stack string) int {
+func (m *deadlockMutex) getGoroutineID(stack string) int {
 	// Use a regex to get the goroutine ID from the stack.
 	// The stack is in the following format:
 	//
@@ -64,9 +64,13 @@ func (m *RWMutex) getGoroutineID(stack string) int {
 	panic("could not find goroutine ID")
 }
 
-func (m *RWMutex) dumpInfo() {
+func (m *deadlockMutex) dumpInfo() bool {
 	m.infoMu.Lock()
 	defer m.infoMu.Unlock()
+
+	if m.owner == 0 {
+		return false
+	}
 
 	println("=====================================================================")
 	println("Current mutex owner:", m.owner)
@@ -76,9 +80,11 @@ func (m *RWMutex) dumpInfo() {
 		println(info.stack)
 		println("=====================================================================")
 	}
+
+	return true
 }
 
-func (m *RWMutex) makeInfo() (*mutexLockInfo, int) {
+func (m *deadlockMutex) makeInfo() (*mutexLockInfo, int) {
 	stack := m.getStack()
 	goroutineID := m.getGoroutineID(stack)
 
@@ -89,12 +95,12 @@ func (m *RWMutex) makeInfo() (*mutexLockInfo, int) {
 }
 
 // Lock locks the mutex and sets the owner to the current goroutine.
-func (m *RWMutex) Lock() {
+func (m *deadlockMutex) Lock() {
 	m.infoMu.Lock()
 	info, id := m.makeInfo()
 	if _, ok := m.info[id]; ok {
-		m.infoMu.Unlock()
 		m.dumpInfo()
+		m.infoMu.Unlock()
 		panic("attempted to lock a mutex that is already locked")
 	}
 	m.info[id] = info
@@ -107,33 +113,35 @@ func (m *RWMutex) Lock() {
 		close(locked)
 	}()
 
-	select {
-	case <-locked:
-		return
-	case <-time.After(m.timeout):
-		m.dumpInfo()
-		panic("deadlock timeout")
+	for {
+		select {
+		case <-locked:
+			return
+		case <-time.After(m.timeout):
+			if m.dumpInfo() {
+				panic("deadlock timeout")
+			}
+		}
 	}
 }
 
 // Unlock unlocks the mutex and resets the owner.
-func (m *RWMutex) Unlock() {
+func (m *deadlockMutex) Unlock() {
 	_, id := m.makeInfo()
 	m.infoMu.Lock()
 	delete(m.info, id)
-	m.infoMu.Unlock()
-
 	m.owner = 0
+	m.infoMu.Unlock()
 	m.mu.Unlock()
 }
 
 // TryLock tries to lock the mutex and returns true if it was successful.
-func (m *RWMutex) TryLock() bool {
+func (m *deadlockMutex) TryLock() bool {
 	m.infoMu.Lock()
 	info, id := m.makeInfo()
 	if _, ok := m.info[id]; ok {
-		m.infoMu.Unlock()
 		m.dumpInfo()
+		m.infoMu.Unlock()
 		panic("attempted to lock a mutex that is already locked")
 	}
 	m.info[id] = info
@@ -147,17 +155,20 @@ func (m *RWMutex) TryLock() bool {
 		close(locked)
 	}()
 
-	select {
-	case <-locked:
-		return m.owner == id
-	case <-time.After(m.timeout):
-		m.dumpInfo()
-		panic("deadlock timeout")
+	for {
+		select {
+		case <-locked:
+			return m.owner == id
+		case <-time.After(m.timeout):
+			if m.dumpInfo() {
+				panic("deadlock timeout")
+			}
+		}
 	}
 }
 
 // RLock locks the mutex for reading and sets the owner to the current goroutine.
-func (m *RWMutex) RLock() {
+func (m *deadlockMutex) RLock() {
 	m.infoMu.Lock()
 	info, id := m.makeInfo()
 	if info, ok := m.info[id]; ok {
@@ -175,17 +186,20 @@ func (m *RWMutex) RLock() {
 		close(locked)
 	}()
 
-	select {
-	case <-locked:
-		return
-	case <-time.After(m.timeout):
-		m.dumpInfo()
-		panic("deadlock timeout")
+	for {
+		select {
+		case <-locked:
+			return
+		case <-time.After(m.timeout):
+			if m.dumpInfo() {
+				panic("deadlock timeout")
+			}
+		}
 	}
 }
 
 // RUnlock unlocks the mutex and resets the owner.
-func (m *RWMutex) RUnlock() {
+func (m *deadlockMutex) RUnlock() {
 	_, id := m.makeInfo()
 	m.infoMu.Lock()
 	info := m.info[id]
@@ -195,8 +209,7 @@ func (m *RWMutex) RUnlock() {
 		return
 	}
 	delete(m.info, id)
-	m.infoMu.Unlock()
-
 	m.owner = 0
+	m.infoMu.Unlock()
 	m.mu.RUnlock()
 }

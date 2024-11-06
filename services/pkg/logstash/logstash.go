@@ -62,7 +62,7 @@ func (f *logFile) Unlink() error {
 }
 
 type logStash struct {
-	mu     *utils.RWMutex
+	mu     utils.RWMutex
 	config LogStashConfig
 	fs     utils.Fs
 	lru    *utils.LRU[*logFile]

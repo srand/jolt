@@ -14,7 +14,7 @@ type BroadcastConsumer[E any] struct {
 }
 
 type Broadcast[E any] struct {
-	mu        *RWMutex
+	mu        RWMutex
 	consumers map[string]*BroadcastConsumer[E]
 }
 

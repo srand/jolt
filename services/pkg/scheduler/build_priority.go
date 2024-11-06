@@ -12,7 +12,7 @@ import (
 type TaskWalkFunc func(*priorityBuild, *Task) bool
 
 type priorityBuild struct {
-	mu *utils.RWMutex
+	mu utils.RWMutex
 
 	// The context of the build.
 	// Cancel the context to cancel the build.

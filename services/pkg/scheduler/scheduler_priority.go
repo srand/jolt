@@ -48,7 +48,7 @@ func (c *priorityUnicastCallbacks) NotSelected(item *Task, consumer interface{})
 // Builds are scheduled in priority order, with builds of the same priority
 // being scheduled by the number of queued tasks, fewest first.
 type priorityScheduler struct {
-	mu *utils.RWMutex
+	mu utils.RWMutex
 
 	// Channel used to trigger rescheduling
 	rescheduleChan chan bool
