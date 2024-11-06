@@ -26,6 +26,7 @@ from jolt.error import JoltError
 from jolt import filesystem as fs
 from jolt import colors
 from jolt import common_pb2 as common_pb
+from jolt import utils
 
 
 current_time = datetime.now().strftime("%Y-%m-%dT%H%M%S.%f")
@@ -146,9 +147,14 @@ class TqdmStream(object):
 _root = logging.getLogger()
 _root.setLevel(logging.CRITICAL)
 
-# create jolt logger
+# create jolt logger and protect it's methods against interrupts
 _logger = logging.getLogger('jolt')
 _logger.setLevel(EXCEPTION)
+_logger.handle = utils.delay_interrupt(_logger.handle)
+_logger.log = utils.delay_interrupt(_logger.log)
+_logger.addHandler = utils.delay_interrupt(_logger.addHandler)
+_logger.removeHandler = utils.delay_interrupt(_logger.removeHandler)
+
 
 _console_formatter = ConsoleFormatter('[{levelname:>7}] {message}', '{message}')
 
