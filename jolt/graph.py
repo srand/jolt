@@ -320,19 +320,19 @@ class TaskProxy(object):
             return True
         artifacts = self._artifacts
         if session_only:
-            artifacts = list(filter(lambda a: a.is_session(), self._artifacts))
+            artifacts = list(filter(lambda a: a.is_session(), artifacts))
         if persistent_only:
-            artifacts = list(filter(lambda a: not a.is_session(), self._artifacts))
+            artifacts = list(filter(lambda a: not a.is_session(), artifacts))
         if not artifacts:
             return True
         return all([self.cache.download(artifact, force=force) for artifact in artifacts])
 
-    def upload(self, force=False, locked=False, session_only=False, persistent_only=False):
-        artifacts = self._artifacts
+    def upload(self, force=False, locked=False, session_only=False, persistent_only=False, artifacts=None):
+        artifacts = artifacts or self._artifacts
         if session_only:
-            artifacts = list(filter(lambda a: a.is_session(), self._artifacts))
+            artifacts = list(filter(lambda a: a.is_session(), artifacts))
         if persistent_only:
-            artifacts = list(filter(lambda a: not a.is_session(), self._artifacts))
+            artifacts = list(filter(lambda a: not a.is_session(), artifacts))
         if not artifacts:
             return True
         if not self.is_uploadable(artifacts):
@@ -674,11 +674,12 @@ class TaskProxy(object):
 
                                 finally:
                                     # Session artifacts should be uploaded
-                                    upload_session_artifacts = True
+                                    upload_session_artifacts = []
 
                                     # Publish session artifacts to local cache
                                     for artifact in filter(lambda a: a.is_session(), artifacts):
                                         self.publish(context, artifact)
+                                        upload_session_artifacts.append(artifact)
 
                         except KeyboardInterrupt as e:
                             self.failed_execution(interrupt=True)
@@ -712,10 +713,10 @@ class TaskProxy(object):
                                     self, "Failed to upload task artifact")
 
                         finally:
-                            # Upload session artifacts to remote cache
+                            # Upload published session artifacts to remote cache
                             raise_task_error_if(
                                 upload_session_artifacts \
-                                and not self.upload(force=force_upload, locked=False, session_only=True) \
+                                and not self.upload(force=force_upload, locked=False, session_only=True, artifacts=upload_session_artifacts) \
                                 and cache.upload_enabled(),
                                 self, "Failed to upload session artifact")
 
