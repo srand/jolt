@@ -684,7 +684,7 @@ class BuildCli(testsupport.JoltTest):
         """
         --- tasks:
         class R(Resource):
-            def acquire(self, deps, artifact, tools):
+            def acquire(self, deps, artifact, tools, owner):
                 assert False
 
         @attributes.artifact("result", session=True)

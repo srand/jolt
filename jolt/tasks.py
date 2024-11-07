@@ -3380,27 +3380,18 @@ class ResourceAttributeSetProvider(ArtifactAttributeSetProvider):
     def apply(self, task, artifact):
         resource = artifact.task
         if isinstance(resource, Resource):
-            from inspect import signature
-
             if not hasattr(resource, "_run_env"):
                 raise_error("Internal scheduling error, resource has not been prepared: {}", task.short_qualified_name)
 
             deps = resource._run_env
             deps.__enter__()
-            sig = signature(resource.acquire)
-            try:
-                ba = sig.bind_partial(artifact=artifact, deps=deps, tools=resource.tools, owner=task)
-                acquire = resource.acquire
-            except Exception:
-                ba = sig.bind_partial(artifact, deps, resource.tools)
-                acquire = utils.deprecated(resource.acquire)
 
             try:
                 if not isinstance(resource, WorkspaceResource):
                     ts = utils.duration()
                     log.info(colors.blue("Resource acquisition started ({})"),
                              resource.short_qualified_name)
-                acquire(*ba.args, **ba.kwargs)
+                resource.acquire(artifact=artifact, deps=deps, tools=resource.tools, owner=task)
                 if not isinstance(resource, WorkspaceResource):
                     log.info(colors.green("Resource acquisition finished after {} ({})"),
                              ts, resource.short_qualified_name)
@@ -3416,23 +3407,13 @@ class ResourceAttributeSetProvider(ArtifactAttributeSetProvider):
     def unapply(self, task, artifact):
         resource = artifact.task
         if isinstance(resource, Resource):
-            from inspect import signature
-
             deps = resource._run_env
-            sig = signature(resource.release)
-            try:
-                ba = sig.bind_partial(artifact=artifact, deps=deps, tools=resource.tools, owner=task)
-                release = resource.release
-            except Exception:
-                ba = sig.bind_partial(artifact, deps, resource.tools)
-                release = utils.deprecated(resource.release)
-
             try:
                 if not isinstance(resource, WorkspaceResource):
                     ts = utils.duration()
                     log.info(colors.blue("Resource release started ({})"),
                              resource.short_qualified_name)
-                release(*ba.args, **ba.kwargs)
+                resource.release(artifact=artifact, deps=deps, tools=resource.tools, owner=task)
                 if not isinstance(resource, WorkspaceResource):
                     log.info(colors.green("Resource release finished after {} ({})"),
                              ts, resource.short_qualified_name)

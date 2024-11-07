@@ -1008,13 +1008,13 @@ class TaskApi(JoltTest):
                 tools.write_file("r1.lock", "locked")
                 assert owner.name == "a", "Incorrect task argument"
                 assert False, "Acquisition Error"
-            def release(self, artifact, deps, tools):
+            def release(self, artifact, deps, tools, owner):
                 print("Release R1")
                 tools.write_file("r1.lock", "unlocked")
                 assert False, "Unexpected Release"
 
         class R2(Resource):
-            def acquire(self, artifact, deps, tools):
+            def acquire(self, artifact, deps, tools, owner):
                 print("Acquire R2")
                 tools.write_file("r2.lock", "locked")
             def release(self, artifact, deps, tools, owner):
@@ -1068,10 +1068,10 @@ class TaskApi(JoltTest):
         class R1(Resource):
             release_on_error = True
 
-            def acquire(self, artifact, deps, tools):
+            def acquire(self, artifact, deps, tools, owner):
                 raise Exception("Acquisition Error")
 
-            def release(self, artifact, deps, tools):
+            def release(self, artifact, deps, tools, owner):
                 print("Release R1")
 
         class A(Task):
