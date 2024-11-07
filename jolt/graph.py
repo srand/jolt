@@ -303,10 +303,10 @@ class TaskProxy(object):
     def lock_artifacts(self, discard=False):
         artifacts = []
         stack = ExitStack()
-        for artifact in self.artifacts:
-            lock = self.cache.lock_artifact(artifact, discard=discard)
-            artifacts.append(stack.enter_context(lock))
         try:
+            for artifact in self.artifacts:
+                lock = self.cache.lock_artifact(artifact, discard=discard)
+                artifacts.append(stack.enter_context(lock))
             self._artifacts = artifacts
             yield artifacts
         finally:
