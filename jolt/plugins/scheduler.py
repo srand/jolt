@@ -207,7 +207,7 @@ class RemoteExecutor(NetworkExecutor):
                 try:
                     self.run_build(env)
                 except (grpc.RpcError, grpc._channel._MultiThreadedRendezvous) as rpc_error:
-                    raise_task_error(self.task, rpc_error.details(), type="Scheduler error")
+                    raise_task_error(self.task, rpc_error.details(), type="Scheduler Error")
         except Exception as e:
             if not self.task.is_unstable:
                 raise e
@@ -243,10 +243,9 @@ class RemoteExecutor(NetworkExecutor):
             pass
 
         except (grpc.RpcError, grpc._channel._MultiThreadedRendezvous) as rpc_error:
-            if rpc_error.code() != grpc.StatusCode.UNAVAILABLE:
-                raise_task_error(self.task, rpc_error.details(), type="Scheduler error")
-            log.warning("Scheduler error: {}", rpc_error.details())
-            self.session.clear_build_request()
+            if rpc_error.code() not in [grpc.StatusCode.NOT_FOUND, grpc.StatusCode.UNAVAILABLE]:
+                raise_task_error(self.task, rpc_error.details(), type="Scheduler Error")
+            self.session.clear_build_request(f"Scheduler Error: {rpc_error.details()}")
             raise rpc_error
 
         except Exception as e:
@@ -414,6 +413,7 @@ class RemoteSession(object):
         self.pruned = graph.pruned
 
     @locked
+    @utils.retried.on_exception(grpc.RpcError)
     def make_build_request(self):
         """ Create a build request with the scheduler. """
 
@@ -467,12 +467,14 @@ class RemoteSession(object):
         return self.build
 
     @locked
-    def clear_build_request(self):
+    def clear_build_request(self, message=None):
         """ Clear the build request. Called when a build fails. """
 
         # Close grpc server response stream
         if self.build:
             self.build.cancel()
+            if message:
+                log.warning(message)
         self.build = None
         self.build_id = None
 
@@ -673,6 +675,12 @@ def executor(ctx, worker, build, request):
 
                 # Release references to cache artifacts
                 acache.release()
+
+    except grpc.RpcError as rpc_error:
+        log.warning("Scheduler Error: {}", rpc_error.details())
+
+    except KeyboardInterrupt:
+        log.info("Interrupted, exiting")
 
     except Exception as e:
         log.set_level(log.EXCEPTION)
