@@ -327,6 +327,19 @@ class attributes:
 
         def decorate(cls):
             class CoverageReportLcovMixin(object):
+                def _cov_report_has_trace_data(self, report):
+                    """
+                    Check if a coverage report has trace data.
+
+                    LCOV argument ``--ignore-errors=empty`` is not working correctly.
+
+                    """
+                    with open(report, "r") as f:
+                        for line in f:
+                            if line.startswith("DA:") or line.startswith("BRDA:"):
+                                return True
+                    return False
+
                 def run_coverage_report_lcov(self, deps, tools):
                     lcov = tools.getenv("LCOV", "lcov")
                     if not tools.which(lcov):
@@ -402,6 +415,15 @@ class attributes:
                         if str(artifact.paths.coverage_report_lcov):
                             reports.append(str(artifact.paths.coverage_report_lcov))
                     if reports:
+                        filtered_reports = []
+                        for report in reports:
+                            if not self._cov_report_has_trace_data(report):
+                                self.warning(f"Coverage report {report} has no data records, excluding from merge")
+                            else:
+                                filtered_reports.append(report)
+                        reports = filtered_reports
+
+                    if reports:
                         reports = ["-a " + report for report in reports]
                         self.info("Merging LCOV code coverage reports")
                         tools.run("{} {} -o {}/coverage.info --gcov-tool={} {}",
@@ -414,7 +436,7 @@ class attributes:
                         tools.replace_in_file("coverage.info.abs", "SF:", f"SF:{tools.wsroot}/")
                         tools.replace_in_file("coverage.info.abs", f"SF:{tools.wsroot}/" + "{{cachedir}}/", f"SF:{cachedir}/")
 
-                        if tools.file_size("coverage.info") <= 0:
+                        if tools.file_size("coverage.info") <= 0 or not self._cov_report_has_trace_data(tools.expand_path("coverage.info")):
                             tools.unlink("coverage.info")
                             self.warning("No coverage data records available, skipping HTML report generation")
                             return
