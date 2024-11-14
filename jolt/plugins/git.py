@@ -246,7 +246,7 @@ class GitRepository(object):
         with self.tools.cwd(self.path):
             log.info("Fetching {0} from {1}", commit or refspec or 'commits', self.url)
             self.tools.run(
-                "git fetch {url} {what}",
+                "git fetch --prune {url} {what}",
                 url=self.url,
                 what=commit or refspec or '',
                 output_on_error=True)
