@@ -140,7 +140,7 @@ The ``[jolt]`` config section contains global configuration:
   The following environment variables can be used to override the configuration:
 
   .. list-table::
-    :widths: 20 10 70
+    :widths: 30 70
     :header-rows: 1
     :class: tight-table
 
