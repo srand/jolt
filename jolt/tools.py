@@ -54,6 +54,34 @@ def stderr_write(line):
     sys.stderr.flush()
 
 
+class Reader(threading.Thread):
+    def __init__(self, parent, stream, output=None, logbuf=None, output_rstrip=True):
+        super(Reader, self).__init__()
+        self.output = output
+        self.output_rstrip = output_rstrip
+        self.parent = parent
+        self.stream = stream
+        self.logbuf = logbuf if logbuf is not None else []
+        self.start()
+
+    def run(self):
+        line = ""
+        try:
+            with log.map_thread(self, self.parent):
+                for line in iter(self.stream.readline, b''):
+                    if self.output_rstrip:
+                        line = line.rstrip()
+                    line = line.decode(errors='ignore')
+                    if self.output:
+                        self.output(line)
+                    self.logbuf.append((self, line))
+        except Exception as e:
+            if self.output:
+                self.output("{0}", str(e))
+                self.output(line)
+            self.logbuf.append((self, line))
+
+
 def _run(cmd, cwd, env, preexec_fn, *args, **kwargs):
     output = kwargs.get("output")
     output_on_error = kwargs.get("output_on_error")
@@ -67,76 +95,66 @@ def _run(cmd, cwd, env, preexec_fn, *args, **kwargs):
     timeout = timeout if type(timeout) is int and timeout > 0 else None
 
     log.debug("Running: '{0}' (CWD: {1})", cmd, cwd)
-
-    p = subprocess.Popen(
-        cmd,
-        stdin=subprocess.PIPE,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        shell=shell,
-        cwd=cwd,
-        env=env,
-        preexec_fn=preexec_fn,
-    )
-
-    class Reader(threading.Thread):
-        def __init__(self, parent, stream, output=None, logbuf=None):
-            super(Reader, self).__init__()
-            self.output = output
-            self.parent = parent
-            self.stream = stream
-            self.logbuf = logbuf if logbuf is not None else []
-            self.start()
-
-        def run(self):
-            line = ""
-            try:
-                with log.map_thread(self, self.parent):
-                    for line in iter(self.stream.readline, b''):
-                        if output_rstrip:
-                            line = line.rstrip()
-                        line = line.decode(errors='ignore')
-                        if self.output:
-                            self.output(line)
-                        self.logbuf.append((self, line))
-            except Exception as e:
-                if self.output:
-                    self.output("{0}", str(e))
-                    self.output(line)
-                self.logbuf.append((self, line))
-
-    stdout_func = log.stdout if not output_stdio else stdout_write
-    stderr_func = log.stderr if not output_stdio else stderr_write
-
-    logbuf = []
-    stdout = Reader(
-        threading.current_thread(), p.stdout,
-        output=stdout_func if output else None, logbuf=logbuf)
-    stderr = Reader(
-        threading.current_thread(), p.stderr,
-        output=stderr_func if output else None, logbuf=logbuf)
-
-    def terminate(pid):
-        try:
-            process = Process(pid)
-            for chld in process.children(recursive=True):
-                chld.terminate()
-            process.terminate()
-        except NoSuchProcess:
-            pass
-
-    def kill(pid):
-        try:
-            process = Process(pid)
-            for chld in process.children(recursive=True):
-                chld.kill()
-            process.kill()
-        except NoSuchProcess:
-            pass
-
     timedout = False
     try:
+        with utils.delayed_interrupt():
+            p = subprocess.Popen(
+                cmd,
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                shell=shell,
+                cwd=cwd,
+                env=env,
+                preexec_fn=preexec_fn,
+            )
+
+            stdout_func = log.stdout if not output_stdio else stdout_write
+            stderr_func = log.stderr if not output_stdio else stderr_write
+
+            logbuf = []
+            stdout = Reader(
+                threading.current_thread(),
+                p.stdout,
+                output=stdout_func if output else None,
+                logbuf=logbuf,
+                output_rstrip=output_rstrip)
+            stderr = Reader(
+                threading.current_thread(),
+                p.stderr,
+                output=stderr_func if output else None,
+                logbuf=logbuf,
+                output_rstrip=output_rstrip)
+
+        def terminate(pid):
+            try:
+                process = Process(pid)
+                for chld in process.children(recursive=True):
+                    chld.terminate()
+                process.terminate()
+            except NoSuchProcess:
+                pass
+
+        def kill(pid):
+            try:
+                process = Process(pid)
+                for chld in process.children(recursive=True):
+                    chld.kill()
+                process.kill()
+            except NoSuchProcess:
+                pass
+
         p.wait(timeout=timeout)
+
+    except KeyboardInterrupt:
+        timedout = True
+        try:
+            terminate(p.pid)
+            p.wait(10)
+        except subprocess.TimeoutExpired:
+            kill(p.pid)
+            p.wait()
+
     except (subprocess.TimeoutExpired, JoltTimeoutError):
         timedout = True
         try:
@@ -145,6 +163,7 @@ def _run(cmd, cwd, env, preexec_fn, *args, **kwargs):
         except subprocess.TimeoutExpired:
             kill(p.pid)
             p.wait()
+
     finally:
         stdout.join()
         stderr.join()

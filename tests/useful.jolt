@@ -24,6 +24,13 @@ class Sleep(Task):
         time.sleep(int(self.t))
 
 
+class ShellSleep(Task):
+    t = IntParameter()
+
+    def run(self, deps, tools):
+        tools.run("sleep {t}")
+
+
 class Interrupt(Task):
     t = IntParameter()
 
