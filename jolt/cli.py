@@ -714,7 +714,14 @@ def docs():
     """
     Opens the Jolt documentation in the default webbrowser.
     """
-    webbrowser.open(config.get("jolt", "docs", "http://jolt.readthedocs.io/"))
+    url = config.get("jolt", "docs", "http://jolt.readthedocs.io/")
+    success = False
+    try:
+        success = webbrowser.open(url)
+    except Exception:
+        pass
+    if not success:
+        print(f"Failed to open web browser. Visit {url} manually.")
 
 
 @cli.command()
