@@ -93,6 +93,7 @@ def _run(cmd, cwd, env, preexec_fn, *args, **kwargs):
     shell = kwargs.get("shell", True)
     timeout = kwargs.get("timeout", config.getint("jolt", "command_timeout", 0))
     timeout = timeout if type(timeout) is int and timeout > 0 else None
+    deadline = time.time() + timeout if timeout is not None else None
 
     log.debug("Running: '{0}' (CWD: {1})", cmd, cwd)
     timedout = False
@@ -144,23 +145,26 @@ def _run(cmd, cwd, env, preexec_fn, *args, **kwargs):
             except NoSuchProcess:
                 pass
 
-        deadline = time.time() + timeout if timeout is not None else None
-        while True:
-            timeout = None if deadline is None else max(0, deadline - time.time())
-            try:
-                p.wait(timeout=timeout)
-                break
-            except KeyboardInterrupt:
-                continue
 
-    except (subprocess.TimeoutExpired, JoltTimeoutError):
-        timedout = True
-        try:
-            terminate(p.pid)
-            p.wait(10)
-        except subprocess.TimeoutExpired:
-            kill(p.pid)
-            p.wait()
+        p.wait(timeout=timeout)
+
+    except (KeyboardInterrupt, subprocess.TimeoutExpired, JoltTimeoutError) as e:
+        if type(e) is KeyboardInterrupt:
+            try:
+                timeout = None if deadline is None else max(0, deadline - time.time())
+                p.wait(timeout=timeout)
+            except (subprocess.TimeoutExpired, JoltTimeoutError):
+                timedout = True
+        else:
+            timedout = True
+
+        if timedout:
+            try:
+                terminate(p.pid)
+                p.wait(10)
+            except subprocess.TimeoutExpired:
+                kill(p.pid)
+                p.wait()
 
     finally:
         stdout.join()

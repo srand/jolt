@@ -28,7 +28,7 @@ class ShellSleep(Task):
     t = IntParameter()
 
     def run(self, deps, tools):
-        tools.run("sleep {t}")
+        tools.run("bash -c 'function debug() {{ echo SIGNAL; }}; trap debug SIGINT; while true; do sleep {t}; done'", timeout=15)
 
 
 class Interrupt(Task):
