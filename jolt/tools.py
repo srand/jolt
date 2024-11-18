@@ -144,16 +144,14 @@ def _run(cmd, cwd, env, preexec_fn, *args, **kwargs):
             except NoSuchProcess:
                 pass
 
-        p.wait(timeout=timeout)
-
-    except KeyboardInterrupt:
-        timedout = True
-        try:
-            terminate(p.pid)
-            p.wait(10)
-        except subprocess.TimeoutExpired:
-            kill(p.pid)
-            p.wait()
+        deadline = time.time() + timeout if timeout is not None else None
+        while True:
+            timeout = None if deadline is None else max(0, deadline - time.time())
+            try:
+                p.wait(timeout=timeout)
+                break
+            except KeyboardInterrupt:
+                continue
 
     except (subprocess.TimeoutExpired, JoltTimeoutError):
         timedout = True
