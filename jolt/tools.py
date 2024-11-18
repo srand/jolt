@@ -145,7 +145,6 @@ def _run(cmd, cwd, env, preexec_fn, *args, **kwargs):
             except NoSuchProcess:
                 pass
 
-
         p.wait(timeout=timeout)
 
     except (KeyboardInterrupt, subprocess.TimeoutExpired, JoltTimeoutError) as e:
