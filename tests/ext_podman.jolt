@@ -16,6 +16,7 @@ class PodmanExt(JoltTest):
         super().setup(deps, tools)
         if tools.which("podman") is None:
             self.skip("podman not found")
+        super().setup(deps, tools)
 
     def test_simple(self):
         """
@@ -33,7 +34,7 @@ class PodmanExt(JoltTest):
 
         b = self.build("busybox")
         a = self.artifacts(b)
-        self.assertExists(path.join(a[0], "busybox.tar"))
+        self.assertExists(path.join(a[0], "oci-archive", "busybox.tar"))
 
     def test_podmanfile(self):
         """
@@ -51,7 +52,7 @@ class PodmanExt(JoltTest):
 
         b = self.build("busybox")
         a = self.artifacts(b)
-        self.assertExists(path.join(a[0], "busybox.tar"))
+        self.assertExists(path.join(a[0], "oci-archive", "busybox.tar"))
 
     def test_podmanfile_as_source(self):
         """
@@ -72,7 +73,7 @@ class PodmanExt(JoltTest):
 
         b = self.build("busybox")
         a = self.artifacts(b)
-        self.assertExists(path.join(a[0], "busybox.tar"))
+        self.assertExists(path.join(a[0], "oci-archive", "busybox.tar"))
 
     def test_output_directory(self):
         """
@@ -92,8 +93,8 @@ class PodmanExt(JoltTest):
 
         b = self.build("busybox")
         a = self.artifacts(b)
-        self.assertNotExists(path.join(a[0], "test-file1"))
-        self.assertExists(path.join(a[0], "test-file2"))
+        self.assertNotExists(path.join(a[0], "directory", "test-file1"))
+        self.assertExists(path.join(a[0], "directory", "test-file2"))
 
     def test_imagefile(self):
         """
@@ -111,7 +112,7 @@ class PodmanExt(JoltTest):
 
         b = self.build("busybox")
         a = self.artifacts(b)
-        self.assertExists(path.join(a[0], "image.tar"))
+        self.assertExists(path.join(a[0], "oci-archive", "image.tar"))
 
     def test_output(self):
         """
@@ -154,11 +155,11 @@ class PodmanExt(JoltTest):
         a3 = self.artifacts(b3)
         a4 = self.artifacts(b4)
         a5 = self.artifacts(b5)
-        f1 = path.join(a1[0], "busybox_oci_archive.tar")
-        f2 = path.join(a2[0], "oci-layout")
-        f3 = path.join(a3[0], "busybox_docker_archive.tar")
-        f4 = path.join(a4[0], "bin", "busybox")
-        f5 = path.join(a5[0], "busybox_archive.tar")
+        f1 = path.join(a1[0], "oci-archive", "busybox_oci_archive.tar")
+        f2 = path.join(a2[0], "oci-directory", "oci-layout")
+        f3 = path.join(a3[0], "docker-archive", "busybox_docker_archive.tar")
+        f4 = path.join(a4[0], "directory", "bin", "busybox")
+        f5 = path.join(a5[0], "archive", "busybox_archive.tar")
         self.assertExists(f1)
         self.assertExists(f2)
         self.assertExists(f3)
@@ -186,7 +187,7 @@ class PodmanExt(JoltTest):
 
         b = self.build("busybox")
         a = self.artifacts(b)
-        f = path.join(a[0], "busybox.tar")
+        f = path.join(a[0], "oci-archive", "busybox.tar")
         self.assertExists(f)
         try:
             loaded = self.tools.run("podman image load -i {}", f)
