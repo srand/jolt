@@ -511,8 +511,21 @@ class ContainerImage(Task):
     dockerfile = "Dockerfile"
     """ Path to the Dockerfile to build, or the full source code of such a file. """
 
-    output = "oci-archive"
-    """ none, oci-archive, oci-directory, docker-archive, directory, tar, tar.gz, tgz, tar.bz2, tar.xz"""
+    output = ["oci-archive"]
+    """
+    List of output formats.
+
+    If set to None, no output is produced and published.
+
+    Supported formats:
+        - archive
+        - custom
+        - directory
+        - docker-archive
+        - oci-archive
+        - oci-directory
+
+    """
 
     imagefile = "{canonical_name}.tar"
     """
@@ -562,6 +575,10 @@ class ContainerImage(Task):
         return " ".join([utils.option("-l ", self.tools.expand(label)) for label in self.labels])
 
     @property
+    def _output(self):
+        return utils.as_list(self.output) if self.output else []
+
+    @property
     def _platform(self):
         platform = self.tools.expand(self.target) if self.target else None
         return utils.option("--platform ", platform)
@@ -603,22 +620,25 @@ class ContainerImage(Task):
                 for tag in self.tags:
                     tools.run("podman push {}", tag)
 
-            if self.output:
-                self.info("Saving image")
-                with tools.cwd(tools.builddir()):
-                    if self.output in ["oci-archive", "docker-archive"]:
+            for output in self._output:
+                self.info("Saving image as {}", output)
+                with tools.cwd(tools.builddir(output)):
+                    if output in ["oci-archive", "docker-archive"]:
                         tools.run("podman image save --format={output} {} -o {}", self.tags[0], "image.tar")
-                    if self.output == "oci-directory":
+                    if output == "oci-directory":
                         tools.run("podman image save --format=oci-dir {} -o {}", self.tags[0], "image.dir")
-                    if self.output in ["archive", "directory"]:
+                    if output in ["archive", "custom", "directory"]:
                         ctr = tools.run("podman create {}", self.tags[0])
                         try:
-                            mount_path = tools.run("podman unshare podman mount {}", ctr, output_on_error=True)
-                            if self.output == "archive":
-                                tools.run("podman unshare tar -C {} -cf image.tar .", mount_path, output_on_error=True)
-                            else:
-                                tools.mkdir("image.dir")
-                                tools.run("podman unshare tar c -C {} . | tar --no-same-permissions --no-same-owner --no-overwrite-dir -x -C ./image.dir/", mount_path, output_on_error=True)
+                            with tools.runprefix("podman unshare "):
+                                mount_path = tools.run("podman mount {}", ctr, output_on_error=True)
+                                if output == "custom":
+                                    self.run_custom(deps, tools, mount_path)
+                                elif output == "archive":
+                                    tools.run("tar -C {} -cf image.tar .", mount_path, output_on_error=True)
+                                else:
+                                    tools.mkdir("image.dir")
+                                    tools.run("tar c -C {} . | tar --no-same-permissions --no-same-owner --no-overwrite-dir -x -C ./image.dir/", mount_path, output_on_error=True)
                         finally:
                             utils.call_and_catch(tools.run, "podman rm {}", ctr)
         finally:
@@ -627,26 +647,45 @@ class ContainerImage(Task):
                 for tag in self.tags:
                     utils.call_and_catch(tools.run("podman rmi -f {}", tag))
 
+    def run_custom(self, deps, tools, mount_path):
+        """
+        Save image as custom output format.
+
+        The method is called when the output format is set to "custom".
+        The mount_path is the path to the mounted container root filesystem.
+
+        The default implementation does nothing.
+        """
+        pass
+
     def publish(self, artifact, tools):
+        """ Publish the image as different output formats """
+
         artifact.strings.tag = tools.expand(self.tags[0])
 
         for tag in self.tags:
             artifact.podman.tags.append(tag)
 
-        if self.output:
-            with tools.cwd(tools.builddir()):
-                if self.output in ["oci-archive", "docker-archive"] and self._imagefile:
-                    artifact.collect("image.tar", "{_imagefile}")
+        for output in self._output:
+            with tools.cwd(tools.builddir(output)):
+                if output in ["oci-archive", "docker-archive"] and self._imagefile:
+                    artifact.collect("image.tar", output + "/{_imagefile}")
                     if self._autoload:
-                        artifact.podman.load.append("{_imagefile}")
+                        artifact.podman.load.append(output + "/{_imagefile}")
                         artifact.podman.rmi.append(artifact.strings.tag.get_value())
-                if self.output in ["archive"] and self._imagefile:
-                    artifact.collect("image.tar", "{_imagefile}")
+                if output in ["archive"] and self._imagefile:
+                    artifact.collect("image.tar", output + "/{_imagefile}")
                     if self._autoload:
-                        artifact.podman.imprt.append("{_imagefile}")
+                        artifact.podman.imprt.append(output + "/{_imagefile}")
                         artifact.podman.rmi.append(artifact.strings.tag.get_value())
-                if self.output in ["directory", "oci-directory"]:
+                if output in ["directory", "oci-directory"]:
                     with tools.cwd("image.dir"):
-                        artifact.collect("*", symlinks=True)
-                if self.output in ["directory"]:
-                    artifact.paths.rootfs = "."
+                        artifact.collect("*", f"{output}/", symlinks=True)
+                if output in ["directory"]:
+                    artifact.paths.rootfs = output
+                if output in ["custom"]:
+                    self.publish_custom(artifact, tools)
+
+    def publish_custom(self, artifact, tools):
+        """ Publish custom output as produced by run_custom """
+        pass
