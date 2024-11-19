@@ -6,6 +6,7 @@ import lzma
 import subprocess
 import os
 import platform
+import signal
 import sys
 import threading
 import time
@@ -152,6 +153,7 @@ def _run(cmd, cwd, env, preexec_fn, *args, **kwargs):
             try:
                 timeout = None if deadline is None else max(0, deadline - time.time())
                 p.wait(timeout=timeout)
+                raise e
             except (subprocess.TimeoutExpired, JoltTimeoutError):
                 timedout = True
         else:
@@ -171,6 +173,9 @@ def _run(cmd, cwd, env, preexec_fn, *args, **kwargs):
         p.stdin.close()
         p.stdout.close()
         p.stderr.close()
+
+    if p.returncode == -signal.SIGINT:
+        raise KeyboardInterrupt()
 
     if p.returncode != 0 and output_on_error:
         for reader, line in logbuf:

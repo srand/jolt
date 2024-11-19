@@ -1004,3 +1004,18 @@ class ToolsApi(JoltTest):
             self.fail("Expected KeyboardInterrupt")
         else:
             self.fail("Expected KeyboardInterrupt")
+
+    def test_run_interrupt(self):
+        """
+        --- tasks:
+        import os
+
+        class A(Task):
+            def run(self, d, t):
+                t.run("kill -INT {{}} $$", os.getpid())
+        ---
+        """
+        with self.assertRaises(Exception):
+            self.build("a")
+
+        self.assertIn("Execution interrupted", self.lastLog())
