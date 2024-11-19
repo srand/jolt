@@ -196,12 +196,10 @@ def _run(cmd, cwd, env, preexec_fn, *args, **kwargs):
         stderrbuf = [line for reader, line in logbuf if reader is stderr]
         if timedout:
             raise JoltTimeoutError(
-                "Command timeout: {0}".format(
-                    " ".join(cmd) if type(cmd) is list else cmd.format(*args, **kwargs)))
+                "Command timeout: " + (" ".join(cmd) if type(cmd) is list else cmd))
         else:
             raise JoltCommandError(
-                "Command failed: {0}".format(
-                    " ".join(cmd) if type(cmd) is list else cmd.format(*args, **kwargs)),
+                "Command failed: " + (" ".join(cmd) if type(cmd) is list else cmd),
                 stdoutbuf, stderrbuf, p.returncode)
     if return_stderr:
         return "\n".join(stdoutbuf) if output_rstrip else "".join(stdoutbuf), \
