@@ -631,7 +631,7 @@ def executor(ctx, worker, build, request):
 
                 # Run the task
                 with log.handler(LogHandler(updates, task)):
-                    executor.run(JoltEnvironment(cache=acache, worker=True))
+                    executor.run(JoltEnvironment(cache=acache, queue=None, worker=True))
 
             except KeyboardInterrupt:
                 # Send an update to the scheduler

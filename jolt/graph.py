@@ -583,7 +583,7 @@ class TaskProxy(object):
 
         for child in filter(lambda task: task.is_resource() and not task.is_completed(), reversed(self.children)):
             executor = ExecutorRegistry.get().create_local(child)
-            executor.run(JoltEnvironment(cache=cache))
+            executor.run(JoltEnvironment(cache=cache, queue=None))
 
     def partially_available_locally(self):
         availability = map(lambda a: self.cache.is_available_locally(a), self.artifacts)
@@ -607,7 +607,10 @@ class TaskProxy(object):
                 arch != platform_arch,
                 self, f"Task is not runnable on current platform (wants node.arch={arch})")
 
-    def run(self, cache, force_upload=False, force_build=False):
+    def run(self, env, force_upload=False, force_build=False):
+        cache = env.cache
+        queue = env.queue
+
         with self.tools:
             available_locally = available_remotely = False
 
@@ -689,9 +692,13 @@ class TaskProxy(object):
                             raise e
 
                         except Exception as e:
-                            self.failed_execution()
+                            self.failed_execution(interrupt=queue.is_aborted() if queue else False)
+
                             with utils.ignore_exception():
                                 exitstack.close()
+
+                            if queue is not None and queue.is_aborted():
+                                raise KeyboardInterrupt()
 
                             if cli.debug_enabled:
                                 import pdb
@@ -734,7 +741,7 @@ class TaskProxy(object):
 
             for extension in self.extensions:
                 with hooks.task_run(extension):
-                    extension.run(cache, force_upload, force_build)
+                    extension.run(env, force_upload, force_build)
 
     def publish(self, context, artifact, buildlog=None):
         hooks.task_prepublish(self, artifact, self.tools)

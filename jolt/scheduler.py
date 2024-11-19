@@ -45,7 +45,7 @@ class TaskQueue(object):
         if self._aborted:
             return None
 
-        env = JoltEnvironment(cache=self.cache)
+        env = JoltEnvironment(cache=self.cache, queue=self)
         executor = self.strategy.create_executor(self.session, task)
         raise_task_error_if(
             not executor, task,
@@ -128,7 +128,7 @@ class LocalExecutor(Executor):
         try:
             with hooks.task_run(task):
                 self.task.run(
-                    env.cache,
+                    env,
                     force_build=self.force_build,
                     force_upload=self.force_upload)
 

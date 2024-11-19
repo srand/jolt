@@ -156,7 +156,7 @@ def publish_artifact():
     registry = TaskRegistry()
     registry.add_task_class(Jolt)
     acache = ArtifactCache.get()
-    env = JoltEnvironment(cache=acache)
+    env = JoltEnvironment(cache=acache, queue=None)
     gb = GraphBuilder(registry, acache, JoltManifest())
     dag = gb.build(["jolt"])
     task = dag.select(lambda graph, task: True)
