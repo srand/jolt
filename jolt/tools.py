@@ -2,6 +2,7 @@ import bz2
 import copy
 import getpass
 import gzip
+import json
 import lzma
 import subprocess
 import os
@@ -2169,6 +2170,20 @@ class Tools(object):
 
         return deps
 
+    def read_json(self, pathname):
+        """
+        Reads a JSON file.
+
+        Args:
+            pathname (str): Name/path of file to be read.
+
+        Returns:
+            dict: Dictionary of JSON data.
+        """
+        pathname = self.expand_path(pathname)
+        with open(pathname) as f:
+            return json.load(f)
+
     def which(self, executable):
         """ Find executable in PATH.
 
@@ -2212,6 +2227,19 @@ class Tools(object):
             content = self.expand(content, **kwargs)
         with open(pathname, "wb") as f:
             f.write(content.encode())
+
+    def write_json(self, pathname, data, indent=4, sort_keys=True):
+        """
+        Writes a JSON file.
+
+        Args:
+            pathname (str): Name/path of file to be written.
+            data (dict): Dictionary of JSON data.
+            indent (int): Indentation level for JSON output.
+        """
+        pathname = self.expand_path(pathname)
+        with open(pathname, "w") as f:
+            json.dump(data, f, indent=indent, sort_keys=sort_keys)
 
     @property
     def wsroot(self):

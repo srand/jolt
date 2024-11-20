@@ -1019,3 +1019,30 @@ class ToolsApi(JoltTest):
             self.build("a")
 
         self.assertIn("Execution interrupted", self.lastLog())
+
+    def test_read_write_json(self):
+        with self.tools.cwd(self.ws):
+            self.tools.write_json("test.json", {"a": 1, "b": 2})
+            self.assertEqual(self.tools.read_json("test.json"), {"a": 1, "b": 2})
+
+    def test_read_write_json_indent(self):
+        with self.tools.cwd(self.ws):
+            self.tools.write_json("test.json", {"a": 1, "b": 2}, indent=2)
+            self.assertEqual(self.tools.read_json("test.json"), {"a": 1, "b": 2})
+            self.assertEqual(self.tools.read_file("test.json"), '{\n  "a": 1,\n  "b": 2\n}')
+
+    def test_read_write_json_indent_str(self):
+        with self.tools.cwd(self.ws):
+            self.tools.write_json("test.json", {"a": 1, "b": 2}, indent="  ")
+            self.assertEqual(self.tools.read_json("test.json"), {"a": 1, "b": 2})
+
+    def test_read_write_json_indent_none(self):
+        with self.tools.cwd(self.ws):
+            self.tools.write_json("test.json", {"a": 1, "b": 2}, indent=None)
+            self.assertEqual(self.tools.read_json("test.json"), {"a": 1, "b": 2})
+
+    def test_read_write_json_sort_keys(self):
+        with self.tools.cwd(self.ws):
+            self.tools.write_json("test.json", {"b": 2, "a": 1}, sort_keys=True, indent=None)
+            self.assertEqual(self.tools.read_json("test.json"), {"a": 1, "b": 2})
+            self.assertEqual(self.tools.read_file("test.json"), '{"a": 1, "b": 2}')
