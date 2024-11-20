@@ -552,3 +552,21 @@ class PodmanExt(JoltTest):
         """
         r = self.build("atest")
         self.assertIn("Resource release finished after 03s", r)
+
+    def test_annotations(self):
+        """
+        --- tasks:
+        from jolt.plugins.podman import *
+
+        class A(ContainerImage):
+            annotations = ["jolt.test=true"]
+            dockerfile = '''FROM busybox:latest'''
+
+        class ATest(Task):
+            requires = "a"
+
+            def run(self, deps, tools):
+                assert "jolt.test" in tools.run("podman inspect {{}}", deps["a"].strings.tag)
+        ---
+        """
+        self.build("atest")

@@ -499,6 +499,9 @@ class DockerImage(Task):
     """
     abstract = True
 
+    annotations = []
+    """ A list of image annotations """
+
     autoload = True
     """
     Automatically load image file into local registry when the artifact is
@@ -586,6 +589,10 @@ class DockerImage(Task):
             tar.extractall(targetpath)
 
     @property
+    def _annotations(self):
+        return " ".join([utils.option("--annotation ", self.tools.expand(an)) for an in self.annotations])
+
+    @property
     def _buildargs(self):
         return " ".join([utils.option("--build-arg ", self.tools.expand(ba)) for ba in self.buildargs])
 
@@ -626,7 +633,7 @@ class DockerImage(Task):
                   tools.expand_relpath(context))
 
         with tools.cwd(context):
-            tools.run("docker build {_platform} . -f {} {_buildargs} {_labels} {_tags} {pull}{squash}",
+            tools.run("docker build {_platform} . -f {} {_annotations} {_buildargs} {_labels} {_tags} {pull}{squash}",
                       utils.quote(dockerfile), pull=pull, squash=squash)
 
         try:
