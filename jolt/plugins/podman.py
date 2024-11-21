@@ -520,6 +520,7 @@ class ContainerImage(Task):
         - docker-archive
         - oci-archive
         - oci-directory
+        - squashfs
 
     """
 
@@ -628,7 +629,7 @@ class ContainerImage(Task):
                         tools.run("podman image save --format={output} {} -o {}", self.tags[0], "image.tar")
                     if output == "oci-directory":
                         tools.run("podman image save --format=oci-dir {} -o {}", self.tags[0], "image.dir")
-                    if output in ["archive", "cpio", "custom", "directory"]:
+                    if output in ["archive", "cpio", "custom", "directory", "squashfs"]:
                         ctr = tools.run("podman create {}", self.tags[0])
                         try:
                             with tools.runprefix("podman unshare "):
@@ -640,6 +641,8 @@ class ContainerImage(Task):
                                 elif output == "cpio":
                                     with tools.cwd(mount_path):
                                         tools.run("find | podman unshare cpio -o -F {}/image.cpio -H newc", outdir, output_on_error=True)
+                                elif output == "squashfs":
+                                    tools.run("mksquashfs {} image.squashfs", mount_path, output_on_error=True)
                                 else:
                                     tools.mkdir("image.dir")
                                     tools.run("tar c -C {} . | tar --no-same-permissions --no-same-owner --no-overwrite-dir -x -C ./image.dir/", mount_path, output_on_error=True)
@@ -688,10 +691,12 @@ class ContainerImage(Task):
                         artifact.collect("*", f"{output}/", symlinks=True)
                 if output in ["cpio"]:
                     artifact.collect("image.cpio", output + "/{_imagefile}.cpio")
-                if output in ["directory"]:
-                    artifact.paths.rootfs = output
                 if output in ["custom"]:
                     self.publish_custom(artifact, tools)
+                if output in ["directory"]:
+                    artifact.paths.rootfs = output
+                if output in ["squashfs"]:
+                    artifact.collect("image.squashfs", output + "/{_imagefile}.squashfs")
 
     def publish_custom(self, artifact, tools):
         """ Publish custom output as produced by run_custom """
