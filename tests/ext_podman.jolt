@@ -570,3 +570,39 @@ class PodmanExt(JoltTest):
         ---
         """
         self.build("atest")
+
+    def test_output_cpio(self):
+        """
+        --- tasks:
+        from jolt.plugins.podman import *
+
+        class A(ContainerImage):
+            dockerfile = "FROM busybox:latest"
+            output = "cpio"
+
+        class ATest(Task):
+            requires = "a"
+
+            def run(self, deps, tools):
+                assert "bin/busybox" in tools.run("cpio -t < {{}}/cpio/a.cpio", deps[self.requires[0]].path)
+        ---
+        """
+        self.build("atest")
+
+    def test_output_squashfs(self):
+        """
+        --- tasks:
+        from jolt.plugins.podman import *
+
+        class A(ContainerImage):
+            dockerfile = "FROM busybox:latest"
+            output = "squashfs"
+
+        class ATest(Task):
+            requires = "a"
+
+            def run(self, deps, tools):
+                assert "bin/busybox" in tools.run("unsquashfs -l {{}}/squashfs/a.squashfs", deps[self.requires[0]].path)
+        ---
+        """
+        self.build("atest")
