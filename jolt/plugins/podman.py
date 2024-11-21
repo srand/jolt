@@ -514,6 +514,7 @@ class ContainerImage(Task):
 
     Supported formats:
         - archive
+        - cpio
         - custom
         - directory
         - docker-archive
@@ -522,7 +523,7 @@ class ContainerImage(Task):
 
     """
 
-    imagefile = "{canonical_name}.tar"
+    imagefile = "{canonical_name}"
     """
     Name of the image tarball published by the task.
 
@@ -621,12 +622,13 @@ class ContainerImage(Task):
 
             for output in self._output:
                 self.info("Saving image as {}", output)
-                with tools.cwd(tools.builddir(output)):
+                outdir = tools.builddir(output)
+                with tools.cwd(outdir):
                     if output in ["oci-archive", "docker-archive"]:
                         tools.run("podman image save --format={output} {} -o {}", self.tags[0], "image.tar")
                     if output == "oci-directory":
                         tools.run("podman image save --format=oci-dir {} -o {}", self.tags[0], "image.dir")
-                    if output in ["archive", "custom", "directory"]:
+                    if output in ["archive", "cpio", "custom", "directory"]:
                         ctr = tools.run("podman create {}", self.tags[0])
                         try:
                             with tools.runprefix("podman unshare "):
@@ -635,6 +637,9 @@ class ContainerImage(Task):
                                     self.run_custom(deps, tools, mount_path)
                                 elif output == "archive":
                                     tools.run("tar -C {} -cf image.tar .", mount_path, output_on_error=True)
+                                elif output == "cpio":
+                                    with tools.cwd(mount_path):
+                                        tools.run("find | podman unshare cpio -o -F {}/image.cpio -H newc", outdir, output_on_error=True)
                                 else:
                                     tools.mkdir("image.dir")
                                     tools.run("tar c -C {} . | tar --no-same-permissions --no-same-owner --no-overwrite-dir -x -C ./image.dir/", mount_path, output_on_error=True)
@@ -666,20 +671,23 @@ class ContainerImage(Task):
             artifact.podman.tags.append(tag)
 
         for output in self._output:
-            with tools.cwd(tools.builddir(output)):
+            outdir = tools.builddir(output)
+            with tools.cwd(outdir):
                 if output in ["oci-archive", "docker-archive"] and self._imagefile:
-                    artifact.collect("image.tar", output + "/{_imagefile}")
+                    artifact.collect("image.tar", output + "/{_imagefile}.tar")
                     if self._autoload:
-                        artifact.podman.load.append(output + "/{_imagefile}")
+                        artifact.podman.load.append(output + "/{_imagefile}.tar")
                         artifact.podman.rmi.append(artifact.strings.tag.get_value())
                 if output in ["archive"] and self._imagefile:
-                    artifact.collect("image.tar", output + "/{_imagefile}")
+                    artifact.collect("image.tar", output + "/{_imagefile}.tar")
                     if self._autoload:
-                        artifact.podman.imprt.append(output + "/{_imagefile}")
+                        artifact.podman.imprt.append(output + "/{_imagefile}.tar")
                         artifact.podman.rmi.append(artifact.strings.tag.get_value())
                 if output in ["directory", "oci-directory"]:
                     with tools.cwd("image.dir"):
                         artifact.collect("*", f"{output}/", symlinks=True)
+                if output in ["cpio"]:
+                    artifact.collect("image.cpio", output + "/{_imagefile}.cpio")
                 if output in ["directory"]:
                     artifact.paths.rootfs = output
                 if output in ["custom"]:
