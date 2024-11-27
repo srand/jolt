@@ -181,6 +181,10 @@ class RemoteExecutor(NetworkExecutor):
             return
         if not task.download(session_only=True):
             task.warning("Failed to download session artifact")
+        if not task.is_resource():
+            # Tasks also download session artifacts of consumed resources
+            for resource in filter(lambda task: task.is_resource() and not task.is_workspace_resource(), task.children):
+                self.download_session_artifacts(resource)
 
     def download_log(self, task):
         """ Download log and transfer lines into local logging system. """
@@ -203,7 +207,7 @@ class RemoteExecutor(NetworkExecutor):
     def run(self, env):
         """ Run the task. """
         try:
-            with hooks.task_run([self.task] + self.task.extensions):
+            with hooks.task_run([self.task] + self.task.extensions), self.task.run_resources():
                 try:
                     self.run_build(env)
                 except (grpc.RpcError, grpc._channel._MultiThreadedRendezvous) as rpc_error:
@@ -569,7 +573,7 @@ def executor(ctx, worker, build, request):
     manifest.ManifestExtensionRegistry.import_protobuf(request.environment)
 
     options = JoltOptions(
-        network=False,
+        network=True,
         local=False,
         download=config.getboolean("network", "download", True),
         upload=config.getboolean("network", "upload", True),

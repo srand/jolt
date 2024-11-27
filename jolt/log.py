@@ -143,6 +143,25 @@ class TqdmStream(object):
         getattr(self.stream, 'flush', lambda: None)()
 
 
+class ThreadPrefix(logging.LoggerAdapter):
+    thread_prefix = {}
+
+    def process(self, msg, kwargs):
+        tid = threading.current_thread()
+        if tid in self.thread_prefix:
+            msg = f"[{self.thread_prefix[tid]}] {msg}"
+        return msg, kwargs
+
+    def set_thread_prefix(self, prefix):
+        tid = threading.current_thread()
+        self.thread_prefix[tid] = prefix
+
+    def clear_thread_prefix(self):
+        tid = threading.current_thread()
+        if tid in self.thread_prefix:
+            del self.thread_prefix[tid]
+
+
 # silence root logger
 _root = logging.getLogger()
 _root.setLevel(logging.CRITICAL)
@@ -175,6 +194,7 @@ _stderr.addFilter(Filter(lambda r: r.levelno >= ERROR or r.levelno == EXCEPTION)
 
 _logger.addHandler(_stdout)
 _logger.addHandler(_stderr)
+_logger_frontend = ThreadPrefix(_logger, {})
 
 _file_formatter = Formatter('{asctime} [{levelname:>7}] {message}')
 
@@ -212,35 +232,35 @@ def log(level, message, created=None, context=None, prefix=False):
 
 
 def info(fmt, *args, **kwargs):
-    _logger.log(INFO, fmt, *args, **kwargs)
+    _logger_frontend.log(INFO, fmt, *args, **kwargs)
 
 
 def warning(fmt, *args, **kwargs):
-    _logger.log(WARNING, fmt, *args, **kwargs)
+    _logger_frontend.log(WARNING, fmt, *args, **kwargs)
 
 
 def verbose(fmt, *args, **kwargs):
-    _logger.log(VERBOSE, fmt, *args, **kwargs)
+    _logger_frontend.log(VERBOSE, fmt, *args, **kwargs)
 
 
 def debug(fmt, *args, **kwargs):
-    _logger.log(DEBUG, fmt, *args, **kwargs)
+    _logger_frontend.log(DEBUG, fmt, *args, **kwargs)
 
 
 def error(fmt, *args, **kwargs):
-    _logger.log(ERROR, fmt, *args, **kwargs)
+    _logger_frontend.log(ERROR, fmt, *args, **kwargs)
 
 
 def stdout(line, **kwargs):
     line = line.replace("{", "{{")
     line = line.replace("}", "}}")
-    _logger.log(STDOUT, line, extra=kwargs)
+    _logger_frontend.log(STDOUT, line, extra=kwargs)
 
 
 def stderr(line, **kwargs):
     line = line.replace("{", "{{")
     line = line.replace("}", "}}")
-    _logger.log(STDERR, line, extra=kwargs)
+    _logger_frontend.log(STDERR, line, extra=kwargs)
 
 
 def format_exception_msg(exc):
@@ -273,7 +293,7 @@ def format_exception_msg(exc):
 def exception(exc=None, error=True):
     if exc:
         if error:
-            _logger.log(ERROR, format_exception_msg(exc))
+            _logger_frontend.log(ERROR, format_exception_msg(exc))
 
         tb = traceback.format_exception(type(exc), value=exc, tb=exc.__traceback__)
         installdir = fs.path.dirname(__file__)
@@ -288,7 +308,7 @@ def exception(exc=None, error=True):
         line = line.replace("{", "{{")
         line = line.replace("}", "}}")
         line = line.strip()
-        _logger.log(EXCEPTION, line)
+        _logger_frontend.log(EXCEPTION, line)
 
 
 def transfer(line, context):
@@ -308,7 +328,7 @@ def transfer(line, context):
     elif line.startswith("[ EXCEPT]"):
         outline1 = outline1.replace("{", "{{")
         outline1 = outline1.replace("}", "}}")
-        _logger.log(EXCEPTION, outline1)
+        _logger_frontend.log(EXCEPTION, outline1)
     elif line.startswith("[ STDERR]"):
         stderr(outline1, prefix=True)
     elif line.startswith("[ STDOUT]"):
@@ -489,6 +509,15 @@ def map_thread(thread_from, thread_to):
         yield
     finally:
         _thread_map.unmap(tid)
+
+
+@contextmanager
+def thread_prefix(prefix):
+    try:
+        _logger_frontend.set_thread_prefix(prefix)
+        yield
+    finally:
+        _logger_frontend.clear_thread_prefix()
 
 
 class _LogStream(object):

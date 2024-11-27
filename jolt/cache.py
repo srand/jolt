@@ -879,6 +879,28 @@ class Artifact(object):
         return self._node.task
 
 
+class ArtifactToolsProxy(object):
+    def __init__(self, artifact, tools):
+        self._artifact = artifact
+        self._tools = tools
+
+    def __getattr__(self, name):
+        if name == "tools":
+            return self._tools
+        if name == "_artifact":
+            return self._artifact
+        attr = getattr(self._artifact.__class__, name, None)
+        if attr is not None and callable(attr):
+            return attr.__get__(self, ArtifactToolsProxy)
+        return getattr(self._artifact, name)
+
+    def __setattr__(self, name, value):
+        if name == "_artifact" or name == "_tools":
+            super(ArtifactToolsProxy, self).__setattr__(name, value)
+        else:
+            setattr(self._artifact, name, value)
+
+
 class Context(object):
     """
     Execution context and dependency wrapper.
@@ -904,18 +926,14 @@ class Context(object):
             for dep in reversed(self._node.children):
                 for artifact in dep.artifacts:
                     # Create clone with tools from this task
-                    artifact = self._cache.get_artifact(
-                        dep,
-                        name=artifact.name,
-                        session=artifact.is_session(),
-                        tools=self._node.tools,
-                    )
+                    artifact = ArtifactToolsProxy(artifact, self._node.tools)
 
                     # Don't include session artifacts that don't exist,
                     # i.e. where no build has taken place due to presence
                     # of the persistent artifacts.
-                    if artifact.is_session() and not self._cache.is_available_locally(artifact):
-                        continue
+                    if not dep.is_resource():
+                        if artifact.is_session() and not self._cache.is_available_locally(artifact):
+                            continue
 
                     self._cache.unpack(artifact)
 

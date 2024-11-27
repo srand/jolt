@@ -1650,7 +1650,7 @@ class Tools(object):
         """
 
         raise_error_if(
-            type(artifact) is not cache.Artifact,
+            type(artifact) not in [cache.Artifact, cache.ArtifactToolsProxy],
             "non-artifact passed as argument to Tools.sandbox()")
 
         suffix = utils.canonical(artifact.task.short_qualified_name)

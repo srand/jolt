@@ -10,6 +10,8 @@ from jolt.plugins import docker
 class Worker(Resource):
     name = "jolt/deployment"
 
+    local = True
+
     storage = Parameter(values=["cache", "http"])
 
     requires = ["jolt/cache", "jolt/scheduler", "jolt/worker"]

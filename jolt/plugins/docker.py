@@ -25,8 +25,6 @@ class DockerListVariable(ArtifactListAttribute):
 
 class DockerLoadListVariable(DockerListVariable):
     def apply(self, task, artifact):
-        if isinstance(task, Resource):
-            return
         for image in self.items():
             task.tools.run(
                 "docker load -i {}",
@@ -35,16 +33,12 @@ class DockerLoadListVariable(DockerListVariable):
 
 class DockerPullListVariable(DockerListVariable):
     def apply(self, task, artifact):
-        if isinstance(task, Resource):
-            return
         for image in self.items():
             task.tools.run("docker pull {}", image, output_on_error=True)
 
 
 class DockerRmiListVariable(DockerListVariable):
     def unapply(self, task, artifact):
-        if isinstance(task, Resource):
-            return
         for image in self.items():
             task.tools.run("docker rmi -f {}", image, output_on_error=True)
 

@@ -1,9 +1,8 @@
 #!/usr/bin/env python
 
 import json
-import re
+import os
 import sys
-import time
 sys.path.append(".")
 
 import testsupport
@@ -13,6 +12,7 @@ import testsupport
 class BuildCli(testsupport.JoltTest):
     name = "cli/build"
 
+    @testsupport.skip_if_network
     def test_no_args(self):
         """
         --- tasks:
@@ -20,11 +20,10 @@ class BuildCli(testsupport.JoltTest):
             pass
         ---
         """
-        if self.network:
-            self.skipTest("network build not supported")
         r1 = self.jolt("")
         self.assertBuild(r1, "default")
 
+    @testsupport.skip_if_network
     def test_no_args_and_config(self):
         """
         --- config:
@@ -34,11 +33,10 @@ class BuildCli(testsupport.JoltTest):
             pass
         ---
         """
-        if self.network:
-            self.skipTest("network build not supported")
         r1 = self.jolt("")
         self.assertBuild(r1, "custom")
 
+    @testsupport.skip_if_local
     def test_no_download(self):
         """
         --- tasks:
@@ -46,14 +44,12 @@ class BuildCli(testsupport.JoltTest):
             pass
         ---
         """
-        if not self.network:
-            self.skipTest("only network build supported")
-
         r = self.jolt("build -n --no-download a")
         self.assertBuild(r, "a")
         r = self.jolt("build a")
         self.assertDownload(r, "a")
 
+    @testsupport.skip_if_local
     def test_no_download_persistent(self):
         """
         --- tasks:
@@ -63,9 +59,6 @@ class BuildCli(testsupport.JoltTest):
                 pass
         ---
         """
-        if not self.network:
-            self.skipTest("only network build supported")
-
         r = self.jolt("build -n --no-download-persistent a -vvv")
         self.assertBuild(r, "a")
         a = self.artifacts(r)
@@ -76,6 +69,7 @@ class BuildCli(testsupport.JoltTest):
         a = self.artifacts(r)
         self.assertEqual(1, len(a))
 
+    @testsupport.skip_if_local
     def test_no_upload(self):
         """
         --- tasks:
@@ -85,9 +79,6 @@ class BuildCli(testsupport.JoltTest):
             pass
         ---
         """
-        if not self.network:
-            self.skipTest("only network build supported")
-
         r = self.jolt("build a")
         self.assertBuild(r, "a")
         r = self.jolt("build -n --no-upload a")
@@ -256,7 +247,7 @@ class BuildCli(testsupport.JoltTest):
         r1 = self.lastLog()
         self.assertBuild(r1, "pass2")
 
-
+    @testsupport.skip_if_local
     def test_fast_task(self):
         """
         --- tasks:
@@ -274,13 +265,11 @@ class BuildCli(testsupport.JoltTest):
             requires = "b"
         ---
         """
-        if not self.network:
-            self.skipTest("network build deployment required")
-
         r1 = self.build("c")
         l1 = self.tasks(r1, local=True)
         self.assertEqual(l1, ["a"])
 
+    @testsupport.skip_if_local
     def test_fast_task_with_deps(self):
         """
         --- tasks:
@@ -298,9 +287,6 @@ class BuildCli(testsupport.JoltTest):
             requires = "b"
         ---
         """
-        if not self.network:
-            self.skipTest("network build deployment required")
-
         r1 = self.build("c")
         l1 = self.tasks(r1, local=True)
         self.assertEqual(l1, [])
@@ -312,6 +298,7 @@ class BuildCli(testsupport.JoltTest):
         l2 = self.tasks(r2, local=True)
         self.assertEqual(l2, ["b"])
 
+    @testsupport.skip_if_local
     def test_fast_task_with_unavailable_resource_dep(self):
         """
         --- tasks:
@@ -326,9 +313,6 @@ class BuildCli(testsupport.JoltTest):
             requires = "r"
         ---
         """
-        if not self.network:
-            self.skipTest("network build deployment required")
-
         r1 = self.build("b")
         l1 = self.tasks(r1, local=True)
         self.assertEqual(l1, [])
@@ -485,6 +469,7 @@ class BuildCli(testsupport.JoltTest):
             self.assertNoBuild(r, "a")
             self.assertBuild(r, "b")
 
+    @testsupport.skip_if_local
     def test_cache_forced_discard(self):
         """
         --- tasks:
@@ -496,9 +481,6 @@ class BuildCli(testsupport.JoltTest):
             requires = ["a"]
         ---
         """
-        if not self.network:
-            self.skipTest("network build required")
-
         r = self.build("b")
         self.assertBuild(r, "a")
         self.assertBuild(r, "b")
@@ -526,6 +508,7 @@ class BuildCli(testsupport.JoltTest):
                 log = self.tools.read_file(".build.log")
                 self.assertIn("Running unpack!", log)
 
+    @testsupport.skip_if_local
     def test_cache_forced_discard_when_worker_cache_db_cleared(self):
         """
         --- tasks:
@@ -537,9 +520,6 @@ class BuildCli(testsupport.JoltTest):
             requires = ["a"]
         ---
         """
-        if not self.network:
-            self.skipTest("network build required")
-
         r = self.build("b")
         self.assertBuild(r, "a")
         self.assertBuild(r, "b")
@@ -568,6 +548,7 @@ class BuildCli(testsupport.JoltTest):
                 log = self.tools.read_file(".build.log")
                 self.assertIn("Running unpack!", log)
 
+    @testsupport.skip_if_local
     def test_uncacheable(self):
         """
         --- tasks:
@@ -578,9 +559,6 @@ class BuildCli(testsupport.JoltTest):
             requires = ["a"]
         ---
         """
-        if not self.network:
-            self.skipTest("network build required")
-
         r = self.build("b")
         self.assertBuild(r, "b")
 
@@ -680,6 +658,7 @@ class BuildCli(testsupport.JoltTest):
         a = self.artifacts(r)
         self.assertEqual(1, len(a))
 
+    @testsupport.skip_if_local
     def test_session_artifact_with_resource_failure(self):
         """
         --- tasks:
@@ -695,14 +674,12 @@ class BuildCli(testsupport.JoltTest):
                 pass
         ---
         """
-        if not self.network_enabled:
-            self.skipTest("Network build required")
-
         with self.assertRaises(Exception):
             self.build("a")
         r = self.lastLog()
         self.assertIn("Failed to download session artifact", r)
 
+    @testsupport.skip_if_local
     def test_session_artifact_with_publish_failure(self):
         """
         --- tasks:
@@ -715,9 +692,6 @@ class BuildCli(testsupport.JoltTest):
                 assert False
         ---
         """
-        if not self.network_enabled:
-            self.skipTest("Network build required")
-
         with self.assertRaises(Exception):
             self.build("a")
         r = self.lastLog()
@@ -738,3 +712,336 @@ class BuildCli(testsupport.JoltTest):
         with self.tools.cwd(self.ws):
             data = self.tools.read_file("result.xml")
             self.assertIn("test1234", data)
+
+    @testsupport.skip_if_local
+    def test_local_task_consumed(self):
+        """
+        --- tasks:
+        class Local(Task):
+            local = True
+
+            def run(self, deps, tools):
+                pass
+
+        class Remote(Task):
+            local = False
+
+            requires = ["local"]
+
+            def run(self, deps, tools):
+                pass
+        ---
+        """
+        r = self.build("remote")
+        self.assertLocalBuild(r, "local")
+        self.assertRemoteBuild(r, "remote")
+
+    @testsupport.skip_if_local
+    def test_local_task_consumer(self):
+        """
+        --- tasks:
+        class Remote(Task):
+            local = False
+
+            def run(self, deps, tools):
+                pass
+
+        class Local(Task):
+            local = True
+
+            requires = ["remote"]
+
+            def run(self, deps, tools):
+                pass
+        ---
+        """
+        r = self.build("local")
+        self.assertLocalBuild(r, "local")
+        self.assertRemoteBuild(r, "remote")
+
+    @testsupport.skip_if_local
+    def test_local_resource_consumed(self):
+        """
+        --- tasks:
+        from jolt import log
+
+        class R(Resource):
+            local = True
+
+            def acquire(self, artifact, deps, tools, owner):
+                node = artifact.get_node()
+                log.info("Acquiring local resource: {{}}", artifact.path)
+                assert artifact.is_temporary()
+                assert not node.options.worker
+
+            def release(self, artifact, deps, tools, owner):
+                log.info("Releasing local resource: {{}}", artifact.path)
+                assert not artifact.is_temporary()
+
+        class A(Task):
+            requires = ["r"]
+
+            def run(self, deps, tools):
+                a = deps["r"]
+                assert not a.is_temporary()
+        ---
+        """
+        r = self.build("a")
+        self.assertRemoteBuild(r, "a")
+
+    @testsupport.skip_if_local
+    def test_resource_artifact_on_failure(self):
+        """
+        --- tasks:
+        class R(Resource):
+            def acquire(self, artifact, deps, tools, owner):
+                with tools.cwd(tools.builddir()):
+                    tools.write_file("file.txt", self.instance + "-main")
+                    artifact.collect("file.txt")
+                assert False, "Always fails"
+
+        class A(Task):
+            requires = ["r"]
+        ---
+        """
+        with self.assertRaises(Exception):
+            self.build("a")
+        with self.tools.cwd(self.ws, "cache"):
+            files = self.tools.glob("**/file.txt")
+            self.assertEqual(1, len(files))
+            self.assertEqual(os.path.basename(os.path.dirname(files[0])), self.tools.read_file(files[0]))
+
+    @testsupport.skip_if_local
+    def test_resource_consumes_local_task(self):
+        """
+        --- tasks:
+        class A(Task):
+            local = True
+
+            def run(self, deps, tools):
+                pass
+
+        class R(Resource):
+            requires = ["a"]
+
+            def acquire(self, artifact, deps, tools, owner):
+                assert not deps["a"].is_temporary()
+
+        class B(Task):
+            requires = ["r"]
+
+            def run(self, deps, tools):
+                assert not deps["a"].is_temporary()
+                assert not deps["r"].is_temporary()
+        ---
+        """
+        r = self.build("b")
+        self.assertLocalBuild(r, "a")
+        self.assertRemoteBuild(r, "b")
+
+    @testsupport.skip_if_local
+    def test_local_task_consumes_resource_with_remote_dep(self):
+        """
+        --- tasks:
+        class A(Task):
+            def run(self, deps, tools):
+                pass
+
+        class R(Resource):
+            requires = ["a"]
+
+            def acquire(self, artifact, deps, tools, owner):
+                assert not deps["a"].is_temporary()
+
+        class B(Task):
+            local = True
+            requires = ["r"]
+
+            def run(self, deps, tools):
+                assert not deps["a"].is_temporary()
+                assert not deps["r"].is_temporary()
+        ---
+        """
+        r = self.build("b")
+        self.assertRemoteBuild(r, "a")
+        self.assertLocalBuild(r, "b")
+
+    @testsupport.skip_if_local
+    def test_resource_instances(self):
+        """
+        --- tasks:
+        class R(Resource):
+            pass
+
+        class A(Task):
+            requires = ["r"]
+
+        class B(Task):
+            requires = ["r"]
+        ---
+        """
+        r = self.build("a b")
+        self.assertRemoteBuild(r, "a")
+        self.assertRemoteBuild(r, "b")
+        self.assertIn("Resource acquisition started (r for a)", r)
+        self.assertIn("Resource acquisition started (r for b)", r)
+        self.assertIn("Resource acquisition finished after 00s (r for a)", r)
+        self.assertIn("Resource acquisition finished after 00s (r for b)", r)
+        self.assertIn("Resource release started (r for a)", r)
+        self.assertIn("Resource release started (r for b)", r)
+        self.assertIn("Resource release finished after 00s (r for a)", r)
+        self.assertIn("Resource release finished after 00s (r for b)", r)
+
+    @testsupport.skip_if_local
+    def test_local_resource_instances(self):
+        """
+        --- tasks:
+        class R(Resource):
+            local = True
+
+        class A(Task):
+            requires = ["r"]
+
+        class B(Task):
+            requires = ["r"]
+        ---
+        """
+        r = self.build("a b")
+        self.assertRemoteBuild(r, "a")
+        self.assertRemoteBuild(r, "b")
+        self.assertIn("Resource acquisition started (r for a)", r)
+        self.assertIn("Resource acquisition started (r for b)", r)
+        self.assertIn("Resource acquisition finished after 00s (r for a)", r)
+        self.assertIn("Resource acquisition finished after 00s (r for b)", r)
+        self.assertIn("Resource release started (r for a)", r)
+        self.assertIn("Resource release started (r for b)", r)
+        self.assertIn("Resource release finished after 00s (r for a)", r)
+        self.assertIn("Resource release finished after 00s (r for b)", r)
+
+    @testsupport.skip_if_local
+    def test_local_task_with_extension(self):
+        """
+        --- tasks:
+        class A(Task):
+            local = True
+
+        class B(Task):
+            extends = "a"
+        ---
+        """
+        r = self.build("b")
+        self.assertLocalBuild(r, "a")
+        self.assertLocalBuild(r, "b")
+
+    @testsupport.skip_if_local
+    def test_task_with_local_extension(self):
+        """
+        --- tasks:
+        class A(Task):
+            pass
+
+        class B(Task):
+            extends = "a"
+            local = True
+        ---
+        """
+        r = self.build("b")
+        self.assertLocalBuild(r, "a")
+        self.assertLocalBuild(r, "b")
+
+    @testsupport.skip("extensions currently not supported")
+    @testsupport.skip_if_local
+    def test_task_with_resource_and_local_extension(self):
+        """
+        --- tasks:
+        class R(Resource):
+            pass
+
+        class A(Task):
+            requires = ["r"]
+
+        class B(Task):
+            extends = "a"
+            local = True
+        ---
+        """
+        r = self.build("b")
+        self.assertLocalBuild(r, "a")
+        self.assertLocalBuild(r, "b")
+        self.assertIn("Resource acquisition started (r for a)", r)
+        self.assertIn("Resource acquisition finished after 00s (r for a)", r)
+        self.assertIn("Resource release started (r for a)", r)
+        self.assertIn("Resource release finished after 00s (r for a)", r)
+
+    @testsupport.skip("extensions currently not supported")
+    @testsupport.skip_if_local
+    def test_local_task_with_resource_and_extension(self):
+        """
+        --- tasks:
+        class R(Resource):
+            pass
+
+        class A(Task):
+            local = True
+            requires = ["r"]
+
+        class B(Task):
+            extends = "a"
+        ---
+        """
+        r = self.build("b")
+        self.assertLocalBuild(r, "a")
+        self.assertLocalBuild(r, "b")
+        self.assertIn("Resource acquisition started (r for a)", r)
+        self.assertIn("Resource acquisition finished after 00s (r for a)", r)
+        self.assertIn("Resource release started (r for a)", r)
+        self.assertIn("Resource release finished after 00s (r for a)", r)
+
+    @testsupport.skip("extensions currently not supported")
+    @testsupport.skip_if_local
+    def test_extension_with_resource(self):
+        """
+        --- tasks:
+        class R(Resource):
+            pass
+
+        class A(Task):
+            pass
+
+        class B(Task):
+            extends = "a"
+            requires = ["r"]
+        ---
+        """
+        r = self.build("b")
+        self.assertRemoteBuild(r, "a")
+        self.assertRemoteBuild(r, "b")
+        self.assertIn("Resource acquisition started (r for b)", r)
+        self.assertIn("Resource acquisition finished after 00s (r for b)", r)
+        self.assertIn("Resource release started (r for b)", r)
+        self.assertIn("Resource release finished after 00s (r for b)", r)
+
+    @testsupport.skip("extensions currently not supported")
+    @testsupport.skip_if_local
+    def test_local_extension_with_resource(self):
+        """
+        --- tasks:
+        class R(Resource):
+            pass
+
+        class A(Task):
+            pass
+
+        class B(Task):
+            local = True
+            extends = "a"
+            requires = ["r"]
+        ---
+        """
+        r = self.build("b")
+        self.assertLocalBuild(r, "a")
+        self.assertLocalBuild(r, "b")
+        self.assertIn("Resource acquisition started (r for b)", r)
+        self.assertIn("Resource acquisition finished after 00s (r for b)", r)
+        self.assertIn("Resource release started (r for b)", r)
+        self.assertIn("Resource release finished after 00s (r for b)", r)

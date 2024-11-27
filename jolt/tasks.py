@@ -20,8 +20,7 @@ import traceback
 from jolt import filesystem as fs
 from jolt import log
 from jolt import utils
-from jolt.cache import ArtifactAttributeSetProvider
-from jolt.error import raise_error, raise_error_if, raise_task_error, raise_task_error_if
+from jolt.error import raise_error_if, raise_task_error, raise_task_error_if
 from jolt.error import raise_unreported_task_error_if
 from jolt.error import JoltError, JoltCommandError, LoggedJoltError
 from jolt.expires import Immediately
@@ -805,8 +804,9 @@ class TaskRegistry(object):
         if cls:
             task = cls(parameters=params, manifest=manifest, buildenv=buildenv)
             task = self.instances.get(task.qualified_name, task)
-            self.instances[task.qualified_name] = task
-            self.instances[full_name] = task
+            if not isinstance(task, Resource):
+                self.instances[task.qualified_name] = task
+                self.instances[full_name] = task
             return task
 
         raise_task_error_if(not task, full_name, "No such task")
@@ -918,7 +918,7 @@ class attributes:
             @functools.wraps(cls._artifacts)
             def _artifacts(self, cache, node):
                 artifacts = _old_artifacts(self, cache, node)
-                artifacts += [cache.get_artifact(node, name, session=session)]
+                artifacts += [cache.get_artifact(node, name, session=session or isinstance(cls, Resource))]
                 return artifacts
 
             cls._artifacts = _artifacts
@@ -1394,6 +1394,9 @@ class TaskBase(object):
     joltproject = None
     """ Name of project this task belongs to. """
 
+    local = False
+    """ A local task is only executed on the local node where the build is initiated. """
+
     name = None
     """ Name of the task. Derived from class name if not set. """
 
@@ -1467,6 +1470,14 @@ class TaskBase(object):
     While the task hash identity may be identical for multiple parallel
     execution requests, the instance ID won't be.
     """
+
+    @property
+    def instance(self):
+        return str(self._instance.value)
+
+    @instance.setter
+    def instance(self, value):
+        self._instance.assign(value)
 
     def __init__(self, parameters=None, manifest=None, buildenv=None, **kwargs):
         self._identity = None
@@ -2713,8 +2724,6 @@ class Resource(Task):
 
     """
 
-    cacheable = False
-
     abstract = True
     """ An abstract resource class indended to be subclassed. """
 
@@ -2723,6 +2732,9 @@ class Resource(Task):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+
+    def _artifacts(self, cache, node):
+        return [cache.get_artifact(node, "main", session=True)]
 
     def is_runnable(self):
         return False
@@ -2787,10 +2799,10 @@ class WorkspaceResource(Resource):
         raise_task_error_if(len(self.requires) > 0, self,
                             "Workspace resource is not allowed to have requirements")
 
-    def acquire(self, **kwargs):
+    def acquire(self, *args, **kwargs):
         return self.acquire_ws()
 
-    def release(self, **kwargs):
+    def release(self, *args, **kwargs):
         return self.release_ws()
 
     def prepare_ws_for(self, task):
@@ -3364,62 +3376,3 @@ class Test(Task):
             "{} tests out of {} were successful".format(
                 len(self.testresult.successes),
                 self.testresult.testsRun))
-
-
-@ArtifactAttributeSetProvider.Register
-class ResourceAttributeSetProvider(ArtifactAttributeSetProvider):
-    def create(self, artifact):
-        pass
-
-    def parse(self, artifact, content):
-        pass
-
-    def format(self, artifact, content):
-        pass
-
-    def apply(self, task, artifact):
-        resource = artifact.task
-        if isinstance(resource, Resource):
-            if not hasattr(resource, "_run_env"):
-                raise_error("Internal scheduling error, resource has not been prepared: {}", task.short_qualified_name)
-
-            deps = resource._run_env
-            deps.__enter__()
-
-            try:
-                if not isinstance(resource, WorkspaceResource):
-                    ts = utils.duration()
-                    log.info(colors.blue("Resource acquisition started ({})"),
-                             resource.short_qualified_name)
-                resource.acquire(artifact=artifact, deps=deps, tools=resource.tools, owner=task)
-                if not isinstance(resource, WorkspaceResource):
-                    log.info(colors.green("Resource acquisition finished after {} ({})"),
-                             ts, resource.short_qualified_name)
-            except (KeyboardInterrupt, Exception) as e:
-                if not isinstance(resource, WorkspaceResource):
-                    log.error("Resource acquisition failed after {} ({})",
-                              ts, resource.short_qualified_name)
-                    if resource.release_on_error:
-                        with utils.ignore_exception():
-                            self.unapply(task, artifact)
-                raise e
-
-    def unapply(self, task, artifact):
-        resource = artifact.task
-        if isinstance(resource, Resource):
-            deps = resource._run_env
-            try:
-                if not isinstance(resource, WorkspaceResource):
-                    ts = utils.duration()
-                    log.info(colors.blue("Resource release started ({})"),
-                             resource.short_qualified_name)
-                resource.release(artifact=artifact, deps=deps, tools=resource.tools, owner=task)
-                if not isinstance(resource, WorkspaceResource):
-                    log.info(colors.green("Resource release finished after {} ({})"),
-                             ts, resource.short_qualified_name)
-            except Exception as e:
-                if not isinstance(resource, WorkspaceResource):
-                    log.error("Resource release failed after {} ({})",
-                              ts, resource.short_qualified_name)
-                raise e
-            deps.__exit__(None, None, None)

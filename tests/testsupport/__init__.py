@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 from copy import copy, deepcopy
+import functools
 import os
 import re
 
@@ -48,12 +49,31 @@ def skip_if_no_deployment(method):
     return _wrap
 
 
+def skip_if_local(method):
+    @functools.wraps(method)
+    def _wrap(self):
+        if not self.network:
+            self.skipTest("network build required")
+        return method(self)
+    return _wrap
+
+
 def skip_if_network(method):
+    @functools.wraps(method)
     def _wrap(self):
         if self.network:
             self.skipTest("network build not supported")
         return method(self)
     return _wrap
+
+
+def skip(message):
+    def _decorator(method):
+        @functools.wraps(method)
+        def _wrap(self):
+            self.skipTest(message)
+        return _wrap
+    return _decorator
 
 
 @influence.files("../../jolt/**/*.py")
@@ -106,6 +126,7 @@ global_string("{test}")
 """.format(test=self._testMethodName) + self._recipe())
             tools.write_file("test.conf", self._config())
             tools.write_file("net.conf", self._network_config())
+            tools.write_file(".joltignore", "artifacts\nbuild\n")
 
             for filename, content in self._files():
                 content = "\n".join([l[8:] for l in content.splitlines()])
@@ -178,6 +199,20 @@ global_string("{test}")
             self.fail("no tasks were executed")
         elif task not in tasks:
             self.fail("{} was not executed".format(task))
+
+    def assertLocalBuild(self, r, task):
+        tasks = self.tasks(r, local=True)
+        if len(tasks) <= 0:
+            self.fail("no tasks were executed locally")
+        elif task not in tasks:
+            self.fail("{} was not executed locally".format(task))
+
+    def assertRemoteBuild(self, r, task):
+        tasks = self.tasks(r, remote=True)
+        if len(tasks) <= 0:
+            self.fail("no tasks were executed remotely")
+        elif task not in tasks:
+            self.fail("{} was not executed remotely".format(task))
 
     def assertNoBuild(self, r, task=None):
         tasks = self.tasks(r)

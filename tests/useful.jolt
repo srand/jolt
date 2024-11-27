@@ -1,4 +1,4 @@
-from jolt import Task, IntParameter, utils
+from jolt import Task, IntParameter, utils, Resource, log
 import time
 
 class Pass(Task):
@@ -37,3 +37,56 @@ class Interrupt(Task):
     def run(self, deps, tools):
         with utils.delay_interrupt():
             time.sleep(int(self.t))
+
+
+class RC1(Resource):
+    local = False
+
+    def acquire(self, artifact, deps, tools, owner):
+        log.info("Acquiring resource: {}", artifact.path)
+
+    def release(self, artifact, deps, tools, owner):
+        log.info("Releasing resource: {}", artifact.path)
+
+class RC2(Resource):
+    local = True
+
+    def acquire(self, artifact, deps, tools, owner):
+        log.info("Acquiring resource: {}", artifact.path)
+
+    def release(self, artifact, deps, tools, owner):
+        log.info("Releasing resource: {}", artifact.path)
+
+
+class Use1(Task):
+    cacheable = False
+    requires = ["rc1"]
+
+    def run(self, deps, tools):
+        self.info("Using resource: {}", deps["rc1"].path)
+
+
+class Use2(Task):
+    cacheable = False
+    requires = ["rc2"]
+
+    def run(self, deps, tools):
+        self.info("Using resource: {}", deps["rc2"].path)
+
+
+class Use3(Task):
+    requires = ["rc1", "rc2"]
+    local = True
+
+    def run(self, deps, tools):
+        self.info("Using resource: {}", deps["rc1"].path)
+        self.info("Using resource: {}", deps["rc2"].path)
+
+
+
+class A(Task):
+    pass
+
+class B(Task):
+    extends = "a"
+    requires = ["rc1"]

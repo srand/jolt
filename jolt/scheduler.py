@@ -116,17 +116,18 @@ class Executor(object):
 
 
 class LocalExecutor(Executor):
-    def __init__(self, factory, task, force_upload=False, force_build=False):
+    def __init__(self, factory, task, force_upload=False, force_build=False, is_worker=False):
         super().__init__(factory)
         self.task = task
         self.force_build = force_build
         self.force_upload = force_upload
+        self.is_worker = is_worker
 
     def _run(self, env, task):
         if self.is_aborted():
             return
         try:
-            with hooks.task_run(task):
+            with hooks.task_run(task), self.task.run_resources():
                 self.task.run(
                     env,
                     force_build=self.force_build,
@@ -409,7 +410,7 @@ class LocalStrategy(ExecutionStrategy, PruneStrategy):
         self.cache = cache
 
     def create_executor(self, session, task):
-        if task.is_alias():
+        if task.is_alias() or task.is_resource():
             return self.executors.create_skipper(task)
         if not task.is_cacheable():
             return self.executors.create_local(task)
@@ -457,14 +458,11 @@ class DistributedStrategy(ExecutionStrategy, PruneStrategy):
         self.cache = cache
 
     def create_executor(self, session, task):
-        if task.is_alias():
+        if task.is_alias() or task.is_resource():
             return self.executors.create_skipper(task)
 
-        if task.is_resource():
-            if task.deps_available_locally():
-                return self.executors.create_local(task)
-            else:
-                return self.executors.create_skipper(task)
+        if task.is_local():
+            return self.executors.create_local(task)
 
         if not task.is_cacheable():
             return self.executors.create_network(session, task)
@@ -506,10 +504,7 @@ class WorkerStrategy(ExecutionStrategy, PruneStrategy):
         self.cache = cache
 
     def create_executor(self, session, task):
-        if task.is_resource():
-            return self.executors.create_local(task)
-
-        if task.is_alias():
+        if task.is_alias() or task.is_resource():
             return self.executors.create_skipper(task)
 
         raise_task_error_if(

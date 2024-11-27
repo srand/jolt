@@ -25,8 +25,6 @@ class PodmanListVariable(ArtifactListAttribute):
 
 class PodmanImportListVariable(PodmanListVariable):
     def apply(self, task, artifact):
-        if isinstance(task, Resource):
-            return
         for tar in self.items():
             try:
                 tag = artifact.podman.tags[0]
@@ -41,8 +39,6 @@ class PodmanImportListVariable(PodmanListVariable):
 
 class PodmanLoadListVariable(PodmanListVariable):
     def apply(self, task, artifact):
-        if isinstance(task, Resource):
-            return
         for image in self.items():
             task.tools.run(
                 "podman load -i {}",
@@ -51,16 +47,12 @@ class PodmanLoadListVariable(PodmanListVariable):
 
 class PodmanPullListVariable(PodmanListVariable):
     def apply(self, task, artifact):
-        if isinstance(task, Resource):
-            return
         for image in self.items():
             task.tools.run("podman pull {}", image, output_on_error=True)
 
 
 class PodmanRmiListVariable(PodmanListVariable):
     def unapply(self, task, artifact):
-        if isinstance(task, Resource):
-            return
         for image in self.items():
             task.tools.run("podman rmi -f {}", image, output_on_error=True)
 

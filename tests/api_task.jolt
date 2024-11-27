@@ -1082,6 +1082,77 @@ class TaskApi(JoltTest):
             self.build("a")
         self.assertIn("Release R1", self.lastLog())
 
+    def test_resource_artifact(self):
+        """
+        --- tasks:
+        class R1(Resource):
+            def acquire(self, artifact, deps, tools, owner):
+                assert artifact.is_temporary()
+                with tools.cwd(tools.builddir()):
+                    tools.write_file("r1.lock", "locked")
+                    artifact.collect("r1.lock")
+
+            def release(self, artifact, deps, tools, owner):
+                assert not artifact.is_temporary()
+                with tools.cwd(artifact.path):
+                    assert tools.read_file("r1.lock") == "locked"
+
+        class A(Task):
+            requires = ["r1"]
+
+            def run(self, deps, tools):
+                a = deps["r1"]
+                assert not a.is_temporary()
+                with tools.cwd(a.path):
+                    assert tools.read_file("r1.lock") == "locked"
+        ---
+        """
+        self.build("a")
+
+    def test_multiple_resource_artifacts(self):
+        """
+        --- tasks:
+        @attributes.artifact("extra")
+        class R1(Resource):
+            def acquire(self, artifact, deps, tools, owner):
+                assert artifact.is_temporary()
+                with tools.cwd(tools.builddir()):
+                    tools.write_file("r1.lock", "locked")
+                    artifact.collect("r1.lock")
+
+            def release(self, artifact, deps, tools, owner):
+                assert not artifact.is_temporary()
+                with tools.cwd(artifact.path):
+                    assert tools.read_file("r1.lock") == "locked"
+
+            def acquire_extra(self, artifact, deps, tools, owner):
+                assert artifact.is_temporary()
+                with tools.cwd(tools.builddir()):
+                    tools.write_file("r1.extra", "extra_locked")
+                    artifact.collect("r1.extra")
+
+            def release_extra(self, artifact, deps, tools, owner):
+                assert not artifact.is_temporary()
+                with tools.cwd(artifact.path):
+                    assert tools.read_file("r1.extra") == "extra_locked"
+
+        class A(Task):
+            requires = ["r1"]
+
+            def run(self, deps, tools):
+                a = deps["r1"]
+                extra = deps["extra@r1"]
+                assert not a.is_temporary()
+                assert not extra.is_temporary()
+                with tools.cwd(a.path):
+                    assert tools.read_file("r1.lock") == "locked"
+                with tools.cwd(extra.path):
+                    assert tools.read_file("r1.extra") == "extra_locked"
+        ---
+        """
+        self.build("a")
+
+
     def test_runner(self):
         '''
         --- tasks:
