@@ -126,6 +126,11 @@ The ``[jolt]`` config section contains global configuration:
       - String
       - The shell to use when entering the interactive task debug shell.
 
+    * - ``task_max_errors``
+      - Integer
+      - | The maximum numbers of task errors to include in build reports.
+        | Default: ``100``
+
     * - ``task_timeout``
       - Integer
       - | The maximum time in seconds that a task is allowed to run before it is

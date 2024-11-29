@@ -1069,3 +1069,29 @@ class BuildCli(testsupport.JoltTest):
         ---
         """
         self.build("b")
+
+    def test_task_max_errors(self):
+        """
+        --- config:
+        task_max_errors = 1
+
+        --- tasks:
+        class A(Task):
+            def run(self, deps, tools):
+                with self.report() as r:
+                    r.add_error("error1", "error1", "error1")
+                    r.add_error("error2", "error2", "error2")
+                    r.add_error("error3", "error3", "error3")
+                assert False
+        ---
+        """
+
+        with self.assertRaises(Exception):
+            self.build("a --result result.xml")
+
+        with self.tools.cwd(self.ws):
+            data = self.tools.read_file("result.xml")
+            self.assertIn("error1", data)
+            self.assertIn("list truncated", data)
+            self.assertNotIn("error2", data)
+            self.assertNotIn("error3", data)

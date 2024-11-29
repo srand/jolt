@@ -2581,11 +2581,21 @@ class ErrorProxy(object):
 
 class ReportProxy(object):
     def __init__(self, task, report):
+        from jolt import config
         self._task = task
         self._report = report
+        self._max_errors = config.getint("jolt", "task_max_errors", 100)
 
     def add_error(self, type, location, message, details=""):
         """ Add an error to the build report. """
+        if len(self.errors) >= self._max_errors:
+            if not hasattr(self._report, "truncated"):
+                error = self._report.create_error()
+                error.type = "Error"
+                error.message = "Too many errors, list truncated"
+                self._report.truncated = True
+            return None
+
         error = self._report.create_error()
         error.type = type
         error.location = location
@@ -2606,11 +2616,8 @@ class ReportProxy(object):
         """
         for match in re.finditer(regex, logbuf, re.MULTILINE):
             error = match.groupdict()
-            self.add_error(
-                type,
-                error.get("location", ""),
-                error.get("message", ""),
-                error.get("details", ""))
+            if not self.add_error(type, error.get("location", ""), error.get("message", ""), error.get("details", "")):
+                break
 
     def add_regex_errors_with_file(self, type, regex, logbuf, reldir, filterfn=lambda n: True):
         """
@@ -2652,7 +2659,8 @@ class ReportProxy(object):
                     location = self._task.tools.expand_path(location)
                 location = self._task.tools.expand_relpath(location, self._task.tools.wsroot)
 
-            self.add_error(type, location, message, details)
+            if not self.add_error(type, location, message, details):
+                break
 
     def add_exception(self, exc, errtype=None, location=None):
         """
