@@ -133,7 +133,7 @@ def gdb(ctx, task, default, machine_interface, no_binary, gdb_args):
         stage_artifacts(main + deps, goal.tools)
 
         # Find an artifact with an executable
-        main = [artifact for artifact in main if artifact.strings.executable.get_value()]
+        main = [artifact for artifact in main if artifact.strings.executable]
         raise_task_error_if(
             not main, goal, "No executable found in task artifact")
         main = main[0]

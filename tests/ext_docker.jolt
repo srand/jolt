@@ -240,7 +240,7 @@ class DockerExt(JoltTest):
 
             def run(self, deps, tools):
                 images = tools.run("docker image ls --format '{{{{{{{{.Repository}}}}}}}}:{{{{{{{{.Tag}}}}}}}}'")
-                assert deps["busybox"].strings.tag.get_value() in images, "image not properly loaded"
+                assert deps["busybox"].strings.tag in images, "image not properly loaded"
         ---
         """
         self.build("consumer")
@@ -262,7 +262,7 @@ class DockerExt(JoltTest):
 
             def run(self, deps, tools):
                 images = tools.run("docker image ls --format '{{{{{{{{.Repository}}}}}}}}:{{{{{{{{.Tag}}}}}}}}'")
-                assert deps["busybox"].strings.tag.get_value() not in images, "image not properly loaded"
+                assert deps["busybox"].strings.tag not in images, "image not properly loaded"
         ---
         """
         self.build("consumer")
@@ -285,7 +285,7 @@ class DockerExt(JoltTest):
 
             def run(self, deps, tools):
                 images = tools.run("docker image ls --format '{{{{{{{{.Repository}}}}}}}}:{{{{{{{{.Tag}}}}}}}}'")
-                assert deps["busybox"].strings.tag.get_value() not in images, "image not properly loaded"
+                assert deps["busybox"].strings.tag not in images, "image not properly loaded"
         ---
         """
         self.build("consumer")

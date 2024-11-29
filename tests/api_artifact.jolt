@@ -534,3 +534,21 @@ class ArtifactApi(JoltTest):
         r = self.build("upload")
         self.assertExists("output", "file1.txt")
         self.assertExists("output", "dir", "file2.txt")
+
+    def test_artifact_strings(self):
+        """
+        --- tasks:
+        class A(Task):
+            def publish(self, a, t):
+                a.strings.testkey = "testvalue"
+
+        class B(Task):
+            requires = ["a"]
+
+            def run(self, d, t):
+                assert d["a"].strings.testkey == "testvalue"
+
+                for k, v in d["a"].strings.items():
+                    assert k == "testkey"
+                    assert v == "testvalue"
+        """

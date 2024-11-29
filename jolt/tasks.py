@@ -2539,7 +2539,7 @@ class Runner(Task):
         for task, artifact in deps.items():
             if not artifact.task.is_cacheable():
                 continue
-            if artifact.strings.executable.get_value() is None:
+            if artifact.strings.executable is None:
                 self.verbose("No executable found in task artifact for '{}'", task)
                 continue
             with tools.cwd(artifact.path):

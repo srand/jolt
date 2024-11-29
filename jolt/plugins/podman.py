@@ -680,12 +680,12 @@ class ContainerImage(Task):
                     artifact.collect("image.tar", output + "/{_imagefile}.tar")
                     if self._autoload:
                         artifact.podman.load.append(output + "/{_imagefile}.tar")
-                        artifact.podman.rmi.append(artifact.strings.tag.get_value())
+                        artifact.podman.rmi.append(artifact.strings.tag)
                 if output in ["archive"] and self._imagefile:
                     artifact.collect("image.tar", output + "/{_imagefile}.tar")
                     if self._autoload:
                         artifact.podman.imprt.append(output + "/{_imagefile}.tar")
-                        artifact.podman.rmi.append(artifact.strings.tag.get_value())
+                        artifact.podman.rmi.append(artifact.strings.tag)
                 if output in ["directory", "oci-directory"]:
                     with tools.cwd("image.dir"):
                         artifact.collect("*", f"{output}/", symlinks=True)

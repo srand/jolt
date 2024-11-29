@@ -105,7 +105,7 @@ class PodmanExt(JoltTest):
         from jolt.plugins.podman import *
 
         class Busybox(ContainerImage):
-            imagefile = "image.tar"
+            imagefile = "image"
 
         ---
         """
@@ -237,7 +237,7 @@ class PodmanExt(JoltTest):
 
             def run(self, deps, tools):
                 images = tools.run("podman image ls --format '{{{{{{{{.Repository}}}}}}}}:{{{{{{{{.Tag}}}}}}}}'")
-                assert deps["busybox"].strings.tag.get_value() in images, "image not properly loaded"
+                assert deps["busybox"].strings.tag in images, "image not properly loaded"
         ---
         """
         self.build("consumer")
@@ -262,7 +262,7 @@ class PodmanExt(JoltTest):
 
             def run(self, deps, tools):
                 images = tools.run("podman image ls --format '{{{{{{{{.Repository}}}}}}}}:{{{{{{{{.Tag}}}}}}}}'")
-                assert deps["busybox"].strings.tag.get_value() not in images, "image not properly loaded"
+                assert deps["busybox"].strings.tag not in images, "image not properly loaded"
         ---
         """
         self.build("consumer")
@@ -288,7 +288,7 @@ class PodmanExt(JoltTest):
 
             def run(self, deps, tools):
                 images = tools.run("podman image ls --format '{{{{{{{{.Repository}}}}}}}}:{{{{{{{{.Tag}}}}}}}}'")
-                assert deps["busybox"].strings.tag.get_value() not in images, "image not properly loaded"
+                assert deps["busybox"].strings.tag not in images, "image not properly loaded"
         ---
         """
         self.build("consumer")

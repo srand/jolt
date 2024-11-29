@@ -677,4 +677,4 @@ class DockerImage(Task):
                     if self._autoload:
                         artifact.docker.load.append("{_imagefile}")
             if self._autoload:
-                artifact.docker.rmi.append(artifact.strings.tag.get_value())
+                artifact.docker.rmi.append(artifact.strings.tag)

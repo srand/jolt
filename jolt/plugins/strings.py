@@ -1,27 +1,31 @@
-from jolt.cache import ArtifactAttributeSet
 from jolt.cache import ArtifactAttributeSetProvider
-from jolt.cache import ArtifactStringAttribute
 
 
-class StringVariable(ArtifactStringAttribute):
-    def __init__(self, artifact, name):
-        super(StringVariable, self).__init__(artifact, name)
-        self._old_value = None
-
-    def apply(self, task, artifact):
-        pass
-
-    def unapply(self, task, artifact):
-        pass
-
-
-class StringVariableSet(ArtifactAttributeSet):
+class StringVariableSet(object):
     def __init__(self, artifact):
-        super(StringVariableSet, self).__init__()
-        super(ArtifactAttributeSet, self).__setattr__("_artifact", artifact)
+        super(StringVariableSet, self).__setattr__("_attributes", {})
 
-    def create(self, name):
-        return StringVariable(self._artifact, name)
+    def _get_attributes(self):
+        return self._attributes
+
+    def __getattr__(self, name):
+        attributes = self._get_attributes()
+        if name not in attributes:
+            return None
+        return attributes[name]
+
+    def __setattr__(self, name, value):
+        if not isinstance(value, str):
+            raise ValueError(f"Value assigned to artifact.strings.{name} must be a string, got {type(value)}")
+        attributes = self._get_attributes()
+        attributes[name] = value
+        return value
+
+    def __dict__(self):
+        return {key: str(value) for key, value in self.items()}
+
+    def items(self):
+        return self._get_attributes().items()
 
 
 @ArtifactAttributeSetProvider.Register
@@ -34,7 +38,7 @@ class StringVariableSetProvider(ArtifactAttributeSetProvider):
             return
 
         for key, value in content["strings"].items():
-            getattr(artifact.strings, key).set_value(value, expand=False)
+            setattr(artifact.strings, key, value)
 
     def format(self, artifact, content):
         if "strings" not in content:
@@ -44,7 +48,7 @@ class StringVariableSetProvider(ArtifactAttributeSetProvider):
             content["strings"][key] = str(value)
 
     def apply(self, task, artifact):
-        artifact.strings.apply(task, artifact)
+        pass
 
     def unapply(self, task, artifact):
-        artifact.strings.unapply(task, artifact)
+        pass

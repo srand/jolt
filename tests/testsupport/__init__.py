@@ -104,7 +104,7 @@ class JoltTest(Test):
         return common + "\n".join([l[8:] for l in lines.splitlines()])
 
     def _network_config(self):
-        return self.deps["deployment"].strings.config.get_value() \
+        return self.deps["deployment"].strings.config \
             if self.network_enabled else ""
 
     def setup(self, deps, tools):
