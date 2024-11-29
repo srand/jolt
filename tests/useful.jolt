@@ -85,8 +85,21 @@ class Use3(Task):
 
 
 class A(Task):
-    pass
+    local = True
+
+    def unpack(self, artifact, tools):
+        pass
+
+
+class R(Resource):
+    local = True
+    requires = ["a"]
+
+    def acquire(self, artifact, deps, tools, owner):
+        log.info("Acquiring resource: {}", artifact.path)
+
+    def release(self, artifact, deps, tools, owner):
+        log.info("Releasing resource: {}", artifact.path)
 
 class B(Task):
-    extends = "a"
-    requires = ["rc1"]
+    requires = ["r"]

@@ -1855,7 +1855,7 @@ class Tools(object):
             not self.which("newgidmap") and not self.which("/usr/bin/newuidmap"), self._task,
             "No usable 'newgidmap' found in PATH")
 
-        if type(chroot) is cache.Artifact:
+        if type(chroot) in [cache.Artifact, cache.ArtifactToolsProxy]:
             raise_task_error_if(
                 not str(chroot.paths.rootfs), self._task,
                 "No 'rootfs' path in artifact")

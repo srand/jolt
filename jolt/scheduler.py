@@ -127,7 +127,7 @@ class LocalExecutor(Executor):
         if self.is_aborted():
             return
         try:
-            with hooks.task_run(task), self.task.run_resources():
+            with hooks.task_run(task):
                 self.task.run(
                     env,
                     force_build=self.force_build,

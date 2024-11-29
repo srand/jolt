@@ -1045,3 +1045,27 @@ class BuildCli(testsupport.JoltTest):
         self.assertIn("Resource acquisition finished after 00s (r for b)", r)
         self.assertIn("Resource release started (r for b)", r)
         self.assertIn("Resource release finished after 00s (r for b)", r)
+
+    @testsupport.skip_if_local
+    def test_unpack_of_resource_dep(self):
+        """
+        --- tasks:
+        class A(Task):
+            local = True
+
+            def unpack(self, artifact, tools):
+                with tools.cwd(artifact.path):
+                    tools.write_file("file.txt", "file")
+
+        class R(Resource):
+            local = True
+            requires = ["a"]
+
+            def acquire(self, artifact, deps, tools, owner):
+                assert not deps["a"].is_temporary()
+
+        class B(Task):
+            requires = ["r"]
+        ---
+        """
+        self.build("b")

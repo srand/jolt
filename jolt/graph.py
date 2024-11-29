@@ -422,7 +422,7 @@ class TaskProxy(object):
 
         # Prepare workspace resources for this task so that influence can be calculated
         for child in self.children:
-            if not isinstance(child.task, WorkspaceResource):
+            if not child.is_workspace_resource():
                 continue
             child.task.prepare_ws_for(self.task)
 
@@ -585,9 +585,10 @@ class TaskProxy(object):
                 continue
 
             if child.is_resource() and child.is_local() and child.options.worker:
-                return raise_task_error_if(
+                raise_task_error_if(
                     not child.download(force=True),
                     child, "Failed to download task artifact")
+                continue
 
             raise_task_error_if(
                 not child.is_completed() and child.is_unstable,
@@ -625,8 +626,9 @@ class TaskProxy(object):
 
         The artifact is published to the cache even if the acquisition fails.
         """
+
         try:
-            if not isinstance(self.task, WorkspaceResource):
+            if not self.is_workspace_resource():
                 ts = utils.duration()
                 log.info(colors.blue("Resource acquisition started ({} for {})"), self.short_qualified_name, owner.short_qualified_name)
 
@@ -636,13 +638,14 @@ class TaskProxy(object):
                     acquire(artifact, self.deps, self.tools, owner.task)
             finally:
                 # Always commit the resource session artifact to the cache, even if the acquisition failed.
-                self.cache.commit(artifact)
+                if not self.is_workspace_resource():
+                    self.cache.commit(artifact)
 
-            if not isinstance(self.task, WorkspaceResource):
+            if not self.is_workspace_resource():
                 log.info(colors.green("Resource acquisition finished after {} ({} for {})"), ts, self.short_qualified_name, owner.short_qualified_name)
 
         except (KeyboardInterrupt, Exception) as e:
-            if not isinstance(self.task, WorkspaceResource):
+            if not self.is_workspace_resource():
                 log.error(colors.red("Resource acquisition failed after {} ({} for {})"), ts, self.short_qualified_name, owner.short_qualified_name)
             if self.task.release_on_error:
                 with utils.ignore_exception():
@@ -654,7 +657,7 @@ class TaskProxy(object):
         Releases a resource.
         """
         try:
-            if not isinstance(self.task, WorkspaceResource):
+            if not self.is_workspace_resource():
                 ts = utils.duration()
                 log.info(colors.blue("Resource release started ({} for {})"), self.short_qualified_name, owner.short_qualified_name)
 
@@ -662,11 +665,11 @@ class TaskProxy(object):
                 release = getattr(self.task, "release_" + artifact.name) if artifact.name != "main" else self.task.release
                 release(artifact, self.deps, self.tools, owner.task)
 
-            if not isinstance(self.task, WorkspaceResource):
+            if not self.is_workspace_resource():
                 log.info(colors.green("Resource release finished after {} ({} for {})"), ts, self.short_qualified_name, owner.short_qualified_name)
 
         except (KeyboardInterrupt, Exception) as e:
-            if not isinstance(self.task, WorkspaceResource):
+            if not self.is_workspace_resource():
                 log.error(colors.red("Resource release failed after {} ({} for {})"), ts, self.short_qualified_name, owner.short_qualified_name)
             raise e
 
@@ -683,7 +686,13 @@ class TaskProxy(object):
         Resource artifacts are always published and uploaded if the acquisition has been started,
         even if the acquisition fails. That way, a failed acquisition can be debugged.
         """
+        self._run_download_dependencies(self.cache)
 
+        with self._run_resources_no_dep_download():
+            yield
+
+    @contextmanager
+    def _run_resources_no_dep_download(self):
         # Log messages are prefixed with task identity if resources are acquired in parallel
         log_prefix = False
 
@@ -704,10 +713,7 @@ class TaskProxy(object):
         try:
             # Acquire resource dependencies in reverse order.
             for resource in reversed(resource_deps):
-                # Download resource dependencies if not already done.
-                resource._run_download_dependencies(self.cache, force_upload=False, force_build=False)
-
-                with resource.lock_artifacts(discard=False):
+                with resource.lock_artifacts(discard=False) if not resource.is_workspace_resource() else nullcontext():
                     resource.deps = self.cache.get_context(resource)
                     exitstack.enter_context(resource.deps)
 
@@ -731,13 +737,19 @@ class TaskProxy(object):
 
     def run(self, env, force_upload=False, force_build=False):
         cache = env.cache
+
+        # Download dependency artifacts if not already done
+        self._run_download_dependencies(cache, force_upload, force_build)
+
+        with self._run_resources_no_dep_download():
+            self._run_task(env, force_upload, force_build)
+
+    def _run_task(self, env, force_upload=False, force_build=False):
+        cache = env.cache
         queue = env.queue
 
         with self.tools:
             available_locally = available_remotely = False
-
-            # Download dependency artifacts if not already done
-            self._run_download_dependencies(cache, force_upload, force_build)
 
             # Check if task artifact is available locally or remotely,
             # either skip execution or download it if necessary.
@@ -1067,9 +1079,9 @@ class GraphBuilder(object):
             if not node.is_resource():
                 self.nodes[node.short_qualified_name] = node
                 self.nodes[node.qualified_name] = node
-            elif parent:
+            elif parent and not self.options.worker:
                 # A resource inherits its instance uuid from the consuming task
-                node.instance = parent.instance
+                node.instance += "-" + parent.instance
             if self.options.salt:
                 node.taint(self.options.salt)
             self._build_node(progress, node)
