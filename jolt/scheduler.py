@@ -645,7 +645,7 @@ def export_tasks(tasks):
             properties=properties,
         )
 
-        pb_tasks[task.short_qualified_name] = common_pb.Task(**args)
+        pb_tasks[task.exported_name] = common_pb.Task(**args)
 
     return pb_tasks
 

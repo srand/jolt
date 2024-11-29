@@ -1520,7 +1520,7 @@ class TaskBase(object):
     def _apply_protobuf(self, buildenv):
         if buildenv is None:
             return
-        task = buildenv.tasks.get(self.short_qualified_name)
+        task = buildenv.tasks.get(self.exported_name)
         if not task:
             return
         if task.identity:
@@ -1674,6 +1674,16 @@ class TaskBase(object):
         return utils.format_task_name(
             self.name,
             self._get_explicitly_set_parameters())
+
+    @property
+    def exported_name(self):
+        if hasattr(self, "_exported_name"):
+            return self._exported_name
+        return self.short_qualified_name
+
+    @exported_name.setter
+    def exported_name(self, name):
+        self._exported_name = name
 
     def expand(self, string_or_list, *args, **kwargs):
         """ Expands keyword arguments/macros in a format string.

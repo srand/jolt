@@ -62,6 +62,9 @@ class TaskProxy(object):
         self._status = None
         self._finalized = False
 
+        # Consumer task if this is a resource
+        self._owner = None
+
         # List of all artifacts that are produced by this task
         self._artifacts = []
 
@@ -100,6 +103,10 @@ class TaskProxy(object):
     @property
     def short_qualified_name(self):
         return self.task.short_qualified_name
+
+    @property
+    def exported_name(self):
+        return self.task.exported_name
 
     @property
     def log_name(self):
@@ -396,6 +403,10 @@ class TaskProxy(object):
 
     def set_goal(self):
         self._goal = True
+
+    def set_owner(self, owner):
+        self._owner = owner
+        self.task.exported_name = f"{self.short_qualified_name}@{owner.short_qualified_name}"
 
     def finalize(self, dag, manifest):
         log.debug("Finalizing: " + self.short_qualified_name)
@@ -1079,9 +1090,10 @@ class GraphBuilder(object):
             if not node.is_resource() or node.is_workspace_resource():
                 self.nodes[node.short_qualified_name] = node
                 self.nodes[node.qualified_name] = node
-            elif parent and not self.options.worker:
-                # A resource inherits its instance uuid from the consuming task
-                node.instance += "-" + parent.instance
+            elif parent:
+                node.set_owner(parent)
+                if self.buildenv:
+                    task._apply_protobuf(self.buildenv)
             if self.options.salt:
                 node.taint(self.options.salt)
             self._build_node(progress, node)
