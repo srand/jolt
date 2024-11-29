@@ -1076,7 +1076,7 @@ class GraphBuilder(object):
             if node is not None:
                 return node
             node = TaskProxy(task, self.graph, self.cache, self.options)
-            if not node.is_resource():
+            if not node.is_resource() or node.is_workspace_resource():
                 self.nodes[node.short_qualified_name] = node
                 self.nodes[node.qualified_name] = node
             elif parent and not self.options.worker:

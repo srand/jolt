@@ -804,7 +804,7 @@ class TaskRegistry(object):
         if cls:
             task = cls(parameters=params, manifest=manifest, buildenv=buildenv)
             task = self.instances.get(task.qualified_name, task)
-            if not isinstance(task, Resource):
+            if not isinstance(task, Resource) or isinstance(task, WorkspaceResource):
                 self.instances[task.qualified_name] = task
                 self.instances[full_name] = task
             return task
