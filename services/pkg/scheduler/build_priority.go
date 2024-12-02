@@ -168,7 +168,7 @@ func (b *priorityBuild) IsDone() bool {
 
 // Returns true if the build is terminal.
 func (b *priorityBuild) IsTerminal() bool {
-	return (!b.HasQueuedTask() && !b.HasRunningTask() && !b.HasObserver()) || (b.IsCancelled() && !b.HasRunningTask())
+	return (!b.HasQueuedTask() && !b.HasRunningTask() && !b.HasObserver()) || b.IsCancelled()
 }
 
 // Returns true if the build or one of its tasks has an observer.

@@ -280,6 +280,7 @@ func (s *priorityScheduler) Run(ctx context.Context) {
 			log.Trace("rescheduling")
 			ticker.Reset(tickerPeriod)
 			s.removeStaleBuilds()
+			s.requeueReadyBuilds()
 			s.selectTaskAndWorker()
 		}
 	}
@@ -439,6 +440,17 @@ func (s *priorityScheduler) removeStaleBuilds() {
 	s.Lock()
 	for _, build := range stale {
 		s.closeBuildNoLock(build)
+	}
+	s.Unlock()
+}
+
+// Requeue builds which are ready for scheduling.
+func (s *priorityScheduler) requeueReadyBuilds() {
+	s.Lock()
+	for _, build := range s.builds {
+		if build.HasQueuedTask() && !s.readyBuilds.Contains(build) {
+			s.enqueueBuildNoLock(build)
+		}
 	}
 	s.Unlock()
 }

@@ -36,24 +36,30 @@ func TestUnicast(t *testing.T) {
 		bc.Send(unicastTestData[i])
 	}
 
+	assert.True(t, bc.HasUnackedData())
+
 	var msg string
 	select {
 	case msg = <-c1.Chan:
 	case msg = <-c2.Chan:
 	}
 	assert.True(t, unicastTestData[0] == msg || unicastTestData[1] == msg)
+	assert.True(t, bc.HasUnackedData())
 
 	select {
 	case msg = <-c1.Chan:
 	case msg = <-c2.Chan:
 	}
 	assert.True(t, unicastTestData[0] == msg || unicastTestData[1] == msg)
+	assert.True(t, bc.HasUnackedData())
 
 	// Close consumers without acknowledging message
 	c2.Close()
 	c1.Close()
+	assert.False(t, bc.HasUnackedData())
 
 	c3 := bc.NewConsumer(nil)
+	assert.True(t, bc.HasUnackedData())
 
 	expectedOrder := []string{
 		unicastTestData[0],
@@ -68,6 +74,7 @@ func TestUnicast(t *testing.T) {
 		assert.Equal(t, expectedOrder[i], msg)
 		c3.Acknowledge()
 	}
+	assert.False(t, bc.HasUnackedData())
 }
 
 func TestUnicastAck(t *testing.T) {
