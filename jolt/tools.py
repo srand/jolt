@@ -148,24 +148,23 @@ def _run(cmd, cwd, env, preexec_fn, *args, **kwargs):
 
         p.wait(timeout=timeout)
 
-    except (KeyboardInterrupt, subprocess.TimeoutExpired, JoltTimeoutError) as e:
-        if type(e) is KeyboardInterrupt:
-            try:
-                timeout = None if deadline is None else max(0, deadline - time.time())
-                p.wait(timeout=timeout)
-                raise e
-            except (subprocess.TimeoutExpired, JoltTimeoutError):
-                timedout = True
-        else:
-            timedout = True
+    except KeyboardInterrupt:
+        try:
+            terminate(p.pid)
+            p.wait(10)
+        except subprocess.TimeoutExpired:
+            kill(p.pid)
+            p.wait()
+        raise
 
-        if timedout:
-            try:
-                terminate(p.pid)
-                p.wait(10)
-            except subprocess.TimeoutExpired:
-                kill(p.pid)
-                p.wait()
+    except (subprocess.TimeoutExpired, JoltTimeoutError) as e:
+        timedout = True
+        try:
+            terminate(p.pid)
+            p.wait(10)
+        except subprocess.TimeoutExpired:
+            kill(p.pid)
+            p.wait()
 
     finally:
         stdout.join()
