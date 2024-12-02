@@ -1,4 +1,4 @@
-FROM python:3.11-slim
+FROM docker.io/python:3.11-slim
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update
 RUN apt-get install -y --no-install-recommends \

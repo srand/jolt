@@ -1,4 +1,4 @@
-FROM golang:1.21-bookworm as tools
+FROM docker.io/golang:1.21-bookworm as tools
 ARG DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y \
     protobuf-compiler-grpc \
@@ -6,7 +6,7 @@ RUN apt-get update && apt-get install -y \
     protoc-gen-go \
     protoc-gen-go-grpc
 
-FROM debian:bookworm-slim as base
+FROM docker.io/debian:bookworm-slim as base
 ARG DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \
     bubblewrap \

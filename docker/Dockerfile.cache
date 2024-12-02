@@ -1,4 +1,4 @@
-FROM golang:1.21-bookworm as base
+FROM docker.io/golang:1.21-bookworm as base
 
 FROM base as tools
 ARG DEBIAN_FRONTEND=noninteractive
@@ -10,7 +10,7 @@ ADD . /usr/src
 WORKDIR /usr/src/services
 RUN go build -ldflags '-s -w' ${BUILD_ARGS} ./cmd/cache
 
-FROM debian:bookworm-slim
+FROM docker.io/debian:bookworm-slim
 COPY --from=build /usr/src/services/cache /opt/jolt/cache
 RUN mkdir /data
 WORKDIR /data

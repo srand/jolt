@@ -1,4 +1,4 @@
-FROM golang:1.21-bookworm as base
+FROM docker.io/golang:1.21-bookworm as base
 
 FROM base as tools
 ARG DEBIAN_FRONTEND=noninteractive
@@ -15,7 +15,7 @@ WORKDIR /usr/src/services
 RUN go generate ./...
 RUN go build -ldflags '-s -w' ${BUILD_ARGS} ./cmd/scheduler
 
-FROM debian:bookworm-slim
+FROM docker.io/debian:bookworm-slim
 COPY --from=build /usr/src/services/scheduler /opt/jolt/scheduler
 RUN mkdir /data
 WORKDIR /data
