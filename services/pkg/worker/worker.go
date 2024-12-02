@@ -224,7 +224,7 @@ func (w *worker) run() error {
 						// Only newer executors can handle interrupts correctly.
 						var pid int
 
-						if currentClient == nil || utils.VersionLessThan(currentClient.Version, "0.9.312") {
+						if currentClient == nil || utils.VersionLessThan(currentClient.Version, "0.9.329") {
 							pid = currentProc.Pid
 						} else {
 							pid = -currentProc.Pid
