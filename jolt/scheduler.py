@@ -116,12 +116,11 @@ class Executor(object):
 
 
 class LocalExecutor(Executor):
-    def __init__(self, factory, task, force_upload=False, force_build=False, is_worker=False):
+    def __init__(self, factory, task, force_upload=False, force_build=False):
         super().__init__(factory)
         self.task = task
         self.force_build = force_build
         self.force_upload = force_upload
-        self.is_worker = is_worker
 
     def _run(self, env, task):
         if self.is_aborted():

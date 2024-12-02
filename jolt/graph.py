@@ -708,7 +708,8 @@ class TaskProxy(object):
         log_prefix = False
 
         # Collect list of resource dependencies
-        resource_deps = [child for child in self.children if child.is_resource()]
+        resource_deps = [child for child in self.children if child.is_resource() and not child.is_workspace_resource()]
+        resource_deps_ws = [child for child in self.children if child.is_workspace_resource()]
 
         if self.options.worker:
             # Exclude local resources when running as worker. They are already acquired by the client.
@@ -723,7 +724,7 @@ class TaskProxy(object):
         acquired = []
         try:
             # Acquire resource dependencies in reverse order.
-            for resource in reversed(resource_deps):
+            for resource in reversed(resource_deps + resource_deps_ws):
                 with resource.lock_artifacts(discard=False) if not resource.is_workspace_resource() else nullcontext():
                     resource.deps = self.cache.get_context(resource)
                     exitstack.enter_context(resource.deps)
