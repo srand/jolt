@@ -139,7 +139,20 @@ func (w *worker) run() error {
 		select {
 		case request := <-requests:
 			if request == nil {
-				return errors.New("read error")
+				// Lost connection to the scheduler
+				// Terminate the current build and exit.
+				if currentCmd != nil {
+					log.Info("Terminating current build due to lost connection to scheduler")
+					if w.interruptExecutor(currentProc, currentClient); err != nil {
+						log.Error("Failed to terminate executor:", err)
+					}
+					select {
+					case <-currentCmd:
+					case <-time.After(30 * time.Second):
+						w.killExecutor(currentProc)
+					}
+				}
+				return errors.New("Disconnected from scheduler")
 			}
 			switch request.Action {
 			case protocol.WorkerRequest_BUILD:
@@ -213,27 +226,8 @@ func (w *worker) run() error {
 			case protocol.WorkerRequest_CANCEL_BUILD:
 				log.Info("Sending interrupt signal to executor:", request.BuildId)
 				if currentProc != nil {
-					// On POSIX systems, send SIGINT to the process group
-					// to interrupt the executor and all its children.
-					if runtime.GOOS == "windows" {
-						err = currentProc.Signal(os.Interrupt)
-						if err != nil {
-							log.Debug(err)
-						}
-					} else {
-						// Only newer executors can handle interrupts correctly.
-						var pid int
-
-						if currentClient == nil || utils.VersionLessThan(currentClient.Version, "0.9.329") {
-							pid = currentProc.Pid
-						} else {
-							pid = -currentProc.Pid
-						}
-
-						err = syscall.Kill(pid, syscall.SIGINT)
-						if err != nil {
-							log.Debug(err)
-						}
+					if w.interruptExecutor(currentProc, currentClient); err != nil {
+						log.Error("Failed to terminate executor:", err)
 					}
 				}
 
@@ -262,6 +256,46 @@ func (w *worker) run() error {
 			}
 		}
 	}
+}
+
+func (w *worker) interruptExecutor(process *os.Process, client *protocol.Client) error {
+	// On POSIX systems, send SIGINT to the process group
+	// to interrupt the executor and all its children.
+	if runtime.GOOS == "windows" {
+		err := process.Signal(os.Interrupt)
+		if err != nil {
+			return err
+		}
+	} else {
+		// Only newer executors can handle interrupts correctly.
+		var pid int
+
+		if client == nil || utils.VersionLessThan(client.Version, "0.9.329") {
+			pid = process.Pid
+		} else {
+			pid = -process.Pid
+		}
+
+		err := syscall.Kill(pid, syscall.SIGINT)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (w *worker) killExecutor(process *os.Process) error {
+	// On POSIX systems, send SIGKILL to the process group
+	// to terminate the executor and all its children.
+	if runtime.GOOS == "windows" {
+		err := process.Kill()
+		if err != nil {
+			return err
+		}
+		return nil
+	}
+	return syscall.Kill(-process.Pid, syscall.SIGKILL)
 }
 
 // Serialize a BuildRequest pb to a temporary file so that the executor can read it
