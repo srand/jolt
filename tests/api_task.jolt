@@ -1382,3 +1382,22 @@ class TaskApi(JoltTest):
         ---
         """
         self.build("a")
+
+    def test_test_filter(self):
+        """
+        --- tasks:
+        class A(Test):
+            def test_a(self):
+                pass
+
+            def test_b(self):
+                pass
+        ---
+        """
+        r = self.build("a:filter=*a")
+        self.assertIn("test_a", r)
+        self.assertNotIn("test_b", r)
+
+        r = self.build("a")
+        self.assertIn("test_a", r)
+        self.assertIn("test_b", r)

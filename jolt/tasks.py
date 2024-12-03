@@ -3221,7 +3221,7 @@ class Test(Task):
     Abstract test tasks can't be executed and won't be listed.
     """
 
-    pattern = Parameter(required=False, help="Test-case filter wildcard.")
+    filter = Parameter(required=False, help="Test-case filter wildcard.")
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -3376,7 +3376,7 @@ class Test(Task):
     def run(self, deps, tools):
         testsuite = ut.TestSuite()
         for test in self._get_test_names():
-            if self.pattern.is_unset() or fnmatch.fnmatch(test, str(self.pattern)):
+            if self.filter.is_unset() or fnmatch.fnmatch(test, str(self.filter)):
                 testfunc = getattr(self, test)
                 if not testfunc:
                     continue
