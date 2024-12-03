@@ -34,7 +34,7 @@ func TestRWMutex(t *testing.T) {
 	defer m.Unlock()
 
 	// Check that the mutex is locked
-	if !m.TryLock() {
+	if m.TryLock() {
 		t.Error("Expected mutex to be locked")
 	}
 }

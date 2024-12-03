@@ -67,7 +67,10 @@ func (m *deadlockMutex) getGoroutineID(stack string) int {
 func (m *deadlockMutex) dumpInfo() bool {
 	m.infoMu.Lock()
 	defer m.infoMu.Unlock()
+	return m.dumpInfoNoLock()
+}
 
+func (m *deadlockMutex) dumpInfoNoLock() bool {
 	if m.owner == 0 {
 		return false
 	}
@@ -99,7 +102,7 @@ func (m *deadlockMutex) Lock() {
 	m.infoMu.Lock()
 	info, id := m.makeInfo()
 	if _, ok := m.info[id]; ok {
-		m.dumpInfo()
+		m.dumpInfoNoLock()
 		m.infoMu.Unlock()
 		panic("attempted to lock a mutex that is already locked")
 	}
@@ -129,20 +132,25 @@ func (m *deadlockMutex) Lock() {
 func (m *deadlockMutex) Unlock() {
 	_, id := m.makeInfo()
 	m.infoMu.Lock()
-	delete(m.info, id)
-	m.owner = 0
-	m.infoMu.Unlock()
-	m.mu.Unlock()
+	if _, ok := m.info[id]; ok {
+		delete(m.info, id)
+		m.owner = 0
+		m.infoMu.Unlock()
+		m.mu.Unlock()
+	} else {
+		m.infoMu.Unlock()
+		m.dumpInfo()
+		panic("attempted to unlock a mutex that is not locked by the current goroutine")
+	}
 }
 
 // TryLock tries to lock the mutex and returns true if it was successful.
 func (m *deadlockMutex) TryLock() bool {
-	m.infoMu.Lock()
 	info, id := m.makeInfo()
+	m.infoMu.Lock()
 	if _, ok := m.info[id]; ok {
-		m.dumpInfo()
 		m.infoMu.Unlock()
-		panic("attempted to lock a mutex that is already locked")
+		return false
 	}
 	m.info[id] = info
 	m.infoMu.Unlock()
