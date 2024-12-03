@@ -206,6 +206,8 @@ class RemoteExecutor(NetworkExecutor):
 
     def run(self, env):
         """ Run the task. """
+        if self.is_aborted():
+            return
         try:
             with hooks.task_run([self.task] + self.task.extensions), self.task.run_resources():
                 try:
@@ -247,8 +249,16 @@ class RemoteExecutor(NetworkExecutor):
             pass
 
         except (grpc.RpcError, grpc._channel._MultiThreadedRendezvous) as rpc_error:
+            if self.is_aborted():
+                if self.task.is_running():
+                    self.task.failed_execution(remote=True, interrupt=True)
+                    for extension in self.task.extensions:
+                        extension.failed_execution(remote=True, interrupt=True)
+                return
+
             if rpc_error.code() not in [grpc.StatusCode.NOT_FOUND, grpc.StatusCode.UNAVAILABLE]:
                 raise_task_error(self.task, rpc_error.details(), type="Scheduler Error")
+
             self.session.clear_build_request(f"Scheduler Error: {rpc_error.details()}")
             raise rpc_error
 
