@@ -97,7 +97,7 @@ class Reporter(object):
             result.start = time.time() * 1000
             result.fullName = self._task.__class__.__name__ + "." + name
             result.testCaseId = utils.sha1(result.fullName)
-            result.historyId = utils.sha1(self._task.identity + result.testCaseId)
+            result.historyId = utils.sha1(self._task.qualified_name + result.testCaseId)
             result.description = description
             result.labels.append(Label(name=LabelType.HOST, value=self._host))
             result.labels.append(Label(name=LabelType.THREAD, value=self._thread))
@@ -203,7 +203,7 @@ class AllureHooks(TaskHook):
             result.fullName = task.qualified_name
             result.description = task.task.__doc__
             result.testCaseId = utils.sha1(result.fullName)
-            result.historyId = utils.sha1(task.identity + result.testCaseId)
+            result.historyId = utils.sha1(task.qualified_name + result.testCaseId)
             result.labels.append(Label(name=LabelType.HOST, value=host_tag()))
             result.labels.append(Label(name=LabelType.THREAD, value=thread_tag()))
             result.labels.append(Label(name=LabelType.FRAMEWORK, value='jolt'))
