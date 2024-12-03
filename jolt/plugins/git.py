@@ -101,6 +101,7 @@ class GitRepository(object):
                     self.tools.mkdir(".git/objects/info")
                     self.tools.write_file(".git/objects/info/alternates", refpath)
 
+                utils.call_and_catch(self.tools.run, "git remote remove origin", output=False)
                 self.tools.run("git remote add origin {}", self.url, output_on_error=True)
                 self.tools.run("git fetch origin", output_on_error=True)
                 self.tools.run("git checkout -f FETCH_HEAD", output_on_error=True)
