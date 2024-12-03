@@ -406,7 +406,7 @@ class TaskProxy(object):
 
     def set_owner(self, owner):
         self._owner = owner
-        self.task.exported_name = f"{self.short_qualified_name}@{owner.short_qualified_name}"
+        self.task.exported_name = f"{self.short_qualified_name}@@{owner.short_qualified_name}"
 
     def finalize(self, dag, manifest):
         log.debug("Finalizing: " + self.short_qualified_name)

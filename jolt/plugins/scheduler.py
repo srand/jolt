@@ -614,7 +614,8 @@ def executor(ctx, worker, build, request):
 
     # Build the graph of tasks
     gb = GraphBuilder(registry, acache, options=options, progress=True, buildenv=request.environment)
-    dag = gb.build(request.environment.tasks.keys())
+    task_names = [task.name for task in request.environment.tasks.values()]
+    dag = gb.build(task_names)
 
     # Enlist to execute build tasks from the scheduler
     enlist_msg = scheduler_pb.TaskUpdate(

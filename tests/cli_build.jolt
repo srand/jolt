@@ -871,13 +871,13 @@ class BuildCli(testsupport.JoltTest):
         """
         --- tasks:
         class R(Resource):
-            pass
+            value = Parameter(values=["1", "2"])
 
         class A(Task):
-            requires = ["r"]
+            requires = ["r:value=1"]
 
         class B(Task):
-            requires = ["r"]
+            requires = ["r:value=1"]
         ---
         """
         r = self.build("a b")
