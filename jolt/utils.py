@@ -440,6 +440,28 @@ def Singleton(cls):
     return cls
 
 
+class IdLock(object):
+    """ A wrapper for multiple thread locks that are identified by a unique id. """
+
+    def __init__(self):
+        self._lock = RLock()
+        self._locks = {}
+
+    def acquire(self, id, blocking=True):
+        with self._lock:
+            if id not in self._locks:
+                self._locks[id] = RLock()
+            lock = self._locks[id]
+        return lock.acquire(blocking=blocking)
+
+    def release(self, id):
+        with self._lock:
+            if id in self._locks:
+                self._locks[id].release()
+            else:
+                raise RuntimeError("Lock not acquired: {}".format(id))
+
+
 class LockFile(object):
     def __init__(self, path, logfunc=None, *args, **kwargs):
         self._file = process_lock.InterProcessLock(os.path.join(path, "lock"))

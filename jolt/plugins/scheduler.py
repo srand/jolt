@@ -184,7 +184,8 @@ class RemoteExecutor(NetworkExecutor):
         if not task.is_resource():
             # Tasks also download session artifacts of consumed resources
             for resource in filter(lambda task: task.is_resource() and not task.is_workspace_resource(), task.children):
-                self.download_session_artifacts(resource)
+                if not resource.is_available_locally(persistent_only=False):
+                    self.download_session_artifacts(resource)
 
     def download_log(self, task):
         """ Download log and transfer lines into local logging system. """

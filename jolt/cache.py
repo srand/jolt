@@ -1104,6 +1104,7 @@ class ArtifactCache(StorageProvider):
         self._cache_locked = False
         self._lock_file = fasteners.InterProcessLock(self._fs_get_lock_file())
         self._thread_lock = RLock()
+        self._artifact_thread_lock = utils.IdLock()
 
         # Create process lock file
         with self._cache_lock():
@@ -1852,6 +1853,18 @@ class ArtifactCache(StorageProvider):
 
     @contextlib.contextmanager
     def lock_artifact(self, artifact: Artifact, discard: bool = False, why: str = "publish"):
+        """
+        Locks the task artifact, both with process thread locks and interprocess file locks.
+        """
+        try:
+            self._artifact_thread_lock.acquire(artifact.identity)
+            with self._lock_artifact_interprocess(artifact, discard=discard, why=why) as artifact:
+                yield artifact
+        finally:
+            self._artifact_thread_lock.release(artifact.identity)
+
+    @contextlib.contextmanager
+    def _lock_artifact_interprocess(self, artifact: Artifact, discard: bool = False, why: str = "publish"):
         """
         Locks the task artifact.
 

@@ -590,15 +590,23 @@ class TaskProxy(object):
                 else:
                     log.debug(" Retained: {} ({})", self.short_qualified_name, artifact.identity)
 
-    def _run_download_dependencies(self, cache, force_upload=False, force_build=False):
+    def _run_download_dependencies(self, resource_only=False):
         for child in self.children:
             if not child.has_artifact():
                 continue
 
-            if child.is_resource() and child.is_local() and child.options.worker:
-                raise_task_error_if(
-                    not child.download(force=True),
-                    child, "Failed to download task artifact")
+            if child.is_resource() and child.is_local():
+                if child.options.worker:
+                    # Resource already acquired by the client when running as worker
+                    raise_task_error_if(
+                        not child.download(force=True),
+                        child, "Failed to download task artifact")
+                else:
+                    # Resource about to be acquired by the client
+                    child._run_download_dependencies()
+                continue
+
+            if resource_only and not child.is_resource():
                 continue
 
             raise_task_error_if(
@@ -697,7 +705,7 @@ class TaskProxy(object):
         Resource artifacts are always published and uploaded if the acquisition has been started,
         even if the acquisition fails. That way, a failed acquisition can be debugged.
         """
-        self._run_download_dependencies(self.cache)
+        self._run_download_dependencies(resource_only=True)
 
         with self._run_resources_no_dep_download():
             yield
@@ -748,10 +756,8 @@ class TaskProxy(object):
             exitstack.close()
 
     def run(self, env, force_upload=False, force_build=False):
-        cache = env.cache
-
         # Download dependency artifacts if not already done
-        self._run_download_dependencies(cache, force_upload, force_build)
+        self._run_download_dependencies()
 
         with self._run_resources_no_dep_download():
             self._run_task(env, force_upload, force_build)
