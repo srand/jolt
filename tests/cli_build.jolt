@@ -871,26 +871,26 @@ class BuildCli(testsupport.JoltTest):
         """
         --- tasks:
         class R(Resource):
-            pass
+            value = Parameter(values=["1", "2"])
 
         class A(Task):
-            requires = ["r"]
+            requires = ["r:value=1"]
 
         class B(Task):
-            requires = ["r"]
+            requires = ["r:value=1"]
         ---
         """
         r = self.build("a b")
         self.assertRemoteBuild(r, "a")
         self.assertRemoteBuild(r, "b")
-        self.assertIn("Resource acquisition started (r for a)", r)
-        self.assertIn("Resource acquisition started (r for b)", r)
-        self.assertIn("Resource acquisition finished after 00s (r for a)", r)
-        self.assertIn("Resource acquisition finished after 00s (r for b)", r)
-        self.assertIn("Resource release started (r for a)", r)
-        self.assertIn("Resource release started (r for b)", r)
-        self.assertIn("Resource release finished after 00s (r for a)", r)
-        self.assertIn("Resource release finished after 00s (r for b)", r)
+        self.assertIn("Resource acquisition started (r:value=1 for a)", r)
+        self.assertIn("Resource acquisition started (r:value=1 for b)", r)
+        self.assertIn("Resource acquisition finished after 00s (r:value=1 for a)", r)
+        self.assertIn("Resource acquisition finished after 00s (r:value=1 for b)", r)
+        self.assertIn("Resource release started (r:value=1 for a)", r)
+        self.assertIn("Resource release started (r:value=1 for b)", r)
+        self.assertIn("Resource release finished after 00s (r:value=1 for a)", r)
+        self.assertIn("Resource release finished after 00s (r:value=1 for b)", r)
 
     @testsupport.skip_if_local
     def test_local_resource_instances(self):
