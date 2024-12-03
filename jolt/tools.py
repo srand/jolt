@@ -96,7 +96,30 @@ def _run(cmd, cwd, env, preexec_fn, *args, **kwargs):
     timeout = timeout if type(timeout) is int and timeout > 0 else None
 
     log.debug("Running: '{0}' (CWD: {1})", cmd, cwd)
+
+    p = None
+    stdout = None
+    stderr = None
     timedout = False
+
+    def terminate(pid):
+        try:
+            process = Process(pid)
+            for chld in process.children(recursive=True):
+                chld.terminate()
+            process.terminate()
+        except NoSuchProcess:
+            pass
+
+    def kill(pid):
+        try:
+            process = Process(pid)
+            for chld in process.children(recursive=True):
+                chld.kill()
+            process.kill()
+        except NoSuchProcess:
+            pass
+
     try:
         with utils.delayed_interrupt():
             p = subprocess.Popen(
@@ -127,27 +150,11 @@ def _run(cmd, cwd, env, preexec_fn, *args, **kwargs):
                 logbuf=logbuf,
                 output_rstrip=output_rstrip)
 
-        def terminate(pid):
-            try:
-                process = Process(pid)
-                for chld in process.children(recursive=True):
-                    chld.terminate()
-                process.terminate()
-            except NoSuchProcess:
-                pass
-
-        def kill(pid):
-            try:
-                process = Process(pid)
-                for chld in process.children(recursive=True):
-                    chld.kill()
-                process.kill()
-            except NoSuchProcess:
-                pass
-
         p.wait(timeout=timeout)
 
     except KeyboardInterrupt:
+        if not p:
+            raise
         try:
             terminate(p.pid)
             p.wait(10)
@@ -166,11 +173,14 @@ def _run(cmd, cwd, env, preexec_fn, *args, **kwargs):
             p.wait()
 
     finally:
-        stdout.join()
-        stderr.join()
-        p.stdin.close()
-        p.stdout.close()
-        p.stderr.close()
+        if stdout:
+            stdout.join()
+        if stderr:
+            stderr.join()
+        if p:
+            p.stdin.close()
+            p.stdout.close()
+            p.stderr.close()
 
     if p.returncode != 0 and output_on_error:
         for reader, line in logbuf:

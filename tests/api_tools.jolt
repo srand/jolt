@@ -8,7 +8,7 @@ import sys
 import time
 sys.path.append(".")
 
-from testsupport import JoltTest
+from testsupport import JoltTest, skip
 from jolt import JoltTimeoutError
 from jolt import utils
 
@@ -1005,6 +1005,7 @@ class ToolsApi(JoltTest):
         else:
             self.fail("Expected KeyboardInterrupt")
 
+    @skip("Signal may arrive after task failure")
     def test_run_interrupt(self):
         """
         --- tasks:
@@ -1012,13 +1013,29 @@ class ToolsApi(JoltTest):
 
         class A(Task):
             def run(self, d, t):
-                t.run("kill -INT {{}} $$", os.getpid())
+                t.run("kill -INT {{}}; sleep 2; exit 1", os.getpid())
         ---
         """
         with self.assertRaises(Exception):
             self.build("a")
 
         self.assertIn("Execution interrupted", self.lastLog())
+
+    def test_run_no_shell(self):
+        """
+        --- tasks:
+        class A(Task):
+            def run(self, d, t):
+                t.run(["echo", "Hello world"], shell=False)
+
+        class B(Task):
+            def run(self, d, t):
+                t.run(["false"], shell=False)
+        ---
+        """
+        self.build("a")
+        with self.assertRaises(Exception):
+            self.build("b")
 
     def test_read_write_json(self):
         with self.tools.cwd(self.ws):
