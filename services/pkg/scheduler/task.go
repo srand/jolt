@@ -201,20 +201,14 @@ func (t *Task) Status() protocol.TaskStatus {
 }
 
 // Cancel the task.
-func (t *Task) Cancel() error {
-	// Can only transition to cancelled from created/queued.
-	if t.status != protocol.TaskStatus_TASK_CREATED && t.status != protocol.TaskStatus_TASK_QUEUED {
-		log.Debugf("err - task - id: %s, status: %v - cancellation ignored", t.Identity(), t.status)
-		return nil
-	}
-
+func (t *Task) cancel() error {
 	t.PostStatusUpdate(protocol.TaskStatus_TASK_CANCELLED)
 	return nil
 }
 
 // Close the task and cancel all observers.
 func (t *Task) Close() {
-	t.Cancel()
+	t.cancel()
 	t.updateObservers.Close()
 	t.updateObservers = nil
 }

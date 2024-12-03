@@ -73,6 +73,10 @@ func (s *schedulerService) ScheduleTask(request *protocol.TaskRequest, stream pr
 	for {
 		select {
 		case update := <-observer.Updates():
+			if update == nil {
+				return nil
+			}
+
 			if err := stream.Send(update); err != nil {
 				return utils.GrpcError(err)
 			}

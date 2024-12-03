@@ -109,13 +109,6 @@ func (b *priorityBuild) Cancel() {
 	b.Lock()
 	defer b.Unlock()
 	b.status = protocol.BuildStatus_BUILD_CANCELLED
-
-	// Attempt to cancel all tasks.
-	// Tasks that are in progress or have already finished will be ignored.
-	for _, task := range b.tasks {
-		task.Cancel()
-	}
-
 	b.ctxCancel()
 }
 
@@ -132,7 +125,7 @@ func (b *priorityBuild) Close() {
 	b.buildObservers.Close()
 
 	tasks := []*Task{}
-	b.WalkQueuedTasks(func(b *priorityBuild, t *Task) bool {
+	b.WalkTasks(func(b *priorityBuild, t *Task) bool {
 		tasks = append(tasks, t)
 		return true
 	})
@@ -168,7 +161,23 @@ func (b *priorityBuild) IsDone() bool {
 
 // Returns true if the build is terminal.
 func (b *priorityBuild) IsTerminal() bool {
-	return (!b.HasQueuedTask() && !b.HasRunningTask() && !b.HasObserver()) || b.IsCancelled()
+	if b.IsCancelled() {
+		return true
+	}
+
+	if b.HasObserver() {
+		return false
+	}
+
+	if b.HasQueuedTask() {
+		return false
+	}
+
+	if b.HasRunningTask() {
+		return false
+	}
+
+	return true
 }
 
 // Returns true if the build or one of its tasks has an observer.
@@ -250,19 +259,6 @@ func (b *priorityBuild) ScheduleTask(identity string) (*Task, TaskUpdateObserver
 	b.queue.Send(task)
 
 	return task, observer, nil
-}
-
-// Cancel a task.
-func (b *priorityBuild) CancelTask(identity string) error {
-	b.Lock()
-	defer b.Unlock()
-
-	task, ok := b.tasks[identity]
-	if !ok {
-		return utils.ErrNotFound
-	}
-
-	return task.Cancel()
 }
 
 // Returns the queued task with the given identity, or nil.
