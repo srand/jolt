@@ -16,6 +16,12 @@ class PathVariable(ArtifactStringAttribute):
     def unapply(self, task, artifact):
         pass
 
+    def __bool__(self):
+        return bool(self._value)
+
+    def __eq__(self, value: str) -> bool:
+        return str(self) == str(value)
+
     def __str__(self):
         if self._value is None:
             return ""

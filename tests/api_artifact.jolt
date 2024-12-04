@@ -559,3 +559,27 @@ class ArtifactApi(JoltTest):
         ---
         """
         self.build("b")
+
+    def test_artifact_paths(self):
+        """
+        --- tasks:
+        import os
+
+        class A(Task):
+            def publish(self, a, t):
+                a.paths.testdir = "testdir"
+                a.paths.testfile = "testdir/testfile"
+
+        class B(Task):
+            requires = ["a"]
+
+            def run(self, d, t):
+                assert d["a"].paths.testdir == os.path.join(d["a"].path, "testdir"), d["a"].paths.testdir
+                assert d["a"].paths.testfile == os.path.join(d["a"].path, "testdir/testfile"), d["a"].paths.testfile
+
+                for k, v in d["a"].paths.items():
+                    assert k in ["testdir", "testfile"]
+                    assert v in [os.path.join(d["a"].path, "testdir"), os.path.join(d["a"].path, "testdir/testfile")]
+        ---
+        """
+        self.build("b")
