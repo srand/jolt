@@ -51,9 +51,7 @@ class PathVariableSetProvider(ArtifactAttributeSetProvider):
             return
 
         for key, value in content["paths"].items():
-            path = PathVariable(artifact, key)
-            path.set_value(value, expand=False)
-            super(PathVariableSet, artifact.paths).__setattr__(key, path)
+            setattr(artifact.paths, key, value)
 
     def format(self, artifact, content):
         if "paths" not in content:

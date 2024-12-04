@@ -579,6 +579,9 @@ class ArtifactApi(JoltTest):
                 assert d["a"].paths.testfile == os.path.join(d["a"].path, "testdir/testfile"), d["a"].paths.testfile
                 assert d["a"].paths.doesnotexist is None
 
+                assert d["a"].paths.testdir.get_value() == "testdir"
+                assert d["a"].paths.testfile.get_value() == "testdir/testfile"
+
                 for k, v in d["a"].paths.items():
                     assert k in ["testdir", "testfile"]
                     assert v in [os.path.join(d["a"].path, "testdir"), os.path.join(d["a"].path, "testdir/testfile")]
