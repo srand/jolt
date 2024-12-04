@@ -36,6 +36,10 @@ class PathVariableSet(ArtifactAttributeSet):
     def create(self, name):
         return PathVariable(self._artifact, name)
 
+    def __getattr__(self, name):
+        attributes = self._get_attributes()
+        return attributes.get(name, None)
+
 
 @ArtifactAttributeSetProvider.Register
 class PathVariableSetProvider(ArtifactAttributeSetProvider):
@@ -47,7 +51,9 @@ class PathVariableSetProvider(ArtifactAttributeSetProvider):
             return
 
         for key, value in content["paths"].items():
-            getattr(artifact.paths, key).set_value(value, expand=False)
+            path = PathVariable(artifact, key)
+            path.set_value(value, expand=False)
+            super(PathVariableSet, artifact.paths).__setattr__(key, path)
 
     def format(self, artifact, content):
         if "paths" not in content:

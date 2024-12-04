@@ -2281,7 +2281,7 @@ if __name__ == "__main__":
             if self.selfsustained:
                 for _, artifact in deps.items():
                     if str(artifact.paths.coverage_data):
-                        tools.copy(artifact.paths.coverage_data, self.covdatadir)
+                        tools.copy(str(artifact.paths.coverage_data), self.covdatadir)
 
     def publish(self, artifact, tools):
         if bool(getattr(self, "coverage", False)):

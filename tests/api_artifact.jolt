@@ -552,6 +552,7 @@ class ArtifactApi(JoltTest):
             def run(self, d, t):
                 assert d["a"].strings.testkey == "testvalue"
                 assert d["a"].strings.expandkey == "testvalue2"
+                assert d["a"].strings.doesnotexist is None
 
                 for k, v in d["a"].strings.items():
                     assert k in ["testkey", "expandkey"]
@@ -576,6 +577,7 @@ class ArtifactApi(JoltTest):
             def run(self, d, t):
                 assert d["a"].paths.testdir == os.path.join(d["a"].path, "testdir"), d["a"].paths.testdir
                 assert d["a"].paths.testfile == os.path.join(d["a"].path, "testdir/testfile"), d["a"].paths.testfile
+                assert d["a"].paths.doesnotexist is None
 
                 for k, v in d["a"].paths.items():
                     assert k in ["testdir", "testfile"]

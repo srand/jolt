@@ -11,9 +11,7 @@ class StringVariableSet(object):
 
     def __getattr__(self, name):
         attributes = self._get_attributes()
-        if name not in attributes:
-            return None
-        return attributes[name]
+        return attributes.get(name, None)
 
     def __setattr__(self, name, value):
         if not isinstance(value, str):
