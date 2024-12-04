@@ -4,6 +4,7 @@ from jolt.cache import ArtifactAttributeSetProvider
 class StringVariableSet(object):
     def __init__(self, artifact):
         super(StringVariableSet, self).__setattr__("_attributes", {})
+        super(StringVariableSet, self).__setattr__("_artifact", artifact)
 
     def _get_attributes(self):
         return self._attributes
@@ -18,7 +19,7 @@ class StringVariableSet(object):
         if not isinstance(value, str):
             raise ValueError(f"Value assigned to artifact.strings.{name} must be a string, got {type(value)}")
         attributes = self._get_attributes()
-        attributes[name] = value
+        attributes[name] = self._artifact.tools.expand(value)
         return value
 
     def __dict__(self):

@@ -539,16 +539,23 @@ class ArtifactApi(JoltTest):
         """
         --- tasks:
         class A(Task):
+            expandvalue = "testvalue2"
+
             def publish(self, a, t):
                 a.strings.testkey = "testvalue"
+                a.strings.expandkey = "{{expandvalue}}"
+
 
         class B(Task):
             requires = ["a"]
 
             def run(self, d, t):
                 assert d["a"].strings.testkey == "testvalue"
+                assert d["a"].strings.expandkey == "testvalue2"
 
                 for k, v in d["a"].strings.items():
-                    assert k == "testkey"
-                    assert v == "testvalue"
+                    assert k in ["testkey", "expandkey"]
+                    assert v in ["testvalue", "testvalue2"]
+        ---
         """
+        self.build("b")
