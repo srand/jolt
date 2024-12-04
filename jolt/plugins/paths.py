@@ -17,7 +17,7 @@ class PathVariable(ArtifactStringAttribute):
         pass
 
     def __bool__(self):
-        return bool(self._value)
+        return bool(str(self))
 
     def __eq__(self, value: str) -> bool:
         return str(self) == str(value)

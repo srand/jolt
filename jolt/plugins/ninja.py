@@ -100,8 +100,8 @@ class attributes:
                     self.info("Collecting coverage data into {covdatadir}")
 
                     for _, artifact in deps.items():
-                        if str(artifact.paths.coverage_data):
-                            tools.copy(artifact.paths.coverage_data, self.covdatadir)
+                        if artifact.paths.coverage_data:
+                            tools.copy(str(artifact.paths.coverage_data), self.covdatadir)
 
                     with tools.environ(GCOV_PREFIX=self.covdatadir):
                         yield
@@ -196,8 +196,8 @@ class attributes:
                     if not hasattr(self, "covdatadir"):
                         self.covdatadir = tools.builddir("coverage-data")
                         for _, artifact in deps.items():
-                            if str(artifact.paths.coverage_data):
-                                tools.copy(artifact.paths.coverage_data, self.covdatadir)
+                            if artifact.paths.coverage_data:
+                                tools.copy(str(artifact.paths.coverage_data), self.covdatadir)
 
                     with tools.cwd(self.covdatadir):
                         datafiles = tools.glob("**/*.gcda")
@@ -359,8 +359,8 @@ class attributes:
                     if not hasattr(self, "covdatadir"):
                         self.covdatadir = tools.builddir("coverage-data")
                         for _, artifact in deps.items():
-                            if str(artifact.paths.coverage_data):
-                                tools.copy(artifact.paths.coverage_data, self.covdatadir)
+                            if artifact.paths.coverage_data:
+                                tools.copy(str(artifact.paths.coverage_data), self.covdatadir)
 
                     reportdir = tools.builddir("coverage-report-lcov")
                     htmldir = tools.builddir("coverage-report-lcov-html")
@@ -412,7 +412,7 @@ class attributes:
 
                     reports = []
                     for _, artifact in deps.items():
-                        if str(artifact.paths.coverage_report_lcov):
+                        if artifact.paths.coverage_report_lcov:
                             reports.append(str(artifact.paths.coverage_report_lcov))
                     if reports:
                         filtered_reports = []
@@ -2280,7 +2280,7 @@ if __name__ == "__main__":
                         pass
             if self.selfsustained:
                 for _, artifact in deps.items():
-                    if str(artifact.paths.coverage_data):
+                    if artifact.paths.coverage_data:
                         tools.copy(str(artifact.paths.coverage_data), self.covdatadir)
 
     def publish(self, artifact, tools):

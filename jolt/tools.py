@@ -1865,7 +1865,7 @@ class Tools(object):
 
         if type(chroot) in [cache.Artifact, cache.ArtifactToolsProxy]:
             raise_task_error_if(
-                not str(chroot.paths.rootfs), self._task,
+                not chroot.paths.rootfs, self._task,
                 "No 'rootfs' path in artifact")
             chroot = chroot.paths.rootfs
 
