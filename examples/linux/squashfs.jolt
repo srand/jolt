@@ -1,0 +1,24 @@
+from jolt import influence
+from jolt.plugins import linux
+
+
+@influence.files("squashfs")
+class Squashfs(linux.Squashfs):
+    """
+    Build a SquashFS image.
+
+    The image is based on the Debian stable-slim image and includes a minimal
+    set of tools and libraries required to boot the system. Instead of
+    using systemd, the image uses finit-sysv as the init system.
+    """
+
+    dockerfile = """
+    FROM docker.io/debian:stable-slim as base
+    ARG DEBIAN_FRONTEND=noninteractive
+    RUN apt-get update && \
+        apt-get install -y --no-install-recommends finit-sysv finit-plugins
+    ADD squashfs/ /
+    """
+
+    size = "64M"
+    """ Pad image to a valid SD card image size. """

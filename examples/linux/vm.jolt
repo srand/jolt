@@ -1,0 +1,32 @@
+from jolt.plugins import linux
+
+
+class VMIrfs(linux.Qemu):
+    """ Run the Linux kernel and initramfs in a vexpress virtual machine. """
+
+    name = "vm/initramfs"
+    arch = "arm"
+    dtb = "arm/vexpress-v2p-ca9.dtb"
+    kernel = "kernel:arch={arch},defconfig=vexpress,targets=dtbs+zimage"
+    initrd = "initramfs:arch={arch}"
+    machine = "vexpress-a9"
+    arguments = [
+        "-append", "console=ttyAMA0 quiet",
+        "-nographic",
+    ]
+
+
+class VMSquashfs(linux.Qemu):
+    """ Run the Linux kernel and squashfs in a vexpress virtual machine. """
+
+    name = "vm/squashfs"
+    arch = "arm"
+    dtb = "arm/vexpress-v2p-ca9.dtb"
+    kernel = "kernel:arch={arch},defconfig=vexpress,targets=dtbs+zimage"
+    rootfs = "squashfs:arch={arch}"
+    machine = "vexpress-a9"
+    arguments = [
+        "-append", "console=ttyAMA0 root=/dev/mmcblk0 ro quiet",
+        "-drive", "if=sd,driver=file,file={deps[rootfs].paths.squashfs}",
+        "-nographic",
+    ]

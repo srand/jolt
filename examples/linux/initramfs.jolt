@@ -1,0 +1,18 @@
+from jolt import influence
+from jolt.plugins import linux
+
+
+@influence.files("initramfs")
+class Initramfs(linux.Initramfs):
+    """
+    Build an initramfs image.
+
+    The image is based on the BusyBox userland and includes a minimal set of
+    tools and libraries required to boot the system.
+    """
+
+    dockerfile = """
+    FROM docker.io/busybox:latest
+    RUN mkdir -p /proc
+    ADD initramfs/ /
+    """

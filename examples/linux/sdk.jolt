@@ -1,0 +1,12 @@
+from jolt.plugins import linux
+
+
+class Sdk(linux.DebianHostSdk):
+    """
+    SDK for Debian-based hosts
+
+    Verifies that the required build tools are available on the host and
+    exports environment variables such as PATH, CC, and CROSS_COMPILE to
+    consumer tasks.
+    """
+    name = "debian/sdk"

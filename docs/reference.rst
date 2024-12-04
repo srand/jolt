@@ -349,6 +349,39 @@ Google Test
 .. reference-gtest-end
 
 
+Linux
+-----
+
+.. reference-linux-start
+
+.. autoclass:: jolt.plugins.linux.ArchParameter
+
+.. autoclass:: jolt.plugins.linux.DebianHostSdk
+   :members: arch
+
+.. autoclass:: jolt.plugins.linux.FIT
+   :members: configs, signature_key_name, signature_key_path
+
+.. autoclass:: jolt.plugins.linux.Initramfs
+   :members: arch, dockerfile
+
+.. autoclass:: jolt.plugins.linux.Kernel
+   :members: arch, configpaths, defconfig, defconfigpath, dtbs, features, loadaddr, loadaddr_fdt, srcdir, targets
+
+.. autoclass:: jolt.plugins.linux.Module
+   :members: arch, configpaths, defconfig, defconfigpath, features, srcdir, srcdir_module
+
+.. autoclass:: jolt.plugins.linux.Qemu
+   :members: arch, arguments, dtb, initrd, kernel, machine, memory, rootfs
+
+.. autoclass:: jolt.plugins.linux.Squashfs
+   :members: arch, dockerfile, size
+
+.. autoclass:: jolt.plugins.linux.UBoot
+   :members: arch, configpaths, defconfig, defconfigpath, features, srcdir, targets
+
+.. reference-linux-end
+
 
 Ninja
 ------

@@ -1,0 +1,21 @@
+from jolt.plugins import linux
+
+
+class Kernel(linux.Kernel):
+    """
+    Builds the Linux kernel.
+
+    This task clones the Linux kernel repository from GitHub and builds the
+    kernel for the parameter specified architecture and defconfig.
+    """
+
+    requires = [
+        # Clone the Linux kernel repository from GitHub
+        "git:url=https://github.com/torvalds/linux.git",
+
+        # Rely on host Debian to provide the required build tools
+        "debian/sdk:arch={arch}",
+    ]
+
+    # Use the required git repository as the source directory
+    srcdir = "{git[linux]}"

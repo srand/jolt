@@ -206,8 +206,8 @@ class Container(Resource):
     """
 
     volumes_default = [
-        "{joltdir}:{joltdir}",
-        "{joltcachedir}:{joltcachedir}",
+        "{joltdir}",
+        "{joltcachedir}",
     ]
     """
     A list of default volumes to mount.
@@ -247,7 +247,7 @@ class Container(Resource):
     def _image(self):
         registry = TaskRegistry.get()
         tool = tools.Tools(self)
-        if registry.get_task_class(tool.expand(self.image)):
+        if registry.get_task(tool.expand(self.image)):
             return [self.image]
         return []
 
@@ -284,7 +284,7 @@ class Container(Resource):
 
     @property
     def _volumes(self):
-        return " ".join([utils.option("-v ", self.tools.expand(vol))
+        return " ".join([utils.option("-v ", self.tools.expand_path(vol))
                          for vol in self.volumes_default + self.volumes])
 
     def acquire(self, artifact, deps, tools, owner):
