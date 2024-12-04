@@ -259,6 +259,11 @@ func (w *worker) run() error {
 }
 
 func (w *worker) interruptExecutor(process *os.Process, client *protocol.Client) error {
+	if utils.VersionLessThan(client.Version, "0.9.347") {
+		log.Debugf("Client version does not support interrupting the executor (%s)", client.Version)
+		return nil
+	}
+
 	// On POSIX systems, send SIGINT to the process group
 	// to interrupt the executor and all its children.
 	if runtime.GOOS == "windows" {
@@ -267,16 +272,7 @@ func (w *worker) interruptExecutor(process *os.Process, client *protocol.Client)
 			return err
 		}
 	} else {
-		// Only newer executors can handle interrupts correctly.
-		var pid int
-
-		if client == nil || utils.VersionLessThan(client.Version, "0.9.329") {
-			pid = process.Pid
-		} else {
-			pid = -process.Pid
-		}
-
-		err := syscall.Kill(pid, syscall.SIGINT)
+		err := syscall.Kill(process.Pid, syscall.SIGINT)
 		if err != nil {
 			return err
 		}
@@ -639,6 +635,11 @@ func (w *worker) startExecutor(clientDigest string, client *protocol.Client, wor
 		jolt = append(jolt, config...)
 	}
 	jolt = append(jolt, "executor", "-w", worker, "-b", build, request)
+
+	// Add exec prefix on platforms running Jolt in shells
+	if runtime.GOOS != "windows" {
+		jolt = append([]string{"exec"}, jolt...)
+	}
 
 	var cmd []string
 	var err error
