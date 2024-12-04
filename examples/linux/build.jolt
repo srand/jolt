@@ -1,0 +1,23 @@
+from jolt import Task
+from jolt.plugins.linux import ArchParameter
+from jolt.plugins.linux import Kernel
+
+
+
+class Sdk(Task):
+    arch = ArchParameter()
+
+    def publish(self, artifact, tools):
+        if self.arch == "arm":
+            artifact.environ.CROSS_COMPILE = "arm-linux-gnueabihf-"
+        elif self.arch == "arm64":
+            artifact.environ.CROSS_COMPILE = "aarch64-linux-gnu-"
+
+
+class Kernel(Kernel):
+    requires = [
+        "git:url=https://github.com/torvalds/linux.git,path=../linux",
+        "sdk:arch={arch}",
+    ]
+    srcdir = "{git[linux]}"
+
