@@ -126,7 +126,7 @@ global_string("{test}")
 """.format(test=self._testMethodName) + self._recipe())
             tools.write_file("test.conf", self._config())
             tools.write_file("net.conf", self._network_config())
-            tools.write_file(".joltignore", "artifacts\nbuild\n")
+            tools.write_file(".joltignore", "artifacts\nbuild\ncache\n")
 
             for filename, content in self._files():
                 content = "\n".join([l[8:] for l in content.splitlines()])
