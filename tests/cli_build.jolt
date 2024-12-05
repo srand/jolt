@@ -698,6 +698,50 @@ class BuildCli(testsupport.JoltTest):
         a = self.artifacts(r)
         self.assertEqual(1, len(a))
 
+    @testsupport.skip_if_local
+    def test_session_artifact_dep_missing(self):
+        """
+        --- tasks:
+        @attributes.artifact("result", session=True)
+        class A(Task):
+            def publish_result(self, artifact, tools):
+                pass
+
+        class B(Task):
+            requires = ["a"]
+
+            def run(self, deps, tools):
+                try:
+                    deps["result@a"]
+                except KeyError:
+                    pass
+                else:
+                    assert False, "Unexpected session artifact found"
+        ---
+        """
+        self.build("a")
+        self.tools.run("docker exec $(docker inspect $(docker service ps jolt_test_worker --format {{{{.ID}}}}) --format {{{{.Status.ContainerStatus.ContainerID}}}}) find /data/cache/ -delete")
+        r = self.build("b")
+        self.assertIn("Failed to download session artifact: result", r)
+
+    @testsupport.skip_if_local
+    def test_session_artifact_dep_present(self):
+        """
+        --- tasks:
+        @attributes.artifact("result", session=True)
+        class A(Task):
+            def publish_result(self, artifact, tools):
+                pass
+
+        class B(Task):
+            requires = ["a"]
+
+            def run(self, deps, tools):
+                deps["result@a"]
+        ---
+        """
+        self.build("b")
+
     def test_unstable_task_errors(self):
         """
         --- tasks:

@@ -216,7 +216,7 @@ class TaskProxy(object):
         for c in self.children:
             if c.is_resource() or c.is_alias():
                 continue
-            if not c.is_available_locally():
+            if not c.is_available_locally(persistent_only=True):
                 return False
         return True
 
@@ -335,16 +335,32 @@ class TaskProxy(object):
         self._download = False
 
     def download(self, force=False, session_only=False, persistent_only=False):
+        """
+        Downloads all artifacts of this task.
+
+        If the task is not downloadable, the method returns True. Failure to
+        download persistent artifacts is considered a failure, and the method
+        returns False. Session artifacts are not required to be downloaded.
+
+        :param force: Force download even if the artifacts are already available.
+        :param session_only: Download only session artifacts.
+        :param persistent_only: Download only persistent artifacts.
+
+        """
         if not force and not self.is_downloadable():
             return True
+        success = True
         artifacts = self._artifacts
-        if session_only:
-            artifacts = list(filter(lambda a: a.is_session(), artifacts))
-        if persistent_only:
-            artifacts = list(filter(lambda a: not a.is_session(), artifacts))
-        if not artifacts:
-            return True
-        return all([self.cache.download(artifact, force=force) for artifact in artifacts])
+        artifacts_session = list(filter(lambda a: a.is_session(), artifacts))
+        artifacts_persistent = list(filter(lambda a: not a.is_session(), artifacts))
+        download_all = not session_only and not persistent_only
+        if session_only or download_all:
+            for artifact in artifacts_session:
+                if not self.cache.download(artifact, force=force):
+                    self.warning("Failed to download session artifact: {}", artifact.identity)
+        if persistent_only or download_all:
+            success = all([self.cache.download(artifact, force=force) for artifact in artifacts_persistent])
+        return success
 
     def upload(self, force=False, locked=False, session_only=False, persistent_only=False, artifacts=None):
         artifacts = artifacts or self._artifacts
