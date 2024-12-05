@@ -524,3 +524,33 @@ class GitApi(testsupport.JoltTest):
         with self.tools.cwd(self.ws):
             self.assertExists("hello_world/.git/objects/info/alternates")
             self.assertEqual("4", self.tools.run("find hello_world/.git/objects | wc -l"))
+
+    @testsupport.skip_if_local
+    def test_parallel_clone(self):
+        """
+        --- tasks:
+        import os
+
+        class R(Resource):
+            local = True
+            requires = ["git:url=https://github.com/gideont/hello_world.git,path=hello_world,hash=false"]
+
+            def acquire(self, artifact, deps, tools, owner):
+                assert os.path.isdir("hello_world")
+
+        class A(TaskGenerator):
+            def generate(self):
+                clses = []
+                for i in range(100):
+                    class A(Task):
+                        name = f"a{{i}}"
+                        requires = ["r"]
+                    clses.append(A)
+                return clses
+
+        class B(Alias):
+            def requires(self):
+                return [f"a{{i}}" for i in range(100)]
+        ---
+        """
+        self.build("b")

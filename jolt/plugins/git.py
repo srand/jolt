@@ -43,7 +43,6 @@ class GitRepository(object):
         self._tree_hash = {}
         self._original_head = True
         self._last_rev = None
-        self._lock = RLock()
         self._init_repo()
 
     def _init_repo(self):
@@ -77,7 +76,6 @@ class GitRepository(object):
     def is_indexed(self):
         return self.is_cloned() and fs.path.exists(self._git_index())
 
-    @locked
     def clone(self):
         log.info("Cloning into {0}", self.path)
 
@@ -127,7 +125,6 @@ class GitRepository(object):
             "Failed to clone repository '{0}'", self.relpath)
 
     @utils.cached.instance
-    @locked
     def diff_unchecked(self):
         if not self.is_indexed():
             return ""
@@ -141,7 +138,6 @@ class GitRepository(object):
                                   output_on_error=True,
                                   output_rstrip=False)
 
-    @locked
     def diff(self):
         diff = self.diff_unchecked()
         dlim = config.getsize("git", "maxdiffsize", "1 MiB")
@@ -151,7 +147,6 @@ class GitRepository(object):
             .format(self.relpath, len(diff), dlim))
         return diff
 
-    @locked
     def patch(self, patch):
         if not patch:
             return
@@ -162,7 +157,6 @@ class GitRepository(object):
             log.info("Applying patch to {0}", self.path)
             self.tools.run("git apply --whitespace=nowarn {patchfile}", patchfile=patchfile)
 
-    @locked
     def head(self):
         if not self.is_cloned():
             return None
@@ -206,7 +200,6 @@ class GitRepository(object):
                 output_on_error=True)
         return tree
 
-    @locked
     def tree_hash(self, rev=None, path="/"):
         # When rev is None, the caller want the tree hash of the repository's
         # current workspace state. If no checkout has been made, that would be the
@@ -246,17 +239,14 @@ class GitRepository(object):
 
         return value
 
-    @locked
     def clean(self):
         with self.tools.cwd(self.path):
             return self.tools.run("git clean -dfx", output_on_error=True)
 
-    @locked
     def reset(self):
         with self.tools.cwd(self.path):
             return self.tools.run("git reset --hard", output_on_error=True)
 
-    @locked
     def fetch(self, commit=None):
         if commit and not self.is_valid_sha(commit):
             commit = None
@@ -270,7 +260,6 @@ class GitRepository(object):
                 what=commit or refspec or '',
                 output_on_error=True)
 
-    @locked
     def checkout(self, rev, commit=None):
         if rev == self._last_rev:
             log.debug("Checkout skipped, already @ {}", rev)
@@ -566,6 +555,7 @@ class Git(WorkspaceResource, FileInfluence):
         influence = super()._influence()
         return influence + [self] if self._must_influence() else influence
 
+    @locked
     @utils.cached.instance
     def get_influence(self, task):
         if not self.git.is_cloned():
