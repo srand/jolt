@@ -1152,6 +1152,46 @@ class TaskApi(JoltTest):
         """
         self.build("a")
 
+    def test_resource_recursive(self):
+        """
+        --- tasks:
+        from jolt import log
+        from jolt.tasks import WorkspaceResource
+
+        class R0(WorkspaceResource):
+            def acquire(self, artifact, deps, tools, owner):
+                log.info("Acquire R0")
+
+        class R1(WorkspaceResource):
+            def acquire(self, artifact, deps, tools, owner):
+                log.info("Acquire R1")
+
+        class R2(Resource):
+            requires = ["r1", "r0"]
+
+            def acquire(self, artifact, deps, tools, owner):
+                with tools.cwd(tools.builddir()):
+                    tools.write_file("r2.lock", "locked")
+                    artifact.collect("r2.lock")
+
+            def release(self, artifact, deps, tools, owner):
+                with tools.cwd(artifact.path):
+                    assert tools.read_file("r2.lock") == "locked"
+
+        class A(Task):
+            requires = ["r2"]
+
+            def run(self, deps, tools):
+                b = deps["r2"]
+                with tools.cwd(b.path):
+                    assert tools.read_file("r2.lock") == "locked"
+        ---
+        """
+        r = self.build("a")
+        # Workspace resources are allowed as dependencies of other resources
+        # and should have been acquired and released in the correct order
+        import re
+        assert re.search(r".*Acquire R0.*\n.*Acquire R1.*", r, re.MULTILINE)
 
     def test_runner(self):
         '''

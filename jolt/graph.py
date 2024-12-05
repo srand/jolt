@@ -426,9 +426,10 @@ class TaskProxy(object):
                 self.children.extend(n.children)
             n.ancestors.add(self)
 
-        # Exclude transitive alias and resources dependencies
+        # Exclude transitive alias and resources dependencies.
+        # Workspace resources are included as they may be required by its dependencies.
         self.children = list(
-            filter(lambda n: not n.is_alias() and (not n.is_resource() or dag.are_neighbors(self, n)),
+            filter(lambda n: (dag.are_neighbors(self, n) or n.is_workspace_resource()) or (not n.is_alias() and not n.is_resource()),
                    utils.unique_list(self.children)))
 
         # Prepare workspace resources for this task so that influence can be calculated
