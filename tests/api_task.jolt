@@ -1159,11 +1159,11 @@ class TaskApi(JoltTest):
         from jolt.tasks import WorkspaceResource
 
         class R0(WorkspaceResource):
-            def acquire(self, artifact, deps, tools, owner):
+            def acquire_ws(self, force=False):
                 log.info("Acquire R0")
 
         class R1(WorkspaceResource):
-            def acquire(self, artifact, deps, tools, owner):
+            def acquire_ws(self, force=False):
                 log.info("Acquire R1")
 
         class R2(Resource):

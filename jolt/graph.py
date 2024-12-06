@@ -445,7 +445,7 @@ class TaskProxy(object):
         # Exclude transitive alias and resources dependencies.
         # Workspace resources are included as they may be required by its dependencies.
         self.children = list(
-            filter(lambda n: (dag.are_neighbors(self, n) or n.is_workspace_resource()) or (not n.is_alias() and not n.is_resource()),
+            filter(lambda n: dag.are_neighbors(self, n) or (not n.is_alias() and not n.is_resource()),
                    utils.unique_list(self.children)))
 
         # Prepare workspace resources for this task so that influence can be calculated
@@ -733,8 +733,7 @@ class TaskProxy(object):
         log_prefix = False
 
         # Collect list of resource dependencies
-        resource_deps = [child for child in self.children if child.is_resource() and not child.is_workspace_resource()]
-        resource_deps_ws = [child for child in self.children if child.is_workspace_resource()]
+        resource_deps = [child for child in self.children if child.is_resource()]
 
         if self.options.worker:
             # Exclude local resources when running as worker. They are already acquired by the client.
@@ -749,7 +748,7 @@ class TaskProxy(object):
         acquired = []
         try:
             # Acquire resource dependencies in reverse order.
-            for resource in reversed(resource_deps + resource_deps_ws):
+            for resource in reversed(resource_deps):
                 with resource.lock_artifacts(discard=False) if not resource.is_workspace_resource() else nullcontext():
                     resource.deps = self.cache.get_context(resource)
                     exitstack.enter_context(resource.deps)

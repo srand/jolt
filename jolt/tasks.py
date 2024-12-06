@@ -20,6 +20,7 @@ import traceback
 from jolt import filesystem as fs
 from jolt import log
 from jolt import utils
+from jolt.cache import ArtifactAttributeSetProvider
 from jolt.error import raise_error_if, raise_task_error, raise_task_error_if
 from jolt.error import raise_unreported_task_error_if
 from jolt.error import JoltError, JoltCommandError, LoggedJoltError
@@ -3394,3 +3395,45 @@ class Test(Task):
             "{} tests out of {} were successful".format(
                 len(self.testresult.successes),
                 self.testresult.testsRun))
+
+
+@ArtifactAttributeSetProvider.Register
+class WorkspaceResourceAttributeSetProvider(ArtifactAttributeSetProvider):
+    def create(self, artifact):
+        pass
+
+    def parse(self, artifact, content):
+        pass
+
+    def format(self, artifact, content):
+        pass
+
+    def apply(self, task, artifact):
+        resource = artifact.task
+        node = artifact.get_node()
+        if not node.is_workspace_resource():
+            return
+
+        resource.deps = node.cache.get_context(node)
+        resource.deps.__enter__()
+
+        try:
+            resource.acquire(artifact=artifact, deps=resource.deps, tools=resource.tools, owner=task)
+        except (KeyboardInterrupt, Exception) as e:
+            if resource.release_on_error:
+                with utils.ignore_exception():
+                    self.unapply(task, artifact)
+            raise e
+
+    def unapply(self, task, artifact):
+        resource = artifact.task
+        node = artifact.get_node()
+        if not node.is_workspace_resource():
+            return
+
+        try:
+            resource.release(artifact=artifact, deps=resource.deps, tools=resource.tools, owner=task)
+        except Exception as e:
+            raise e
+
+        resource.deps.__exit__(None, None, None)
