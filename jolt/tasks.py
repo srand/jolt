@@ -136,7 +136,7 @@ class Parameter(object):
         self.name = name
 
     def __init__(self, default=None, values=None, required=True,
-                 const=False, influence=True, help=None):
+                 const=False, influence=True, help=None, valuesfn=None):
         """
         Creates a new parameter.
 
@@ -144,6 +144,10 @@ class Parameter(object):
             default (str, optional): An optional default value.
             values (list, optional): A list of accepted values. An
                 assertion is raised if an unlisted value is assigned to the parameter.
+            valuesfn (func, optional); A function that validates the assigned value.
+                If both values and valuesfn are specified, the values list is validated
+                first. The function is passed the assigned value and should return.
+                boolean value. If the function returns False, a ParameterValueError is raised.
             required (boolean, optional): If required, the parameter must be assigned
                 a value before the task can be executed. The default is ``True``.
             const (boolean, optional): If const is True, the parameter is immutable
@@ -165,6 +169,7 @@ class Parameter(object):
         self._default = default
         self._value = default
         self._accepted_values = values
+        self._accepted_values_fn = valuesfn
         self._required = required
         self._const = const
         self._influence = influence
@@ -199,6 +204,8 @@ class Parameter(object):
 
     def _validate(self, value, what=None):
         if self._accepted_values is not None and value not in self._accepted_values:
+            raise ParameterValueError(self, value, what=what)
+        if self._accepted_values_fn is not None and not self._accepted_values_fn(value):
             raise ParameterValueError(self, value, what=what)
 
     def get_default(self):
@@ -437,7 +444,7 @@ class IntParameter(Parameter):
     """
 
     def __init__(self, default=None, min=None, max=None, values=None, required=True, const=False,
-                 influence=True, help=None):
+                 influence=True, help=None, valuesfn=None):
         """
         Creates a new parameter.
 
@@ -485,7 +492,8 @@ class IntParameter(Parameter):
             required=required,
             const=const,
             influence=influence,
-            help=help)
+            help=help,
+            valuesfn=valuesfn)
 
     def _validate(self, value, what=None):
         if self._min is not None and value < self._min:
@@ -688,6 +696,10 @@ class ListParameter(Parameter):
         if self._accepted_values is not None:
             for item in value:
                 if item not in self._accepted_values:
+                    raise ParameterValueError(self, item, what=what)
+        if self._accepted_values_fn is not None:
+            for item in value:
+                if not self._accepted_values_fn(item):
                     raise ParameterValueError(self, item, what=what)
 
     def get_value(self):

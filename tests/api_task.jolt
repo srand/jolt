@@ -755,6 +755,31 @@ class TaskApi(JoltTest):
             self.jolt("inspect a")
             self.assertExists("a.txt")
 
+    def test_param_valuesfn(self):
+        """
+        --- tasks:
+        class A(Task):
+            arg = Parameter(valuesfn=lambda value: value == "ok")
+
+        class B(Task):
+            arg = ListParameter(valuesfn=lambda value: value == "ok")
+
+        class C(Task):
+            arg = IntParameter(valuesfn=lambda value: value == 0)
+        ---
+        """
+
+        self.build("a:arg=ok")
+        self.build("b:arg=ok")
+        self.build("c:arg=0")
+
+        with self.assertRaises(Exception):
+            self.build("a:arg=notok")
+        with self.assertRaises(Exception):
+            self.build("b:arg=notok")
+        with self.assertRaises(Exception):
+            self.build("c:arg=1")
+
     def test_run_output(self):
         """
         --- tasks:
