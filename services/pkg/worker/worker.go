@@ -150,6 +150,14 @@ func (w *worker) run() error {
 					case <-time.After(30 * time.Second):
 						w.killExecutor(currentProc)
 					}
+
+					// Wait for all children to terminate
+					for {
+						err = currentProc.WaitChild()
+						if err != nil {
+							break
+						}
+					}
 				}
 				return errors.New("Disconnected from scheduler")
 			}
@@ -242,6 +250,14 @@ func (w *worker) run() error {
 			} else {
 				log.Info("Executor terminated")
 				err = reply(protocol.WorkerUpdate_BUILD_ENDED, nil)
+			}
+
+			// Wait for all children to terminate
+			for {
+				err := currentProc.WaitChild()
+				if err != nil {
+					break
+				}
 			}
 
 			os.Remove(currentBuildFile)

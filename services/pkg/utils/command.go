@@ -49,26 +49,14 @@ func RunOptions(cwd string, args ...string) (chan error, *Command, error) {
 		return nil, nil, err
 	}
 
-	wait := func(cmd *Command) {
-		// Wait for children in the process group to exit
-		for {
-			err := cmd.WaitChild()
-			if err != nil {
-				break
-			}
-		}
-	}
-
 	done := make(chan error)
 	go func() {
 		err := cmd.Wait()
 		if err != nil {
 			message := fmt.Sprintf("Command failed: %s (%v)", strings.Join(args, " "), err)
 			log.Error(message)
-			wait(cmd)
 			done <- NewCmdError(message, output.String())
 		}
-		wait(cmd)
 		close(done)
 	}()
 
