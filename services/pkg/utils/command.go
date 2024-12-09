@@ -5,9 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"strings"
-	"syscall"
 
 	"github.com/srand/jolt/scheduler/pkg/log"
 )
@@ -32,31 +30,29 @@ func (c *commandError) Error() string {
 	return c.message
 }
 
-func Run(args ...string) (chan error, *os.Process, error) {
+func Run(args ...string) (chan error, *Command, error) {
 	return RunOptions("", args...)
 }
 
-func RunOptions(cwd string, args ...string) (chan error, *os.Process, error) {
+func RunOptions(cwd string, args ...string) (chan error, *Command, error) {
 	output := bytes.Buffer{}
 
-	cmd := exec.Command(args[0], args[1:]...)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = io.MultiWriter(os.Stderr, &output)
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true, Pgid: 0}
+	cmd := NewCommand(args...)
+	cmd.SetStderr(io.MultiWriter(os.Stderr, &output))
 	if cwd != "" {
-		cmd.Dir = cwd
+		cmd.SetDir(cwd)
 	}
 
-	log.Info("Running", strings.Join(cmd.Args, " "))
+	log.Info("Running", strings.Join(cmd.Args(), " "))
 
 	if err := cmd.Start(); err != nil {
 		return nil, nil, err
 	}
 
-	wait := func(pid int) {
+	wait := func(cmd *Command) {
 		// Wait for children in the process group to exit
 		for {
-			_, err := syscall.Wait4(-1*pid, nil, 0, nil)
+			err := cmd.WaitChild()
 			if err != nil {
 				break
 			}
@@ -69,14 +65,14 @@ func RunOptions(cwd string, args ...string) (chan error, *os.Process, error) {
 		if err != nil {
 			message := fmt.Sprintf("Command failed: %s (%v)", strings.Join(args, " "), err)
 			log.Error(message)
-			wait(cmd.Process.Pid)
+			wait(cmd)
 			done <- NewCmdError(message, output.String())
 		}
-		wait(cmd.Process.Pid)
+		wait(cmd)
 		close(done)
 	}()
 
-	return done, cmd.Process, nil
+	return done, cmd, nil
 }
 
 func RunWait(args ...string) error {

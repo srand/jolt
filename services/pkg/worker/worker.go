@@ -12,7 +12,6 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/klauspost/compress/gzip"
@@ -130,8 +129,8 @@ func (w *worker) run() error {
 		}
 	}()
 
-	var currentCmd chan error
-	var currentProc *os.Process
+	var currentDone chan error
+	var currentProc *utils.Command
 	var currentBuildFile string
 	var currentClient *protocol.Client
 
@@ -141,13 +140,13 @@ func (w *worker) run() error {
 			if request == nil {
 				// Lost connection to the scheduler
 				// Terminate the current build and exit.
-				if currentCmd != nil {
+				if currentDone != nil {
 					log.Info("Terminating current build due to lost connection to scheduler")
 					if w.interruptExecutor(currentProc, currentClient); err != nil {
 						log.Error("Failed to terminate executor:", err)
 					}
 					select {
-					case <-currentCmd:
+					case <-currentDone:
 					case <-time.After(30 * time.Second):
 						w.killExecutor(currentProc)
 					}
@@ -157,7 +156,7 @@ func (w *worker) run() error {
 			switch request.Action {
 			case protocol.WorkerRequest_BUILD:
 				log.Info("Accepted new build request:", request.BuildId)
-				if currentCmd != nil {
+				if currentDone != nil {
 					continue
 				}
 
@@ -212,12 +211,12 @@ func (w *worker) run() error {
 					continue
 				}
 
-				currentCmd, currentProc, err = w.startExecutor(clientDigest, currentClient, request.Build.Environment.Workspace, request.WorkerId, request.BuildId, currentBuildFile)
+				currentDone, currentProc, err = w.startExecutor(clientDigest, currentClient, request.Build.Environment.Workspace, request.WorkerId, request.BuildId, currentBuildFile)
 				if err != nil {
 					reply(protocol.WorkerUpdate_EXECUTOR_FAILED, err)
 					os.RemoveAll(currentBuildFile)
 					currentClient = nil
-					currentCmd = nil
+					currentDone = nil
 					currentProc = nil
 					currentClient = nil
 					continue
@@ -236,7 +235,7 @@ func (w *worker) run() error {
 				continue
 			}
 
-		case err := <-currentCmd:
+		case err := <-currentDone:
 			if err != nil && !strings.Contains(err.Error(), "signal: interrupt") {
 				log.Info("Executor terminated with error:", err.Error())
 				err = reply(protocol.WorkerUpdate_EXECUTOR_FAILED, err)
@@ -247,7 +246,7 @@ func (w *worker) run() error {
 
 			os.Remove(currentBuildFile)
 			currentClient = nil
-			currentCmd = nil
+			currentDone = nil
 			currentProc = nil
 			currentBuildFile = ""
 
@@ -258,40 +257,19 @@ func (w *worker) run() error {
 	}
 }
 
-func (w *worker) interruptExecutor(process *os.Process, client *protocol.Client) error {
+func (w *worker) interruptExecutor(cmd *utils.Command, client *protocol.Client) error {
 	if utils.VersionLessThan(client.Version, "0.9.347") {
 		log.Debugf("Client version does not support interrupting the executor (%s)", client.Version)
 		return nil
 	}
 
-	// On POSIX systems, send SIGINT to the process group
-	// to interrupt the executor and all its children.
-	if runtime.GOOS == "windows" {
-		err := process.Signal(os.Interrupt)
-		if err != nil {
-			return err
-		}
-	} else {
-		err := syscall.Kill(process.Pid, syscall.SIGINT)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
+	return cmd.Interrupt()
 }
 
-func (w *worker) killExecutor(process *os.Process) error {
+func (w *worker) killExecutor(cmd *utils.Command) error {
 	// On POSIX systems, send SIGKILL to the process group
 	// to terminate the executor and all its children.
-	if runtime.GOOS == "windows" {
-		err := process.Kill()
-		if err != nil {
-			return err
-		}
-		return nil
-	}
-	return syscall.Kill(-process.Pid, syscall.SIGKILL)
+	return cmd.Kill()
 }
 
 // Serialize a BuildRequest pb to a temporary file so that the executor can read it
@@ -622,7 +600,7 @@ func (w *worker) runClientCmdWindows(clientDigest, workdir string, args ...strin
 	return w.runCmdWindows(workdir, cmd...)
 }
 
-func (w *worker) startExecutor(clientDigest string, client *protocol.Client, workspace *protocol.Workspace, worker, build, request string) (chan error, *os.Process, error) {
+func (w *worker) startExecutor(clientDigest string, client *protocol.Client, workspace *protocol.Workspace, worker, build, request string) (chan error, *utils.Command, error) {
 	activate := w.activateVEnvPath(clientDigest)
 
 	// Build bubblewrap command prefix to run the executor in a namespace.
