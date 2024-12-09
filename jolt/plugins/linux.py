@@ -102,6 +102,43 @@ class _KernelBase(Task):
             fn(artifact, tools)
 
 
+class UBoot(_KernelBase):
+    """
+    Builds u-boot makefile target(s) and publishes the result.
+
+    """
+    abstract = True
+
+    defconfig = Parameter("allnoconfig", help="Name of u-boot defconfig")
+    """ Default configuration """
+
+    targets = ListParameter(
+        ["uboot"],
+        values=["tools", "uboot"],
+        help="Targets to build and publish",
+    )
+
+    def run_tools(self, deps, tools):
+        self.info("Building tools ...")
+        tools.run("tools")
+
+    def run_uboot(self, deps, tools):
+        self.info("Building u-boot ...")
+        tools.run("u-boot.bin")
+
+    def publish_tools(self, artifact, tools):
+        self.info("Publishing tools ...")
+        with tools.cwd(self.objdir):
+            artifact.collect("tools/mkimage")
+            artifact.environ.PATH.append("tools")
+
+    def publish_uboot(self, artifact, tools):
+        self.info("Publishing u-boot ...")
+        with tools.cwd(self.objdir):
+            artifact.collect("*.bin")
+
+
+
 class Kernel(_KernelBase):
     abstract = True
     """ Must be subclassed """
