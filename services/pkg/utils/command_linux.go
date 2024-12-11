@@ -38,10 +38,6 @@ func (c *Command) Interrupt() error {
 	return c.Process().Signal(os.Interrupt)
 }
 
-func (c *Command) Kill() error {
-	return syscall.Kill(-c.GetPid(), syscall.SIGKILL)
-}
-
 func (c *Command) SetStderr(w io.Writer) {
 	c.cmd.Stderr = w
 }

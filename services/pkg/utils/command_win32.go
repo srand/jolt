@@ -33,11 +33,8 @@ func (c *Command) WaitChild() error {
 }
 
 func (c *Command) Interrupt() error {
-	return c.Process().Signal(os.Interrupt)
-}
-
-func (c *Command) Kill() error {
-	return c.cmd.Process.Kill()
+	// Not implemented on Windows
+	return errors.New("Interrupt not supported on Windows")
 }
 
 func (c *Command) SetStderr(w io.Writer) {

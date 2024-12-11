@@ -139,19 +139,17 @@ func (w *worker) run() error {
 		case request := <-requests:
 			if request == nil {
 				// Lost connection to the scheduler
-				// Terminate the current build and exit.
+				// Interrupt the current build and exit.
 				if currentDone != nil {
 					log.Info("Terminating current build due to lost connection to scheduler")
 					if w.interruptExecutor(currentProc, currentClient); err != nil {
 						log.Error("Failed to terminate executor:", err)
 					}
-					select {
-					case <-currentDone:
-					case <-time.After(30 * time.Second):
-						w.killExecutor(currentProc)
-					}
 
-					// Wait for all children to terminate
+					// Wait for the executor to terminate
+					<-currentDone
+
+					// Ensure all children have terminated
 					for {
 						err = currentProc.WaitChild()
 						if err != nil {
@@ -280,12 +278,6 @@ func (w *worker) interruptExecutor(cmd *utils.Command, client *protocol.Client) 
 	}
 
 	return cmd.Interrupt()
-}
-
-func (w *worker) killExecutor(cmd *utils.Command) error {
-	// On POSIX systems, send SIGKILL to the process group
-	// to terminate the executor and all its children.
-	return cmd.Kill()
 }
 
 // Serialize a BuildRequest pb to a temporary file so that the executor can read it
