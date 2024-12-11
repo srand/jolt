@@ -88,6 +88,8 @@ def _run(cmd, cwd, env, preexec_fn, *args, **kwargs):
     output_on_error = kwargs.get("output_on_error")
     output_rstrip = kwargs.get("output_rstrip", True)
     output_stdio = kwargs.get("output_stdio", False)
+    output_stderr = kwargs.get("output_stderr", True)
+    output_stdout = kwargs.get("output_stdout", True)
     return_stderr = kwargs.get("return_stderr", False)
     output = output if output is not None else True
     output = False if output_on_error else output
@@ -133,8 +135,15 @@ def _run(cmd, cwd, env, preexec_fn, *args, **kwargs):
                 preexec_fn=preexec_fn,
             )
 
-            stdout_func = log.stdout if not output_stdio else stdout_write
-            stderr_func = log.stderr if not output_stdio else stderr_write
+            if output_stdout:
+                stdout_func = log.stdout if not output_stdio else stdout_write
+            else:
+                stdout_func = None
+
+            if output_stderr:
+                stderr_func = log.stderr if not output_stdio else stderr_write
+            else:
+                stderr_func = None
 
             logbuf = []
             stdout = Reader(

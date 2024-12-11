@@ -239,8 +239,8 @@ Conan
 
 .. reference-conan-conan-start
 
-.. autoclass:: jolt.plugins.conan.Conan
-   :members: conanfile, generators, incremental, options, packages, remotes
+.. autoclass:: jolt.plugins.conan.Conan2
+   :members: conanfile, incremental, options, packages, remotes
 
 .. reference-conan-conan-end
 

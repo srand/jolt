@@ -5,19 +5,49 @@ import sys
 import time
 sys.path.append(".")
 
-from testsupport import JoltTest
+from testsupport import JoltTest, skip
 
 
 class ConanApi(JoltTest):
     name = "ext/conan"
 
-    def test_build(self):
+    @skip("Conan 1 is deprecated")
+    def test_conan_1(self):
         """
         --- tasks:
         from jolt.plugins.conan import Conan
         from jolt.plugins import ninja
 
         class Json(Conan):
+            packages = ["nlohmann_json/3.10.3"]
+
+        @attributes.system
+        @ninja.attributes.ldflags("ldflags_{{system}}")
+        class Test(ninja.CXXExecutable):
+            requires = ["json"]
+            sources = ["main.cpp"]
+            ldflags_windows = ["/subsystem:console"]
+
+        --- file: main.cpp
+        #include "nlohmann/json.hpp"
+
+        int main(int argc, char *argv[])
+        {{
+            return 0;
+        }}
+        ---
+        """
+        if not shutil.which("conan"):
+            self.skip("Conan is not installed")
+        self.jolt("-v build test")
+
+    def test_conan_2(self):
+        """
+        --- tasks:
+        from jolt.plugins.conan import Conan2
+        from jolt.plugins import ninja
+
+        class Json(Conan2):
             packages = ["nlohmann_json/3.10.3"]
 
         @attributes.system
