@@ -210,7 +210,6 @@ func (t *Task) cancel() error {
 func (t *Task) Close() {
 	t.cancel()
 	t.updateObservers.Close()
-	t.updateObservers = nil
 }
 
 func (t *Task) SetScheduler(hooks SchedulerObserver) {
