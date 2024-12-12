@@ -749,7 +749,10 @@ class TaskProxy(object):
         try:
             # Acquire resource dependencies in reverse order.
             for resource in reversed(resource_deps):
-                with resource.lock_artifacts(discard=False) if not resource.is_workspace_resource() else nullcontext():
+                # Always discard resource artifacts before acquiring the resource.
+                # They should not exist in the cache when the resource is acquired,
+                # but may exist if the resource was previously acquired by an interrupted build.
+                with resource.lock_artifacts(discard=True) if not resource.is_workspace_resource() else nullcontext():
                     resource.deps = self.cache.get_context(resource)
                     exitstack.enter_context(resource.deps)
 
