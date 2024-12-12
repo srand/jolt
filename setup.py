@@ -92,7 +92,7 @@ setup(
     dependency_links=[],
     extras_require={
         "allure": ["allure-python-commons"],
-        "conan": ["conan<2.0"],
+        "conan": ["conan>=2.0"],
         "dev": ["check-manifest"],
         "doc": ["sphinx-click", "sphinx-rtd-theme"],
         "test": ["coverage"],
