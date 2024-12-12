@@ -98,24 +98,76 @@ class TaskQueue(object):
 
 
 class Executor(object):
+    """
+    Base class for all executors.
+
+    An executor is responsible for running a task. It is created by an executor
+    factory and is submitted to a task queue. The factory is also
+    responsible for hosting a thread pool that will run the executors it creates.
+
+    The type of executor created by the factory depends on the execution strategy
+    selected by the user through command line options. The strategy is responsible
+    for deciding which executor to create for each task.
+
+    An implementation of an executor must implement the run method, which is called
+    from the thread pool. The run method is responsible for running the task and
+    handling any exceptions that may occur during execution.
+    """
+
     def __init__(self, factory):
         self.factory = factory
-        self._status = None
 
     def submit(self, env):
         return self.factory.submit(self, env)
 
     def cancel(self):
+        """
+        Cancel the task.
+
+        This method is optional and may be implemented by executors that support
+        cancellation of tasks, such as network executors where a remote scheduler
+        may be able to cancel a task that is already running.
+
+        By default, the method does nothing.
+        """
         pass
 
     def is_aborted(self):
+        """ Check if executor has been aborted. """
         return self.factory.is_aborted()
 
     def run(self, env):
-        pass
+        """
+        Run the task.
+
+        This method must be implemented by all executors. It is called from the
+        factory thread pool and is responsible for running the task
+        and handling any exceptions that may occur during execution.
+        Any exceptions raised by the task must, if caught, be re-raised to
+        the caller unless the task is marked as unstable, in which case the
+        exception should be logged and ignored.
+
+        The task run() method shall be run within a hooks.task_run()
+        context manager to ensure that the task status is recognized by
+        the report hooks and other plugins.
+
+        Network executors have additional requirements. See the
+        NetworkExecutor class for more information.
+        """
+        raise NotImplementedError
 
 
 class LocalExecutor(Executor):
+    """
+    An Executor that runs a task locally.
+
+    The executor runs the task on the local machine. The task is run
+    by calling the task.run() method.
+
+    The executor is created by the local executor factory and is
+    typically run sequentially with other executors.
+    """
+
     def __init__(self, factory, task, force_upload=False, force_build=False):
         super().__init__(factory)
         self.task = task
@@ -138,8 +190,6 @@ class LocalExecutor(Executor):
                 self.task.raise_for_status(log_error=getattr(env, "worker", False))
                 raise e
 
-        return task
-
     def get_all_extensions(self, task):
         extensions = copy.copy(task.extensions)
         for ext in extensions:
@@ -155,15 +205,61 @@ class LocalExecutor(Executor):
 
 
 class NetworkExecutor(Executor):
-    pass
+    def run(self, env):
+        """
+        Run the task.
+
+        See the Executor class for basic information.
+
+        Network executors have additional requirements. Before scheduling
+        the task to a remote scheduler, the executor must call
+        run_resources() on the task. This acquires any Resources marked
+        local=True and uploads the resulting session artifacts
+        to the remote cache.
+
+        Once the task has been submitted to the remote scheduler, the executor
+        must run task.queued() on the task and its extensions. This is done
+        to ensure that the task status is correctly reported to the
+        user.
+
+        For any change in state of task, the executor must run one of:
+
+        - task.running_execution(remote=True) - when the task has started
+        - task.failed_execution(remote=True) - when the task has failed
+        - task.failed_execution(remote=True, interrupt=True) - when the
+          task has been interrupted, e.g. by a user request or rescheduling
+        - task.finished_execution(remote=True) - when the task has passed
+
+        Upon completion of the task, whether successful or not, task
+        session artifacts must be downloaded to the local cache, if
+        the task is marked as downloadable. This is done by calling
+        task.download() with the session_only flag set to True.
+
+        Persistent artifacts are downloaded only if the task is successful
+        and the task is marked as downloadable.
+        """
+        raise NotImplementedError
 
 
 class SkipTask(Executor):
+    """
+    An Executor that skips a task.
+
+    This executor is created by the concurrent executor factory when a task
+    is skipped, i.e. when the task artifacts are already available locally or
+    remotely and the task does not need to be run.
+    """
+
     def __init__(self, factory, task, *args, **kwargs):
         super().__init__(factory, *args, **kwargs)
         self.task = task
 
     def run(self, env):
+        """
+        Skip the task.
+
+        The task and its extensions are marked as skipped.
+        """
         self.task.skipped()
         for ext in self.task.extensions:
             ext.skipped()
@@ -171,11 +267,21 @@ class SkipTask(Executor):
 
 
 class Downloader(Executor):
+    """
+    An Executor that downloads task artifacts.
+
+    The executor downloads the task artifacts and its extensions from the
+    remote cache to the local cache. Failure to download the artifacts
+    is reported by raising an exception.
+
+    Downloader executors are typically run in parallel with other executors.
+
+    """
     def __init__(self, factory, task, *args, **kwargs):
         super().__init__(factory, *args, **kwargs)
         self.task = task
 
-    def _download(self, env, task):
+    def _download(self, task):
         if self.is_aborted():
             return
         if not task.is_downloadable():
@@ -194,18 +300,28 @@ class Downloader(Executor):
             task.finished_download()
 
     def run(self, env):
-        self._download(env, self.task)
+        self._download(self.task)
         for ext in self.task.extensions:
-            self._download(env, ext)
+            self._download(ext)
         return self.task
 
 
 class Uploader(Executor):
+    """
+    An Executor that uploads task artifacts.
+
+    The executor uploads the task artifacts and its extensions from the
+    local cache to the remote cache. Failure to upload the artifacts
+    is reported by raising an exception.
+
+    Uploader executors are typically run in parallel with other executors.
+    """
+
     def __init__(self, factory, task, *args, **kwargs):
         super().__init__(factory, *args, **kwargs)
         self.task = task
 
-    def _upload(self, env, task):
+    def _upload(self, task):
         if self.is_aborted():
             return
         try:
@@ -222,9 +338,9 @@ class Uploader(Executor):
             task.finished_upload()
 
     def run(self, env):
-        self._upload(env, self.task)
+        self._upload(self.task)
         for ext in self.task.extensions:
-            self._upload(env, ext)
+            self._upload(ext)
 
         return self.task
 
