@@ -169,7 +169,7 @@ def _run(cmd, cwd, env, preexec_fn, *args, **kwargs):
             p.wait(10)
         except subprocess.TimeoutExpired:
             kill(p.pid)
-            p.wait()
+            utils.call_and_catch(p.wait, 10)
         raise
 
     except (subprocess.TimeoutExpired, JoltTimeoutError):
@@ -179,7 +179,7 @@ def _run(cmd, cwd, env, preexec_fn, *args, **kwargs):
             p.wait(10)
         except subprocess.TimeoutExpired:
             kill(p.pid)
-            p.wait()
+            utils.call_and_catch(p.wait, 10)
 
     finally:
         if stdout:
