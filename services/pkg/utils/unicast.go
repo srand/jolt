@@ -178,6 +178,11 @@ func (bc *Unicast[E]) NewConsumerWithItem(owner interface{}) (*UnicastConsumer[E
 func (bc *Unicast[E]) HasUnackedData() bool {
 	bc.Lock()
 	defer bc.Unlock()
+
+	if bc.isClosed() {
+		return false
+	}
+
 	return len(bc.consumerItem) > 0
 }
 
@@ -185,15 +190,29 @@ func (bc *Unicast[E]) HasUnackedData() bool {
 func (bc *Unicast[E]) NumUnackedData() int {
 	bc.Lock()
 	defer bc.Unlock()
+
+	if bc.isClosed() {
+		return 0
+	}
+
 	return len(bc.consumerItem)
 }
 
 func (bc *Unicast[E]) acknowledge(bcc *UnicastConsumer[E]) {
 	bc.Lock()
 	defer bc.Unlock()
+
+	if bc.isClosed() {
+		return
+	}
+
 	bc.availConsumers[bcc.ID] = bcc
 	delete(bc.consumerItem, bcc.ID)
 	bc.send()
+}
+
+func (bc *Unicast[E]) isClosed() bool {
+	return bc.consumers == nil
 }
 
 func (bc *Unicast[E]) send() {
@@ -223,6 +242,11 @@ func (bc *Unicast[E]) send() {
 func (bc *Unicast[E]) Empty() bool {
 	bc.Lock()
 	defer bc.Unlock()
+
+	if bc.isClosed() {
+		return true
+	}
+
 	return bc.queue.Len() == 0
 }
 
@@ -230,12 +254,22 @@ func (bc *Unicast[E]) Empty() bool {
 func (bc *Unicast[E]) Len() int {
 	bc.Lock()
 	defer bc.Unlock()
+
+	if bc.isClosed() {
+		return 0
+	}
+
 	return bc.queue.Len()
 }
 
 func (bc *Unicast[E]) remove(bcc *UnicastConsumer[E]) {
 	bc.Lock()
 	defer bc.Unlock()
+
+	if bc.isClosed() {
+		return
+	}
+
 	delete(bc.consumers, bcc.ID)
 	delete(bc.availConsumers, bcc.ID)
 	if data, ok := bc.consumerItem[bcc.ID]; ok {
@@ -260,6 +294,10 @@ func (bc *Unicast[E]) Send(data E) {
 	bc.Lock()
 	defer bc.Unlock()
 
+	if bc.isClosed() {
+		return
+	}
+
 	// Don't add duplicate items to the queue.
 	if bc.contains(data) {
 		return
@@ -282,6 +320,11 @@ func (bc *Unicast[E]) Send(data E) {
 func (bc *Unicast[E]) Walk(walker UnicastWalkFunc[E]) bool {
 	bc.RLock()
 	defer bc.RUnlock()
+
+	if bc.isClosed() {
+		return false
+	}
+
 	for data := bc.queue.Front(); data != nil; data = data.Next() {
 		if !walker(bc, data.Value.(E)) {
 			return false
