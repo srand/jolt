@@ -241,7 +241,6 @@ class Conan(Task):
             artifact.cxxinfo.ldflags.append(dep["exelinkflags"])
 
 
-
 @influence.attribute("conanfile")
 @influence.attribute("generators")
 @influence.attribute("incremental")
