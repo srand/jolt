@@ -115,7 +115,7 @@ def get_task_artifacts(task):
 
 class CompDBHooks(TaskHook):
     def __init__(self):
-        self._depfiles = config.getboolean("ninja-compdb", "depfiles", True)
+        self._depfiles = config.getboolean("ninja-compdb", "depfiles", False)
 
     def publish_compdb(self, artifact, tools):
         with tools.cwd(self.outdir):
