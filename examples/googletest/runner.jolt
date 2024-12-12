@@ -1,8 +1,8 @@
-from jolt.plugins.conan import Conan
+from jolt.plugins.conan import Conan2
 from jolt.plugins.googletest import GTestRunner
 from jolt.plugins.ninja import CXXExecutable
 
-class GTest(Conan):
+class GTest(Conan2):
     packages = ["gtest/1.14.0"]
     settings = ["compiler.libcxx=libstdc++11"]
 

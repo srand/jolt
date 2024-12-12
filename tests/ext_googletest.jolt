@@ -25,10 +25,10 @@ class GoogleTestApi(JoltTest):
             EXPECT_EQ(1, 1);
         }}
         --- tasks:
-        from jolt.plugins.conan import Conan
+        from jolt.plugins.conan import Conan2
         from jolt.plugins import googletest, ninja
 
-        class GTest(Conan):
+        class GTest(Conan2):
             packages = ["gtest/1.11.0"]
             settings = ["compiler.libcxx=libstdc++11"]
 
@@ -85,10 +85,10 @@ class GoogleTestApi(JoltTest):
         }}
 
         --- tasks:
-        from jolt.plugins.conan import Conan
+        from jolt.plugins.conan import Conan2
         from jolt.plugins import googletest, ninja
 
-        class GTest(Conan):
+        class GTest(Conan2):
             packages = ["gtest/1.11.0"]
             settings = ["compiler.libcxx=libstdc++11"]
 
@@ -184,10 +184,10 @@ class GoogleTestApi(JoltTest):
 
         --- tasks:
         from contextlib import contextmanager
-        from jolt.plugins.conan import Conan
+        from jolt.plugins.conan import Conan2
         from jolt.plugins import googletest, ninja
 
-        class GTest(Conan):
+        class GTest(Conan2):
             packages = ["gtest/1.10.0"]
             settings = ["compiler.libcxx=libstdc++11"]
 
@@ -233,10 +233,10 @@ class GoogleTestApi(JoltTest):
 
         --- tasks:
         from contextlib import contextmanager
-        from jolt.plugins.conan import Conan
+        from jolt.plugins.conan import Conan2
         from jolt.plugins import googletest, ninja
 
-        class GTest(Conan):
+        class GTest(Conan2):
             packages = ["gtest/1.10.0"]
             settings = ["compiler.libcxx=libstdc++11"]
 
@@ -280,10 +280,10 @@ class GoogleTestApi(JoltTest):
             EXPECT_EQ(1, 1);
         }}
         --- tasks:
-        from jolt.plugins.conan import Conan
+        from jolt.plugins.conan import Conan2
         from jolt.plugins import googletest, ninja
 
-        class GTest(Conan):
+        class GTest(Conan2):
             packages = ["gtest/1.11.0"]
             settings = ["compiler.libcxx=libstdc++11"]
 
@@ -336,10 +336,10 @@ class GoogleTestApi(JoltTest):
         }}
 
         --- tasks:
-        from jolt.plugins.conan import Conan
+        from jolt.plugins.conan import Conan2
         from jolt.plugins import googletest, ninja
 
-        class GTest(Conan):
+        class GTest(Conan2):
             packages = ["gtest/1.11.0"]
             settings = ["compiler.libcxx=libstdc++11"]
 

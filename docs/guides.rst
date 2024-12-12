@@ -429,9 +429,9 @@ used in our example application. All build metadata is automatically configured.
 
 .. code-block:: python
 
-    from jolt.plugins.conan import Conan
+    from jolt.plugins.conan import Conan2
 
-    class Boost(Conan):
+    class Boost(Conan2):
         requires = ["toolchain"]
         packages = ["boost/1.74.0"]
 

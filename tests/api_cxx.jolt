@@ -133,9 +133,9 @@ class CxxApi(JoltTest):
         #include "weapon_generated.h"
 
         --- tasks:
-        from jolt.plugins.conan import Conan
+        from jolt.plugins.conan import Conan2
 
-        class Flatbuffers(Conan):
+        class Flatbuffers(Conan2):
             packages = ["flatbuffers/2.0.8"]
 
         class Lib(CXXLibrary):
@@ -599,9 +599,9 @@ class CxxApi(JoltTest):
         #include "person.pb.h"
 
         --- tasks:
-        from jolt.plugins.conan import Conan
+        from jolt.plugins.conan import Conan2
 
-        class Protobuf(Conan):
+        class Protobuf(Conan2):
             packages = ["protobuf/3.19.2"]
 
         class Lib(CXXLibrary):
@@ -640,9 +640,9 @@ class CxxApi(JoltTest):
         #include "person.pb.h"
 
         --- tasks:
-        from jolt.plugins.conan import Conan
+        from jolt.plugins.conan import Conan2
 
-        class Protobuf(Conan):
+        class Protobuf(Conan2):
             packages = ["protobuf/3.21.9"]
 
         @jolt.influence.files("proto/*.proto")
@@ -675,9 +675,9 @@ class CxxApi(JoltTest):
         }}
 
         --- tasks:
-        from jolt.plugins.conan import Conan
+        from jolt.plugins.conan import Conan2
 
-        class Protobuf(Conan):
+        class Protobuf(Conan2):
             packages = ["protobuf/3.21.9"]
 
 
