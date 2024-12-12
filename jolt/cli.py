@@ -384,7 +384,7 @@ def build(ctx, task, network, keep_going, default, local,
     goal_task_duration = 0
 
     session = executors.create_session(dag) if options.network else {}
-    queue = scheduler.TaskQueue(strategy, acache, session)
+    queue = scheduler.TaskQueue()
 
     try:
         if not dag.has_tasks():
@@ -407,7 +407,8 @@ def build(ctx, task, network, keep_going, default, local,
 
                 while leafs:
                     task = leafs.pop()
-                    queue.submit(task)
+                    executor = strategy.create_executor(session, task)
+                    queue.submit(executor)
 
                 task, error = queue.wait()
 
@@ -430,6 +431,7 @@ def build(ctx, task, network, keep_going, default, local,
 
                 if not keep_going and error is not None:
                     queue.abort()
+                    executors.shutdown()
                     task.raise_for_status()
                     raise error
 
@@ -448,6 +450,7 @@ def build(ctx, task, network, keep_going, default, local,
         log.warning("Interrupted by user")
         try:
             queue.abort()
+            executors.shutdown()
             sys.exit(1)
         except KeyboardInterrupt:
             print()
@@ -753,7 +756,7 @@ def download(ctx, task, deps, copy, copy_all):
     executors = scheduler.ExecutorRegistry.get(options)
     registry = TaskRegistry.get()
     strategy = scheduler.DownloadStrategy(executors, acache)
-    queue = scheduler.TaskQueue(strategy, acache, {})
+    queue = scheduler.TaskQueue()
     gb = graph.GraphBuilder(registry, acache, manifest, options, progress=True)
     dag = gb.build(task)
 
@@ -772,7 +775,8 @@ def download(ctx, task, deps, copy, copy_all):
 
                 while leafs:
                     task = leafs.pop()
-                    queue.submit(task)
+                    executor = strategy.create_executor({}, task)
+                    queue.submit(executor)
 
                 task, error = queue.wait()
                 p.update(1)
@@ -795,6 +799,7 @@ def download(ctx, task, deps, copy, copy_all):
         log.warning("Interrupted by user")
         try:
             queue.abort()
+            executors.shutdown()
             sys.exit(1)
         except KeyboardInterrupt:
             print()

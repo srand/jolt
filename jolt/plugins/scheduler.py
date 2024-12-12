@@ -145,6 +145,15 @@ class RemoteExecutor(NetworkExecutor):
         self.session = session
         self.task = task
 
+    def schedule(self, env):
+        """
+        Schedule the task for execution.
+
+        The task is marked as in progress before scheduling.
+        """
+        self.task.set_in_progress()
+        return super().schedule(env)
+
     def cancel(self):
         """
         Cancel the build session.

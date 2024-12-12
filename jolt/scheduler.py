@@ -1,5 +1,6 @@
 from concurrent.futures import ThreadPoolExecutor, as_completed, Future
 import copy
+from functools import wraps
 import os
 import queue
 from threading import Lock
@@ -25,12 +26,9 @@ class JoltEnvironment(object):
 
 
 class TaskQueue(object):
-    def __init__(self, strategy, cache, session):
+    def __init__(self):
         self.futures = {}
         self.futures_lock = Lock()
-        self.strategy = strategy
-        self.cache = cache
-        self.session = session
         self.duration_acc = utils.duration_diff(0)
         self._aborted = False
         self._timer = Timer(60, self._log_task_running_time)
@@ -41,19 +39,12 @@ class TaskQueue(object):
             for future in self.futures:
                 self.futures[future].task.log_running_time()
 
-    def submit(self, task):
+    def submit(self, executor):
         if self._aborted:
             return None
 
-        env = JoltEnvironment(cache=self.cache, queue=self)
-        executor = self.strategy.create_executor(self.session, task)
-        raise_task_error_if(
-            not executor, task,
-            "no executor can execute the task; "
-            "requesting a distributed network build without proper configuration?")
-
-        task.set_in_progress()
-        future = executor.submit(env)
+        env = JoltEnvironment(queue=self)
+        future = executor.schedule(env)
         self.futures[future] = executor
         return future
 
@@ -79,7 +70,6 @@ class TaskQueue(object):
                 future.cancel()
             if len(self.futures):
                 log.info("Waiting for tasks to finish, please be patient")
-        self.strategy.executors.shutdown()
         self._timer.cancel()
 
     def shutdown(self):
@@ -117,7 +107,23 @@ class Executor(object):
     def __init__(self, factory):
         self.factory = factory
 
-    def submit(self, env):
+    def schedule(self, env):
+        """ Schedule the task for execution.
+
+        This method is called by the task queue to schedule the task for execution
+        in the factory thread pool. The method must return a Future object that
+        represents the task execution. The Future object is used to track the
+        execution of the task and to retrieve the result of the execution
+        once it is completed.
+
+        The method must be implemented by all executors. They must call the
+        factory submit method to schedule the task for execution and also
+        mark the task as in progress with set_in_progress().
+
+        Args:
+            env: The JoltEnvironment object that contains the queue and cache objects.
+
+        """
         return self.factory.submit(self, env)
 
     def cancel(self):
@@ -173,6 +179,15 @@ class LocalExecutor(Executor):
         self.task = task
         self.force_build = force_build
         self.force_upload = force_upload
+
+    def schedule(self, env):
+        """
+        Schedule the task for execution.
+
+        The task is marked as in progress before scheduling.
+        """
+        self.task.set_in_progress()
+        return super().schedule(env)
 
     def _run(self, env, task):
         if self.is_aborted():
@@ -281,6 +296,15 @@ class Downloader(Executor):
         super().__init__(factory, *args, **kwargs)
         self.task = task
 
+    def schedule(self, env):
+        """
+        Schedule the task for execution.
+
+        The task is marked as in progress before scheduling.
+        """
+        self.task.set_in_progress()
+        return super().schedule(env)
+
     def _download(self, task):
         if self.is_aborted():
             return
@@ -300,6 +324,8 @@ class Downloader(Executor):
             task.finished_download()
 
     def run(self, env):
+        """ Downloads artifacts. """
+
         self._download(self.task)
         for ext in self.task.extensions:
             self._download(ext)
@@ -321,6 +347,15 @@ class Uploader(Executor):
         super().__init__(factory, *args, **kwargs)
         self.task = task
 
+    def schedule(self, env):
+        """
+        Schedule the task for execution.
+
+        The task is marked as in progress before scheduling.
+        """
+        self.task.set_in_progress()
+        return super().schedule(env)
+
     def _upload(self, task):
         if self.is_aborted():
             return
@@ -338,6 +373,8 @@ class Uploader(Executor):
             task.finished_upload()
 
     def run(self, env):
+        """ Uploads artifacts. """
+
         self._upload(self.task)
         for ext in self.task.extensions:
             self._upload(ext)
@@ -514,6 +551,18 @@ class NetworkExecutorFactory(ExecutorFactory):
         raise NotImplementedError()
 
 
+def ensure_executor_return(func):
+    @wraps(func)
+    def wrapper(self, session, task):
+        executor = func(self, session, task)
+        raise_task_error_if(
+            not executor, task,
+            "no executor can execute the task; "
+            "requesting a distributed network build without proper configuration?")
+        return executor
+    return wrapper
+
+
 class ExecutionStrategy(object):
     def create_executor(self, session, task):
         raise NotImplementedError()
@@ -524,6 +573,7 @@ class LocalStrategy(ExecutionStrategy, PruneStrategy):
         self.executors = executors
         self.cache = cache
 
+    @ensure_executor_return
     def create_executor(self, session, task):
         if task.is_alias() or task.is_resource():
             return self.executors.create_skipper(task)
@@ -550,6 +600,7 @@ class DownloadStrategy(ExecutionStrategy, PruneStrategy):
         self.executors = executors
         self.cache = cache
 
+    @ensure_executor_return
     def create_executor(self, session, task):
         if task.is_alias():
             return self.executors.create_skipper(task)
@@ -572,6 +623,7 @@ class DistributedStrategy(ExecutionStrategy, PruneStrategy):
         self.executors = executors
         self.cache = cache
 
+    @ensure_executor_return
     def create_executor(self, session, task):
         if task.is_alias() or task.is_resource():
             return self.executors.create_skipper(task)
@@ -618,6 +670,7 @@ class WorkerStrategy(ExecutionStrategy, PruneStrategy):
         self.executors = executors
         self.cache = cache
 
+    @ensure_executor_return
     def create_executor(self, session, task):
         if task.is_alias() or task.is_resource():
             return self.executors.create_skipper(task)

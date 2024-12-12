@@ -782,7 +782,6 @@ class TaskProxy(object):
             self._run_task(env, force_upload, force_build)
 
     def _run_task(self, env, force_upload=False, force_build=False):
-        cache = env.cache
         queue = env.queue
 
         with self.tools:
@@ -796,7 +795,7 @@ class TaskProxy(object):
                     self.skipped()
                     return
 
-                available_remotely = cache.download_enabled() and self.is_available_remotely()
+                available_remotely = self.cache.download_enabled() and self.is_available_remotely()
                 if not available_locally and available_remotely:
                     available_locally = self.download()
 
@@ -815,7 +814,7 @@ class TaskProxy(object):
                         upload_session_artifacts = False
 
                         try:
-                            context = cache.get_context(self)
+                            context = self.cache.get_context(self)
                             exitstack.enter_context(context)
 
                             self.running_execution()
@@ -884,7 +883,7 @@ class TaskProxy(object):
                             if force_upload or force_build or not available_remotely:
                                 raise_task_error_if(
                                     not self.upload(force=force_upload, locked=False, persistent_only=True) \
-                                    and cache.upload_enabled(),
+                                    and self.cache.upload_enabled(),
                                     self, "Failed to upload task artifact")
 
                         finally:
@@ -892,14 +891,14 @@ class TaskProxy(object):
                             raise_task_error_if(
                                 upload_session_artifacts \
                                 and not self.upload(force=force_upload, locked=False, session_only=True, artifacts=upload_session_artifacts) \
-                                and cache.upload_enabled(),
+                                and self.cache.upload_enabled(),
                                 self, "Failed to upload session artifact")
 
             elif force_upload or not available_remotely:
                 self.started_upload()
                 raise_task_error_if(
                     not self.upload(force=force_upload, persistent_only=True) \
-                    and cache.upload_enabled(),
+                    and self.cache.upload_enabled(),
                     self, "Failed to upload task artifact")
                 self.finished_upload()
 

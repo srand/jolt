@@ -233,7 +233,7 @@ def compdb(ctx, task, default):
     executors = scheduler.ExecutorRegistry.get(options)
     registry = TaskRegistry.get()
     strategy = scheduler.DownloadStrategy(executors, acache)
-    queue = scheduler.TaskQueue(strategy, acache, {})
+    queue = scheduler.TaskQueue()
 
     for params in default:
         registry.set_default_parameters(params)
@@ -251,9 +251,10 @@ def compdb(ctx, task, default):
 
                 while leafs:
                     task = leafs.pop()
-                    queue.submit(task)
+                    executor = strategy.create_executor({}, task)
+                    queue.submit(executor)
 
-                task, error = queue.wait()
+                task, _ = queue.wait()
 
                 # Materialize workspace resources so that
                 # source code is available to the debugger.
@@ -272,6 +273,7 @@ def compdb(ctx, task, default):
         log.warning("Interrupted by user")
         try:
             queue.abort()
+            executors.shutdown()
             sys.exit(1)
         except KeyboardInterrupt:
             print()
