@@ -26,6 +26,10 @@ class JoltEnvironment(object):
 
 
 class TaskQueue(object):
+    """
+    A helper class for tracking tasks in progress and their completion.
+    """
+
     def __init__(self):
         self.futures = {}
         self.futures_lock = Lock()
@@ -40,15 +44,31 @@ class TaskQueue(object):
                 self.futures[future].task.log_running_time()
 
     def submit(self, executor):
+        """
+        Submit an exeuctor to the task queue for execution.
+
+        The method schedules the executor for execution and returns a Future object
+        that may be used to track completion of the task.
+        """
+
         if self._aborted:
             return None
 
         env = JoltEnvironment(queue=self)
         future = executor.schedule(env)
-        self.futures[future] = executor
+        with self.futures_lock:
+            self.futures[future] = executor
         return future
 
     def wait(self):
+        """
+        Wait for any task to complete.
+
+        The method waits for the next task to complete and returns the task and any
+        exception that may have occurred during execution. If no task is in progress,
+        the method returns None, None.
+        """
+
         for future in as_completed(self.futures):
             task = self.futures[future].task
             try:
@@ -63,6 +83,13 @@ class TaskQueue(object):
         return None, None
 
     def abort(self):
+        """
+        Abort all tasks in progress.
+
+        The method cancels all tasks in progress and prevents any new tasks from being
+        submitted to the task queue. The method doesn't wait for all tasks to complete
+        before returning.
+        """
         self._aborted = True
         with self.futures_lock:
             for future, executor in self.futures.items():
@@ -73,16 +100,22 @@ class TaskQueue(object):
         self._timer.cancel()
 
     def shutdown(self):
+        """
+        Shutdown the task queue.
+        """
         self._timer.cancel()
 
     def is_aborted(self):
+        """ Returns true if the task queue has been aborted. """
         return self._aborted
 
     def in_progress(self, task):
+        """ Returns true if the task is in progress. """
         with self.futures_lock:
             return task in self.futures.values()
 
     def empty(self):
+        """ Returns true if the task queue is empty. """
         with self.futures_lock:
             return len(self.futures) == 0
 
@@ -384,6 +417,22 @@ class Uploader(Executor):
 
 @utils.Singleton
 class ExecutorRegistry(object):
+    """
+    The ExecutorRegistry is responsible for creating executors.
+
+    The types of executors that are possible to create are:
+
+    - create_local: Runs tasks locally.
+    - create_network: Schedules tasks for remote execution.
+    - create_downloader: Downloads task artifacts.
+    - create_uploader: Uploads task artifacts.
+    - create_skipper: Skips tasks.
+
+    The registry utilizes different ExecutorFactory objects to create executors. Plugins
+    can register their own NetworkExecutorFactory objects with the help of the
+    ExecutorFactory.Register decorator.
+    """
+
     executor_factories = []
     extension_factories = []
 
@@ -395,30 +444,43 @@ class ExecutorRegistry(object):
         self._extensions = [factory().create() for factory in self.__class__.extension_factories]
 
     def shutdown(self):
+        """ Shuts all executor factories and thread-pools down """
+
         for factory in self._factories:
             factory.shutdown()
         self._local_factory.shutdown()
         self._concurrent_factory.shutdown()
 
     def create_session(self, graph):
+        """ Creates a session for all factories. """
         return {factory: factory.create_session(graph) for factory in self._factories}
 
     def create_skipper(self, task):
+        """ Creates an executor that skips a task. """
         return SkipTask(self._concurrent_factory, task)
 
     def create_downloader(self, task):
-        # TODO: Switch to concurrent factory once the progress bar can handle it
+        """ Creates an executor that downloads task artifacts. """
         return Downloader(self._concurrent_factory, task)
 
     def create_uploader(self, task):
-        # TODO: Switch to concurrent factory once the progress bar can handle it
+        """ Creates an executor that uploads task artifacts. """
         return Uploader(self._concurrent_factory, task)
 
     def create_local(self, task, force=False):
+        """ Creates an executor that runs a task locally. """
         task.set_locally_executed()
         return self._local_factory.create(task, force=force)
 
     def create_network(self, session, task):
+        """
+        Creates an executor that schedules a task for remote execution.
+
+        All registred network executor factories are queried to create an executor.
+        The first factory that can create an executor is used. If no factory is able
+        to create an executor, a local executor is created as fallback.
+        """
+
         for factory in self._factories:
             executor = factory.create(session[factory], task)
             if executor is not None:
@@ -448,32 +510,54 @@ class NetworkExecutorExtension(object):
         return {}
 
 
-class Job(object):
-    def __init__(self, priority, future, executor, env):
-        self.priority = priority
-        self.future = future
-        self.executor = executor
-        self.env = env
-
-    def __le__(self, o):
-        return self.priority <= o.priority
-
-    def __ge__(self, o):
-        return self.priority >= o.priority
-
-    def __lt__(self, o):
-        return self.priority < o.priority
-
-    def __gt__(self, o):
-        return self.priority > o.priority
-
-    def __eq__(self, o):
-        return self.priority == o.priority
-
-
 class ExecutorFactory(object):
+    """
+    The ExecutorFactory class is responsible for creating executors.
+
+    The factory is responsible for creating executors that run tasks. The factory
+    is also responsible for hosting a thread pool that will run the executors it creates.
+
+    """
+    class QueueItem(object):
+        """
+        The type of item that is put into the queue thread-pool queue.
+
+        It wraps the executor and its priority.
+        """
+
+        def __init__(self, priority: int, future: Future, executor: Executor, env: JoltEnvironment):
+            self.priority = priority
+            self.future = future
+            self.executor = executor
+            self.env = env
+
+        def __le__(self, o):
+            return self.priority <= o.priority
+
+        def __ge__(self, o):
+            return self.priority >= o.priority
+
+        def __lt__(self, o):
+            return self.priority < o.priority
+
+        def __gt__(self, o):
+            return self.priority > o.priority
+
+        def __eq__(self, o):
+            return self.priority == o.priority
+
+
     @staticmethod
     def Register(cls):
+        """
+        Decorator to register an executor factory.
+
+        The decorator is used by plugins that whish to register their own
+        executor factories. Such factories are used by the ExecutorRegistry
+        to create executors for tasks, as determined by the execution strategy
+        selected by the user.
+        """
+
         ExecutorRegistry.executor_factories.insert(0, cls)
         return cls
 
@@ -484,42 +568,76 @@ class ExecutorFactory(object):
         self._options = options or JoltOptions()
 
     def is_aborted(self):
+        """ Returns true if the build and thus the factory has been aborted. """
         return self._aborted
 
     def is_keep_going(self):
+        """ Returns true if the build should continue even if a task fails. """
         return self._options.keep_going
 
     def shutdown(self):
+        """
+        Called to shutdown the factory and its thread-pool.
+
+        The method is called when the build is complete or when the build is aborted.
+        After the method is called, no more tasks can be submitted to the factory and
+        the is_aborted() method will return True.
+        """
         self._aborted = True
         self.pool.shutdown()
 
     def create(self, task):
+        """
+        Create an executor for the provided task.
+
+        Must be implemented by all executor factories. The method must return
+        an executor that is capable of running the task. The executor must be
+        created with the factory as its parent so that it can be submitted to
+        the correct thread-pool for execution.
+        """
         raise NotImplementedError()
 
     def _run(self):
-        job = self._queue.get(False)
+        item = self._queue.get(False)
         self._queue.task_done()
         try:
             if not self.is_aborted():
-                job.executor.run(job.env)
+                item.executor.run(item.env)
         except KeyboardInterrupt as e:
             self._aborted = True
-            job.future.set_exception(e)
+            item.future.set_exception(e)
         except Exception as e:
             if not self.is_keep_going():
                 self._aborted = True
-            job.future.set_exception(e)
+            item.future.set_exception(e)
         else:
-            job.future.set_result(job.executor)
+            item.future.set_result(item.executor)
 
     def submit(self, executor, env):
+        """
+        Submit an executor to the thread-pool for execution.
+
+        The method submits the executor to the thread-pool for execution. The executor
+        is wrapped in a Future object that is returned to the caller. The Future object
+        is used to track the execution of the task and to retrieve the result of the
+        execution once it is completed.
+        """
         future = Future()
-        self._queue.put(Job(-executor.task.weight, future, executor, env))
+        self._queue.put(ExecutorFactory.QueueItem(-executor.task.weight, future, executor, env))
         self.pool.submit(self._run)
         return future
 
 
 class LocalExecutorFactory(ExecutorFactory):
+    """
+    Factory for creating local executors.
+
+    The factory creates executors that run tasks locally. Typically,
+    only one LocalExecutor is allowed to run at a time, unless the
+    user has specified a higher number of parallel tasks in the
+    configuration file or through command line options (-j).
+    """
+
     def __init__(self, options=None):
         max_workers = config.getint(
             "jolt", "parallel_tasks",
@@ -529,10 +647,19 @@ class LocalExecutorFactory(ExecutorFactory):
             max_workers=max_workers)
 
     def create(self, task, force=False):
+        """ Create a LocalExecutor for the task. """
         return LocalExecutor(self, task, force_build=force)
 
 
 class ConcurrentLocalExecutorFactory(ExecutorFactory):
+    """
+    A shared factory for local executors that are allowed to run concurrently.
+
+    The factory cannot create any executors on its own. Instead, its executors
+    are created by the ExecutorRegistry. The factory thread-pool is then used to
+    run executors concurrently.
+    """
+
     def __init__(self, options=None):
         max_workers = tools.Tools().thread_count()
         super().__init__(
@@ -544,6 +671,10 @@ class ConcurrentLocalExecutorFactory(ExecutorFactory):
 
 
 class NetworkExecutorFactory(ExecutorFactory):
+    """
+    Base class for executors that schedule task executions remotely in a build cluster.
+    """
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -552,6 +683,8 @@ class NetworkExecutorFactory(ExecutorFactory):
 
 
 def ensure_executor_return(func):
+    """ Decorator to ensure that an executor is returned by factories. """
+
     @wraps(func)
     def wrapper(self, session, task):
         executor = func(self, session, task)
@@ -560,21 +693,61 @@ def ensure_executor_return(func):
             "no executor can execute the task; "
             "requesting a distributed network build without proper configuration?")
         return executor
+
     return wrapper
 
 
 class ExecutionStrategy(object):
+    """
+    Base class for all execution strategies.
+
+    An execution strategy is responsible for deciding which executor to create for each task.
+    The decision is based on the type of task and the availability of the task's artifacts in
+    local and remote caches.
+
+    The strategy is also responsible for deciding if task requirements should be pruned
+    from the build graph. This is done to avoid processing tasks that are not needed for the build.
+
+    Strategies are selected by the user through command line options.
+
+    """
     def create_executor(self, session, task):
+        """
+        Create an executor for the task.
+
+        The method must be implemented by all execution strategies. It is responsible for
+        creating an executor that is capable of running or processing the task. Creation
+        of an executor should be delegated to the ExecutorRegistry which has the knowledge
+        of all available executor factories.
+        """
+        raise NotImplementedError()
+
+    def should_prune_requirements(self, task):
+        """
+        Return True if the task requirements should be pruned from the build graph.
+
+        The method must be implemented by all execution strategies.
+        """
         raise NotImplementedError()
 
 
 class LocalStrategy(ExecutionStrategy, PruneStrategy):
+    """
+    Strategy for local builds.
+
+    By default, the strategy schedules tasks for local execution, unless the task
+    artifacts are available in the local cache. If available remotely, the strategy
+    will create a downloader executor to download the artifacts.
+    """
+
     def __init__(self, executors, cache):
         self.executors = executors
         self.cache = cache
 
     @ensure_executor_return
     def create_executor(self, session, task):
+        """ Create an executor for the task. """
+
         if task.is_alias() or task.is_resource():
             return self.executors.create_skipper(task)
         if not task.is_cacheable():
@@ -586,6 +759,8 @@ class LocalStrategy(ExecutionStrategy, PruneStrategy):
         return self.executors.create_local(task)
 
     def should_prune_requirements(self, task):
+        """ Prune task requirements if possible """
+
         if task.is_alias() or not task.is_cacheable():
             return False
         if task.is_available_locally():
@@ -596,6 +771,16 @@ class LocalStrategy(ExecutionStrategy, PruneStrategy):
 
 
 class DownloadStrategy(ExecutionStrategy, PruneStrategy):
+    """
+    Strategy for downloading task artifacts.
+
+    The strategy is used when the user has requested that task artifacts be downloaded.
+    If the task artifacts are available in the local cache, the strategy will skip the
+    task. If the task artifacts are available in the remote cache, the strategy will
+    create a downloader executor to download the artifacts. If the task artifacts are
+    not available in either cache, the strategy reports an error.
+    """
+
     def __init__(self, executors, cache):
         self.executors = executors
         self.cache = cache
@@ -619,12 +804,22 @@ class DownloadStrategy(ExecutionStrategy, PruneStrategy):
 
 
 class DistributedStrategy(ExecutionStrategy, PruneStrategy):
+    """
+    Strategy for distributed network builds.
+
+    By default, the strategy schedules tasks for remote execution, if there is no
+    artifact available. Otherwise, artifacts are either uploaded or downloaded as
+    needed.
+    """
+
     def __init__(self, executors, cache):
         self.executors = executors
         self.cache = cache
 
     @ensure_executor_return
     def create_executor(self, session, task):
+        """ Create an executor for the task. """
+
         if task.is_alias() or task.is_resource():
             return self.executors.create_skipper(task)
 
@@ -658,6 +853,8 @@ class DistributedStrategy(ExecutionStrategy, PruneStrategy):
         return self.executors.create_network(session, task)
 
     def should_prune_requirements(self, task):
+        """ Prune task requirements if possible """
+
         if task.is_alias() or not task.is_cacheable():
             return False
         if task.is_available_remotely():
@@ -666,12 +863,23 @@ class DistributedStrategy(ExecutionStrategy, PruneStrategy):
 
 
 class WorkerStrategy(ExecutionStrategy, PruneStrategy):
+    """
+    Strategy for worker builds.
+
+    This strategy is used on workers when the user has requested a network build.
+    It is similar to the LocalStrategy in that it will run tasks locally if no
+    artifacts are available. However, if artifacts are available locally, the
+    strategy will upload them to the remote cache.
+    """
+
     def __init__(self, executors, cache):
         self.executors = executors
         self.cache = cache
 
     @ensure_executor_return
     def create_executor(self, session, task):
+        """ Create an executor for the task. """
+
         if task.is_alias() or task.is_resource():
             return self.executors.create_skipper(task)
 
@@ -704,6 +912,8 @@ class WorkerStrategy(ExecutionStrategy, PruneStrategy):
         return self.executors.create_local(task)
 
     def should_prune_requirements(self, task):
+        """ Prune task requirements if possible """
+
         if task.is_alias() or not task.is_cacheable():
             return False
         if task.is_available_locally():
