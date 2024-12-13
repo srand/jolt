@@ -212,6 +212,7 @@ Local Execution
 The diagram below illustrates what happens in the Jolt application when tasks are executed locally by a user.
 
 .. image:: img/execution.png
+   :align: center
 
 
 Remote Execution
@@ -220,6 +221,16 @@ Remote Execution
 The diagram below illustrates what happens in the Jolt application when a user executes tasks in a build cluster.
 
 .. image:: img/execution_remote.png
+   :align: center
+
+
+Internal Classes
+~~~~~~~~~~~~~~~~
+
+The diagram below illustrates the internal classes of the Jolt client application.
+
+.. image:: img/internal_classes.png
+   :align: center
 
 
 .. architecture-end
