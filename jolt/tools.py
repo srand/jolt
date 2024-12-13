@@ -83,7 +83,7 @@ class Reader(threading.Thread):
             self.logbuf.append((self, line))
 
 
-def _run(cmd, cwd, env, preexec_fn, *args, **kwargs):
+def _run(cmd, cwd, env, *args, **kwargs):
     output = kwargs.get("output")
     output_on_error = kwargs.get("output_on_error")
     output_rstrip = kwargs.get("output_rstrip", True)
@@ -132,7 +132,6 @@ def _run(cmd, cwd, env, preexec_fn, *args, **kwargs):
                 shell=shell,
                 cwd=cwd,
                 env=env,
-                preexec_fn=preexec_fn,
             )
 
             if output_stdout:
@@ -480,7 +479,6 @@ class Tools(object):
         self._chroot_path = []
         self._deadline = None
         self._run_prefix = []
-        self._preexec_fn = None
         self._cwd = fs.path.normpath(fs.path.join(config.get_workdir(), cwd or config.get_workdir()))
         self._env = copy.deepcopy(env or os.environ)
         self._task = task
@@ -1587,7 +1585,7 @@ class Tools(object):
             except Exception:
                 pass
 
-            return _run(cmd, self._cwd, self._env, self._preexec_fn, *args, **kwargs)
+            return _run(cmd, self._cwd, self._env, *args, **kwargs)
 
         finally:
             if stdi:
