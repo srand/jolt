@@ -16,8 +16,6 @@ from jolt.manifest import JoltManifest
 from jolt.scheduler import JoltEnvironment
 from jolt.scheduler import LocalExecutor
 from jolt.scheduler import LocalExecutorFactory
-from jolt.scheduler import NetworkExecutorExtension
-from jolt.scheduler import NetworkExecutorExtensionFactory
 from jolt.tasks import Task, TaskRegistry
 
 
@@ -97,24 +95,6 @@ class Jolt(Task):
             for e in self.extra_files:
                 with tools.cwd(fs.path.dirname(e)):
                     artifact.collect(fs.path.basename(e))
-
-
-class SelfDeployExtension(NetworkExecutorExtension):
-    @utils.cached.instance
-    def get_parameters(self, _):
-        client = get_client()
-        params = {}
-        if client.identity:
-            params["jolt_identity"] = client.identity
-        if client.url:
-            params["jolt_url"] = client.url
-        return params
-
-
-@NetworkExecutorExtensionFactory.Register
-class SelfDeployExtensionFactory(NetworkExecutorExtensionFactory):
-    def create(self):
-        return SelfDeployExtension()
 
 
 @utils.cached.method

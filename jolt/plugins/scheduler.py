@@ -445,21 +445,11 @@ class RemoteSession(object):
         if self.build:
             return
 
-        registry = ExecutorRegistry.get()
-
         if not self.buildenv:
-            # Create a list of parameters to send to the scheduler.
-            parameters = []
-            for key, value in registry.get_network_parameters(None).items():
-                parameters.append(common_pb.Property(key=key, value=value))
-
-            # Add parameters from the config / command line (-c params.key).
-            parameters.extend(config.export_params())
-
             # Create the build environment.
             self.buildenv = common_pb.BuildEnvironment(
                 client=selfdeploy.get_client(),
-                parameters=parameters,
+                parameters=config.export_params(),
                 task_default_parameters=scheduler.export_task_default_params(self.tasks),
                 tasks=scheduler.export_tasks(self.tasks + self.pruned),
                 workspace=loader.export_workspace(self.tasks),

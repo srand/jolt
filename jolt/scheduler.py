@@ -434,14 +434,12 @@ class ExecutorRegistry(object):
     """
 
     executor_factories = []
-    extension_factories = []
 
     def __init__(self, options=None):
         self._options = options or JoltOptions()
         self._factories = [factory(self._options) for factory in self.__class__.executor_factories]
         self._local_factory = LocalExecutorFactory(self._options)
         self._concurrent_factory = ConcurrentLocalExecutorFactory(self._options)
-        self._extensions = [factory().create() for factory in self.__class__.extension_factories]
 
     def shutdown(self):
         """ Shuts all executor factories and thread-pools down """
@@ -488,27 +486,6 @@ class ExecutorRegistry(object):
                 return executor
         return self.create_local(task)
 
-    def get_network_parameters(self, task):
-        parameters = {}
-        for extension in self._extensions:
-            parameters.update(extension.get_parameters(task))
-        return parameters
-
-
-class NetworkExecutorExtensionFactory(object):
-    @staticmethod
-    def Register(cls):
-        ExecutorRegistry.extension_factories.insert(0, cls)
-        return cls
-
-    def create(self):
-        raise NotImplementedError()
-
-
-class NetworkExecutorExtension(object):
-    def get_parameters(self, task):
-        return {}
-
 
 class ExecutorFactory(object):
     """
@@ -524,7 +501,6 @@ class ExecutorFactory(object):
 
         It wraps the executor and its priority.
         """
-
         def __init__(self, priority: int, future: Future, executor: Executor, env: JoltEnvironment):
             self.priority = priority
             self.future = future
@@ -545,7 +521,6 @@ class ExecutorFactory(object):
 
         def __eq__(self, o):
             return self.priority == o.priority
-
 
     @staticmethod
     def Register(cls):
