@@ -3,6 +3,7 @@ from os import path
 
 from jolt import Task
 from jolt import influence
+from jolt import utils
 from jolt.error import raise_task_error_if
 
 
@@ -446,21 +447,33 @@ class Conan2(Task):
         for dep in self._manifest["graph"]["nodes"].values():
             if not dep["package_folder"]:
                 continue
-            for incpath in dep["cpp_info"]["root"]["includedirs"]:
-                artifact.cxxinfo.incpaths.append(path.join(dep["name"], path.relpath(incpath, dep["package_folder"])))
-            for libpath in dep["cpp_info"]["root"]["libdirs"]:
-                artifact.cxxinfo.libpaths.append(path.join(dep["name"], path.relpath(libpath, dep["package_folder"])))
-            for binpath in dep["cpp_info"]["root"]["bindirs"]:
-                artifact.environ.PATH.append(path.join(dep["name"], path.relpath(binpath, dep["package_folder"])))
-            if dep["cpp_info"]["root"]["libs"]:
-                artifact.cxxinfo.libraries.extend(dep["cpp_info"]["root"]["libs"])
-            if dep["cpp_info"]["root"]["system_libs"]:
-                artifact.cxxinfo.libraries.extend(dep["cpp_info"]["root"]["system_libs"])
-            if dep["cpp_info"]["root"]["defines"]:
-                artifact.cxxinfo.macros.extend(dep["cpp_info"]["root"]["defines"])
-            if dep["cpp_info"]["root"]["cflags"]:
-                artifact.cxxinfo.cflags.extend(dep["cpp_info"]["root"]["cflags"])
-            if dep["cpp_info"]["root"]["cxxflags"]:
-                artifact.cxxinfo.cxxflags.extend(dep["cpp_info"]["root"]["cxxflags"])
-            if dep["cpp_info"]["root"]["exelinkflags"]:
-                artifact.cxxinfo.ldflags.extend(dep["cpp_info"]["root"]["exelinkflags"])
+
+            for node in dep["cpp_info"]:
+                for incpath in dep["cpp_info"][node]["includedirs"]:
+                    artifact.cxxinfo.incpaths.append(path.join(dep["name"], path.relpath(incpath, dep["package_folder"])))
+                for libpath in dep["cpp_info"][node]["libdirs"]:
+                    artifact.cxxinfo.libpaths.append(path.join(dep["name"], path.relpath(libpath, dep["package_folder"])))
+                for binpath in dep["cpp_info"][node]["bindirs"]:
+                    artifact.environ.PATH.append(path.join(dep["name"], path.relpath(binpath, dep["package_folder"])))
+                if dep["cpp_info"][node]["libs"]:
+                    artifact.cxxinfo.libraries.extend(dep["cpp_info"][node]["libs"])
+                if dep["cpp_info"][node]["system_libs"]:
+                    artifact.cxxinfo.libraries.extend(dep["cpp_info"][node]["system_libs"])
+                if dep["cpp_info"][node]["defines"]:
+                    artifact.cxxinfo.macros.extend(dep["cpp_info"][node]["defines"])
+                if dep["cpp_info"][node]["cflags"]:
+                    artifact.cxxinfo.cflags.extend(dep["cpp_info"][node]["cflags"])
+                if dep["cpp_info"][node]["cxxflags"]:
+                    artifact.cxxinfo.cxxflags.extend(dep["cpp_info"][node]["cxxflags"])
+                if dep["cpp_info"][node]["exelinkflags"]:
+                    artifact.cxxinfo.ldflags.extend(dep["cpp_info"][node]["exelinkflags"])
+
+        # Make list of unique values
+        artifact.cxxinfo.incpaths = utils.unique_list(artifact.cxxinfo.incpaths)
+        artifact.cxxinfo.libpaths = utils.unique_list(artifact.cxxinfo.libpaths)
+        artifact.cxxinfo.libraries = utils.unique_list(artifact.cxxinfo.libraries)
+        artifact.cxxinfo.macros = utils.unique_list(artifact.cxxinfo.macros)
+        artifact.cxxinfo.cflags = utils.unique_list(artifact.cxxinfo.cflags)
+        artifact.cxxinfo.cxxflags = utils.unique_list(artifact.cxxinfo.cxxflags)
+        artifact.cxxinfo.ldflags = utils.unique_list(artifact.cxxinfo.ldflags)
+        artifact.environ.PATH = path.pathsep.join(utils.unique_list(str(artifact.environ.PATH).split(path.pathsep)))
