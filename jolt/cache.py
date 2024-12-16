@@ -33,194 +33,122 @@ def locked(func):
     return _f
 
 
-class StorageProvider(object):
-    def download(self, artifact, force=False):
-        return False
-
-    def download_enabled(self):
-        return True
-
-    def upload(self, artifact, force=False):
-        return False
-
-    def upload_enabled(self):
-        return True
-
-    def location(self, artifact):
-        return ''  # URL
-
-    def availability(self, artifacts):
-        # Ensure artifacts is a list
-        artifacts = utils.as_list(artifacts)
-
-        present = set()
-        missing = set()
-
-        for artifact in artifacts:
-            if self.location(artifact):
-                present.add(artifact)
-            else:
-                missing.add(artifact)
-
-        return list(present), list(missing)
-
-
-class StorageProviderFactory(StorageProvider):
-    def create(self):
-        pass
-
-
-def RegisterStorage(cls):
-    ArtifactCache.storage_provider_factories.append(cls)
-
-
-class ArtifactAttributeSet(object):
-    def __init__(self):
-        super(ArtifactAttributeSet, self).__setattr__("_attributes", {})
-
-    def _get_attributes(self):
-        return self._attributes
-
-    def __getattr__(self, name):
-        attributes = self._get_attributes()
-        if name not in attributes:
-            attributes[name] = self.create(name)
-        return attributes[name]
-
-    def __setattr__(self, name, value):
-        attributes = self._get_attributes()
-        if name not in attributes:
-            attributes[name] = self.create(name)
-        attributes[name].set_value(value)
-        return attributes[name]
-
-    def __dict__(self):
-        return {key: str(value) for key, value in self.items()}
-
-    def items(self):
-        return self._get_attributes().items()
-
-    def apply(self, task, artifact):
-        for _, value in self.items():
-            value.apply(task, artifact)
-
-    def apply_deps(self, task, deps):
-        pass
-
-    def unapply(self, task, artifact):
-        for _, value in self.items():
-            value.unapply(task, artifact)
-
-    def unapply_deps(self, task, deps):
-        pass
-
-    def visit(self, task, artifact, visitor):
-        for _, value in self.items():
-            value.visit(task, artifact, visitor)
-
-
 class ArtifactAttributeSetRegistry(object):
-    providers = []
+    """
+    Registry for providers of artifact attribute sets.
+    """
+
+    providers = []  # List of objects that implement ArtifactAttributeSetProvider
 
     @staticmethod
     def create_all(artifact):
+        """ Create all artifact attribute sets. """
         for provider in ArtifactAttributeSetRegistry.providers:
             provider().create(artifact)
 
     @staticmethod
     def parse_all(artifact, content):
+        """ Parse all artifact attribute sets. """
         for provider in ArtifactAttributeSetRegistry.providers:
             provider().parse(artifact, content)
 
     @staticmethod
     def format_all(artifact, content):
+        """ Format all artifact attribute sets. """
         for provider in ArtifactAttributeSetRegistry.providers:
             provider().format(artifact, content)
 
     @staticmethod
     def apply_all(task, artifact):
+        """ Apply all artifact attribute sets. """
         for provider in ArtifactAttributeSetRegistry.providers:
             provider().apply(task, artifact)
 
     @staticmethod
-    def apply_all_deps(task, deps):
-        for provider in ArtifactAttributeSetRegistry.providers:
-            provider().apply_deps(task, deps)
-
-    @staticmethod
     def unapply_all(task, artifact):
+        """ Unapply all artifact attribute sets. """
         for provider in ArtifactAttributeSetRegistry.providers:
             provider().unapply(task, artifact)
 
     @staticmethod
-    def unapply_all_deps(task, deps):
-        for provider in ArtifactAttributeSetRegistry.providers:
-            provider().unapply_deps(task, deps)
-
-    @staticmethod
     def visit_all(task, artifact, visitor):
+        """ Visit all artifact attribute sets. """
         for provider in ArtifactAttributeSetRegistry.providers:
             provider().visit(task, artifact, visitor)
 
 
-def visit_artifact(task, artifact, visitor):
-    ArtifactAttributeSetRegistry.visit_all(task, artifact, visitor)
-
-
-class ArtifactAttributeSetProvider(object):
-    @staticmethod
-    def Register(cls):
-        ArtifactAttributeSetRegistry.providers.append(cls)
-
-    def create(self, artifact):
-        raise NotImplementedError()
-
-    def parse(self, artifact, content):
-        raise NotImplementedError()
-
-    def format(self, artifact, content):
-        raise NotImplementedError()
-
-    def apply(self, task, artifact):
-        pass
-
-    def apply_deps(self, task, deps):
-        pass
-
-    def unapply(self, task, artifact):
-        pass
-
-    def unapply_deps(self, task, deps):
-        pass
-
-    def visit(self, task, artifact, visitor):
-        pass
-
-
 class ArtifactAttribute(object):
+    """
+    An artifact attribute.
+
+    An artifact attribute is a key-value pair that can be set and retrieved
+    from an artifact attribute set. Attributes are used to store metadata and other
+    information that is associated with an artifact. They communicate information
+    between tasks and store information that is used by tasks when they consume an artifact.
+
+    Artifact attributes can also perform actions when the artifact is consumed.
+
+    """
     def __init__(self, name):
         self._name = name
 
     def get_name(self):
+        """ Get the name of the attribute. """
         return self._name
 
     def set_value(self, value, expand=True):
+        """
+        Set the value of the attribute.
+
+        Must be implemented by subclasses.
+
+        Args:
+            value: The value to set.
+            expand: If True, the value is macro expanded using the tools.expand() method.
+        """
         raise NotImplementedError()
 
     def get_value(self):
+        """
+        Get the value of the attribute.
+
+        Must be implemented by subclasses.
+        """
         raise NotImplementedError()
 
     def apply(self, task, artifact):
+        """
+        Perform an action when the artifact is being used.
+
+        Args:
+            task (Task): The task that is using the artifact.
+            artifact (Artifact): The artifact that is being used.
+
+        """
         pass
 
     def unapply(self, task, artifact):
+        """
+        Undo an action when the artifact is no longer being used.
+
+        Args:
+            task (Task): The task that is no longer using the artifact.
+            artifact (Artifact): The artifact that is no longer being used.
+        """
         pass
 
-    def __str__(self):
+    def __str__(self) -> str:
+        """
+        Get a string representation of the attribute.
+
+        Must be implemented by subclasses.
+        """
         raise NotImplementedError()
 
 
 class ArtifactStringAttribute(ArtifactAttribute):
+    """ An artifact attribute that stores a string value. """
+
     def __init__(self, artifact, name):
         self._artifact = artifact
         self._name = name
@@ -235,17 +163,13 @@ class ArtifactStringAttribute(ArtifactAttribute):
     def get_value(self):
         return self._value
 
-    def apply(self, task, artifact):
-        pass
-
-    def unapply(self, task, artifact):
-        pass
-
-    def __str__(self):
+    def __str__(self) -> str:
         return str(self._value)
 
 
 class ArtifactListAttribute(ArtifactAttribute):
+    """ An artifact attribute that stores a list of values. """
+
     def __init__(self, artifact, name):
         self._artifact = artifact
         self._name = name
@@ -256,6 +180,9 @@ class ArtifactListAttribute(ArtifactAttribute):
 
     def __getslice__(self, i, j):
         return self._value[i:j]
+
+    def __len__(self):
+        return len(self._value)
 
     def get_name(self):
         return self._name
@@ -287,22 +214,12 @@ class ArtifactListAttribute(ArtifactAttribute):
     def count(self):
         return len(self.items())
 
-    def apply(self, task, artifact):
-        pass
-
-    def unapply(self, task, artifact):
-        pass
-
 
 class ArtifactFileAttribute(object):
+    """ An attribute that stores a list of source and destination path tuples for files collected into the artifact. """
+
     def __init__(self):
         self._files = []
-
-    def apply(self, task, artifact):
-        pass
-
-    def unapply(self, task, artifact):
-        pass
 
     def append(self, src, dst):
         self._files.append((fs.as_posix(src), fs.as_posix(dst)))
@@ -314,8 +231,129 @@ class ArtifactFileAttribute(object):
         return self._files
 
 
+class ArtifactAttributeSet(object):
+    """
+    A set of artifact attributes.
+
+    An attribute set is a collection of attributes. Each attribute is
+    accessed using the attribute name as an attribute of the set. For
+    example, to access an attribute named 'version' in an attribute set
+    named 'strings', you would write:
+
+    .. code-block:: python
+
+        artifact.strings.version = "1.0"
+
+    """
+
+    def __init__(self):
+        super(ArtifactAttributeSet, self).__setattr__("_attributes", {})
+
+    def _get_attributes(self):
+        return self._attributes
+
+    def __getattr__(self, name) -> ArtifactAttribute:
+        """
+        Get or create an attribute by name.
+
+        Args:
+            name (str): The name of the attribute.
+
+        Returns:
+            An attribute object.
+        """
+        attributes = self._get_attributes()
+        if name not in attributes:
+            attributes[name] = self.create(name)
+        return attributes[name]
+
+    def __setattr__(self, name, value):
+        """
+        Set an attribute by name.
+
+        Args:
+            name (str): The name of the attribute.
+            value: The value to set.
+        """
+        attributes = self._get_attributes()
+        if name not in attributes:
+            attributes[name] = self.create(name)
+        attributes[name].set_value(value)
+        return attributes[name]
+
+    def __dict__(self):
+        """ Get a dictionary representation of the attribute set. """
+        return {key: str(value) for key, value in self.items()}
+
+    def items(self):
+        """ Get a list of tuples containing the attribute name and value. """
+        return self._get_attributes().items()
+
+    def apply(self, task, artifact):
+        """ Perform attribute actions when the artifact is being used. """
+        for _, value in self.items():
+            value.apply(task, artifact)
+
+    def unapply(self, task, artifact):
+        """ Undo attribute actions when the artifact is no longer being used. """
+        for _, value in self.items():
+            value.unapply(task, artifact)
+
+    def visit(self, task, artifact, visitor):
+        """ Visit all attributes in the set. """
+        for _, value in self.items():
+            value.visit(task, artifact, visitor)
+
+
+class ArtifactAttributeSetProvider(object):
+    """ Base class for artifact attribute set providers.
+
+    An artifact attribute set provider is a factory for creating and managing
+    attribute sets in an artifact.
+    """
+
+    @staticmethod
+    def Register(cls):
+        """ Decorator for registering a provider class. """
+        ArtifactAttributeSetRegistry.providers.append(cls)
+
+    def create(self, artifact):
+        """ Create an attribute set for an artifact. """
+        raise NotImplementedError()
+
+    def parse(self, artifact, content):
+        """
+        Parse an attribute set from a dictionary.
+
+        The dictionary is loaded from a JSON file embedded in the artifact.
+        """
+        raise NotImplementedError()
+
+    def format(self, artifact, content):
+        """
+        Format an attribute set to a dictionary.
+
+        The dictionary is saved to a JSON file embedded in the artifact.
+        """
+        raise NotImplementedError()
+
+    def apply(self, task, artifact):
+        """ Perform actions when the artifact is being used. """
+        pass
+
+    def unapply(self, task, artifact):
+        """ Undo actions when the artifact is no longer being used. """
+        pass
+
+    def visit(self, task, artifact, visitor):
+        """ Visit all attributes in the set. """
+        pass
+
+
 @ArtifactAttributeSetProvider.Register
 class ArtifactFileAttributeProvider(ArtifactAttributeSetProvider):
+    """ Provider for the artifact 'files' attribute set. """
+
     def create(self, artifact):
         setattr(artifact, "files", ArtifactFileAttribute())
 
@@ -329,22 +367,19 @@ class ArtifactFileAttributeProvider(ArtifactAttributeSetProvider):
     def format(self, artifact, content):
         content["files"] = [{"src": src, "dst": dst} for src, dst in artifact.files.items()]
 
-    def apply(self, task, artifact):
-        pass
 
-    def unapply(self, task, artifact):
-        pass
-
-    def visit(self, task, artifact, visitor):
-        pass
+def visit_artifact(task, artifact, visitor):
+    ArtifactAttributeSetRegistry.visit_all(task, artifact, visitor)
 
 
 def json_serializer(obj):
+    """ JSON serializer for datetime objects. """
     if isinstance(obj, datetime):
         return dict(type="datetime", value=obj.strftime("%Y-%m-%d %H:%M:%S.%f"))
 
 
 def json_deserializer(dct):
+    """ JSON deserializer for datetime objects. """
     if dct.get("type") == "datetime":
         return datetime.strptime(dct["value"], "%Y-%m-%d %H:%M:%S.%f")
     return dct
@@ -880,6 +915,16 @@ class Artifact(object):
 
 
 class ArtifactToolsProxy(object):
+    """
+    An artifact proxy that uses a specific tools object.
+
+    Used when artifacts are consumed by tasks. The proxy allows the
+    task to access the artifact's methods and attributes using the
+    task's own tools object. This is useful when the consumer task
+    wishes to copy files, read files, etc, using the current working
+    directory and environment of the task.
+    """
+
     def __init__(self, artifact, tools):
         self._artifact = artifact
         self._tools = tools
@@ -945,10 +990,8 @@ class Context(object):
                     self._artifacts_index[artifact.name + "@" + dep.short_qualified_name] = artifact
                     artifact.apply()
                     ArtifactAttributeSetRegistry.apply_all(self._node.task, artifact)
-            ArtifactAttributeSetRegistry.apply_all_deps(self._node.task, self)
         except (Exception, KeyboardInterrupt) as e:
             # Rollback all attributes/resources except the last failing one
-            ArtifactAttributeSetRegistry.unapply_all_deps(self._node.task, self)
             for name, artifact in reversed(list(self._artifacts.items())[:-1]):
                 with utils.ignore_exception():
                     ArtifactAttributeSetRegistry.unapply_all(self._node.task, artifact)
@@ -957,7 +1000,6 @@ class Context(object):
         return self
 
     def __exit__(self, type, value, tb):
-        ArtifactAttributeSetRegistry.unapply_all_deps(self._node.task, self)
         for name, artifact in reversed(self._artifacts.items()):
             ArtifactAttributeSetRegistry.unapply_all(self._node.task, artifact)
             artifact.unapply()
@@ -1023,6 +1065,144 @@ class PidProvider(object):
         pid = str(uuid.uuid4())
         log.debug("New cache lock file: {0}", pid)
         return pid
+
+
+class StorageProvider(object):
+    """
+    Base class for remote artifact storage providers.
+
+    A storage provider is responsible for uploading and downloading
+    artifacts to and from a remote storage location. The storage
+    location can be a file system path, a cloud storage service, or
+    any other type of storage.
+
+    """
+
+    def download(self, artifact: Artifact, force: bool = False) -> bool:
+        """
+        Download an artifact from the storage location.
+
+        The should be downloaded to the path returned by the artifact's
+        :func:`~jolt.Artifact.get_archive_path` method. The downloaded artifact
+        must be in the format specified by DEFAULT_ARCHIVE_TYPE.
+
+        The download should be retried if it fails due to network issues.
+        The method may raise an exception on errors.
+
+        Args:
+            artifact (Artifact): The artifact to download.
+            force (bool, optional): If True, the download should be forced,
+                even if the artifact is already present locally, or if the
+                download is disabled. The default is False.
+
+        Returns:
+            bool: True if the download was successful, False otherwise.
+
+        """
+        return False
+
+    def download_enabled(self) -> bool:
+        """ Return True if downloading is enabled. Default is True. """
+        return True
+
+    def upload(self, artifact: Artifact, force: bool = False) -> bool:
+        """
+        Upload an artifact to the storage location.
+
+        The artifact to be uploaded is located at the path returned by
+        the artifact's :func:`~jolt.Artifact.get_archive_path` method. The
+        uploaded artifact is in the format specified by DEFAULT_ARCHIVE_TYPE.
+        The provider may choose to upload the artifact using a different
+        format, but it must be able to download the artifact in the
+        DEFAULT_ARCHIVE_TYPE format.
+
+        The upload should be retried if it fails due to network issues.
+        The method may raise an exception on errors.
+
+        Args:
+            artifact (Artifact): The artifact to upload.
+            force (bool, optional): If True, the upload should be forced,
+                even if the artifact is already present remotely, or if the
+                upload is disabled. The default is False.
+
+        Returns:
+            bool: True if the upload was successful, False otherwise.
+
+        """
+        return False
+
+    def upload_enabled(self) -> bool:
+        """ Return True if uploading is enabled. Default is True. """
+        return True
+
+    def location(self, artifact) -> str:
+        """
+        Return the URL of the artifact in the storage location.
+
+        This method is sometimes used to identify if an artifact is
+        present in the storage location. The URL should point to the
+        artifact if present, or an empty string if the artifact is
+        absent.
+
+        Args:
+            artifact (Artifact): The artifact to locate.
+        """
+        return ''  # URL
+
+    def availability(self, artifacts: list) -> tuple:
+        """
+        Check the availability of a list of artifacts.
+
+        This method is used to determine which artifacts are present in the
+        storage location. The method should return a tuple of two lists:
+        the first list contains the artifacts that are present, and the
+        second list contains the artifacts that are missing.
+
+        The default implementation of this method calls the :func:`~jolt.StorageProvider.location`
+        method for each artifact in the list. Subclasses may override this
+        method to provide a more efficient implementation.
+
+        Args:
+            artifacts (list): A list of artifacts to check.
+
+        Returns:
+            tuple: A tuple of two lists: the first list contains the artifacts
+                that are present, and the second list contains the artifacts
+                that are missing.
+
+        """
+        # Ensure artifacts is a list
+        artifacts = utils.as_list(artifacts)
+
+        present = set()
+        missing = set()
+
+        for artifact in artifacts:
+            if self.location(artifact):
+                present.add(artifact)
+            else:
+                missing.add(artifact)
+
+        return list(present), list(missing)
+
+
+class StorageProviderFactory(StorageProvider):
+    """ A factory for store providers. """
+
+    def create(self) -> StorageProvider:
+        """
+        Create a new storage provider.
+
+        This method should return a new instance of a storage provider,
+        which must be a subclass of :class:`~jolt.StorageProvider`.
+
+        """
+        pass
+
+
+def RegisterStorage(cls):
+    """ Decorator used to register a storage provider factory. """
+    ArtifactCache.storage_provider_factories.append(cls)
 
 
 @utils.Singleton

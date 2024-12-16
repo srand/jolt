@@ -2,6 +2,18 @@ from jolt.cache import ArtifactAttributeSetProvider
 
 
 class StringVariableSet(object):
+    """
+    A set of string variables for an artifact.
+
+    Example:
+
+    .. code-block:: python
+
+        artifact.strings.foo = "bar"
+        print(artifact.strings.foo)
+
+    """
+
     def __init__(self, artifact):
         super(StringVariableSet, self).__setattr__("_attributes", {})
         super(StringVariableSet, self).__setattr__("_artifact", artifact)
@@ -29,6 +41,10 @@ class StringVariableSet(object):
 
 @ArtifactAttributeSetProvider.Register
 class StringVariableSetProvider(ArtifactAttributeSetProvider):
+    """
+    A provider of string variable sets.
+    """
+
     def create(self, artifact):
         setattr(artifact, "strings", StringVariableSet(artifact))
 
@@ -45,9 +61,3 @@ class StringVariableSetProvider(ArtifactAttributeSetProvider):
 
         for key, value in artifact.strings.items():
             content["strings"][key] = str(value)
-
-    def apply(self, task, artifact):
-        pass
-
-    def unapply(self, task, artifact):
-        pass

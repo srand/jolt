@@ -55,6 +55,17 @@ class PathEnvironmentVariable(EnvironmentVariable):
 
 
 class EnvironmentVariableSet(ArtifactAttributeSet):
+    """ A set of environment variables for an artifact.
+
+    Example:
+
+    .. code-block:: python
+
+        artifact.environ.FOO = "bar"
+        artifact.environ.PATH.append("bin")
+
+    """
+
     def __init__(self, artifact):
         super(EnvironmentVariableSet, self).__init__()
         super(ArtifactAttributeSet, self).__setattr__("_artifact", artifact)
