@@ -1,4 +1,3 @@
-from collections import OrderedDict
 from contextlib import contextmanager
 import fasteners
 import json
@@ -11,16 +10,13 @@ import sys
 from types import ModuleType
 
 from jolt import inspection
-from jolt.tasks import attributes
-from jolt.tasks import Alias, Task, TaskGenerator, TaskRegistry, WorkspaceResource
-from jolt.error import raise_error_if, raise_task_error_if
+from jolt.tasks import Task, TaskGenerator
+from jolt.error import raise_error_if
 from jolt import common_pb2 as common_pb
 from jolt import config
 from jolt import filesystem as fs
 from jolt import log
 from jolt import utils
-from jolt.manifest import ManifestExtension
-from jolt.manifest import ManifestExtensionRegistry
 from jolt.tools import Tools
 
 
@@ -213,60 +209,13 @@ class JoltLoader(object):
         self._recipes = []
         self._tasks = []
         self._path = None
-        self._project_modules = OrderedDict()
-        self._project_recipes = OrderedDict()
-        self._project_resources = OrderedDict()
         self._build_path = None
         self._workspace_name = None
-
-    def _add_project_module(self, project, src):
-        modules = self._project_modules.get(project, [])
-        modules.append(src)
-        self._project_modules[project] = modules
-
-    def _get_project_modules(self, project):
-        return self._project_modules.get(project, [])
-
-    def _add_project_recipe(self, project, joltdir, src):
-        recipes = self._project_recipes.get(project, [])
-        recipes.append((joltdir, src))
-        self._project_recipes[project] = recipes
-
-    def _get_project_recipes(self, project):
-        return self._project_recipes.get(project, [])
 
     def _get_first_recipe_path(self):
         for recipe in self.recipes:
             return recipe.path
-        for project, recipes in self._project_recipes.items():
-            for joltdir, src in recipes:
-                return fs.path.join(self._path, src)
         return None
-
-    def _add_project_resource(self, project, resource_name, resource_task):
-        class ProjectResource(Alias):
-            name = project + "/" + resource_name
-            requires = [resource_task]
-
-        self._tasks.append(ProjectResource)
-        resources = self._project_resources.get(project, [])
-        resources.append((resource_name, resource_task))
-        self._project_resources[project] = resources
-
-    def _get_project_resources(self, project):
-        return self._project_resources.get(project, [])
-
-    def _load_project_recipes(self):
-        for project, recipes in self._project_recipes.items():
-            resources = [resource for _, resource in self._get_project_resources(project)]
-            for joltdir, src in recipes:
-                joltdir = fs.path.join(self.joltdir, joltdir) if joltdir else self.joltdir
-                recipe = NativeRecipe(fs.path.join(self._path, src), joltdir, project)
-                recipe.load()
-                for task in recipe.tasks:
-                    task._resources = resources
-                    attributes.requires("_resources")(task)
-                self._tasks += recipe.tasks
 
     def _find_workspace_path(self, searchdir):
         for factory in _loaders:
@@ -306,8 +255,6 @@ class JoltLoader(object):
                     recipe.load()
                     self._recipes.append(recipe)
                     self._tasks += recipe.tasks
-
-        self._load_project_recipes()
 
         # Create workspace lock on the first loaded recipe
         if not self._lock:
@@ -427,67 +374,6 @@ class JoltLoader(object):
         log.debug("Jolt build path: {}", self._build_path)
 
 
-class RecipeExtension(ManifestExtension):
-    def export_manifest(self, manifest, tasks):
-        loader = JoltLoader.get()
-
-        for recipe in loader.recipes:
-            manifest_recipe = manifest.create_recipe()
-            manifest_recipe.path = recipe.basepath
-            manifest_recipe.source = recipe.source
-
-        projects = set([task.task.joltproject for task in tasks])
-        for project in filter(lambda x: x is not None, projects):
-            manifest_project = manifest.create_project()
-            manifest_project.name = project
-
-            for name, resource_task in loader._get_project_resources(project):
-                resource = manifest_project.create_resource()
-                resource.name = name
-                resource.text = resource_task
-
-            for joltdir, src in loader._get_project_recipes(project):
-                recipe = manifest_project.create_recipe()
-                recipe.src = src
-                if joltdir:
-                    recipe.joltdir = joltdir
-
-            for path in loader._get_project_modules(project):
-                module = manifest_project.create_module()
-                module.path = path
-
-    def import_manifest(self, manifest):
-        loader = JoltLoader.get()
-        loader.set_workspace_path(manifest.get_workspace_path() or os.getcwd())
-        loader.set_workspace_name(manifest.get_workspace_name())
-        if manifest.build:
-            loader.set_build_path(manifest.build)
-
-        for recipe in manifest.recipes:
-            recipe = Recipe(recipe.path, source=recipe.source)
-            recipe.save()
-
-        for project in manifest.projects:
-            for recipe in project.recipes:
-                loader._add_project_recipe(project.name, recipe.joltdir, recipe.src)
-
-            for resource in project.resources:
-                loader._add_project_resource(project.name, resource.name, resource.text)
-
-                # Acquire resource immediately
-                task = TaskRegistry.get().get_task(resource.text, manifest=manifest)
-                raise_task_error_if(not isinstance(task, WorkspaceResource), task,
-                                    "only workspace resources are allowed in manifest")
-                task.acquire_ws()
-
-            for module in project.modules:
-                loader._add_project_module(project.name, module.src)
-                sys.path.append(fs.path.join(manifest.get_workspace_path(), module.src))
-
-
-ManifestExtensionRegistry.add(RecipeExtension())
-
-
 def get_workspacedir():
     workspacedir = JoltLoader.get().workspace_path
     assert workspacedir is not None, "No workspace present"
@@ -529,24 +415,6 @@ def import_workspace(buildenv: common_pb.BuildEnvironment):
         if file.content:
             with open(file.path, "w") as f:
                 f.write(file.content)
-
-    for project in buildenv.workspace.projects:
-        for recipe in project.recipes:
-            loader._add_project_recipe(project.name, recipe.workdir, recipe.path)
-
-        for resource in project.resources:
-            loader._add_project_resource(project.name, resource.alias, resource.name)
-
-            # Acquire resource immediately
-            task = TaskRegistry.get().get_task(resource.name, buildenv=buildenv)
-            raise_task_error_if(
-                not isinstance(task, WorkspaceResource), task,
-                "only workspace resources are allowed in manifest")
-            task.acquire_ws()
-
-        for path in project.paths:
-            loader._add_project_module(project.name, path.path)
-            sys.path.append(fs.path.join(loader.workspace_path, path.path))
 
 
 @workspace_locked
@@ -681,33 +549,5 @@ def export_workspace(tasks=None) -> common_pb.Workspace:
                 content=recipe.source,
             )
         )
-
-    if tasks is None:
-        projects = loader._project_recipes.keys()
-    else:
-        projects = set([task.task.joltproject for task in tasks])
-
-    for project in filter(lambda x: x is not None, projects):
-        pb_project = common_pb.Project()
-        pb_project.name = project
-
-        for name, resource_task in loader._get_project_resources(project):
-            resource = common_pb.Project.Resource()
-            resource.alias = name
-            resource.name = resource_task
-            pb_project.resources.append(resource)
-
-        for joltdir, src in loader._get_project_recipes(project):
-            recipe = common_pb.Project.Recipe()
-            recipe.path = src
-            if joltdir:
-                recipe.workdir = joltdir
-            pb_project.recipes.append(recipe)
-
-        for path in loader._get_project_modules(project):
-            syspath = common_pb.Project.SystemPath(path=path)
-            pb_project.paths.append(syspath)
-
-        workspace.projects.append(pb_project)
 
     return workspace

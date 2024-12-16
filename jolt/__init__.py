@@ -110,8 +110,7 @@ def require_resource(name: str, ):
             require_resource("git:url=https://github.com/srand/jolt.git")
 
       """
-    from jolt.error import raise_error_if
-    from jolt.tasks import TaskRegistry, WorkspaceResource
+    from jolt.tasks import TaskRegistry
     registry = TaskRegistry.get()
     registry.require_workspace_resource(name)
 

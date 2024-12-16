@@ -70,7 +70,6 @@ def gdb(ctx, task, default, machine_interface, no_binary, gdb_args):
     if machine_interface:
         log.enable_gdb()
 
-    manifest = ctx.obj["manifest"]
     options = JoltOptions(default=default)
     acache = cache.ArtifactCache.get(options)
     TaskHookRegistry.get(options)
@@ -82,7 +81,7 @@ def gdb(ctx, task, default, machine_interface, no_binary, gdb_args):
     for params in default:
         registry.set_default_parameters(params)
 
-    gb = graph.GraphBuilder(registry, acache, manifest, options, progress=True)
+    gb = graph.GraphBuilder(registry, acache, options, progress=True)
     dag = gb.build([task])
 
     try:

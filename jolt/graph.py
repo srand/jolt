@@ -424,9 +424,8 @@ class TaskProxy(object):
         self._owner = owner
         self.task.exported_name = f"{self.short_qualified_name}@@{owner.short_qualified_name}"
 
-    def finalize(self, dag, manifest):
+    def finalize(self, dag):
         log.debug("Finalizing: " + self.short_qualified_name)
-        self.manifest = manifest
 
         # Find all direct and transitive dependencies
         self.ancestors = set()
@@ -1093,12 +1092,11 @@ class Graph(object):
 
 
 class GraphBuilder(object):
-    def __init__(self, registry, cache, manifest=None, options=None, progress=False, buildenv=None):
+    def __init__(self, registry, cache, options=None, progress=False, buildenv=None):
         self.cache = cache
         self.graph = Graph()
         self.nodes = {}
         self.registry = registry
-        self.manifest = manifest
         self.buildenv = buildenv
         self.progress = progress
         self.options = options or JoltOptions()
@@ -1107,7 +1105,7 @@ class GraphBuilder(object):
         name = utils.stable_task_name(name)
         node = self.nodes.get(name)
         if not node:
-            task = self.registry.get_task(name, manifest=self.manifest, buildenv=self.buildenv)
+            task = self.registry.get_task(name, buildenv=self.buildenv)
             node = self.nodes.get(task.qualified_name, None)
             if node is not None:
                 return node
@@ -1139,7 +1137,7 @@ class GraphBuilder(object):
             parent = node
 
         for requirement in node.task.requires:
-            alias, artifact, task, name = utils.parse_aliased_task_name(requirement)
+            alias, _, task, name = utils.parse_aliased_task_name(requirement)
             child = self._get_node(progress, utils.format_task_name(task, name), parent=node)
 
             # Create direct edges from alias parents to alias children
@@ -1174,7 +1172,7 @@ class GraphBuilder(object):
             topological_nodes = self.graph.topological_nodes
             with self._progress("Collecting task influence", len(self.graph.tasks), "tasks") as p:
                 for node in reversed(topological_nodes):
-                    node.finalize(self.graph, self.manifest)
+                    node.finalize(self.graph)
                     p.update(1)
 
                 # Create artifacts in forward order so that parent identities are available

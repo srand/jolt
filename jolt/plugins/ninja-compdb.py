@@ -226,7 +226,6 @@ def compdb(ctx, task, default):
 
     """
 
-    manifest = ctx.obj["manifest"]
     options = JoltOptions(default=default)
     acache = cache.ArtifactCache.get(options)
     TaskHookRegistry.get(options)
@@ -238,7 +237,7 @@ def compdb(ctx, task, default):
     for params in default:
         registry.set_default_parameters(params)
 
-    gb = graph.GraphBuilder(registry, acache, manifest, options, progress=True)
+    gb = graph.GraphBuilder(registry, acache, options, progress=True)
     dag = gb.build(task)
 
     try:

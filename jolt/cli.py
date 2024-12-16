@@ -24,7 +24,6 @@ from jolt import utils
 from jolt.influence import HashInfluenceRegistry
 from jolt.options import JoltOptions
 from jolt import hooks
-from jolt.manifest import JoltManifest
 from jolt.error import JoltError
 from jolt.error import raise_error
 from jolt.error import raise_error_if
@@ -156,19 +155,6 @@ def cli(ctx, verbose, config_file, debugger, profile,
         print(ctx.get_help())
         sys.exit(0)
 
-    manifest = JoltManifest()
-    utils.call_and_catch(manifest.parse)
-    manifest.process_import()
-    ctx.obj["manifest"] = manifest
-
-    if manifest.version:
-        from jolt.version_utils import requirement, version
-        req = requirement(manifest.version)
-        ver = version(__version__)
-        raise_error_if(not req.satisfied(ver),
-                       "This project requires Jolt version {} (running {})",
-                       req, __version__)
-
     registry = TaskRegistry.get()
     loader = JoltLoader.get()
     loader.load(registry)
@@ -193,10 +179,6 @@ def cli(ctx, verbose, config_file, debugger, profile,
 
 
 def _autocomplete_tasks(ctx, args, incomplete):
-    manifest = JoltManifest()
-    utils.call_and_catch(manifest.parse)
-    manifest.process_import()
-
     loader = JoltLoader.get()
     tasks = loader.load()
     tasks = [task.name for task in tasks if task.name.startswith(incomplete or '')]
@@ -356,21 +338,13 @@ def build(ctx, task, network, keep_going, default, local,
     for params in default:
         registry.set_default_parameters(params)
 
-    manifest = ctx.obj["manifest"]
-
-    for mb in manifest.builds:
-        for mt in mb.tasks:
-            task.append(mt.name)
-        for mt in mb.defaults:
-            registry.set_default_parameters(mt.name)
-
     if force:
         for goal in task:
-            registry.get_task(goal, manifest=manifest).taint = uuid.uuid4()
+            registry.get_task(goal).taint = uuid.uuid4()
 
     log.info("Started: {}", datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
 
-    gb = graph.GraphBuilder(registry, acache, manifest, options, progress=True)
+    gb = graph.GraphBuilder(registry, acache, options, progress=True)
     dag = gb.build(task)
 
     # Collect information about artifact presence before starting prune or build
@@ -505,7 +479,7 @@ def clean(ctx, task, deps, expired):
     if task:
         task = [utils.stable_task_name(t) for t in task]
         registry = TaskRegistry.get()
-        dag = graph.GraphBuilder(registry, acache, ctx.obj["manifest"]).build(task)
+        dag = graph.GraphBuilder(registry, acache).build(task)
         if deps:
             tasks = dag.tasks
         else:
@@ -652,7 +626,7 @@ def display(ctx, task, reverse=None, show_cache=False, prune=False):
     registry = TaskRegistry.get()
     options = JoltOptions()
     acache = cache.ArtifactCache.get(options)
-    gb = graph.GraphBuilder(registry, acache, ctx.obj["manifest"])
+    gb = graph.GraphBuilder(registry, acache)
     dag = gb.build(task, influence=show_cache)
 
     if reverse:
@@ -749,7 +723,6 @@ def download(ctx, task, deps, copy, copy_all):
     if copy_all:
         deps = True
 
-    manifest = ctx.obj["manifest"]
     options = JoltOptions()
     acache = cache.ArtifactCache.get(options)
     hooks.TaskHookRegistry.get(options)
@@ -757,7 +730,7 @@ def download(ctx, task, deps, copy, copy_all):
     registry = TaskRegistry.get()
     strategy = scheduler.DownloadStrategy(executors, acache)
     queue = scheduler.TaskQueue()
-    gb = graph.GraphBuilder(registry, acache, manifest, options, progress=True)
+    gb = graph.GraphBuilder(registry, acache, options, progress=True)
     dag = gb.build(task)
 
     if not deps:
@@ -814,54 +787,6 @@ def download(ctx, task, deps, copy, copy_all):
         queue.shutdown()
 
 
-@cli.command(hidden=True)
-@click.argument("task", type=str, nargs=-1, required=True)
-@click.option("-r", "--remove", is_flag=True, help="Remove tasks from existing manifest.")
-@click.option("-d", "--default", type=str, multiple=True, help="Override default parameter values.")
-@click.option("-o", "--output", type=str, default="default.joltxmanifest", help="Manifest filename.")
-@click.pass_context
-def freeze(ctx, task, default, output, remove):
-    """
-    Freeze the identity of a task.
-
-    <WIP>
-    """
-    manifest = ctx.obj["manifest"]
-
-    options = JoltOptions(default=default)
-    acache = cache.ArtifactCache.get(options)
-    scheduler.ExecutorRegistry.get(options)
-    registry = TaskRegistry.get()
-
-    for params in default:
-        registry.set_default_parameters(params)
-
-    gb = graph.GraphBuilder(registry, acache, manifest)
-    dag = gb.build(task)
-
-    available, missing = acache.availability(dag.persistent_artifacts)
-
-    for artifact in missing:
-        raise_task_error_if(
-            not remove, artifact.get_task(),
-            "Task artifact is not available in any cache, build it first")
-
-    for task in dag.tasks:
-        if task.is_resource() or not task.is_cacheable():
-            continue
-        manifest_task = manifest.find_task(task)
-        if remove and manifest_task:
-            manifest.remove_task(manifest_task)
-            continue
-        if not remove:
-            if not manifest_task:
-                manifest_task = manifest.create_task()
-            manifest_task.name = task.qualified_name
-            manifest_task.identity = task.identity
-
-    manifest.write(fs.path.join(JoltLoader.get().joltdir, output))
-
-
 @cli.command(name="list")
 @click.argument("task", type=str, nargs=-1, required=False, shell_complete=_autocomplete_tasks)
 @click.option("-a", "--all", is_flag=True, help="List all direct and indirect dependencies of TASK.")
@@ -897,7 +822,7 @@ def _list(ctx, task=None, all=False, reverse=None):
     reverse = [utils.stable_task_name(t) for t in utils.as_list(reverse or [])]
 
     try:
-        dag = graph.GraphBuilder(registry, acache, ctx.obj["manifest"]).build(task, influence=False)
+        dag = graph.GraphBuilder(registry, acache).build(task, influence=False)
     except JoltError as e:
         raise e
     except Exception:
@@ -997,9 +922,8 @@ def inspect(ctx, task, influence=False, artifact=False, salt=None):
 
     print()
     print("  Requirements")
-    manifest = ctx.obj["manifest"]
     try:
-        task = task_registry.get_task(task_name, manifest=manifest)
+        task = task_registry.get_task(task_name)
         for req in sorted(utils.as_list(utils.call_or_return(task, task.requires))):
             print("    {0}".format(task.tools.expand(req)))
         if not task.requires:
@@ -1021,7 +945,7 @@ def inspect(ctx, task, influence=False, artifact=False, salt=None):
     if artifact:
         options = JoltOptions(salt=salt)
         acache = cache.ArtifactCache.get()
-        builder = graph.GraphBuilder(task_registry, acache, manifest, options)
+        builder = graph.GraphBuilder(task_registry, acache, options)
         dag = builder.build([task.qualified_name])
         tasks = dag.select(lambda graph, node: node.task is task)
         assert len(tasks) == 1, "graph produced multiple tasks, one expected"
@@ -1085,7 +1009,7 @@ def _export(ctx, task):
     executors = scheduler.ExecutorRegistry.get()
     strategy = scheduler.LocalStrategy(executors, acache)
 
-    dag = graph.GraphBuilder(registry, acache, ctx.obj["manifest"])
+    dag = graph.GraphBuilder(registry, acache)
     dag = dag.build(task)
 
     gp = graph.GraphPruner(acache, strategy)

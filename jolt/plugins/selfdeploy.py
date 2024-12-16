@@ -12,7 +12,6 @@ from jolt.cache import ArtifactCache
 from jolt.error import raise_error_if
 from jolt.graph import GraphBuilder
 from jolt.loader import JoltLoader
-from jolt.manifest import JoltManifest
 from jolt.scheduler import JoltEnvironment
 from jolt.scheduler import LocalExecutor
 from jolt.scheduler import LocalExecutorFactory
@@ -137,7 +136,7 @@ def publish_artifact():
     registry.add_task_class(Jolt)
     acache = ArtifactCache.get()
     env = JoltEnvironment(cache=acache, queue=None)
-    gb = GraphBuilder(registry, acache, JoltManifest())
+    gb = GraphBuilder(registry, acache)
     dag = gb.build(["jolt"])
     task = dag.select(lambda graph, task: True)
     assert len(task) == 1, "Too many selfdeploy tasks found"
