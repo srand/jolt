@@ -1,12 +1,12 @@
 bz2file
 colorama
 fasteners
-ninja-syntax
+ninja
 protobuf
 psutil
+pygit2
 sphinx<7.0
 sphinx_click
 sphinx_rtd_theme
 tqdm
 zstandard
-
