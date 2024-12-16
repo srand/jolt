@@ -602,7 +602,7 @@ class NinjaApi(JoltTest):
         from jolt.plugins.conan import Conan2
 
         class Protobuf(Conan2):
-            packages = ["protobuf/3.19.2"]
+            packages = ["protobuf/5.27.0"]
 
         class Lib(CXXLibrary):
             protoflags = ["--error_format=msvs"]
@@ -643,7 +643,7 @@ class NinjaApi(JoltTest):
         from jolt.plugins.conan import Conan2
 
         class Protobuf(Conan2):
-            packages = ["protobuf/3.21.9"]
+            packages = ["protobuf/5.27.0"]
 
         @jolt.influence.files("proto/*.proto")
         class Proto(Task):
@@ -678,7 +678,7 @@ class NinjaApi(JoltTest):
         from jolt.plugins.conan import Conan2
 
         class Protobuf(Conan2):
-            packages = ["protobuf/3.21.9"]
+            packages = ["protobuf/5.27.0"]
 
 
         class Pyth(CXXProject):
