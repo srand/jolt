@@ -169,10 +169,9 @@ def cli(ctx, verbose, config_file, debugger, profile,
                        "This project requires Jolt version {} (running {})",
                        req, __version__)
 
+    registry = TaskRegistry.get()
     loader = JoltLoader.get()
-    tasks = loader.load()
-    for cls in tasks:
-        TaskRegistry.get().add_task_class(cls)
+    loader.load(registry)
 
     if ctx.invoked_subcommand in ["build", "clean"] and loader.joltdir:
         ctx.obj["workspace_lock"] = utils.LockFile(
@@ -185,7 +184,7 @@ def cli(ctx, verbose, config_file, debugger, profile,
     if ctx.invoked_subcommand is None:
         task = config.get("jolt", "default", "default")
         taskname, _ = utils.parse_task_name(task)
-        if TaskRegistry.get().get_task_class(taskname) is not None:
+        if registry.get_task_class(taskname) is not None:
             ctx.invoke(build, task=[task], force=force, salt=salt, debug=debug,
                        network=network, local=local, keep_going=keep_going, jobs=jobs)
         else:
@@ -198,7 +197,8 @@ def _autocomplete_tasks(ctx, args, incomplete):
     utils.call_and_catch(manifest.parse)
     manifest.process_import()
 
-    tasks = JoltLoader.get().load()
+    loader = JoltLoader.get()
+    tasks = loader.load()
     tasks = [task.name for task in tasks if task.name.startswith(incomplete or '')]
     return sorted(tasks)
 

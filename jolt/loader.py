@@ -25,6 +25,23 @@ from jolt.tools import Tools
 
 
 class Recipe(object):
+    """
+    Abstract representation a single recipe file.
+
+    Implementations of this class are responsible for reading the recipe source
+    from the filesystem. The recipe source is then parsed and the tasks are
+    extracted and made available for execution.
+
+    The format of the recipe source is implementation defined.
+    """
+
+    tasks = []
+    """
+    List of task classes defined in the recipe.
+
+    Available after the recipe has been loaded.
+    """
+
     def __init__(self, path, joltdir=None, project=None, source=None):
         self.path = path
         self.basepath = os.path.basename(path)
@@ -33,13 +50,15 @@ class Recipe(object):
         self.source = source
         self.tasks = []
 
-    def load(self, joltdir=None):
+    def load(self):
+        """ Load the recipe source from the file system. """
         raise_error_if(self.source is not None, "recipe already loaded: {}", self.path)
 
         with open(self.path) as f:
             self.source = f.read()
 
     def save(self):
+        """ Save the recipe source to the file system. """
         raise_error_if(self.source is None, "recipe source unknown: {}", self.path)
 
         with open(self.path, "w") as f:
@@ -47,6 +66,8 @@ class Recipe(object):
 
 
 class NativeRecipe(Recipe):
+    """ Represents a Python recipe file (.jolt, .py). """
+
     @staticmethod
     def _is_abstract(cls):
         return cls.__dict__.get("abstract", False) or cls.__name__.startswith("_")
@@ -58,6 +79,13 @@ class NativeRecipe(Recipe):
             not NativeRecipe._is_abstract(cls)
 
     def load(self, joltdir=None):
+        """
+        Load the recipe source from the file system.
+
+        Python classes defined in the recipe source are extracted and made available
+        as tasks for execution. Task classes must be subclasses of Task or TaskGenerator.
+
+        """
         super(NativeRecipe, self).load()
 
         name = utils.canonical(self.path)
@@ -88,17 +116,42 @@ class NativeRecipe(Recipe):
 
 
 class Loader(object):
-    def recipes(self):
+    """
+    Base class for recipe loaders.
+
+    A Loader is responsible for finding recipes in the file system providing a list
+    of Recipe:s from which tasks can be loaded.
+    """
+
+    def recipes(self) -> list:
+        """ Return a list of Recipe:s from which tasks can be loaded. """
         pass
 
 
 class LoaderFactory(object):
+    """
+    A factory for creating Loader instances.
+
+    Factories are registered with the JoltLoader where it is used to create Loader instances.
+    """
     def create(self):
         raise NotImplementedError()
 
 
 class NativeLoader(Loader):
+    """ A loader for Python recipe files (.jolt, .py). """
+
     def __init__(self, searchpath):
+        """
+        Create a new NativeLoader instance.
+
+        Args:
+            searchpath (str): The path to search for recipe files. If the path is a file,
+                only that file will be loaded. If the path is a directory, all files with
+                the .jolt or .py extension will be loaded.
+
+        """
+
         self._files = self._find_files(searchpath)
         self._recipes = self._load_files(self._files) if self._files else []
 
@@ -129,6 +182,7 @@ _loaders = []
 
 
 def register(factory):
+    """ Register a LoaderFactory with the JoltLoader. """
     raise_error_if(not issubclass(factory, LoaderFactory),
                    "{} is not a LoaderFactory", factory.__name__)
     _loaders.append(factory)
@@ -136,12 +190,22 @@ def register(factory):
 
 @register
 class NativeLoaderFactory(LoaderFactory):
+    """ A factory for creating NativeLoader instances. """
     def create(self, searchpath):
         return NativeLoader(searchpath)
 
 
 @utils.Singleton
 class JoltLoader(object):
+    """
+    The JoltLoader is responsible for loading recipes from the file system.
+
+    The JoltLoader is a singleton and is used to load recipes from the file system.
+    The recipes are loaded from the workspace directory and any project directories
+    defined in the workspace. The recipes are then made available for execution.
+
+    """
+
     filename = "*.jolt"
 
     def __init__(self):
@@ -219,7 +283,16 @@ class JoltLoader(object):
     def _get_searchpaths(self):
         return [self.workspace_path]
 
-    def load(self, manifest=None):
+    def load(self, registry=None):
+        """
+        Load all recipes from the workspace directory.
+
+        Optionally populate the task registry with the tasks found in the recipes.
+
+        Returns:
+            List of Task classes found in the recipes.
+        """
+
         if not self.workspace_path:
             self.set_workspace_path(self._find_workspace_path(os.getcwd()))
 
@@ -242,9 +315,16 @@ class JoltLoader(object):
             if path:
                 self._lock = fasteners.InterProcessLock(path)
 
+        # Add tasks to the registry if provided
+        if registry is not None:
+            for task in self._tasks:
+                registry.add_task_class(task)
+
         return self._tasks
 
     def load_file(self, path, joltdir=None):
+        """ Load a single recipe file. """
+
         for factory in _loaders:
             loader = factory().create(path)
             for recipe in loader.recipes:
@@ -254,6 +334,8 @@ class JoltLoader(object):
                 self._tasks += recipe.tasks
 
     def load_plugin(self, filepath):
+        """ Load a single plugin file. """
+
         plugin, ext = os.path.splitext(fs.path.basename(filepath))
         loader = SourceFileLoader("jolt.plugins." + plugin, filepath)
         module = ModuleType(loader.name)
@@ -262,6 +344,15 @@ class JoltLoader(object):
         sys.modules[loader.name] = module
 
     def load_plugins(self):
+        """
+        Load all configured plugins.
+
+        Plugins are loaded from the plugin path configured in the Jolt configuration file
+        or from the default plugin path in the Jolt package.
+
+        If a plugin is already loaded, it will not be loaded again. If a plugin is not found
+        in the plugin path, it will not be loaded.
+        """
         searchpath = config.get("jolt", "pluginpath")
         searchpath = searchpath.split(":") if searchpath else []
         searchpath.append(fs.path.join(fs.path.dirname(__file__), "plugins"))
@@ -288,14 +379,17 @@ class JoltLoader(object):
 
     @property
     def tasks(self):
+        """ Returns a list of all loaded tasks. """
         return self._tasks
 
     @property
     def joltdir(self):
+        """ Returns the path to the workspace. """
         return self._path
 
     @property
     def workspace_name(self):
+        """ Returns the name of the workspace. """
         return self._workspace_name or os.path.basename(self.workspace_path)
 
     def set_workspace_name(self, name):
@@ -303,6 +397,7 @@ class JoltLoader(object):
 
     @property
     def workspace_path(self):
+        """ Returns the path to the workspace. """
         return self._path
 
     @contextmanager
@@ -319,10 +414,12 @@ class JoltLoader(object):
 
     @property
     def build_path(self):
+        """ Returns the path to the build directory. """
         return self._build_path or os.path.join(self.workspace_path, "build")
 
     @property
     def build_path_rel(self):
+        """" Returns the path to the build directory relative to the workspace. """
         return os.path.relpath(self.build_path, self.workspace_path)
 
     def set_build_path(self, path):
