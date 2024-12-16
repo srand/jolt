@@ -162,7 +162,7 @@ class NativeLoader(Loader):
 
         _, ext = fs.path.splitext(searchpath)
         raise_error_if(not fs.path.exists(searchpath), "File does not exist: {}", searchpath)
-        raise_error_if(ext not in [".jolt", ".py"], "Invalid file extension: {}", ext)
+        raise_error_if(ext not in [".build", ".jolt", ".py"], "Invalid file extension: {}", ext)
 
         return [searchpath]
 

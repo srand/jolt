@@ -782,6 +782,7 @@ class TaskRegistry(object):
         self.env = env
         self.tasks = {}
         self.instances = {}
+        self._workspace_resources = []
 
     @staticmethod
     def get(*args, **kwargs):
@@ -790,6 +791,21 @@ class TaskRegistry(object):
         return TaskRegistry._instance
 
     def add_task_class(self, cls):
+        """
+        Add a task class to the registry.
+
+        The class is decorated to require workspace resources.
+        """
+
+        registry = self
+
+        def _workspace_resources(self):
+            return registry._workspace_resources
+
+        if not issubclass(cls, WorkspaceResource):
+            cls = attributes.requires("_workspace_resources")(cls)
+            cls._workspace_resources = property(_workspace_resources)
+
         self.tasks[cls.name] = cls
 
     def add_task(self, task, extra_params):
@@ -797,6 +813,13 @@ class TaskRegistry(object):
         params.update(extra_params or {})
         full_name = utils.format_task_name(name, params)
         self.instances[full_name] = task
+
+    def require_workspace_resource(self, taskname):
+        name, _ = utils.parse_task_name(taskname)
+        task = self.get_task_class(name)
+        raise_task_error_if(task is None, name, "Resource not found")
+        raise_task_error_if(not issubclass(task, WorkspaceResource), name, "Not a workspace resource")
+        self._workspace_resources.append(taskname)
 
     def get_task_class(self, name):
         return self.tasks.get(name)

@@ -93,3 +93,51 @@ def include(joltfile, joltdir=None):
     except Exception as e:
         from jolt.error import raise_error
         raise_error("Failed to load '{0}': {1}", joltfile, str(e))
+
+
+def require_resource(name: str, ):
+    """ Require a resource task.
+
+    Args:
+        name (str): The name of the resource task.
+
+    Example:
+
+      .. code-block:: python
+
+            from jolt import require_resource
+
+            require_resource("git:url=https://github.com/srand/jolt.git")
+
+      """
+    from jolt.error import raise_error_if
+    from jolt.tasks import TaskRegistry, WorkspaceResource
+    registry = TaskRegistry.get()
+    registry.require_workspace_resource(name)
+
+
+def require_version(verstr: str):
+    """ Require a specific version of Jolt.
+
+    Args:
+        verstr (str): The version to require. Must be a string.
+            Operators such as ``>=`` and ``<=`` are supported.
+
+    Example:
+
+      .. code-block:: python
+
+            from jolt import require_version
+
+            require_version("1.0.0")
+
+      """
+    from jolt.error import raise_error_if
+    from jolt.version_utils import requirement, version
+
+    req = requirement(verstr)
+    ver = version(__version__)
+    raise_error_if(
+        not req.satisfied(ver),
+        "This project requires Jolt version {} (running {})",
+        req, __version__)
