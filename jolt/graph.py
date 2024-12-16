@@ -467,11 +467,23 @@ class TaskProxy(object):
         self._artifacts.extend(self.task._artifacts(self.cache, self))
 
     def taint(self, salt=None):
-        self.task.taint = self.task.taint or salt or uuid.uuid4()
+        self.task.taint = salt or uuid.uuid4()
         if salt is None:
             # Only recalculate identity when build is forced, not when salted
             self.identity = None
             self.identity
+            # Recreate artifacts
+            self._artifacts = []
+            self.finalize_artifacts()
+
+        # If this is an alias, taint all children
+        if self.is_alias():
+            for child in self.children:
+                child.taint()
+
+        # Taint all extensions
+        for extension in self.extensions:
+            extension.taint()
 
     def queued(self, remote=True):
         self.task.verbose("Task queued " + self.log_name)

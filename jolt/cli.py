@@ -338,18 +338,20 @@ def build(ctx, task, network, keep_going, default, local,
     for params in default:
         registry.set_default_parameters(params)
 
-    if force:
-        for goal in task:
-            registry.get_task(goal).taint = uuid.uuid4()
-
     log.info("Started: {}", datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
 
     gb = graph.GraphBuilder(registry, acache, options, progress=True)
     dag = gb.build(task)
 
+    # If asked to force rebuild, taint all goal tasks
+    if force:
+        for goal in dag.goals:
+            goal.taint()
+
     # Collect information about artifact presence before starting prune or build
     acache.precheck(dag.persistent_artifacts, remote=not local)
 
+    # Prune the graph to remove tasks that are already available locally or remotely
     if not no_prune:
         gp = graph.GraphPruner(acache, strategy)
         dag = gp.prune(dag)

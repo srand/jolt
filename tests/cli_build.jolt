@@ -102,7 +102,6 @@ class BuildCli(testsupport.JoltTest):
         with self.assertRaises(Exception, msg="always fails"):
             self.build("fail")
 
-
     def test_force(self):
         """
         --- tasks:
@@ -110,6 +109,9 @@ class BuildCli(testsupport.JoltTest):
             pass
         class Pass2(Task):
             pass
+
+        class Default(Alias):
+            requires = ["pass", "pass2"]
         ---
         """
         r1 = self.build("pass")
@@ -135,6 +137,13 @@ class BuildCli(testsupport.JoltTest):
         self.assertBuild(r5, "pass")
         self.assertBuild(r5, "pass2")
 
+        r6 = self.jolt("")
+        self.assertNoBuild(r6, "pass")
+        self.assertNoBuild(r6, "pass2")
+
+        r7 = self.jolt("-f")
+        self.assertBuild(r7, "pass")
+        self.assertBuild(r7, "pass2")
 
     def test_salt(self):
         """
@@ -439,7 +448,7 @@ class BuildCli(testsupport.JoltTest):
 
         r = self.build("c -f a")
         self.assertBuild(r, "a")
-        self.assertBuild(r, "b")
+        self.assertNoBuild(r, "b")
         self.assertBuild(r, "c")
 
     def test_environ(self):
