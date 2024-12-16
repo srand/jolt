@@ -113,3 +113,17 @@ class ExportCli(testsupport.JoltTest):
             self.build("b")
             self.assertEqual("B", self.tools.run(
                 "bash -c 'source <(jolt -c test.conf export b) && a.sh'"))
+
+    def test_export_resource(self):
+        """
+        --- tasks:
+        class A(Resource):
+            pass
+
+        class B(Task):
+            requires = ["a"]
+        ---
+        """
+        self.build("b")
+        with self.tools.cwd(self.ws):
+            self.tools.run("jolt -c test.conf export b")

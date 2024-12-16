@@ -1041,7 +1041,7 @@ def _export(ctx, task):
     for task in context.tasks:
         for artifact in task.artifacts:
             raise_task_error_if(
-                artifact.is_temporary(), task,
+                not task.is_resource() and artifact.is_temporary(), task,
                 "Task artifact not found in local cache, build it first")
 
             visitor = Export()
