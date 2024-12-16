@@ -22,6 +22,7 @@ class CompDBExtension(JoltTest):
         --- config:
 
         [ninja-compdb]
+        depfiles = true
 
         --- file: lib.h
         int lib();
@@ -101,7 +102,6 @@ class CompDBExtension(JoltTest):
         --- config:
 
         [ninja-compdb]
-        depfiles = false
 
         --- file: lib.h
         int lib();
