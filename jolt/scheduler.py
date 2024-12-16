@@ -14,8 +14,6 @@ from jolt import tools
 from jolt.error import raise_task_error
 from jolt.error import raise_task_error_if
 from jolt.graph import PruneStrategy
-from jolt.manifest import ManifestExtension
-from jolt.manifest import ManifestExtensionRegistry
 from jolt.options import JoltOptions
 from jolt.timer import Timer
 
@@ -907,68 +905,6 @@ def get_exported_task_set(task):
     for ext in task.extensions:
         children.extend(get_exported_task_set(ext))
     return list(set(children))
-
-
-class TaskIdentityExtension(ManifestExtension):
-    def export_manifest(self, manifest, tasks):
-        # Generate a list of all tasks that must be evaluated
-        # for inclusion in the manifest
-        all_tasks = []
-        for task in tasks:
-            all_tasks += get_exported_task_set(task)
-        all_tasks = list(set(all_tasks))
-
-        for child in all_tasks:
-            manifest_task = manifest.find_task(child.qualified_name)
-            if manifest_task is None:
-                manifest_task = manifest.create_task()
-                manifest_task.name = child.qualified_name
-            manifest_task.identity = child.identity
-            manifest_task.instance = child.instance
-
-
-ManifestExtensionRegistry.add(TaskIdentityExtension())
-
-
-class TaskExportExtension(ManifestExtension):
-    def export_manifest(self, manifest, tasks):
-        short_task_names = set()
-
-        # Generate a list of all tasks that must be evaluated
-        # for inclusion in the manifest
-        all_tasks = []
-        for task in tasks:
-            all_tasks += get_exported_task_set(task)
-        all_tasks = list(set(all_tasks))
-
-        # Add all tasks with export attributes to the manifest
-        for child in all_tasks:
-            manifest_task = manifest.find_task(child.qualified_name)
-            if manifest_task is None:
-                manifest_task = manifest.create_task()
-                manifest_task.name = child.qualified_name
-            for key, export in child.task._get_export_objects().items():
-                attrib = manifest_task.create_attribute()
-                attrib.name = key
-                attrib.value = export.export(child.task)
-            short_task_names.add(child.name)
-
-        # Figure out if any task with an overridden default parameter
-        # value was included in the manifest. If so, add info about it.
-        default_task_names = set()
-        for task in all_tasks:
-            for task in task.options.default:
-                short_name, _ = utils.parse_task_name(task)
-                if short_name in short_task_names:
-                    default_task_names.add(task)
-        if default_task_names:
-            build = manifest.create_build()
-            for task in default_task_names:
-                default = build.create_default()
-                default.name = task
-
-
-ManifestExtensionRegistry.add(TaskExportExtension())
 
 
 def export_tasks(tasks):

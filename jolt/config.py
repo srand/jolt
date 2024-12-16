@@ -7,7 +7,6 @@ from jolt import common_pb2 as common_pb
 from jolt import filesystem as fs
 from jolt import utils
 from jolt.error import raise_error_if
-from jolt.manifest import ManifestExtension, ManifestExtensionRegistry
 
 
 _workdir = os.getcwd()
@@ -318,39 +317,28 @@ def split(string):
     return section, key
 
 
-class ConfigExtension(ManifestExtension):
-    def export_manifest(self, manifest, _):
-        manifest.config = get("network", "config", "", expand=False)
-
-        for key, value in options("params"):
-            p = manifest.create_parameter()
-            p.key = "config." + key
-            p.value = value
-
-    def import_manifest(self, manifest):
-        if manifest.config:
-            _manifest.read_string(manifest.config)
-            from jolt.loader import JoltLoader
-            JoltLoader.get().load_plugins()
-
-        for param in manifest.parameters:
-            if param.key.startswith("config."):
-                set("params", param.key.split(".", 1)[1], param.value)
-
-    def import_protobuf(self, pb):
-        self.import_manifest(pb)
+def import_config(snippet: str):
+    """ Apply extra configuration for the worker, provided by the client. """
+    _manifest.read_string(snippet)
+    from jolt.loader import JoltLoader
+    JoltLoader.get().load_plugins()
 
 
 def export_config():
+    """ Get extra configuration for the worker. """
     return get("network", "config", "", expand=False)
 
 
+def import_params(params: dict):
+    """ Apply user-defined parameters (-c params.key=value). """
+    for key, value in params.items():
+        if key.startswith("config."):
+            set("params", key.split(".", 1)[1], value)
+
+
 def export_params():
+    """ Get user-defined parameters (-c params.key=value). """
     parameters = []
     for key, value in options("params"):
         parameters.append(common_pb.Property(key="config." + key, value=value))
     return parameters
-
-
-# High priority so that plugins are loaded before resources are acquired.
-ManifestExtensionRegistry.add(ConfigExtension(), -10)

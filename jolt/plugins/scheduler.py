@@ -13,7 +13,6 @@ from jolt import config
 from jolt import hooks
 from jolt import loader
 from jolt import log
-from jolt import manifest
 from jolt import common_pb2 as common_pb
 from jolt import scheduler
 from jolt import utils
@@ -579,8 +578,14 @@ def executor(ctx, worker, build, request):
     loglevel = request.environment.loglevel
     log.set_level_pb(loglevel)
 
-    # Import protobuf build description
-    manifest.ManifestExtensionRegistry.import_protobuf(request.environment)
+    # Import workspace
+    loader.import_workspace(request.environment)
+
+    # Import configuration snippet
+    config.import_config(request.environment.config)
+
+    # Import configuration parameters (-c params.key)
+    config.import_params({param.key: param.value for param in request.environment.parameters})
 
     options = JoltOptions(
         network=True,

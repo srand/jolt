@@ -387,37 +387,6 @@ class RecipeExtension(ManifestExtension):
                 loader._add_project_module(project.name, module.src)
                 sys.path.append(fs.path.join(manifest.get_workspace_path(), module.src))
 
-    def import_protobuf(self, buildenv):
-        loader = JoltLoader.get()
-        loader.set_workspace_path(os.getcwd())
-        loader.set_workspace_name(buildenv.workspace.name)
-        if buildenv.workspace.builddir:
-            loader.set_build_path(buildenv.workspace.builddir)
-
-        # Write .jolt files into workspace
-        for file in buildenv.workspace.files:
-            if file.content:
-                with open(file.path, "w") as f:
-                    f.write(file.content)
-
-        for project in buildenv.workspace.projects:
-            for recipe in project.recipes:
-                loader._add_project_recipe(project.name, recipe.workdir, recipe.path)
-
-            for resource in project.resources:
-                loader._add_project_resource(project.name, resource.alias, resource.name)
-
-                # Acquire resource immediately
-                task = TaskRegistry.get().get_task(resource.name, buildenv=buildenv)
-                raise_task_error_if(
-                    not isinstance(task, WorkspaceResource), task,
-                    "only workspace resources are allowed in manifest")
-                task.acquire_ws()
-
-            for path in project.paths:
-                loader._add_project_module(project.name, path.path)
-                sys.path.append(fs.path.join(loader.workspace_path, path.path))
-
 
 ManifestExtensionRegistry.add(RecipeExtension())
 
@@ -441,8 +410,63 @@ def workspace_locked(func):
     return wrapper
 
 
+def import_workspace(buildenv: common_pb.BuildEnvironment):
+    """
+    Import workspace from a BuildEnvironment protobuf message.
+
+    This function will create files, recipes, resources and modules in the workspace
+    based on the information in the BuildEnvironment message.
+
+    The workspace tree is not pulled and checked out here. This is done by the
+    worker before it starts the executor.
+
+    """
+    loader = JoltLoader.get()
+    loader.set_workspace_path(os.getcwd())
+    loader.set_workspace_name(buildenv.workspace.name)
+    if buildenv.workspace.builddir:
+        loader.set_build_path(buildenv.workspace.builddir)
+
+    # Write .jolt files into workspace
+    for file in buildenv.workspace.files:
+        if file.content:
+            with open(file.path, "w") as f:
+                f.write(file.content)
+
+    for project in buildenv.workspace.projects:
+        for recipe in project.recipes:
+            loader._add_project_recipe(project.name, recipe.workdir, recipe.path)
+
+        for resource in project.resources:
+            loader._add_project_resource(project.name, resource.alias, resource.name)
+
+            # Acquire resource immediately
+            task = TaskRegistry.get().get_task(resource.name, buildenv=buildenv)
+            raise_task_error_if(
+                not isinstance(task, WorkspaceResource), task,
+                "only workspace resources are allowed in manifest")
+            task.acquire_ws()
+
+        for path in project.paths:
+            loader._add_project_module(project.name, path.path)
+            sys.path.append(fs.path.join(loader.workspace_path, path.path))
+
+
 @workspace_locked
-def export_workspace(tasks=None):
+def export_workspace(tasks=None) -> common_pb.Workspace:
+    """
+    Export workspace to a Workspace protobuf message.
+
+    This function will create a Workspace protobuf message containing all the
+    recipes, resources and modules in the workspace. If tasks is provided, only
+    the projects associated with the tasks will be exported. Otherwise, all
+    projects will be exported.
+
+    If the workspace is configured to use a remote cache, the workspace will be
+    pushed to the remote cache using the fstree tool. The tree hash of the
+    workspace will be included in the returned Workspace message.
+
+    """
     loader = JoltLoader.get()
     tools = Tools()
     tree = None
