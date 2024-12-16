@@ -1438,7 +1438,8 @@ class TaskApi(JoltTest):
         from jolt import Task
 
         class A(Task):
-            pass
+            def run(self, deps, tools):
+                self.info("Joltdir: {{joltdir}}")
 
         --- tasks:
         from jolt import include
@@ -1446,7 +1447,8 @@ class TaskApi(JoltTest):
         include("a.jolt")
         ---
         """
-        self.build("a")
+        r = self.build("a")
+        self.assertRegex(r, r"Joltdir: .*/workspace/dir")
 
     def test_test_filter(self):
         """
