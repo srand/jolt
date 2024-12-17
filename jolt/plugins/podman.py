@@ -247,7 +247,7 @@ class Container(Resource):
     def _image(self):
         registry = TaskRegistry.get()
         tool = tools.Tools(self)
-        if registry.get_task(tool.expand(self.image)):
+        if registry.has_task(tool.expand(self.image)):
             return [self.image]
         return []
 

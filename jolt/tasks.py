@@ -847,6 +847,10 @@ class TaskRegistry(object):
 
         raise_task_error_if(not task, full_name, "No such task")
 
+    def has_task(self, name):
+        name, params = utils.parse_task_name(name)
+        return self.tasks.get(name) is not None
+
     def set_default_parameters(self, task):
         name, params = utils.parse_task_name(task)
 
