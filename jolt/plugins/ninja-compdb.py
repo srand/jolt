@@ -242,8 +242,10 @@ def compdb(ctx, task, default):
 
     try:
         with log.progress("Progress", dag.number_of_tasks(), " tasks", estimates=False, debug=False) as progress:
+            in_progress = set()
+
             while dag.has_tasks() or not queue.empty():
-                leafs = dag.select(lambda graph, task: task.is_ready())
+                leafs = dag.select(lambda graph, task: task.is_ready() and task not in in_progress)
 
                 # Order the tasks by their weights to improve build times
                 leafs.sort(key=lambda x: x.weight)
@@ -252,6 +254,7 @@ def compdb(ctx, task, default):
                     task = leafs.pop()
                     executor = strategy.create_executor({}, task)
                     queue.submit(executor)
+                    in_progress.add(task)
 
                 task, _ = queue.wait()
 

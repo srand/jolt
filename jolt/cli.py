@@ -374,9 +374,11 @@ def build(ctx, task, network, keep_going, default, local,
             debug=debug)
 
         with progress:
+            in_progress = set()
+
             while dag.has_tasks() or not queue.empty():
                 # Find all tasks ready to be executed
-                leafs = dag.select(lambda graph, task: task.is_ready())
+                leafs = dag.select(lambda graph, task: task.is_ready() and task not in in_progress)
 
                 # Order the tasks by their weights to improve build times
                 leafs.sort(key=lambda x: x.weight)
@@ -385,6 +387,7 @@ def build(ctx, task, network, keep_going, default, local,
                     task = leafs.pop()
                     executor = strategy.create_executor(session, task)
                     queue.submit(executor)
+                    in_progress.add(task)
 
                 task, error = queue.wait()
 
@@ -745,13 +748,16 @@ def download(ctx, task, deps, copy, copy_all):
 
     try:
         with log.progress("Progress", dag.number_of_tasks(), " tasks", estimates=False, debug=False) as p:
+            in_progress = set()
+
             while dag.has_tasks() or not queue.empty():
-                leafs = dag.select(lambda graph, task: task.is_ready())
+                leafs = dag.select(lambda graph, task: task.is_ready() and task not in in_progress)
 
                 while leafs:
                     task = leafs.pop()
                     executor = strategy.create_executor({}, task)
                     queue.submit(executor)
+                    in_progress.add(task)
 
                 task, error = queue.wait()
                 p.update(1)
