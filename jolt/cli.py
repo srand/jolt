@@ -18,7 +18,7 @@ from jolt import log
 from jolt import __version__
 from jolt.log import logfile
 from jolt import config
-from jolt.loader import JoltLoader
+from jolt.loader import JoltLoader, import_workspace
 from jolt import tools
 from jolt import utils
 from jolt.influence import HashInfluenceRegistry
@@ -216,12 +216,13 @@ def _autocomplete_tasks(ctx, args, incomplete):
               help="Don't prune cached artifacts from the build graph. This option can be used to populate the local cache with remotely cached dependency artifacts.")
 @click.option("--worker", is_flag=True, default=False,
               help="Run with the worker build strategy", hidden=True)
+@click.option("--environ", type=click.Path(), help="Import build environment from protobuf", hidden=True)
 @click.pass_context
 @hooks.cli_build
 def build(ctx, task, network, keep_going, default, local,
           no_download, no_download_persistent, no_upload, download, upload, worker, force,
           salt, copy, debug, result, jobs, no_prune, verbose,
-          mute):
+          mute, environ):
     """
     Build task artifact.
 
@@ -253,6 +254,7 @@ def build(ctx, task, network, keep_going, default, local,
     are removed before execution starts.
 
     """
+
     raise_error_if(network and local,
                    "The -n and -l flags are mutually exclusive")
 
@@ -304,6 +306,33 @@ def build(ctx, task, network, keep_going, default, local,
     if keep_going:
         config.set_keep_going(True)
 
+    # Import build environment from protobuf if provided
+    buildenv = None
+    if environ:
+        with open(environ, "rb") as f:
+            from jolt import common_pb2 as common_pb
+            buildenv = common_pb.BuildEnvironment()
+            try:
+                buildenv.ParseFromString(f.read())
+            except Exception as e:
+                raise_error("Failed to parse build environment protobuf: {}", e)
+
+        # Import log level
+        log.set_level_pb(buildenv.loglevel)
+
+        # Import workspace
+        import_workspace(buildenv)
+
+        # Import configuration snippet
+        config.import_config(buildenv.config)
+
+        # Import configuration parameters (-c params.key)
+        config.import_params({param.key: param.value for param in buildenv.parameters})
+
+        # Import default parameters (-d taskname:param=value)
+        default = utils.as_list(default)
+        default += buildenv.task_default_parameters
+
     options = JoltOptions(
         network=network,
         local=local,
@@ -340,7 +369,7 @@ def build(ctx, task, network, keep_going, default, local,
 
     log.info("Started: {}", datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
 
-    gb = graph.GraphBuilder(registry, acache, options, progress=True)
+    gb = graph.GraphBuilder(registry, acache, options, progress=True, buildenv=buildenv)
     dag = gb.build(task)
 
     # If asked to force rebuild, taint all goal tasks
