@@ -451,6 +451,22 @@ Jolt includes task base classes that can be used to build the Linux kernel and
 filesystem images. The tasks are designed to be easily extended and customizable
 to fit your specific needs.
 
+Toolchain
+~~~~~~~~~
+
+In order to build a kernel, a toolchain must be available. The toolchain is
+a collection of tools and libraries required to build the kernel. The toolchain
+can be installed manually or provisioned by a task.
+
+The example below shows how to provision a toolchain using a DebianHostSdk task.
+This tasks assumes that the host system is running a Debian-based Linux distribution
+and that the required packages have been installed. It exports environment variables
+that are used by the kernel build task to locate the toolchain.
+
+  .. literalinclude:: ../examples/linux/sdk.jolt
+    :language: python
+    :caption: examples/linux/sdk.jolt
+
 Kernel
 ~~~~~~
 
@@ -472,7 +488,7 @@ using the vexpress defconfig. The build output will be published into the task a
 
   .. code:: bash
 
-    $ jolt build kernel:arch=arm,defconfig=vexpress,targets=zimage,dtbs
+    $ jolt build kernel:arch=arm,defconfig=vexpress,targets=zimage+dtbs
 
 Accepted parameter values can be displayed with:
 
@@ -497,6 +513,10 @@ must have the ``binfmt-support`` and ``qemu-static-user`` packages installed to
 allow execution of foreign binaries. The packages are available in most Linux
 distributions.
 
+
+Initramfs
+^^^^^^^^^
+
 The next example task builds an initramfs image. The image is based on the BusyBox
 userland and includes a minimal set of tools and libraries required to boot the system.
 
@@ -509,6 +529,10 @@ userland and includes a minimal set of tools and libraries required to boot the 
     $ jolt build initramfs:arch=arm
 
 The resulting artifact contains a cpio archive (initramfs) of the built container image.
+
+
+SquashFS
+^^^^^^^^
 
 It is also possible to build a SquashFS image. This image is baised on the Debian stable-slim
 image and includes a minimal set of tools and libraries required to boot the system. Instead
