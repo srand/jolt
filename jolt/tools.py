@@ -1939,21 +1939,18 @@ class Tools(object):
             self._chroot_path = self._env.get("PATH")
             self._chroot_path = self._chroot_path.split(fs.pathsep) if self._chroot_path else []
 
+        self._chroot_prefix = [
+            sys.executable,
+            unshare,
+            "-b",
+        ] + bind + [
+            "-c",
+            chroot,
+            "--shell={shell}",
+            "--",
+        ]
         try:
-            with self.tmpdir("chroot") as bindroot:
-                self._chroot_prefix = [
-                    sys.executable,
-                    unshare,
-                    "-b",
-                ] + bind + [
-                    "-c",
-                    chroot,
-                    "-t",
-                    bindroot,
-                    "--shell={shell}",
-                    "--",
-                ]
-                yield
+            yield
         finally:
             self._chroot = old_chroot
             self._chroot_path = old_chroot_path
