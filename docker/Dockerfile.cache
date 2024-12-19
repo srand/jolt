@@ -1,4 +1,4 @@
-FROM docker.io/golang:1.21-bookworm as base
+FROM docker.io/golang:1.23-bookworm as base
 
 FROM base as tools
 ARG DEBIAN_FRONTEND=noninteractive
