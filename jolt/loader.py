@@ -252,6 +252,7 @@ class JoltLoader(object):
             for factory in _loaders:
                 loader = factory().create(searchpath)
                 for recipe in loader.recipes:
+                    recipe.workspace_path = os.path.relpath(recipe.path, self.workspace_path)
                     recipe.load()
                     self._recipes.append(recipe)
                     self._tasks += recipe.tasks
@@ -450,6 +451,7 @@ def export_workspace(tasks=None) -> common_pb.Workspace:
     cache_grpc_uri = config.geturi("cache", "grpc_uri")
     if fstree_enabled:
         if not cache_grpc_uri:
+            fstree_enabled = False
             log.warning("No cache gRPC URI configured, will not push workspace to remote cache")
         else:
             raise_error_if(cache_grpc_uri.scheme not in ["tcp"], "Invalid scheme in cache gRPC URI config: {}", cache_grpc_uri.scheme)
@@ -542,12 +544,13 @@ def export_workspace(tasks=None) -> common_pb.Workspace:
         tree=tree,
     )
 
-    for recipe in loader.recipes:
-        workspace.files.append(
-            common_pb.File(
-                path=recipe.basepath,
-                content=recipe.source,
+    if not fstree_enabled:
+        for recipe in loader.recipes:
+            workspace.files.append(
+                common_pb.File(
+                    path=recipe.workspace_path,
+                    content=recipe.source,
+                )
             )
-        )
 
     return workspace
