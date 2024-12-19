@@ -1,4 +1,4 @@
-from jolt import Download, Parameter, Resource, Task
+from jolt import Parameter, Resource, Task
 from jolt.error import raise_task_error_if
 from jolt.tasks import TaskRegistry
 from jolt import attributes
@@ -15,7 +15,6 @@ from jolt.cache import ArtifactAttributeSetProvider
 import contextlib
 import json
 from os import path
-from platform import system
 import tarfile
 
 
@@ -98,35 +97,6 @@ class PodmanAttributeProvider(ArtifactAttributeSetProvider):
 
     def unapply(self, task, artifact):
         artifact.podman.unapply(task, artifact)
-
-
-class PodmanClient(Download):
-    """ Task: Downloads and publishes the Podman command line client.
-
-    The task will be automatically made available after importing
-    ``jolt.plugins.podman``.
-    """
-
-    name = "podman/cli"
-    """ Name of the task """
-
-    arch = Parameter("x86_64", help="Host architecture")
-    """ Host architecture [x86_64] """
-
-    collect = ["podman/podman"]
-
-    host = Parameter(system().lower(), help="Host operating system")
-    """ Host operating system [autodetected] """
-
-    url = "https://download.podman.com/{host}/static/stable/{arch}/podman-{version}.tgz"
-    """ URL of binaries """
-
-    version = Parameter("20.10.13", help="Podman version")
-    """ Podman version [20.10.13] """
-
-    def publish(self, artifact, tools):
-        super().publish(artifact, tools)
-        artifact.environ.PATH.append("podman")
 
 
 @attributes.requires("_image")
@@ -344,8 +314,6 @@ class PodmanLogin(Resource):
     name = "podman/login"
     """ Name of the resource """
 
-    requires = ["podman/cli"]
-
     user = Parameter("", help="Podman Registry username")
     """
     Podman Registry username.
@@ -385,7 +353,6 @@ class PodmanLogin(Resource):
         tools.run("podman logout {server}")
 
 
-TaskRegistry.get().add_task_class(PodmanClient)
 TaskRegistry.get().add_task_class(PodmanLogin)
 
 
@@ -445,7 +412,6 @@ class ContainerImage(Task):
 
     Optionally add requirements to:
 
-      - ``podman/cli`` to provision the Podman client, if none is available on the host.
       - ``podman/login`` to automatically login to the Podman registry.
 
     This class must be subclassed.
@@ -468,7 +434,6 @@ class ContainerImage(Task):
         class Busybox(ContainerImage):
             \"\"\" Publishes Busybox image as gzip-compressed tarball \"\"\"
             compression = "gz"
-            requires = ["podman/cli"]
             tags = ["busybox:{identity}"]
 
     """
