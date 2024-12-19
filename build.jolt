@@ -80,19 +80,6 @@ class JoltImage(docker.DockerImage):
 
 @influence.files("{dockerfile}")
 @attributes.requires("requires_push_{push}")
-class RabbitImage(docker.DockerImage):
-    name = "jolt/rabbitmq"
-    buildargs = ["VERSION={version}"]
-    dockerfile = "docker/Dockerfile.rabbitmq"
-    push = BooleanParameter(False)
-    requires = ["docker/cli"]
-    requires_push_true = ["docker/login"]
-    tags = ["robrt/rabbitmq:latest", "robrt/rabbitmq:{version}"]
-    version = Parameter("3.9")
-
-
-@influence.files("{dockerfile}")
-@attributes.requires("requires_push_{push}")
 @git.influence("services")
 class SchedulerImage(docker.DockerImage):
     name = "jolt/scheduler"
@@ -240,7 +227,6 @@ class Default(Alias):
         "jolt/docker/pypi:release={push}",
         "jolt/image:push={push}",
         "jolt/pypi:release={push}",
-        "jolt/rabbitmq:push={push}",
         "jolt/scheduler:push={push}",
         "jolt/worker:push={push}",
     ]
