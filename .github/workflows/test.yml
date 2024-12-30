@@ -1,0 +1,30 @@
+name: Test
+
+on: [push]
+
+env:
+  JOLT_VERSION: 0.9.${{ github.run_number }}
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: self-hosted
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+        cache: 'pip'
+    - name: Update version
+      run: echo "__version__ = \"$JOLT_VERSION\"" > jolt/version.py
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip setuptools
+        python -m pip install --upgrade -e .[allure,conan]
+    - name: Run tests
+      working-directory: tests
+      run: python -m jolt -c jolt.cachedir=${{ github.workspace }}/cache build all

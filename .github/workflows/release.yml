@@ -1,0 +1,35 @@
+name: Release
+
+on: [workflow_dispatch]
+
+env:
+  JOLT_VERSION: 0.9.${{ github.run_number }}
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    runs-on: self-hosted
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+        cache: 'pip'
+    - name: Update version
+      run: echo "__version__ = \"$JOLT_VERSION\"" > jolt/version.py
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        python -m pip install --upgrade -e .[allure,conan]
+    - name: Release
+      run: python -m jolt -c jolt.cachedir=${{ github.workspace }}/cache build default:push=true
+    - name: Push tag
+      run: |
+        git commit -asm "bump version to $JOLT_VERSION [no ci]"
+        git push origin HEAD:master
+        git tag v$JOLT_VERSION
+        git push origin v$JOLT_VERSION
