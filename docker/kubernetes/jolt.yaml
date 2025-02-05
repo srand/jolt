@@ -102,7 +102,7 @@ spec:
         - name: jolt-dashboard
           image: robrt/jolt-dashboard:latest
           ports:
-            - containerPort: 80
+            - containerPort: 8080
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -220,8 +220,8 @@ spec:
     app: jolt-dashboard
   ports:
     - name: "http"
-      port: 80
-      targetPort: 80
+      port: 8080
+      targetPort: 8080
   type: LoadBalancer
 ---
 apiVersion: v1
