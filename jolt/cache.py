@@ -1275,7 +1275,7 @@ class ArtifactCache(StorageProvider):
 
         # Read configuration
         self._max_size = config.getsize(
-            "jolt", "cachesize", os.environ.get("JOLT_CACHESIZE", 1 * 1024 ** 3))
+            "jolt", "cachesize", os.environ.get("JOLT_CACHE_SIZE", 1 * 1024 ** 3))
 
         # Create cache directory
         self._fs_create_cachedir()
