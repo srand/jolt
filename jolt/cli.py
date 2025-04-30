@@ -375,7 +375,7 @@ def build(ctx, task, network, keep_going, default, local,
     # If asked to force rebuild, taint all goal tasks
     if force:
         for goal in dag.goals:
-            goal.taint()
+            goal.get_extended_task().taint()
 
     # Collect information about artifact presence before starting prune or build
     acache.precheck(dag.persistent_artifacts, remote=not local)

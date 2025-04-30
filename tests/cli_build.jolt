@@ -1148,3 +1148,32 @@ class BuildCli(testsupport.JoltTest):
             self.assertIn("list truncated", data)
             self.assertNotIn("error2", data)
             self.assertNotIn("error3", data)
+
+    def test_extended_taint(self):
+        """
+        --- tasks:
+        class A(Task):
+            def publish(self, artifact, tools):
+                artifact.cxxinfo.macros.append("TEST")
+
+        class B(Task):
+            extends = "a"
+
+            def run(self, deps, tools):
+                m = deps["a"].cxxinfo.macros.items()
+                assert len(m) == 1, m
+        ---
+        """
+        r = self.build("b")
+        self.assertBuild(r, "a")
+        self.assertBuild(r, "b")
+        a1 = self.artifacts(r)
+
+        # Force rebuild of B, should also rebuild A
+        r = self.build("-f b")
+        self.assertBuild(r, "a")
+        self.assertBuild(r, "b")
+        a2 = self.artifacts(r)
+
+        # Check that the artifacts are different
+        self.assertNotEqual(a1[0], a2[0])
