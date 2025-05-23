@@ -35,7 +35,7 @@ func (c *Command) WaitChild() error {
 }
 
 func (c *Command) Interrupt() error {
-	return c.Process().Signal(os.Interrupt)
+	return c.Process().Signal(syscall.SIGTERM)
 }
 
 func (c *Command) SetStderr(w io.Writer) {
