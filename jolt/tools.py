@@ -1546,6 +1546,9 @@ class Tools(object):
                 refuses to terminate, it will be killed after an additional
                 10 seconds have passed. Default: None.
 
+        Returns:
+           str: stdout from command unless output=False
+
         Example:
 
             .. code-block:: python
