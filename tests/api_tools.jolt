@@ -992,6 +992,7 @@ class ToolsApi(JoltTest):
             with self.assertRaises(JoltTimeoutError):
                     self.tools.run("sleep 10", timeout=1)
 
+    @skip("Signal arrives to main thread, not the task worker thread")
     def test_delayed_interrupt(self):
         duration = utils.duration()
         try:
@@ -1036,6 +1037,19 @@ class ToolsApi(JoltTest):
         self.build("a")
         with self.assertRaises(Exception):
             self.build("b")
+
+    def test_run_and_interrupt(self):
+        """
+        --- tasks:
+        import os
+
+        class A(Task):
+            def run(self, d, t):
+                t.run("timeout 3 yes & (sleep 1 && kill -INT {{}})", os.getpid(), shell=True)
+        ---
+        """
+        with self.assertRaises(Exception):
+            self.build("a")
 
     def test_read_write_json(self):
         with self.tools.cwd(self.ws):

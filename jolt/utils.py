@@ -415,7 +415,16 @@ def delayed_signal(signum):
 
 @contextlib.contextmanager
 def delayed_interrupt():
-    with delayed_signal(signum=signal.SIGINT):
+    if hasattr(signal, 'pthread_sigmask'):
+        try:
+            # Temporarily block the SIGINT signal
+            signal.pthread_sigmask(signal.SIG_BLOCK, {signal.SIGINT})
+            yield
+        finally:
+            # Unblock the SIGINT signal after the code block
+            signal.pthread_sigmask(signal.SIG_UNBLOCK, {signal.SIGINT})
+    else:
+        # Fallback for systems without pthread_sigmask
         yield
 
 
