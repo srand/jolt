@@ -136,7 +136,7 @@ class CxxApi(JoltTest):
         from jolt.plugins.conan import Conan2
 
         class Flatbuffers(Conan2):
-            packages = ["flatbuffers/2.0.8"]
+            packages = ["flatbuffers/24.12.23"]
 
         class Lib(CXXLibrary):
             fbflags = ["--scoped-enums"]
