@@ -3,7 +3,7 @@ import hashlib
 import os
 from pathlib import Path, PurePath
 
-from jolt import config
+from jolt import config as jolt_config
 from jolt import inspection
 from jolt import utils
 from jolt import filesystem as fs
@@ -202,6 +202,71 @@ def source(name, obj=None):
     return _decorate
 
 
+class ConfigInfluence(HashInfluenceProvider):
+    name = "Config"
+
+    def __init__(self, section, key):
+        self.section = section
+        self.key = key
+
+    def get_influence(self, task):
+        value = jolt_config.get(self.section, self.key)
+        if value is None:
+            value = "<unset>"
+        return "{}.{}: {}".format(self.section, self.key, value)
+
+
+def config(section, key):
+    """ Add configuration value as hash influence.
+
+    Note that the configuration value is read at the time
+    when the task is prepared, not when it is executed.
+    This means that if the configuration value changes after
+    influence has been calculated, the task will not be re-executed.
+    This is true also in distributed mode, where the task
+    is prepared locally and executed remotely on a worker
+    where the configuration value may be different.
+
+    Args:
+        section (str): Name of the configuration section.
+        key (str): Name of the configuration key.
+
+    Example:
+    .. code-block:: python
+
+        from jolt import influence
+
+        @influence.config("jolt", "task_timeout")
+        class Example(Task):
+
+    """
+    def _decorate(cls):
+        _old_influence = cls._influence
+
+        def _influence(self, *args, **kwargs):
+            influence = _old_influence(self, *args, **kwargs)
+            influence.append(ConfigInfluence(section, key))
+            return influence
+
+        cls._influence = _influence
+        return cls
+
+    return _decorate
+
+
+def global_config(section, key):
+    """ Register a configuration influence globally.
+
+    See :py:func:`config` for more information.
+
+    Args:
+        section (str): Name of the configuration section.
+        key (str): Name of the configuration key.
+    """
+
+    HashInfluenceRegistry.get().register(ConfigInfluence(section, key))
+
+
 class TaskClassSourceInfluence(HashInfluenceProvider):
     name = "Source"
 
@@ -250,7 +315,7 @@ class CacheLocationInfluence(HashInfluenceProvider):
     name = "Cache"
 
     def get_influence(self, task):
-        return config.get_cachedir()
+        return jolt_config.get_cachedir()
 
 
 @HashInfluenceRegistry.Register

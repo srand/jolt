@@ -1468,3 +1468,25 @@ class TaskApi(JoltTest):
         r = self.build("a")
         self.assertIn("test_a", r)
         self.assertIn("test_b", r)
+
+    def test_config_influence(self):
+        """
+        --- config:
+        task_max_errors = 1234
+
+        --- tasks:
+        from jolt import config
+
+        @influence.config("jolt", "not_present")
+        @influence.config("jolt", "task_max_errors")
+        class A(Task):
+            def run(self, deps, tools):
+                assert config.get("jolt", "task_max_errors") == "1234", "Config not applied"
+        ---
+        """
+        r = self.build("a")
+        self.assertBuild(r, "a")
+
+        i = self.jolt("inspect -i a")
+        self.assertIn("jolt.not_present: <unset>", i)
+        self.assertIn("jolt.task_max_errors: 1234", i)
