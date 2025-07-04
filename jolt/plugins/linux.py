@@ -21,6 +21,7 @@ def linux_arch_to_container_platform(arch):
     Returns:
         - linux/amd64
         - linux/arm
+        - linux/arm/v5
         - linux/arm64
         - linux/mips
         - linux/ppc64
@@ -30,6 +31,7 @@ def linux_arch_to_container_platform(arch):
     platforms = {
         "arm": "linux/arm",
         "arm64": "linux/arm64",
+        "armv5": "linux/arm/v5",
         "mips": "linux/mips64le",
         "powerpc": "linux/ppc64le",
         "riscv": "linux/riscv64",
@@ -63,6 +65,7 @@ def linux_arch_to_debian_arch(arch):
         "amd64": "amd64",
         "arm": "armhf",
         "arm64": "arm64",
+        "armv5": "armel",
         "mips": "mips",
         "powerpc": "ppc64el",
         "riscv": "riscv64",
@@ -81,6 +84,7 @@ class ArchParameter(Parameter):
       - amd64
       - arm
       - arm64
+      - armv5
       - mips
       - powerpc
       - riscv
@@ -94,6 +98,7 @@ class ArchParameter(Parameter):
             "amd64",
             "arm",
             "arm64",
+            "armv5",
             "mips",
             "powerpc",
             "riscv",
@@ -111,7 +116,7 @@ class _ContainerImageBase(podman.ContainerImage):
     """ Must be subclassed """
 
     arch = ArchParameter()
-    """ Target architecture [amd64, arm, arm64, mips, powerpc, riscv, s390, x86] """
+    """ Target architecture [amd64, arm, arm64, armv5, mips, powerpc, riscv, s390, x86] """
 
     @property
     def target(self):
@@ -169,13 +174,14 @@ class DebianHostSdk(Task):
     """ Must be subclassed """
 
     arch = ArchParameter()
-    """ Target architecture [amd64, arm, arm64, mips, powerpc, riscv, s390, x86] """
+    """ Target architecture [amd64, arm, arm64, armv5, mips, powerpc, riscv, s390, x86] """
 
     def publish(self, artifact, tools):
         arch_to_cross_compile = {
             "amd64": "x86_64-linux-gnu-",
             "arm": "arm-linux-gnueabihf-",
             "arm64": "aarch64-linux-gnu-",
+            "armv5": "arm-linux-gnueabi-",
             "mips": "mips-linux-gnu-",
             "powerpc": "powerpc64-linux-gnu-",
             "riscv": "riscv64-linux-gnu-",
@@ -262,6 +268,47 @@ class Squashfs(_ContainerImageBase):
         super().publish(artifact, tools)
         artifact.strings.arch = str(self.arch)
         artifact.paths.squashfs = "squashfs/{_imagefile}.squashfs"
+
+
+class Ext4(_ContainerImageBase):
+    """
+    Builds an ext4 image using Podman.
+
+    The task builds a container image using the given Dockerfile and converts
+    the resulting container filesystem to an ext4 image which is published.
+
+    When building images for an architecture other than the host, the
+    binfmt-support package must be installed and configured to support running
+    applications for the target architecture. The package is available in most
+    Linux distributions.
+
+    The location of the resulting squashfs image is stored in the
+    ``artifact.paths.squashfs`` artifact attribute.
+    """
+    abstract = True
+    """ Must be subclassed """
+
+    output = ["ext4"]
+
+    size = None
+    """
+    Size of the ext4 image.
+
+    Typically used to align the image size to a supported SD card size (power of two).
+
+    Supported units are 'K', 'M', 'G', 'T'.
+    """
+
+    def run(self, deps, tools):
+        super().run(deps, tools)
+        if self.size:
+            with tools.cwd(tools.builddir("ext4")):
+                tools.run("fallocate -l {size} image.ext4")
+
+    def publish(self, artifact, tools):
+        super().publish(artifact, tools)
+        artifact.strings.arch = str(self.arch)
+        artifact.paths.ext4 = "ext4/{_imagefile}.ext4"
 
 
 class _KernelBase(Task):
