@@ -1,4 +1,4 @@
-from jolt.plugins import linux
+from jolt.plugins import git, linux
 
 
 class Kernel(linux.Kernel):
