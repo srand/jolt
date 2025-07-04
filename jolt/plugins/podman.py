@@ -483,6 +483,7 @@ class ContainerImage(Task):
         - custom
         - directory
         - docker-archive
+        - ext4
         - oci-archive
         - oci-directory
         - squashfs
@@ -515,6 +516,9 @@ class ContainerImage(Task):
     To be able to push images, the current user must login to the Podman Registry.
     The ``podman/login`` Jolt resource can be used for that purpose.
     """
+
+    size = None
+    """ Size of the image, e.g. "64M" (for certain output formats). """
 
     squash = False
     """ Squash image layers """
@@ -594,7 +598,7 @@ class ContainerImage(Task):
                         tools.run("podman image save --format={output} {} -o {}", self.tags[0], "image.tar")
                     if output == "oci-directory":
                         tools.run("podman image save --format=oci-dir {} -o {}", self.tags[0], "image.dir")
-                    if output in ["archive", "cpio", "custom", "directory", "squashfs"]:
+                    if output in ["archive", "cpio", "custom", "directory", "ext4", "squashfs"]:
                         ctr = tools.run("podman create {}", self.tags[0])
                         try:
                             with tools.runprefix("podman unshare "):
@@ -606,6 +610,9 @@ class ContainerImage(Task):
                                 elif output == "cpio":
                                     with tools.cwd(mount_path):
                                         tools.run("find | podman unshare cpio -o -F {}/image.cpio -H newc", outdir, output_on_error=True)
+                                elif output == "ext4":
+                                    assert self.size, "Size must be set for ext4 output"
+                                    tools.run("mke2fs -t ext4 -F -L rootfs -d {} image.ext4 {size}", mount_path, output_on_error=True)
                                 elif output == "squashfs":
                                     tools.run("mksquashfs {} image.squashfs", mount_path, output_on_error=True)
                                 else:
@@ -660,6 +667,8 @@ class ContainerImage(Task):
                     self.publish_custom(artifact, tools)
                 if output in ["directory"]:
                     artifact.paths.rootfs = output
+                if output in ["ext4"]:
+                    artifact.collect("image.ext4", output + "/{_imagefile}.ext4")
                 if output in ["squashfs"]:
                     artifact.collect("image.squashfs", output + "/{_imagefile}.squashfs")
 
