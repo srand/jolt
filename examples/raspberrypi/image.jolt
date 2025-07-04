@@ -1,0 +1,40 @@
+from jolt import influence
+from jolt import Task
+
+
+@influence.files("firmware")
+@influence.files("image")
+class Image(Task):
+    """
+    Task to build the Raspberry Pi OS image using genimage.
+    """
+
+    requires = [
+        "firmware=firmware",
+        "kernel=kernel:arch=arm,defconfig=bcm2835,targets=dtbs+zimage",
+        "fs=ext4:arch=armv5",
+    ]
+
+    def run(self, deps, tools):
+        # Ensure the required tools are available
+        assert tools.which("genimage"), "genimage tool is required but not found in PATH"
+
+        # Prepare the build directories
+        self.outdir = tools.builddir("image")
+
+        # Populate the input directory with necessary files from dependencies
+        deps["firmware"].copy("*", "{outdir}/root/boot/")
+        deps["kernel"].copy("zimage/zImage", "{outdir}/root/boot/kernel.img", flatten=True)
+        deps["kernel"].copy("dtbs/broadcom/*.dtb", "{outdir}/root/boot/", flatten=True)
+        deps["fs"].copy("ext4/*", "{outdir}/input/", flatten=True)
+        tools.copy("firmware/cmdline.txt", "{outdir}/root/boot/cmdline.txt")
+        tools.copy("image/genimage.cfg", "{outdir}/")
+
+        # Run the genimage tool to create the Raspberry Pi OS image
+        with tools.cwd(self.outdir):
+            tools.mkdir("root")
+            tools.run("genimage")
+
+
+    def publish(self, artifact, tools):
+        artifact.collect("{outdir}/images/raspberrypi.img", flatten=True)

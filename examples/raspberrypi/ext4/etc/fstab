@@ -1,0 +1,4 @@
+# <file system> <mount point>   <type>  <options>       <dump>  <pass>
+tmpfs 		/tmp   tmpfs 	defaults 0 1
+devtmpfs 	/dev   devtmpfs defaults 0 1
+proc 		/proc  proc 	defaults 0 1

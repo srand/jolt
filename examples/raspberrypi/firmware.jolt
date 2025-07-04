@@ -1,0 +1,13 @@
+from jolt import Download
+from jolt import Parameter
+
+
+class Firmware(Download):
+    """
+    Task to download the firmware for Raspberry Pi boards.
+    """
+
+    collect = [{"files": "*", "cwd": "raspi-firmware-{version}/boot"}]
+    url = "https://github.com/raspberrypi/firmware/releases/download/{version}/raspi-firmware_{version}.orig.tar.xz"
+    version = Parameter("1.20250430", help="Firmware version to download")
+

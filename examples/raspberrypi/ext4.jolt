@@ -1,0 +1,25 @@
+from jolt import influence
+from jolt.plugins import linux
+
+
+@influence.files("ext4")
+class Ext4(linux.Ext4):
+    """
+    Build an Ext4 image.
+
+    The image is based on the Debian stable-slim image and includes a minimal
+    set of tools and libraries required to boot the system. Instead of
+    using systemd, the image uses finit-sysv as the init system.
+    """
+
+    dockerfile = """
+    FROM docker.io/debian:stable-slim as base
+    ARG DEBIAN_FRONTEND=noninteractive
+    RUN apt-get update && \
+        apt-get install -y --no-install-recommends finit-sysv finit-plugins
+    RUN echo "root:root" | chpasswd
+    ADD ext4/ /
+    """
+
+    size = "256M"
+    """ Size of image. """
