@@ -1,6 +1,6 @@
 bz2file
 colorama
-fasteners
+fasteners==0.20
 ninja
 protobuf
 psutil
