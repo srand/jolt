@@ -111,7 +111,7 @@ class GitRepository(object):
 
                 utils.call_and_catch(self.tools.run, "git remote remove origin", output=False)
                 self.tools.run("git remote add origin {}", self.url, output_on_error=True)
-                self.tools.run("git fetch origin", output_on_error=True)
+                self._fetch_origin()
                 self.tools.run("git checkout -f FETCH_HEAD", output_on_error=True)
         else:
             if refpath and os.path.isdir(refpath):
@@ -123,6 +123,11 @@ class GitRepository(object):
         raise_error_if(
             self.repository is None,
             "Failed to clone repository '{0}'", self.relpath)
+
+    @utils.retried.on_exception(JoltCommandError, pattern="Command failed: git fetch", count=6, backoff=[2, 5, 10, 15, 20, 30])
+    def _fetch_origin(self):
+        with self.tools.cwd(self.path):
+            self.tools.run("git fetch origin", output_on_error=True)
 
     @utils.cached.instance
     def diff_unchecked(self):
@@ -247,6 +252,7 @@ class GitRepository(object):
         with self.tools.cwd(self.path):
             return self.tools.run("git reset --hard", output_on_error=True)
 
+    @utils.retried.on_exception(JoltCommandError, pattern="Command failed: git fetch", count=6, backoff=[2, 5, 10, 15, 20, 30])
     def fetch(self, commit=None):
         if commit and not self.is_valid_sha(commit):
             commit = None
@@ -255,7 +261,7 @@ class GitRepository(object):
         with self.tools.cwd(self.path):
             log.info("Fetching {0} from {1}", commit or refspec or 'commits', self.url)
             self.tools.run(
-                "git fetch --prune {url} {what}",
+                "git fetch --force --prune {url} {what}",
                 url=self.url,
                 what=commit or refspec or '',
                 output_on_error=True)
