@@ -1,5 +1,5 @@
+import importlib_metadata
 import os
-import pkg_resources
 
 from jolt import config
 from jolt import filesystem as fs
@@ -104,17 +104,28 @@ def get_dependencies(packages=None):
     while reqs:
         req = reqs.pop()
 
-        dist = pkg_resources.working_set.by_key.get(req)
+        try:
+            dist = importlib_metadata.distribution(req)
+        except (ImportError, importlib_metadata.PackageNotFoundError):
+            dist = None
+        except Exception:
+            dist = None
         if dist is None:
             log.debug("[SelfDeploy] Dependency not found: {}", req)
             pkgs[req] = req
             continue
 
-        for dep in dist.requires():
-            if dep.name not in pkgs:
-                reqs.append(dep.name)
+        for dep in dist.requires or []:
+            if dep not in pkgs:
+                dep = dep.split(" ", 1)[0].strip()
+                dep = dep.split("[", 1)[0].strip()
+                dep = dep.split(";", 1)[0].strip()
+                dep = dep.split(">", 1)[0].strip()
+                dep = dep.split("=", 1)[0].strip()
+                dep = dep.split("<", 1)[0].strip()
+                reqs.append(dep)
 
-        pkgs[req] = f"{dist.project_name}=={dist.version}"
+        pkgs[req] = f"{dist.name}=={dist.version}"
 
     try:
         del pkgs["jolt"]
