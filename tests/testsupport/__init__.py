@@ -84,24 +84,38 @@ class JoltTest(Test):
     network_enabled = False
     network_plugin = None
     storage = None
+    indent = 8
 
     def _files(self):
         if not self._testMethodDoc:
             return ""
-        return re.findall(r"--- file: ([^\n]*)\n(.*?)(?=---)", self._testMethodDoc, re.M|re.DOTALL)
+        if os.sys.version_info >= (3, 13):
+            lines = re.findall(r"--- file: ([^\n]*)\n(.*?)(?=---)", self._testMethodDoc, re.M|re.DOTALL)
+            return [(name, content) for name, content in lines]
+        else:
+            lines = re.findall(r"--- file: ([^\n]*)\n(.*?)(?=---)", self._testMethodDoc, re.M|re.DOTALL)
+            return [(name, "\n".join([l[8:] for l in content.splitlines()])) for name, content in lines]
 
     def _recipe(self):
         if not self._testMethodDoc:
             return ""
-        lines = "".join(re.findall(r"--- tasks:\n(.*?)\n        ---", self._testMethodDoc, re.M|re.DOTALL))
-        return "\n".join([l[8:] for l in lines.splitlines()])
+        if os.sys.version_info >= (3, 13):
+            lines = "".join(re.findall(r"--- tasks:\n(.*?)\n---", self._testMethodDoc, re.M|re.DOTALL))
+            return "\n".join([l[0:] for l in lines.splitlines()])
+        else:
+            lines = "".join(re.findall(r"--- tasks:\n(.*?)\n        ---", self._testMethodDoc, re.M|re.DOTALL))
+            return "\n".join([l[8:] for l in lines.splitlines()])
 
     def _config(self):
         if not self._testMethodDoc:
             return ""
         common = "\n[jolt]\ncachedir={}/cache\n".format(self.ws)
-        lines = "".join(re.findall(r"--- config:\n(.*?)---", self._testMethodDoc, re.M|re.DOTALL))
-        return common + "\n".join([l[8:] for l in lines.splitlines()])
+        if os.sys.version_info >= (3, 13):
+            lines = "".join(re.findall(r"--- config:\n(.*?)---", self._testMethodDoc, re.M|re.DOTALL))
+            return common + "\n".join([l[0:] for l in lines.splitlines()])
+        else:
+            lines = "".join(re.findall(r"--- config:\n(.*?)---", self._testMethodDoc, re.M|re.DOTALL))
+            return common + "\n".join([l[8:] for l in lines.splitlines()])
 
     def _network_config(self):
         return self.deps["deployment"].strings.config \
@@ -110,6 +124,7 @@ class JoltTest(Test):
     def setup(self, deps, tools):
         self.deps = deps
         self.ws = tools.builddir("workspace", unique=False)
+        # Use a different indent if the python version is different
         tools.rmtree(self.ws, ignore_errors=True)
         tools.mkdir(self.ws)
         with tools.cwd(self.ws):
@@ -129,7 +144,6 @@ global_string("{test}")
             tools.write_file(".joltignore", "artifacts\nbuild\ncache\n")
 
             for filename, content in self._files():
-                content = "\n".join([l[8:] for l in content.splitlines()])
                 dirname = fs.path.dirname(filename)
                 if dirname:
                     print(dirname)

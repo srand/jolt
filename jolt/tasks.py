@@ -10,6 +10,7 @@ import platform
 from threading import RLock
 import subprocess
 from os import environ
+from os import sys as os_sys
 import sys
 import unittest as ut
 from urllib.parse import urlparse
@@ -3134,7 +3135,8 @@ class Script(Task):
         doc = self.__doc__.split("---", 1)
         script = doc[1] if len(doc) > 1 else doc[0]
         script = script.splitlines()
-        script = [line[4:] for line in script]
+        if os_sys.version_info < (3, 13):
+            script = [line[4:] for line in script]
         script = "\n".join(script)
         script = script.lstrip()
         if not script.startswith("#!"):
