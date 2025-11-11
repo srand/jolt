@@ -100,6 +100,7 @@ class Jolt(Task):
 def get_dependencies(packages=None):
     reqs = packages or ["jolt"]
     pkgs = {}
+    skip = set()
 
     while reqs:
         req = reqs.pop()
@@ -112,17 +113,18 @@ def get_dependencies(packages=None):
             dist = None
         if dist is None:
             log.debug("[SelfDeploy] Dependency not found: {}", req)
-            pkgs[req] = req
+            skip.add(req)
             continue
 
         for dep in dist.requires or []:
-            if dep not in pkgs:
-                dep = dep.split(" ", 1)[0].strip()
-                dep = dep.split("[", 1)[0].strip()
-                dep = dep.split(";", 1)[0].strip()
-                dep = dep.split(">", 1)[0].strip()
-                dep = dep.split("=", 1)[0].strip()
-                dep = dep.split("<", 1)[0].strip()
+            dep = dep.split(" ", 1)[0].strip()
+            dep = dep.split("[", 1)[0].strip()
+            dep = dep.split(";", 1)[0].strip()
+            dep = dep.split(">", 1)[0].strip()
+            dep = dep.split("=", 1)[0].strip()
+            dep = dep.split("<", 1)[0].strip()
+            dep = dep.split("!", 1)[0].strip()
+            if dep not in pkgs and dep not in skip:
                 reqs.append(dep)
 
         pkgs[req] = f"{dist.name}=={dist.version}"
