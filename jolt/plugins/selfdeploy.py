@@ -112,7 +112,6 @@ def get_dependencies(packages=None):
         except Exception:
             dist = None
         if dist is None:
-            log.debug("[SelfDeploy] Dependency not found: {}", req)
             skip.add(req)
             continue
 
