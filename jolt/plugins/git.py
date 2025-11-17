@@ -114,10 +114,13 @@ class GitRepository(object):
                 self._fetch_origin()
                 self.tools.run("git checkout -f FETCH_HEAD", output_on_error=True)
         else:
+            # Get configurable extra clone options
+            extra_clone_options = config.get("git", "clone_options", "")
+
             if refpath and os.path.isdir(refpath):
-                self.tools.run("git clone --reference-if-able {0} {1} {2}", refpath, self.url, self.path, output_on_error=True)
+                self.tools.run("git clone --reference-if-able {0} {1} {2} {3}", refpath, extra_clone_options, self.url, self.path, output_on_error=True)
             else:
-                self.tools.run("git clone  {0} {1}", self.url, self.path, output_on_error=True)
+                self.tools.run("git clone {0} {1} {2}", extra_clone_options, self.url, self.path, output_on_error=True)
 
         self._init_repo()
         raise_error_if(
@@ -126,8 +129,11 @@ class GitRepository(object):
 
     @utils.retried.on_exception(JoltCommandError, pattern="Command failed: git fetch", count=6, backoff=[2, 5, 10, 15, 20, 30])
     def _fetch_origin(self):
+        # Get configurable extra clone options
+        extra_fetch_options = config.get("git", "fetch_options", "")
+
         with self.tools.cwd(self.path):
-            self.tools.run("git fetch origin", output_on_error=True)
+            self.tools.run("git fetch {0} origin", extra_fetch_options, output_on_error=True)
 
     @utils.cached.instance
     def diff_unchecked(self):
