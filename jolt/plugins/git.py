@@ -263,11 +263,15 @@ class GitRepository(object):
         if commit and not self.is_valid_sha(commit):
             commit = None
 
+        # Get configurable extra clone options
+        extra_fetch_options = config.get("git", "fetch_options", "")
+
         refspec = " ".join(self.default_refspecs + self.refspecs)
         with self.tools.cwd(self.path):
             log.info("Fetching {0} from {1}", commit or refspec or 'commits', self.url)
             self.tools.run(
-                "git fetch --force --prune {url} {what}",
+                "git fetch --force --prune {extra_fetch_options} {url} {what}",
+                extra_fetch_options=extra_fetch_options,
                 url=self.url,
                 what=commit or refspec or '',
                 output_on_error=True)
