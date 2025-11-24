@@ -1,6 +1,7 @@
 import os
 import pygit2
 import re
+import time
 from threading import RLock
 import urllib.parse
 
@@ -258,6 +259,21 @@ class GitRepository(object):
         with self.tools.cwd(self.path):
             return self.tools.run("git reset --hard", output_on_error=True)
 
+    def _move_objects_store(self):
+        try:
+            objdir = fs.path.join(self.gitpath, "objects")
+            bakdir = fs.path.join(self.gitpath, f"objects.bad.{int(time.time())}")
+            if fs.path.exists(objdir):
+                log.warning("Moving local object store aside for {}", self.relpath)
+                fs.rename(objdir, bakdir)
+                fs.makedirs(fs.path.join(self.gitpath, "objects", "info"))
+                fs.makedirs(fs.path.join(self.gitpath, "objects", "pack"))
+                alt = fs.path.join(self.gitpath, "objects", "info", "alternates")
+                if fs.path.exists(alt):
+                    fs.unlink(alt, ignore_errors=True)
+        except Exception:
+            pass
+
     @utils.retried.on_exception(JoltCommandError, pattern="Command failed: git fetch", count=6, backoff=[2, 5, 10, 15, 20, 30])
     def fetch(self, commit=None):
         if commit and not self.is_valid_sha(commit):
@@ -269,12 +285,26 @@ class GitRepository(object):
         refspec = " ".join(self.default_refspecs + self.refspecs)
         with self.tools.cwd(self.path):
             log.info("Fetching {0} from {1}", commit or refspec or 'commits', self.url)
-            self.tools.run(
-                "git fetch --force --prune {extra_fetch_options} {url} {what}",
-                extra_fetch_options=extra_fetch_options,
-                url=self.url,
-                what=commit or refspec or '',
-                output_on_error=True)
+            try:
+                self.tools.run(
+                    "git fetch --force --prune {extra_fetch_options} {url} {what}",
+                    extra_fetch_options=extra_fetch_options,
+                    url=self.url,
+                    what=commit or refspec or '',
+                    output_on_error=True)
+            except JoltCommandError as e:
+                errtxt = "\n".join(e.stderr)
+                if ("unresolved deltas" in errtxt) or ("invalid index-pack output" in errtxt) or ("Could not read" in errtxt) or ("missing blob object" in errtxt) or ("remote did not send all necessary objects" in errtxt):
+                    log.warning("Fetch failed due to pack/index issues; moving object store aside and retrying once for {}", self.relpath)
+                    self._move_objects_store()
+                    self.tools.run(
+                        "git fetch --force --prune {extra_fetch_options} {url} {what}",
+                        extra_fetch_options=extra_fetch_options,
+                        url=self.url,
+                        what=commit or refspec or '',
+                        output_on_error=True)
+                else:
+                    raise
 
     def checkout(self, rev, commit=None):
         if rev == self._last_rev:
