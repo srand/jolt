@@ -2266,7 +2266,7 @@ if __name__ == "__main__":
         except JoltCommandError as e:
             self.buildlog = "\n".join(e.stdout)
             report = self._report_errors(self.buildlog)
-            raise CompileError(self._first_reported_error(report))
+            raise CompileError(self._first_reported_error(report) or str(e))
 
         if bool(getattr(self, "coverage", False)):
             self.covdatadir = tools.builddir("coverage-data")
@@ -2351,13 +2351,15 @@ if __name__ == "__main__":
             # LLVM linker errors
             report.add_regex_errors(
                 "Linker Error",
-                r"^(?P<location>ld(\.lld)?): (error|warning): (?P<message>.*)",
+                r"^(?P<location>(.*?)ld(\.lld)?): (error|warning): (?P<message>.*)",
                 logbuffer)
 
             return report
 
     def _first_reported_error(self, report):
         """ Returns the first reported error or None if no errors were reported. """
+        if report is None:
+            return None
         for error in report.errors:
             return error
 
