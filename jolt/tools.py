@@ -42,6 +42,9 @@ from jolt.error import raise_error_if
 from jolt.error import raise_task_error, raise_task_error_if
 
 
+SUPPORTED_ARCHIVE_TYPES = [".tar", ".tar.bz2", ".tar.gz", ".tgz", ".tar.xz", ".tar.zst", ".zip"]
+
+
 http_session = Session()
 
 
@@ -257,6 +260,10 @@ class _CMake(object):
         self.builddir = self.tools.builddir(incremental=incremental)
         self.installdir = self.tools.builddir("install", incremental=False)
 
+    def clean(self):
+        self.tools.rmtree(self.builddir, ignore_errors=True)
+        self.tools.rmtree(self.installdir, ignore_errors=True)
+
     def configure(self, sourcedir, *args, generator=None, **kwargs):
         sourcedir = self.tools.expand_path(sourcedir)
 
@@ -267,10 +274,9 @@ class _CMake(object):
 
         with self.tools.cwd(self.builddir):
             self.tools.run(
-                "cmake {0} -B{1} -DCMAKE_INSTALL_PREFIX={2} {3} {4}",
+                "cmake {0} {1} -DCMAKE_INSTALL_PREFIX=/jolt-prefix {1} {2} {3}",
                 sourcedir,
-                self.builddir,
-                self.installdir,
+                utils.option("-B", self.builddir),
                 utils.option("-G", generator),
                 extra_args,
                 output=True)
@@ -282,25 +288,32 @@ class _CMake(object):
             self.tools.run("cmake --build . {0}{1}", release, threading_args, output=True)
 
     def install(self, release=True, *args, **kwargs):
-        with self.tools.cwd(self.builddir):
+        with self.tools.cwd(self.builddir), self.tools.environ(DESTDIR=self.installdir):
             release = "--config Release" if release else ""
             self.tools.run("cmake --build . --target install {0}", release, output=True)
 
-    def publish(self, artifact, files='*', *args, **kwargs):
-        with self.tools.cwd(self.installdir):
-            artifact.collect(files, *args, **kwargs)
+    def publish(self, artifact, files='*', symlinks=True, *args, **kwargs):
+        with self.tools.cwd(self.installdir, "jolt-prefix"):
+            artifact.collect(files, *args, symlinks=symlinks, **kwargs)
+        artifact.strings.install_prefix = "/jolt-prefix"
 
 
 class _Meson(object):
-    def __init__(self, deps, tools):
+    def __init__(self, deps, tools, incremental=False):
         self.deps = deps
         self.tools = tools
-        self.builddir = self.tools.builddir()
-        self.installdir = self.tools.builddir("install")
+        self.builddir = self.tools.builddir(incremental=incremental)
+        self.installdir = self.tools.builddir("install", incremental=False)
+
+    def clean(self):
+        self.tools.rmtree(self.builddir, ignore_errors=True)
+        self.tools.rmtree(self.installdir, ignore_errors=True)
 
     def configure(self, sourcedir, *args, **kwargs):
         sourcedir = self.tools.expand_path(sourcedir)
-        self.tools.run("meson --prefix=/ {0} {1}", sourcedir, self.builddir,
+        options = " ".join([f"-D{arg}" for arg in args]) + " "
+        options += " ".join(["-D{0}={1}".format(key, self.tools.expand(val)) for key, val in kwargs.items()])
+        self.tools.run("meson setup --prefix=/jolt-prefix {1} {2} {3}", self.installdir, sourcedir, self.builddir, options,
                        output=True)
 
     def build(self, *args, **kwargs):
@@ -312,29 +325,36 @@ class _Meson(object):
                        output=True)
 
     def publish(self, artifact, files='*', *args, **kwargs):
-        with self.tools.cwd(self.installdir):
+        with self.tools.cwd(self.installdir, "jolt-prefix"):
             artifact.collect(files, *args, **kwargs)
+        artifact.strings.install_prefix = "/jolt-prefix"
 
 
 class _AutoTools(object):
-    def __init__(self, deps, tools):
+    def __init__(self, deps, tools, incremental=False):
         self.deps = deps
         self.tools = tools
-        self.builddir = self.tools.builddir()
-        self.installdir = self.tools.builddir("install")
+        self.builddir = self.tools.builddir(incremental=incremental)
+        self.installdir = self.tools.builddir("install", incremental=False)
+        self.prefix = "jolt-prefix-" + tools._task.short_qualified_name
 
-    def configure(self, sourcedir, *args, **kwargs):
+    def clean(self):
+        self.tools.rmtree(self.builddir, ignore_errors=True)
+        self.tools.rmtree(self.installdir, ignore_errors=True)
+
+    def configure(self, sourcedir, *args):
         sourcedir = self.tools.expand_path(sourcedir)
-        prefix = kwargs.get("prefix", "/")
 
         if not fs.path.exists(fs.path.join(sourcedir, "configure")):
             with self.tools.cwd(sourcedir):
                 self.tools.run("autoreconf -visf", output=True)
 
         with self.tools.cwd(self.builddir), self.tools.environ(DESTDIR=self.installdir):
-            self.tools.run("{0}/configure --prefix={1} {2}",
-                           sourcedir, prefix,
+            self.tools.run("{0}/configure --prefix=/{1} {2} {3}",
+                           sourcedir,
+                           self.prefix,
                            self.tools.getenv("CONFIGURE_FLAGS", ""),
+                           " ".join(args),
                            output=True)
 
     def build(self, *args, **kwargs):
@@ -342,13 +362,14 @@ class _AutoTools(object):
             self.tools.run("make VERBOSE=yes Q= V=1 -j{0}",
                            self.tools.cpu_count(), output=True)
 
-    def install(self, target="install", **kwargs):
-        with self.tools.cwd(self.builddir), self.tools.environ(DESTDIR=self.installdir):
-            self.tools.run("make {}", target, output=True)
+    def install(self, target="install"):
+        with self.tools.cwd(self.builddir):
+            self.tools.run("make DESTDIR={} {}", self.installdir, target, output=True)
 
     def publish(self, artifact, files='*', *args, **kwargs):
-        with self.tools.cwd(self.installdir):
+        with self.tools.cwd(self.installdir, self.prefix):
             artifact.collect(files, *args, **kwargs)
+        artifact.strings.install_prefix = "/" + self.prefix
 
 
 class ZipFile(zipfile.ZipFile):
@@ -608,9 +629,9 @@ class Tools(object):
         except Exception:
             raise_task_error(self._task, "failed to create archive from directory '{0}'", pathname)
 
-    def autotools(self, deps=None):
+    def autotools(self, deps=None, incremental=False):
         """ Creates an AutoTools invokation helper """
-        return _AutoTools(deps, self)
+        return _AutoTools(deps, self, incremental=incremental)
 
     @utils.locked(lock='_builddir_lock')
     def builddir(self, name=None, incremental=False, unique=True):
@@ -1268,9 +1289,9 @@ class Tools(object):
         """
         return utils.map_concurrent(callable, iterable, max_workers)
 
-    def meson(self, deps=None):
+    def meson(self, deps=None, incremental=False):
         """ Creates a Meson invokation helper """
-        return _Meson(deps, self)
+        return _Meson(deps, self, incremental=incremental)
 
     @contextmanager
     def nixpkgs(self, nixfile=None, packages=None, pure=False, path=None, options=None):
