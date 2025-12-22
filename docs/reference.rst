@@ -30,6 +30,16 @@ Artifact
 
 .. reference-artifact-end
 
+Autotools
+---------
+
+.. reference-autotools-start
+
+.. autoclass:: jolt.plugins.autotools.Autotools
+   :members: incremental, options, srcdir
+
+.. reference-autotools-end
+
 Chroot
 ------
 
