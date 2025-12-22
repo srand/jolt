@@ -93,6 +93,14 @@ Influence
 
 .. reference-influence-end
 
+Meson
+------
+.. reference-meson-start
+
+.. autoclass:: jolt.plugins.meson.Meson
+   :members: incremental, options, srcdir
+
+.. reference-meson-end
 
 Parameter
 ---------
