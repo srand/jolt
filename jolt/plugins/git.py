@@ -116,11 +116,12 @@ class GitRepository(object):
         else:
             # Get configurable extra clone options
             extra_clone_options = config.get("git", "clone_options", "")
+            depth = "--depth {}".format(self.depth) if self.depth > 0 else ""
 
             if refpath and os.path.isdir(refpath):
-                self.tools.run("git clone --reference-if-able {0} {1} {2} {3}", refpath, extra_clone_options, self.url, self.path, output_on_error=True)
+                self.tools.run("git clone --reference-if-able  {0} {1} {2} {3} {4}", refpath, extra_clone_options, depth, self.url, self.path, output_on_error=True)
             else:
-                self.tools.run("git clone {0} {1} {2}", extra_clone_options, self.url, self.path, output_on_error=True)
+                self.tools.run("git clone {0} {1} {2} {3}", extra_clone_options, depth, self.url, self.path, output_on_error=True)
 
         self._init_repo()
         raise_error_if(
@@ -276,7 +277,7 @@ class GitRepository(object):
                 what=commit or refspec or '',
                 output_on_error=True)
 
-    def checkout(self, rev, commit=None):
+    def checkout(self, rev, commit=None, submodules=False):
         if rev == self._last_rev:
             log.debug("Checkout skipped, already @ {}", rev)
             return False
@@ -284,15 +285,23 @@ class GitRepository(object):
         with self.tools.cwd(self.path):
             try:
                 self.tools.run("git checkout -f {rev}", rev=rev, output=False)
+                if submodules:
+                    self._update_submodules()
             except Exception:
                 self.fetch(commit=commit)
                 try:
                     self.tools.run("git checkout -f {rev}", rev=rev, output_on_error=True)
+                    if submodules:
+                        self._update_submodules()
                 except Exception:
                     raise_error("Commit does not exist in remote for '{}': {}", self.relpath, rev)
         self._original_head = False
         self._last_rev = rev
         return True
+
+    def _update_submodules(self):
+        with self.tools.cwd(self.path):
+            self.tools.run("git submodule update --init --recursive", output_on_error=True)
 
 
 _gits = {}
@@ -444,6 +453,11 @@ class Git(WorkspaceResource, FileInfluence):
     path = Parameter(required=False, help="Local path where the repository should be cloned.")
     """ Alternative path where the repository should be cloned. Relative to ``joltdir``. Optional. """
 
+    depth = Parameter(default=0, help="Depth for shallow clone. 0 means full clone. Optional.")
+
+    submodules = BooleanParameter(default=False, help="Initialize and update git submodules after cloning.")
+    """ Initialize and update git submodules after cloning. Default ``False``. Optional. """
+
     _revision = Export(value=lambda t: t._export_revision())
     """ To worker exported value of the revision to be checked out. """
 
@@ -544,7 +558,7 @@ class Git(WorkspaceResource, FileInfluence):
             # Should be safe to do this now
             rev = self.git.rev_parse(rev)
             if not self.git.is_head(rev) or self._revision.is_imported:
-                if self.git.checkout(rev, commit=commit):
+                if self.git.checkout(rev, commit=commit, submodules=bool(self.submodules)):
                     self.git.clean()
                     self.git.patch(self._diff.value)
 

@@ -88,7 +88,7 @@ Git
 .. reference-git-start
 
 .. autoclass:: jolt.plugins.git.Git
-   :members: hash, path, rev, url
+   :members: hash, path, rev, url, depth, submodules
 
 .. reference-git-end
 
