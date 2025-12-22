@@ -204,6 +204,17 @@ MultiTask
 
 .. reference-multitask-end
 
+Python
+------
+
+.. reference-python-start
+
+.. autoclass:: jolt.plugins.python.PythonEnv
+   :members: requirements
+
+.. reference-python-end
+
+
 Rust
 -----
 
@@ -211,7 +222,7 @@ Rust
 
 .. autoclass:: jolt.plugins.rust.Rust
    :members: srcdir
-   
+
 .. reference-rust-end
 
 

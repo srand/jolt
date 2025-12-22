@@ -1,5 +1,6 @@
 import sys
 
+from jolt import Task
 from jolt import filesystem as fs
 from jolt.cache import ArtifactStringAttribute
 from jolt.cache import ArtifactAttributeSet
@@ -98,3 +99,55 @@ class PythonProvider(ArtifactAttributeSetProvider):
 
     def unapply(self, task, artifact):
         artifact.python.unapply(task, artifact)
+
+
+class PythonEnv(Task):
+    """
+    Base class for Python virtual environment tasks.
+
+    Builds a Python virtual environment and installs specified packages.
+
+    The venv module from the Python standard library must be available in the
+    Python installation used to run the task.
+    """
+
+    abstract = True
+    """ This is an abstract base class that should be inherited by concrete tasks. """
+
+    requirements = []
+    """
+    List of Python packages to install in the virtual environment.
+
+    Each entry should be a string suitable for pip, e.g., "package==version".
+    """
+
+    def run(self, deps, tools):
+        self.installdir = tools.builddir("python-env")
+
+        import venv
+        builder = venv.EnvBuilder(with_pip=True)
+        builder.create(self.installdir)
+
+        with tools.tmpdir() as tmp, tools.cwd(tmp):
+            tools.write_file(
+                "requirements.txt",
+                "\n".join(self.requirements) + "\n"
+            )
+            pip_executable = fs.path.join(self.installdir, "bin", "pip")
+            tools.run([pip_executable, "install", "-r", "requirements.txt"], shell=False)
+
+    def publish(self, artifact, tools):
+        with tools.cwd(self.installdir):
+            # Adjust paths in pyvenv.cfg
+            tools.replace_in_file("pyvenv.cfg", self.installdir, artifact.final_path)
+
+            # Collect installed files
+            artifact.collect("*", symlinks=True)
+
+        artifact.environ.PATH.append("bin")
+        artifact.strings.install_prefix = self.installdir
+
+    def unpack(self, artifact, tools):
+        with tools.cwd(artifact.path):
+            # Adjust paths in pyvenv.cfg
+            tools.replace_in_file("pyvenv.cfg", artifact.strings.install_prefix, artifact.path)
