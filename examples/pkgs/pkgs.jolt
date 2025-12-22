@@ -9,6 +9,7 @@ from jolt.pkgs import cbindgen
 from jolt.pkgs import clang
 from jolt.pkgs import cmake
 from jolt.pkgs import cpython
+from jolt.pkgs import crun
 from jolt.pkgs import curl
 from jolt.pkgs import dbus
 from jolt.pkgs import double_conversion
@@ -22,6 +23,7 @@ from jolt.pkgs import glog
 from jolt.pkgs import glslang
 from jolt.pkgs import googlebenchmark
 from jolt.pkgs import googletest
+from jolt.pkgs import gperf
 from jolt.pkgs import grpc
 from jolt.pkgs import hdf5
 from jolt.pkgs import help2man
@@ -30,6 +32,7 @@ from jolt.pkgs import libevent
 from jolt.pkgs import libfastjson
 from jolt.pkgs import libglvnd
 from jolt.pkgs import libpciaccess
+from jolt.pkgs import libseccomp
 from jolt.pkgs import libtool
 from jolt.pkgs import libunwind
 from jolt.pkgs import libva
@@ -41,6 +44,7 @@ from jolt.pkgs import libxcb_proto
 from jolt.pkgs import libxml2
 from jolt.pkgs import libxshmfence
 from jolt.pkgs import libxslt
+from jolt.pkgs import libyajl
 from jolt.pkgs import llvm
 from jolt.pkgs import lua
 from jolt.pkgs import m4
@@ -85,6 +89,7 @@ class Default(Alias):
         "clang",
         "cmake",
         "cpython",
+        "crun",
         "curl",
         "dbus",
         "double-conversion",
@@ -98,6 +103,7 @@ class Default(Alias):
         "glslang",
         "google/benchmark",
         "googletest",
+        "gperf",
         "grpc",
         "hdf5",
         "help2man",
@@ -106,6 +112,7 @@ class Default(Alias):
         "libfastjson",
         "libglvnd",
         "libpciaccess",
+        "libseccomp",
         "libtool",
         "libunwind",
         "libva",
@@ -117,6 +124,7 @@ class Default(Alias):
         "libxml2",
         "libxslt",
         "libxshmfence",
+        "libyajl",
         "llvm",
         "lua",
         "texinfo",
