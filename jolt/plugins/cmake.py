@@ -1,3 +1,4 @@
+from jolt import attributes
 from jolt import influence
 from jolt import Task
 from jolt import utils
@@ -6,9 +7,9 @@ from jolt.error import raise_task_error_if
 import os
 
 
+@attributes.common_metadata()
 class CMake(Task):
     """ Builds and publishes a CMake project """
-
     abstract = True
 
     cmakelists = "CMakeLists.txt"
@@ -21,16 +22,25 @@ class CMake(Task):
     options = []
     """ List of options and their values (``option[:type]=value``) """
 
+    srcdir = None
+    """ Source directory. If not specified, the task working directory is used. """
+
+    def clean(self, tools):
+        cmake = tools.cmake(incremental=self.incremental)
+        cmake.clean()
+
     def run(self, deps, tools):
+        self.deps = deps
         raise_task_error_if(not self.cmakelists, self, "cmakelists attribute has not been defined")
 
-        cmake = tools.cmake(incremental=self.incremental)
-        cmake.configure(tools.expand(self.cmakelists), *["-D" + tools.expand(option) for option in self.options], generator=self.generator)
-        cmake.build()
-        cmake.install()
+        with tools.cwd(self.srcdir or self.joltdir):
+            cmake = tools.cmake(deps, incremental=self.incremental)
+            cmake.configure(tools.expand(self.cmakelists), *["-D" + tools.expand(option) for option in self.options], generator=self.generator)
+            cmake.build()
+            cmake.install()
 
     def publish(self, artifact, tools):
-        cmake = tools.cmake()
+        cmake = tools.cmake(incremental=self.incremental)
         cmake.publish(artifact)
 
 
