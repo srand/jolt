@@ -924,6 +924,14 @@ class TaskGenerator(object):
 
 class attributes:
     @staticmethod
+    def arch(cls):
+        """ Return the architecture name (x86_64, arm64, etc.). """
+
+        cls._arch = Export(lambda t: platform.machine().lower())
+        cls.arch = property(lambda t: t._arch.value)
+        return cls
+
+    @staticmethod
     def artifact(name, session=False):
         """Decorator adding an additional artifact to a task.
 
@@ -1206,6 +1214,67 @@ class attributes:
                 cls.publish = publish
 
             return utils.concat_attributes("_publish_files", attrib)(cls)
+        return decorate
+
+    @staticmethod
+    def common_metadata(aclocal=True, cmake=True, cxxinfo=True, path=True, pkgconfig=True):
+        """
+        Decorator adding common metadata to published artifacts.
+
+        The decorator adds common environment variables and C/C++ build information
+        to the published artifact:
+
+            - Adds `bin/` to `PATH` environment variable if it exists.
+            - Adds `lib/` and `lib64/` to C++ library paths if they exist.
+            - Adds `include/` to C++ include paths if it exists.
+            - Adds `lib/pkgconfig/`, `lib64/pkgconfig/` and `share/pkgconfig/` to
+              `PKG_CONFIG_PATH` environment variable if `.pc` files are found.
+              The `prefix` variable in `.pc` files is relocated to allow
+              installation in arbitrary locations.
+            - Adds `lib/cmake/`, `lib64/cmake/` and `share/cmake/` to
+              `CMAKE_PREFIX_PATH` environment variable if they exist.
+            - Adds `share/aclocal/` to `ACLOCAL_PATH` environment variable if it exists.
+
+        """
+        def decorate(cls):
+            _old_publish = cls.publish
+
+            @functools.wraps(cls.publish)
+            def publish(self, artifact, tools):
+                _old_publish(self, artifact, tools)
+
+                with tools.cwd(artifact.path):
+                    if path and tools.exists("bin"):
+                        artifact.environ.PATH.append("bin")
+
+                    if cxxinfo and tools.exists("lib"):
+                        artifact.cxxinfo.libpaths.append("lib")
+                    if cxxinfo and tools.exists("lib64"):
+                        artifact.cxxinfo.libpaths.append("lib64")
+                    if cxxinfo and tools.exists("include"):
+                        artifact.cxxinfo.incpaths.append("include")
+
+                    for pcpath in tools.glob("lib/pkgconfig/*.pc") + tools.glob("lib64/pkgconfig/*.pc") + tools.glob("share/pkgconfig/*.pc"):
+                        artifact.environ.PKG_CONFIG_PATH.append(fs.path.dirname(pcpath))
+                        tools.replace_in_file(pcpath, artifact.strings.install_prefix, "${{pcfiledir}}/../..")
+                    for pcpath in tools.glob("lib/*/pkgconfig/*.pc") + tools.glob("lib64/*/pkgconfig/*.pc"):
+                        artifact.environ.PKG_CONFIG_PATH.append(fs.path.dirname(pcpath))
+                        tools.replace_in_file(pcpath, artifact.strings.install_prefix, "${{pcfiledir}}/../../..")
+
+                    if cmake and tools.exists("lib/cmake"):
+                        artifact.environ.CMAKE_PREFIX_PATH.append("lib/cmake")
+                    if cmake and tools.exists("lib64/cmake"):
+                        artifact.environ.CMAKE_PREFIX_PATH.append("lib64/cmake")
+                    if cmake and tools.exists("share/cmake"):
+                        artifact.environ.CMAKE_PREFIX_PATH.append("share/cmake")
+
+                    if aclocal and tools.exists("share/aclocal"):
+                        artifact.environ.ACLOCAL_PATH.append("share/aclocal")
+
+            cls.publish = publish
+
+            return cls
+
         return decorate
 
     @staticmethod

@@ -56,7 +56,7 @@ Decorators
 .. reference-decorators-start
 
 .. autoclass:: jolt.attributes
-   :members: artifact, artifact_upload, attribute, environ, load, requires, system, timeout
+   :members: artifact, artifact_upload, attribute, common_metadata, environ, load, requires, system, timeout
 
 .. reference-decorators-end
 

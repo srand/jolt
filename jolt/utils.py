@@ -238,6 +238,8 @@ class JoltFormatter(Formatter):
             return str(value).lower()
         elif conversion == "c":
             return value()
+        elif conversion == "t":
+            return str(value).title()
         elif conversion == "j":
             return " ".join(value)
         return super().convert_field(value, conversion)
