@@ -27,6 +27,7 @@ from jolt.pkgs import hdf5
 from jolt.pkgs import help2man
 from jolt.pkgs import libdrm
 from jolt.pkgs import libevent
+from jolt.pkgs import libfastjson
 from jolt.pkgs import libglvnd
 from jolt.pkgs import libpciaccess
 from jolt.pkgs import libtool
@@ -101,6 +102,7 @@ class Default(Alias):
         "help2man",
         "libdrm",
         "libevent",
+        "libfastjson",
         "libglvnd",
         "libpciaccess",
         "libtool",
