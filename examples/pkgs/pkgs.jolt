@@ -8,6 +8,7 @@ from jolt.pkgs import catch2
 from jolt.pkgs import cbindgen
 from jolt.pkgs import clang
 from jolt.pkgs import cmake
+from jolt.pkgs import cpython
 from jolt.pkgs import curl
 from jolt.pkgs import dbus
 from jolt.pkgs import double_conversion
@@ -81,6 +82,7 @@ class Default(Alias):
         "cbindgen",
         "clang",
         "cmake",
+        "cpython",
         "curl",
         "dbus",
         "double-conversion",
