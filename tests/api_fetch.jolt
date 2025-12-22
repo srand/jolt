@@ -1,0 +1,148 @@
+#!/usr/bin/env python
+
+import os
+import sys
+import time
+sys.path.append(".")
+
+import testsupport
+
+
+class FetchApi(testsupport.JoltTest):
+    name = "api/fetch"
+
+    url = "https://github.com/srand/jolt/archive/refs/tags/v0.9.416.tar.gz"
+
+    def test_fetch(self):
+        """
+        --- tasks:
+        from jolt.plugins import fetch
+
+        class Test(Task):
+            requires = ["fetch:url={url}"]
+
+            def publish(self, artifact, tools):
+                artifact.collect("*", symlinks=True, cwd="{{fetch[v0.9.416.tar.gz]}}")
+        ---
+        """
+        r = self.build("test")
+        a = self.artifacts(r)[0]
+        self.assertExists(a, "jolt-0.9.416/README.rst")
+
+        r = self.build("-f test")
+
+    def test_fetch_sha256(self):
+        """
+        --- tasks:
+        from jolt.plugins import fetch
+
+        class Test(Task):
+            sha256 = Parameter("be18194480c18ebf8fbe6adcce41b4b5bcbe350f66fcb99e13e61ae5af4d5ec5")
+            requires = ["fetch:url={url},sha256={{sha256}}"]
+
+            def publish(self, artifact, tools):
+                artifact.collect("*", symlinks=True, cwd="{{fetch[v0.9.416.tar.gz]}}")
+        ---
+        """
+        with self.assertRaises(Exception):
+            r = self.build("test:sha256=invalidhash")
+        self.build("test")
+
+    def test_fetch_sha256_no_extract(self):
+        """
+        --- tasks:
+        from jolt.plugins import fetch
+
+        class Test(Task):
+            sha256 = Parameter("be18194480c18ebf8fbe6adcce41b4b5bcbe350f66fcb99e13e61ae5af4d5ec5")
+            requires = ["fetch:url={url},sha256={{sha256}}"]
+
+            def publish(self, artifact, tools):
+                artifact.collect("*", symlinks=True, cwd="{{fetch[v0.9.416.tar.gz]}}")
+        ---
+        """
+        with self.assertRaises(Exception):
+            r = self.build("test:sha256=invalidhash")
+        self.build("test")
+
+    def test_fetch_path(self):
+        """
+        --- tasks:
+        from jolt.plugins import fetch
+
+        class Test(Task):
+            requires = ["fetch:url={url},path=build/jolt"]
+
+            def publish(self, artifact, tools):
+                self.info("{{fetch[v0.9.416.tar.gz]}}")
+                assert tools.expand("{{fetch[v0.9.416.tar.gz]}}") == "build/jolt", "Fetch path incorrect"
+                artifact.collect("*", symlinks=True, cwd="{{fetch[v0.9.416.tar.gz]}}")
+        ---
+        """
+        r = self.build("test")
+        a = self.artifacts(r)[0]
+        self.assertExists(a, "jolt-0.9.416/README.rst")
+
+    def test_fetch_alias(self):
+        """
+        --- tasks:
+        from jolt.plugins import fetch
+
+        class Test(Task):
+            requires = ["fetch:url={url},alias=jolt"]
+
+            def publish(self, artifact, tools):
+                artifact.collect("*", symlinks=True, cwd="{{fetch[jolt]}}")
+        ---
+        """
+        r = self.build("test")
+        a = self.artifacts(r)[0]
+        self.assertExists(a, "jolt-0.9.416/README.rst")
+
+    def test_fetch_no_extract(self):
+        """
+        --- tasks:
+        from jolt.plugins import fetch
+
+        class Test(Task):
+            requires = ["fetch:url={url},alias=jolt,extract=false"]
+
+            def publish(self, artifact, tools):
+                artifact.collect("{{fetch[jolt]}}", flatten=True)
+        ---
+        """
+        r = self.build("test")
+        a = self.artifacts(r)[0]
+        self.assertExists(a, "v0.9.416.tar.gz")
+
+    def test_fetch_no_extract_and_path(self):
+        """
+        --- tasks:
+        from jolt.plugins import fetch
+
+        class Test(Task):
+            requires = ["fetch:url={url},alias=jolt,extract=false,path=build/jolt/pkg.tar.gz"]
+
+            def publish(self, artifact, tools):
+                artifact.collect("{{fetch[jolt]}}", flatten=True)
+        ---
+        """
+        r = self.build("test")
+        a = self.artifacts(r)[0]
+        self.assertExists(a, "pkg.tar.gz")
+
+    def test_fetch_implicit_no_extract(self):
+        """
+        --- tasks:
+        from jolt.plugins import fetch
+
+        class Test(Task):
+            requires = ["fetch:url=https://github.com/srand/jolt,alias=jolt,path=build/jolt.html"]
+
+            def publish(self, artifact, tools):
+                artifact.collect("{{fetch[jolt]}}", flatten=True)
+        ---
+        """
+        r = self.build("test")
+        a = self.artifacts(r)[0]
+        self.assertExists(a, "jolt.html")

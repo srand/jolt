@@ -82,6 +82,16 @@ Download
 
 .. reference-download-end
 
+Fetch
+------
+
+.. reference-fetch-start
+
+.. autoclass:: jolt.tasks.Fetch
+   :members: url, extract, path, alias, sha256
+   :show-inheritance:
+
+.. reference-fetch-end
 
 Git
 ---
