@@ -33,6 +33,7 @@ from jolt.pkgs import libpciaccess
 from jolt.pkgs import libtool
 from jolt.pkgs import libunwind
 from jolt.pkgs import libva
+from jolt.pkgs import libvorbis
 from jolt.pkgs import libx11
 from jolt.pkgs import libxcb
 from jolt.pkgs import libxcb_keysyms
@@ -108,6 +109,7 @@ class Default(Alias):
         "libtool",
         "libunwind",
         "libva",
+        "libvorbis",
         "libx11",
         "libxcb",
         "libxcb-keysyms",
