@@ -204,6 +204,16 @@ MultiTask
 
 .. reference-multitask-end
 
+Rust
+-----
+
+.. reference-rust-start
+
+.. autoclass:: jolt.plugins.rust.Rust
+   :members: srcdir
+   
+.. reference-rust-end
+
 
 Test
 ----
