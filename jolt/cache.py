@@ -285,6 +285,10 @@ class ArtifactAttributeSet(object):
         """ Get a dictionary representation of the attribute set. """
         return {key: str(value) for key, value in self.items()}
 
+    def __iter__(self):
+        """ Iterate over the attribute set. """
+        return iter(self.items())
+
     def items(self):
         """ Get a list of tuples containing the attribute name and value. """
         return self._get_attributes().items()
