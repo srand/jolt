@@ -37,7 +37,7 @@ class GitRepository(object):
         self.url = url
         self.default_refspecs = [
             '+refs/heads/*:refs/remotes/origin/*',
-            '+refs/tags/*:refs/remotes/origin/*',
+            '+refs/tags/*:refs/tags/*',
         ]
         self.refspecs = refspecs or []
         self._tree_hash = {}
