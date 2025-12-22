@@ -29,8 +29,9 @@ class Golang(Download):
 
     def publish(self, artifact, tools):
         super().publish(artifact, tools)
-        artifact.environ.PATH.append("go/bin")
         artifact.paths.goroot = "go"
+        artifact.environ.GOROOT = str(artifact.paths.goroot)
+        artifact.environ.PATH.append("go/bin")
 
     def unpack(self, artifact, tools):
         artifact.environ.GOROOT = str(artifact.paths.goroot)

@@ -6,4 +6,5 @@ class Flake8(Task):
     def run(self, deps, tools):
         with tools.cwd(".."):
             tools.run("pip install --break-system-packages flake8")
-            tools.run("flake8 --exclude '*pb2*' --ignore=E501,E502,F824 jolt")
+            tools.run("flake8 --exclude '*pb2*,pkgs' --ignore=E501,E502,F824 jolt")
+            tools.run("flake8 --ignore=E501,E502,F401,F811,F824 jolt/pkgs")

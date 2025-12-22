@@ -1,6 +1,7 @@
 from jolt import Alias, BooleanParameter, Parameter, Task, TaskGenerator, Tools
 from jolt import attributes, influence
 from jolt import __version__
+from jolt.pkgs import fstree
 from jolt.plugins import cxx, docker, git, selfdeploy
 
 from os import getenv
@@ -24,17 +25,6 @@ class CacheImage(docker.DockerImage):
         "robrt/jolt-cache:latest",
         "robrt/jolt-cache:{version}",
     ]
-
-
-@influence.string(fstree_version)
-class Fstree(Task):
-    def publish(self, artifact, tools):
-        with tools.cwd(tools.builddir()):
-            tools.mkdir("jolt/bin")
-            tools.download(f"https://github.com/srand/fstree/releases/download/{fstree_version}/fstree-linux-x86_64", "jolt/bin/fstree-linux-x86_64")
-            tools.chmod("jolt/bin/fstree-linux-x86_64", 0o755)
-            artifact.collect("jolt/bin/fstree-linux-x86_64", "bin/fstree")
-            artifact.environ.PATH.append("bin")
 
 
 class Jolt(selfdeploy.Jolt):

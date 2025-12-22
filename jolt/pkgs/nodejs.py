@@ -1,4 +1,4 @@
-from jolt import attributes as jolt_attributes
+from jolt import attributes
 from jolt import Download
 from jolt import Parameter
 from jolt.tasks import TaskRegistry
@@ -6,9 +6,9 @@ from jolt.tasks import TaskRegistry
 import platform
 
 
-@jolt_attributes.system
-@jolt_attributes.attribute("bin", "bin_{system}")
-@jolt_attributes.attribute("url", "url_{system}")
+@attributes.system
+@attributes.attribute("bin", "bin_{system}")
+@attributes.attribute("url", "url_{system}")
 class NodeJS(Download):
     name = "nodejs"
     version = Parameter("16.15.1", help="NodeJS version.")

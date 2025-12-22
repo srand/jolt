@@ -8,6 +8,7 @@ import re
 from jolt import *
 from jolt import error
 from jolt import filesystem as fs
+from jolt.pkgs import fstree
 from jolt.tasks import TaskRegistry
 from jolt.plugins.allure import Test
 

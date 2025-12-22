@@ -1,0 +1,145 @@
+from jolt import Alias
+
+from jolt.pkgs import abseil
+from jolt.pkgs import asio
+from jolt.pkgs import boost
+from jolt.pkgs import cares
+from jolt.pkgs import catch2
+from jolt.pkgs import cbindgen
+from jolt.pkgs import clang
+from jolt.pkgs import cmake
+from jolt.pkgs import curl
+from jolt.pkgs import dbus
+from jolt.pkgs import double_conversion
+from jolt.pkgs import fastfloat
+from jolt.pkgs import ffmpeg
+from jolt.pkgs import flatbuffers
+from jolt.pkgs import fmt
+from jolt.pkgs import fstree
+from jolt.pkgs import gflags
+from jolt.pkgs import glog
+from jolt.pkgs import glslang
+from jolt.pkgs import googlebenchmark
+from jolt.pkgs import googletest
+from jolt.pkgs import grpc
+from jolt.pkgs import hdf5
+from jolt.pkgs import help2man
+from jolt.pkgs import libdrm
+from jolt.pkgs import libevent
+from jolt.pkgs import libglvnd
+from jolt.pkgs import libpciaccess
+from jolt.pkgs import libtool
+from jolt.pkgs import libunwind
+from jolt.pkgs import libva
+from jolt.pkgs import libx11
+from jolt.pkgs import libxcb
+from jolt.pkgs import libxcb_keysyms
+from jolt.pkgs import libxcb_proto
+from jolt.pkgs import libxml2
+from jolt.pkgs import libxshmfence
+from jolt.pkgs import libxslt
+from jolt.pkgs import llvm
+from jolt.pkgs import lua
+from jolt.pkgs import m4
+from jolt.pkgs import mesa
+from jolt.pkgs import nasm
+from jolt.pkgs import ng_log
+from jolt.pkgs import ninja
+from jolt.pkgs import nlohmann_json
+from jolt.pkgs import opencv
+from jolt.pkgs import openssl
+from jolt.pkgs import poco
+from jolt.pkgs import protobuf
+from jolt.pkgs import pugixml
+from jolt.pkgs import python
+from jolt.pkgs import qt
+from jolt.pkgs import rapidjson
+from jolt.pkgs import re2
+from jolt.pkgs import readline
+from jolt.pkgs import rust
+from jolt.pkgs import sdl
+from jolt.pkgs import soci
+from jolt.pkgs import spirv_llvm
+from jolt.pkgs import spirv_tools
+from jolt.pkgs import sqlite
+from jolt.pkgs import texinfo
+from jolt.pkgs import wayland
+from jolt.pkgs import xorg_macros
+from jolt.pkgs import xz
+from jolt.pkgs import yamlcpp
+from jolt.pkgs import zlib
+from jolt.pkgs import zstd
+
+
+class Default(Alias):
+    requires = [
+        "abseil",
+        "asio",
+        "boost",
+        "c-ares",
+        "catch2",
+        "cbindgen",
+        "clang",
+        "cmake",
+        "curl",
+        "dbus",
+        "double-conversion",
+        "fastfloat",
+        "ffmpeg",
+        "flatbuffers",
+        "fmt",
+        "fstree",
+        "gflags",
+        "glog",
+        "glslang",
+        "google/benchmark",
+        "googletest",
+        "grpc",
+        "hdf5",
+        "help2man",
+        "libdrm",
+        "libevent",
+        "libglvnd",
+        "libpciaccess",
+        "libtool",
+        "libunwind",
+        "libva",
+        "libx11",
+        "libxcb",
+        "libxcb-keysyms",
+        "libxcb-proto",
+        "libxml2",
+        "libxslt",
+        "libxshmfence",
+        "llvm",
+        "lua",
+        "texinfo",
+        "m4",
+        "mesa",
+        "nasm",
+        "ng-log",
+        "ninja",
+        "nlohmann/json",
+        "opencv",
+        "openssl",
+        "poco",
+        "protobuf",
+        "pugixml",
+        "python",
+        "qt",
+        "rapidjson",
+        "re2",
+        "readline",
+        "rust",
+        "sdl",
+        "soci",
+        "spirv-llvm-translator",
+        "spirv-tools",
+        "sqlite",
+        "wayland",
+        "xorg/macros",
+        "xz",
+        "yaml-cpp",
+        "zlib",
+        "zstd",
+    ]

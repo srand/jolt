@@ -1,0 +1,4 @@
+[flake8]
+# F401: Some modules are imported only to register tasks
+# F811: Some packages share names with plugins
+extend-ignore = F811,F401
