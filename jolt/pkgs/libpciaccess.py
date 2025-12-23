@@ -5,7 +5,7 @@ from jolt.tasks import TaskRegistry
 
 
 @attributes.requires("requires_git")
-@attributes.requires("requries_meson")
+@attributes.requires("requires_meson")
 class Libpciaccess(meson.Meson):
     name = "libpciaccess"
     version = Parameter("0.18.1", help="pciaccess version.")
