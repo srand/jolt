@@ -973,6 +973,27 @@ class TaskApi(JoltTest):
         a = self.artifacts(r)
         self.assertEqual(1, len(a))
 
+    def test_unpack_alias(self):
+        """
+        --- tasks:
+        class UnpackMe(Task):
+            def unpack(self, a, t):
+                with t.cwd(a.path):
+                    t.write_file("unpacked", "yes")
+
+        class UnpackAlias(Alias):
+            requires = "unpackme"
+
+        class Unpacker(Task):
+            requires = "unpackalias"
+
+            def run(self, d, t):
+                with t.cwd(d["unpackme"].path):
+                    assert t.read_file("unpacked") == "yes"
+        ---
+        """
+        self.build("unpacker")
+
     def test_download(self):
         """
         --- tasks:
