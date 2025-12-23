@@ -10,6 +10,47 @@ from jolt.tools import SUPPORTED_ARCHIVE_TYPES
 
 
 class Fetch(Resource):
+    """
+    Fetch a file from a URL and extract it.
+
+    By default, the fetched file is extracted if it is a supported archive type.
+    Extraction may be disable by assigning the `extract` parameter to false.
+
+    The fetched content is placed in a build directory named after the resource.
+    The `path` parameter can be used to specify a different location relative to
+    the workspace root.
+
+    The path of the fetched content is made available to consuming tasks through
+    the `fetch` attribute. The `fetch` attribute is a dictionary where the key
+    is the name of the fetched file and the value is a path relative to the
+    workspace root. You can specify an alias for the filename / key through the
+    `alias` parameter.
+
+    The plugin must be loaded before it can be used. This is done by importing
+    the module, or by adding the following line to the configuration file:
+
+    .. code-block:: ini
+
+            [fetch]
+
+
+    Example:
+
+    .. code-block:: python
+
+            from jolt.plugins import fetch
+
+            class Example(Task):
+                requires = ["fetch:alias=zlib,url=https://zlib.net/zlib-1.3.1.tar.gz"]
+
+                def run(self, deps, tools):
+                    self.info("The source tree is located at: {fetch[zlib]}")
+                    with tools.cwd(self.fetch["zlib"]):
+                        tools.run("make")
+
+            """
+
+
     name = "fetch"
     alias = Parameter(required=False, help="Name of the task used when referencing content. Defaults to the filename of the fetched file.")
     extract = BooleanParameter(default=True, help="Whether to extract the fetched file.")

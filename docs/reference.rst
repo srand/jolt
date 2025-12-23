@@ -87,9 +87,8 @@ Fetch
 
 .. reference-fetch-start
 
-.. autoclass:: jolt.tasks.Fetch
+.. autoclass:: jolt.plugins.fetch.Fetch
    :members: url, extract, path, alias, sha256
-   :show-inheritance:
 
 .. reference-fetch-end
 
@@ -521,5 +520,16 @@ Rule
 .. reference-ninja-rule-end
 
 .. reference-ninja-end
+
+
+PkgConfig
+---------
+
+.. reference-pkgconfig-start
+
+.. automodule:: jolt.plugins.pkgconfig
+   :members: cxxinfo
+
+.. reference-pkgconfig-end
 
 .. reference-end
