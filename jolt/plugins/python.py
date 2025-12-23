@@ -138,16 +138,24 @@ class PythonEnv(Task):
 
     def publish(self, artifact, tools):
         with tools.cwd(self.installdir):
-            # Adjust paths in pyvenv.cfg
-            tools.replace_in_file("pyvenv.cfg", self.installdir, artifact.final_path)
-
             # Collect installed files
             artifact.collect("*", symlinks=True)
 
         artifact.environ.PATH.append("bin")
         artifact.strings.install_prefix = self.installdir
+        self.unpack(artifact, tools)
 
     def unpack(self, artifact, tools):
         with tools.cwd(artifact.path):
             # Adjust paths in pyvenv.cfg
-            tools.replace_in_file("pyvenv.cfg", artifact.strings.install_prefix, artifact.path)
+            tools.replace_in_file("pyvenv.cfg", artifact.strings.install_prefix, artifact.final_path)
+
+        with tools.cwd(artifact.path, "bin"):
+            # Adjust paths in scripts
+            for script in tools.glob("*"):
+                # Ignore python executables
+                if script.startswith("python"):
+                    continue
+                tools.replace_in_file(script, artifact.strings.install_prefix, artifact.final_path)
+
+        artifact.strings.install_prefix = artifact.final_path
