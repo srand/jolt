@@ -1,0 +1,75 @@
+#!/usr/bin/python
+
+import os
+import sys
+import time
+sys.path.append(".")
+
+from testsupport import JoltTest
+
+
+class PkgConfigTest(JoltTest):
+    name = "ext/pkgconfig"
+
+    def test_pkgconfig_cxxinfo(self):
+        """
+        --- file: mylib.pc
+
+        prefix=/prefix
+
+        Name: mylib
+        Description: My Library
+        Version: 1.0
+        Cflags: -I${{prefix}}/include --std=c11
+        Libs: -L${{prefix}}/lib -lmylib -Wl,--no-undefined
+
+        --- file: mylib.h
+
+        extern void mylib_function();
+
+        --- file: mylib.c
+
+        #include "mylib.h"
+        
+        void mylib_function() {{
+            // Do nothing
+        }}
+
+        --- tasks:
+
+        from jolt.plugins import pkgconfig
+
+        @influence.files("mylib.*")
+        @influence.whitelist("*.a")
+        @attributes.common_metadata()
+        class MyLibBase(Task):
+            abstract = True
+
+            def run(self, deps, tools):
+                tools.run("gcc -c mylib.c -o mylib.o")
+                tools.run("ar rcs libmylib.a mylib.o")
+                
+            def publish(self, artifact, tools):
+                artifact.collect("mylib.h", "include/")
+                artifact.collect("mylib.pc", "lib/pkgconfig/")
+                artifact.collect("libmylib.a", "lib/")
+                artifact.strings.install_prefix = "/prefix"
+
+        @pkgconfig.cxxinfo("mylib")
+        class MyLib(MyLibBase):
+            pass
+
+        class Tester(Task):
+            requires = ["mylib"]
+
+            def run(self, deps, tools):
+                a = deps["mylib"]
+                assert "--std=c11" in a.cxxinfo.cflags, a.cxxinfo.cflags
+                assert "--std=c11" in a.cxxinfo.cxxflags, a.cxxinfo.cxxflags
+                assert "include" in a.cxxinfo.incpaths, a.cxxinfo.incpaths
+                assert "mylib" in a.cxxinfo.libraries, a.cxxinfo.libraries
+                assert "lib" in a.cxxinfo.libpaths, a.cxxinfo.libpaths
+                assert "-Wl,--no-undefined" in a.cxxinfo.ldflags, a.cxxinfo.ldflags
+        ---
+        """
+        self.build("tester")

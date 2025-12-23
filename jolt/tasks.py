@@ -1247,13 +1247,6 @@ class attributes:
                     if path and tools.exists("bin"):
                         artifact.environ.PATH.append("bin")
 
-                    if cxxinfo and tools.exists("lib"):
-                        artifact.cxxinfo.libpaths.append("lib")
-                    if cxxinfo and tools.exists("lib64"):
-                        artifact.cxxinfo.libpaths.append("lib64")
-                    if cxxinfo and tools.exists("include"):
-                        artifact.cxxinfo.incpaths.append("include")
-
                     for pcpath in tools.glob("lib/pkgconfig/*.pc") + tools.glob("lib64/pkgconfig/*.pc") + tools.glob("share/pkgconfig/*.pc"):
                         artifact.environ.PKG_CONFIG_PATH.append(fs.path.dirname(pcpath))
                         tools.replace_in_file(pcpath, artifact.strings.install_prefix, "${{pcfiledir}}/../..")

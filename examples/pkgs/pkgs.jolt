@@ -19,6 +19,7 @@ from jolt.pkgs import flatbuffers
 from jolt.pkgs import fmt
 from jolt.pkgs import fstree
 from jolt.pkgs import gflags
+from jolt.pkgs import glib
 from jolt.pkgs import glog
 from jolt.pkgs import glslang
 from jolt.pkgs import googlebenchmark
@@ -55,6 +56,7 @@ from jolt.pkgs import ninja
 from jolt.pkgs import nlohmann_json
 from jolt.pkgs import opencv
 from jolt.pkgs import openssl
+from jolt.pkgs import pkgconfig
 from jolt.pkgs import poco
 from jolt.pkgs import protobuf
 from jolt.pkgs import pugixml
@@ -99,6 +101,7 @@ class Default(Alias):
         "fmt",
         "fstree",
         "gflags",
+        "glib",
         "glog",
         "glslang",
         "google/benchmark",
@@ -136,6 +139,7 @@ class Default(Alias):
         "nlohmann/json",
         "opencv",
         "openssl",
+        "pkg-config",
         "poco",
         "protobuf",
         "pugixml",

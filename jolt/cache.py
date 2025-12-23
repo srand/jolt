@@ -214,6 +214,9 @@ class ArtifactListAttribute(ArtifactAttribute):
     def count(self):
         return len(self.items())
 
+    def __str__(self) -> str:
+        return fs.pathsep.join(str(v) for v in self._value)
+
 
 class ArtifactFileAttribute(object):
     """ An attribute that stores a list of source and destination path tuples for files collected into the artifact. """
@@ -288,6 +291,18 @@ class ArtifactAttributeSet(object):
     def __iter__(self):
         """ Iterate over the attribute set. """
         return iter(self.items())
+
+    def get(self, name, default=None):
+        """ Get an attribute by name.
+
+        Args:
+            name (str): The name of the attribute.
+
+        Returns:
+            The attribute object, or None if it does not exist.
+        """
+        attributes = self._get_attributes()
+        return attributes.get(name, default)
 
     def items(self):
         """ Get a list of tuples containing the attribute name and value. """
