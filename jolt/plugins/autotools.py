@@ -41,3 +41,26 @@ class Autotools(Task):
     def publish(self, artifact, tools):
         at = tools.autotools(incremental=self.incremental)
         at.publish(artifact)
+
+
+def requires(autoconf=True, automake=True, libtool=True):
+    """ Decorator to add Autotools requirements to a task. """
+
+    import jolt.pkgs.autoconf
+    import jolt.pkgs.automake
+    import jolt.pkgs.libtool
+
+    def decorate(cls):
+        if autoconf:
+            cls = attributes.requires("requires_autoconf")(cls)
+            cls.requires_autoconf = ["autoconf"]
+        if automake:
+            cls = attributes.requires("requires_automake")(cls)
+            cls.requires_automake = ["automake"]
+        if libtool:
+            cls = attributes.requires("requires_libtool")(cls)
+            cls.requires_libtool = ["libtool"]
+
+        return cls
+
+    return decorate
