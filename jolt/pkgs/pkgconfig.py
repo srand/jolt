@@ -22,6 +22,7 @@ class PkgConf(meson.Meson):
     ]
 
 
+@attributes.common_metadata()
 class PkgConfig(Task):
     """ Package that provides the 'pkg-config' binary using 'pkgconf'. """
 
@@ -39,6 +40,7 @@ class PkgConfig(Task):
         # Create a pkg-config symlink
         with tools.cwd(artifact.path, "bin"):
             tools.symlink("pkgconf", "pkg-config")
+
 
 
 TaskRegistry.get().add_task_class(PkgConf)

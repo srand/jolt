@@ -1,9 +1,11 @@
-from jolt import attributes, Parameter, Task
+from jolt import attributes, Alias, Parameter, Task
+from jolt.plugins import git, pkgconfig
 from jolt.tasks import TaskRegistry
 
 
 @attributes.requires("requires_git")
 @attributes.common_metadata()
+@pkgconfig.cxxinfo(["openssl"])
 class OpenSSL(Task):
     name = "openssl"
     version = Parameter("3.6.0", help="openssl version.")
@@ -26,5 +28,11 @@ class OpenSSL(Task):
         with tools.cwd(self.installdir):
             artifact.collect("*", symlinks=True)
 
+
+class Libssl(Alias):
+    name = "libssl"
+    requires = ["openssl"]
+
+    
 
 TaskRegistry.get().add_task_class(OpenSSL)

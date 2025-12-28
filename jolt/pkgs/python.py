@@ -7,7 +7,10 @@ class Python(python.PythonEnv):
 
     name = "python"
     requirements = [
-        "meson"
+        "setuptools",
+        "mako",
+        "meson",
+        "pyyaml",
     ]
 
 

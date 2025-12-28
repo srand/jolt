@@ -1,10 +1,11 @@
 from jolt import attributes, Parameter
-from jolt.plugins import git, cmake
+from jolt.plugins import git, cmake, pkgconfig
 from jolt.tasks import TaskRegistry
 
 
 @attributes.requires("requires_cmake")
 @attributes.requires("requires_git")
+@pkgconfig.cxxinfo(["liblzma"])
 class Xz(cmake.CMake):
     name = "xz"
     version = Parameter("5.8.2", help="xz version.")

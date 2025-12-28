@@ -19,7 +19,7 @@ class Qt(cmake.CMake):
     generator = "Ninja"
     requires_cmake = ["cmake"]
     requires_dbus = ["dbus"]
-    requires_git = ["git:url=https://github.com/qt/qt5.git,path=build/git-qt,rev=v{version},submodules=true"]
+    requires_git = ["git:depth=1,url=https://github.com/qt/qt5.git,rev=v{version},submodules=true"]
     requires_ninja = ["ninja"]
     requires_gl_true = ["libglvnd"]
     requires_protobuf = ["protobuf"]

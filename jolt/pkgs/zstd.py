@@ -1,11 +1,12 @@
 from jolt import attributes, Parameter
 from jolt.pkgs import cmake
-from jolt.plugins import git, cmake
+from jolt.plugins import git, cmake, pkgconfig
 from jolt.tasks import TaskRegistry
 
 
 @attributes.requires("requires_cmake")
 @attributes.requires("requires_git")
+@pkgconfig.cxxinfo(["libzstd"])
 class Zstd(cmake.CMake):
     name = "zstd"
     version = Parameter("ebc93b0", help="zstd version.")

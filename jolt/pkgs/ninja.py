@@ -1,4 +1,6 @@
-from jolt import attributes, Alias, Download, Parameter
+from jolt import attributes, Alias, BooleanParameter, Download, Parameter
+from jolt.pkgs import cmake, re2c
+from jolt.plugins import git, cmake
 from jolt.tasks import TaskRegistry
 
 
@@ -12,6 +14,21 @@ class NinjaBin(Download):
     collect = [{"files": "*", "dest": "bin/"}]
 
 
+@attributes.requires("requires_cmake")
+@attributes.requires("requires_git")
+@attributes.requires("requires_re2c")
+class NinjaSrc(cmake.CMake):
+    name = "ninja/src"
+    version = Parameter("1.13.2", help="Ninja version.")
+    tests = BooleanParameter(False, help="Build tests.")
+    requires_cmake = ["cmake"]
+    requires_git = ["git:url=https://github.com/ninja-build/ninja.git,rev=v{version}"]
+    requires_re2c = ["re2c"]
+    srcdir = "{git[ninja]}"
+    options = ["BUILD_TESTING={tests[ON,OFF]}"]
+
+
+
 class Ninja(Alias):
     name = "ninja"
     version = Parameter("1.13.2", help="Ninja version.")
@@ -20,3 +37,4 @@ class Ninja(Alias):
 
 TaskRegistry.get().add_task_class(Ninja)
 TaskRegistry.get().add_task_class(NinjaBin)
+TaskRegistry.get().add_task_class(NinjaSrc)

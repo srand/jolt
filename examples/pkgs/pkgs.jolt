@@ -2,10 +2,14 @@ from jolt import Alias
 
 from jolt.pkgs import abseil
 from jolt.pkgs import asio
+from jolt.pkgs import autoconf
+from jolt.pkgs import automake
 from jolt.pkgs import boost
 from jolt.pkgs import cares
 from jolt.pkgs import catch2
 from jolt.pkgs import cbindgen
+from jolt.pkgs import cereal
+from jolt.pkgs import cista
 from jolt.pkgs import clang
 from jolt.pkgs import cmake
 from jolt.pkgs import cpython
@@ -17,6 +21,7 @@ from jolt.pkgs import fastfloat
 from jolt.pkgs import ffmpeg
 from jolt.pkgs import flatbuffers
 from jolt.pkgs import fmt
+from jolt.pkgs import fmtlog
 from jolt.pkgs import fstree
 from jolt.pkgs import gflags
 from jolt.pkgs import glib
@@ -28,6 +33,8 @@ from jolt.pkgs import gperf
 from jolt.pkgs import grpc
 from jolt.pkgs import hdf5
 from jolt.pkgs import help2man
+from jolt.pkgs import inja
+from jolt.pkgs import jsoncpp
 from jolt.pkgs import libdrm
 from jolt.pkgs import libevent
 from jolt.pkgs import libfastjson
@@ -49,6 +56,7 @@ from jolt.pkgs import libyajl
 from jolt.pkgs import llvm
 from jolt.pkgs import lua
 from jolt.pkgs import m4
+from jolt.pkgs import make
 from jolt.pkgs import mesa
 from jolt.pkgs import nasm
 from jolt.pkgs import ng_log
@@ -67,11 +75,14 @@ from jolt.pkgs import re2
 from jolt.pkgs import readline
 from jolt.pkgs import rust
 from jolt.pkgs import sdl
+from jolt.pkgs import simdjson
 from jolt.pkgs import soci
+from jolt.pkgs import spdlog
 from jolt.pkgs import spirv_llvm
 from jolt.pkgs import spirv_tools
 from jolt.pkgs import sqlite
 from jolt.pkgs import texinfo
+from jolt.pkgs import tomlplusplus
 from jolt.pkgs import wayland
 from jolt.pkgs import xorg_macros
 from jolt.pkgs import xz
@@ -84,13 +95,19 @@ class Default(Alias):
     requires = [
         "abseil",
         "asio",
+        "autoconf",
+        "automake",
         "boost",
         "c-ares",
         "catch2",
         "cbindgen",
+        "cereal",
+        "cista",
         "clang",
         "cmake",
         "cpython",
+        "cpython/embed",
+        "cpython/extend",
         "crun",
         "curl",
         "dbus",
@@ -99,6 +116,7 @@ class Default(Alias):
         "ffmpeg",
         "flatbuffers",
         "fmt",
+        "fmtlog",
         "fstree",
         "gflags",
         "glib",
@@ -110,6 +128,8 @@ class Default(Alias):
         "grpc",
         "hdf5",
         "help2man",
+        "inja",
+        "jsoncpp",
         "libdrm",
         "libevent",
         "libfastjson",
@@ -132,10 +152,13 @@ class Default(Alias):
         "lua",
         "texinfo",
         "m4",
+        "make",
         "mesa",
         "nasm",
         "ng-log",
         "ninja",
+        "ninja/bin",
+        "ninja/src",
         "nlohmann/json",
         "opencv",
         "openssl",
@@ -147,13 +170,17 @@ class Default(Alias):
         "qt",
         "rapidjson",
         "re2",
+        "re2c",
         "readline",
         "rust",
         "sdl",
+        "simdjson",
         "soci",
+        "spdlog",
         "spirv-llvm-translator",
         "spirv-tools",
         "sqlite",
+        "tomlplusplus",
         "wayland",
         "xorg/macros",
         "xz",

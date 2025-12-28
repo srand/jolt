@@ -1,9 +1,13 @@
 from jolt import attributes, Parameter
-from jolt.plugins import autotools, git
+from jolt.plugins import autotools, git, libtool, pkgconfig
 from jolt.tasks import TaskRegistry
 
 
 @attributes.requires("requires_git")
+@pkgconfig.cxxinfo("libfastjson")
+@autotools.requires(libtool=False)
+@libtool.relocate()
+@libtool.requires()
 class Libfastjson(autotools.Autotools):
     """ Builds and publishes liblibraries and headers. """
 

@@ -1,11 +1,12 @@
 from jolt import attributes, Parameter
 from jolt.pkgs import cmake
-from jolt.plugins import git, cmake
+from jolt.plugins import git, cmake, pkgconfig
 from jolt.tasks import TaskRegistry
 
 
 @attributes.requires("requires_cmake")
 @attributes.requires("requires_git")
+@pkgconfig.cxxinfo(["zlib"])
 class Zlib(cmake.CMake):
     name = "zlib"
     version = Parameter("1.3.1", help="Zlib version.")

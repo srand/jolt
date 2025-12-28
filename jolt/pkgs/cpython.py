@@ -1,5 +1,5 @@
-from jolt import attributes, Parameter
-from jolt.plugins import autotools, git
+from jolt import attributes, Parameter, Task
+from jolt.plugins import autotools, git, pkgconfig
 from jolt.tasks import TaskRegistry
 
 
@@ -13,4 +13,36 @@ class CPython(autotools.Autotools):
     srcdir = "{git[cpython]}"
 
 
+@pkgconfig.cxxinfo("python3-embed")
+@attributes.common_metadata()
+class CPythonEmbed(Task):
+    name = "cpython/embed"
+    requires = ["cpython"]
+    selfsustained = True
+
+    def run(self, deps, tools):
+        self.cpython = deps["cpython"]
+        
+    def publish(self, artifact, tools):
+        with tools.cwd(self.cpython.path):
+            artifact.collect("*", symlinks=True)
+        
+
+@pkgconfig.cxxinfo("python3")
+@attributes.common_metadata()
+class CPythonExtend(Task):
+    name = "cpython/extend"
+    requires = ["cpython"]
+    selfsustained = True
+
+    def run(self, deps, tools):
+        self.cpython = deps["cpython"]
+        
+    def publish(self, artifact, tools):
+        with tools.cwd(self.cpython.path):
+            artifact.collect("*", symlinks=True)
+
+
 TaskRegistry.get().add_task_class(CPython)
+TaskRegistry.get().add_task_class(CPythonEmbed)
+TaskRegistry.get().add_task_class(CPythonExtend)

@@ -7,6 +7,7 @@ from jolt.tasks import TaskRegistry
 @attributes.requires("requires_git")
 @attributes.requires("requires_help2man")
 @attributes.requires("requires_texinfo")
+@autotools.requires(libtool=False)
 class Libtool(autotools.Autotools):
     name = "libtool"
     version = Parameter("2.6.0", help="Libtool version.")
@@ -24,6 +25,7 @@ class Libtool(autotools.Autotools):
     def publish(self, artifact, tools):
         super().publish(artifact, tools)
         artifact.environ.LIBTOOL = "libtool"
+        artifact.environ.ACLOCAL_PATH.append("share/libtool")
 
     def unpack(self, artifact, tools):
         with tools.cwd(artifact.path):

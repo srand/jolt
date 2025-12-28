@@ -1247,12 +1247,17 @@ class attributes:
                     if path and tools.exists("bin"):
                         artifact.environ.PATH.append("bin")
 
+                    pcdirs = set()
+
                     for pcpath in tools.glob("lib/pkgconfig/*.pc") + tools.glob("lib64/pkgconfig/*.pc") + tools.glob("share/pkgconfig/*.pc"):
-                        artifact.environ.PKG_CONFIG_PATH.append(fs.path.dirname(pcpath))
+                        pcdirs.add(fs.path.dirname(pcpath))
                         tools.replace_in_file(pcpath, artifact.strings.install_prefix, "${{pcfiledir}}/../..")
                     for pcpath in tools.glob("lib/*/pkgconfig/*.pc") + tools.glob("lib64/*/pkgconfig/*.pc"):
-                        artifact.environ.PKG_CONFIG_PATH.append(fs.path.dirname(pcpath))
+                        pcdirs.add(fs.path.dirname(pcpath))
                         tools.replace_in_file(pcpath, artifact.strings.install_prefix, "${{pcfiledir}}/../../..")
+
+                    for pcdir in pcdirs:
+                        artifact.environ.PKG_CONFIG_PATH.append(pcdir)
 
                     if cmake and tools.exists("lib/cmake"):
                         artifact.environ.CMAKE_PREFIX_PATH.append("lib/cmake")

@@ -4,6 +4,7 @@ from jolt.tasks import TaskRegistry
 
 
 @attributes.requires("requires_git")
+@autotools.requires()
 class XorgMacros(autotools.Autotools):
     name = "xorg/macros"
     version = Parameter("1.20.2", help="Xorg Macros version.")

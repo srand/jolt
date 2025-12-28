@@ -1,9 +1,11 @@
 from jolt import attributes, Parameter
-from jolt.plugins import cmake, git, autotools
+from jolt.plugins import cmake, git, autotools, pkgconfig
 from jolt.tasks import TaskRegistry
 
 
 @attributes.requires("requires_git")
+@pkgconfig.cxxinfo("asio")
+@autotools.requires()
 class Asio(autotools.Autotools):
     name = "asio"
     version = Parameter("1.36.0", help="asio version.")

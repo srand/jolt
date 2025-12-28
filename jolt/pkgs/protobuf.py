@@ -1,12 +1,13 @@
 from jolt import attributes, Parameter
 from jolt.pkgs import cmake
-from jolt.plugins import git, cmake
+from jolt.plugins import git, cmake, pkgconfig
 from jolt.tasks import TaskRegistry
 
 
 @attributes.requires("requires_abseil")
 @attributes.requires("requires_cmake")
 @attributes.requires("requires_git")
+@pkgconfig.cxxinfo(["protobuf"])
 class Protobuf(cmake.CMake):
     name = "protobuf"
     version = Parameter("33.2", help="Protobuf version.")

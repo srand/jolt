@@ -6,11 +6,13 @@ from jolt.tasks import TaskRegistry
 
 @attributes.requires("requires_git")
 @attributes.requires("requires_meson")
+@attributes.requires("requires_zlib")
 class Libpciaccess(meson.Meson):
     name = "libpciaccess"
     version = Parameter("0.18.1", help="pciaccess version.")
     requires_git = ["git:url=https://gitlab.freedesktop.org/xorg/lib/libpciaccess.git,rev=libpciaccess-{version}"]
     requires_meson = ["meson"]
+    requires_zlib = ["zlib"]
     srcdir = "{git[libpciaccess]}"
 
 

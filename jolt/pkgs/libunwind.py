@@ -1,11 +1,13 @@
 from jolt import attributes, Parameter
-from jolt.plugins import git, autotools
+from jolt.plugins import git, autotools, pkgconfig
 from jolt.tasks import TaskRegistry
 
 
 @attributes.requires("requires_git")
 @attributes.arch
 @attributes.system
+@autotools.requires()
+@pkgconfig.cxxinfo(["libunwind", "libunwind-generic", "libunwind-coredump", "libunwind-ptrace", "libunwind-setjmp"])
 class LibUnwind(autotools.Autotools):
     name = "libunwind"
     version = Parameter("1.8.3", help="libunwind version.")

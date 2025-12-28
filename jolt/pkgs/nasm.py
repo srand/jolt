@@ -1,6 +1,6 @@
 from jolt import attributes, Parameter, Task
 from jolt.pkgs import zlib
-from jolt.plugins import git
+from jolt.plugins import autotools, git
 from jolt.tasks import TaskRegistry
 
 
@@ -8,6 +8,7 @@ from jolt.tasks import TaskRegistry
 @attributes.requires("requires_git")
 @attributes.requires("requires_xmlto")
 @attributes.requires("requires_zlib")
+@autotools.requires()
 class NASM(Task):
     name = "nasm"
     version = Parameter("3.01", help="nasm version.")
