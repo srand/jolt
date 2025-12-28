@@ -9,7 +9,7 @@ from jolt.tasks import TaskRegistry
 @attributes.requires("requires_meson")
 class PkgConf(meson.Meson):
     """ Package that provides the 'pkgconf' binary, an alternative implementation of 'pkg-config'. """
-    
+
     name = "pkgconf"
     version = Parameter("2.5.1", help="pkg-config version.")
     requires_git = ["git:url=https://github.com/pkgconf/pkgconf.git,rev=pkgconf-{version}"]
@@ -40,7 +40,6 @@ class PkgConfig(Task):
         # Create a pkg-config symlink
         with tools.cwd(artifact.path, "bin"):
             tools.symlink("pkgconf", "pkg-config")
-
 
 
 TaskRegistry.get().add_task_class(PkgConf)

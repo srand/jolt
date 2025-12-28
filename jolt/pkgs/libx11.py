@@ -4,7 +4,6 @@ from jolt.plugins import fetch, autotools, libtool, pkgconfig
 from jolt.tasks import TaskRegistry
 
 
-
 @attributes.requires("requires_src")
 @autotools.requires()
 class Inputproto(autotools.Autotools):

@@ -13,7 +13,6 @@ class Libtool(object):
                     self.tools.replace_in_file(file, prefix, artifact.final_path)
 
 
-
 def relocate(dirs=["lib"]):
     """
     Relocate libtool archive files (.la) published by task.
@@ -24,7 +23,7 @@ def relocate(dirs=["lib"]):
     under the key 'libtool_prefix' for use during unpacking.
 
       :param dirs: List of directories inside the artifact to relocate .la files in.
-      
+
     """
 
     def decorate(cls):
@@ -49,7 +48,6 @@ def relocate(dirs=["lib"]):
         return cls
 
     return decorate
-
 
 
 def requires():

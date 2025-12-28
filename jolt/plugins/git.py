@@ -311,6 +311,7 @@ class GitRepository(object):
         with self.tools.cwd(self.path):
             self.tools.run("git submodule update {0} --init --recursive", depth, output_on_error=True)
 
+
 _gits = {}
 
 

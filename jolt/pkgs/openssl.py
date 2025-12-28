@@ -33,6 +33,5 @@ class Libssl(Alias):
     name = "libssl"
     requires = ["openssl"]
 
-    
 
 TaskRegistry.get().add_task_class(OpenSSL)

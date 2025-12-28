@@ -7,7 +7,7 @@ from jolt.tasks import TaskRegistry
 @attributes.requires("requires_git")
 @attributes.requires("requires_xorg_macros")
 @attributes.requires("requires_xcb_proto")
-@pkgconfig.cxxinfo(["xcb"]) 
+@pkgconfig.cxxinfo(["xcb"])
 @autotools.requires()
 @libtool.relocate()
 class Libxcb(autotools.Autotools):

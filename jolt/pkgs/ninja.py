@@ -28,7 +28,6 @@ class NinjaSrc(cmake.CMake):
     options = ["BUILD_TESTING={tests[ON,OFF]}"]
 
 
-
 class Ninja(Alias):
     name = "ninja"
     version = Parameter("1.13.2", help="Ninja version.")

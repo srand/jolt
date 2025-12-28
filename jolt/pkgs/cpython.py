@@ -22,11 +22,11 @@ class CPythonEmbed(Task):
 
     def run(self, deps, tools):
         self.cpython = deps["cpython"]
-        
+
     def publish(self, artifact, tools):
         with tools.cwd(self.cpython.path):
             artifact.collect("*", symlinks=True)
-        
+
 
 @pkgconfig.cxxinfo("python3")
 @attributes.common_metadata()
@@ -37,7 +37,7 @@ class CPythonExtend(Task):
 
     def run(self, deps, tools):
         self.cpython = deps["cpython"]
-        
+
     def publish(self, artifact, tools):
         with tools.cwd(self.cpython.path):
             artifact.collect("*", symlinks=True)

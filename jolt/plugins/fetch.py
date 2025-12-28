@@ -50,7 +50,6 @@ class Fetch(Resource):
 
             """
 
-
     name = "fetch"
     alias = Parameter(required=False, help="Name of the task used when referencing content. Defaults to the filename of the fetched file.")
     extract = BooleanParameter(default=True, help="Whether to extract the fetched file.")

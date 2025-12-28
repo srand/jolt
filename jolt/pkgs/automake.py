@@ -35,9 +35,8 @@ class Automake(autotools.Autotools):
         with tools.cwd(artifact.path):
             for file in tools.glob("share/aclocal-*"):
                 artifact.environ.ACLOCAL_PATH.append(file)
-        
-        artifact.strings.install_prefix = artifact.final_path
 
+        artifact.strings.install_prefix = artifact.final_path
 
 
 TaskRegistry.get().add_task_class(Automake)
