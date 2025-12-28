@@ -85,6 +85,7 @@ class Fetch(Resource):
 
     def _acquire_ws(self):
         # Create the destination directory if it does not exist
+        self.tools.rmtree(self.abspath, ignore_errors=True)
         self.tools.mkdir(fs.path.dirname(self.abspath), recursively=True)
 
         if self._extract():
