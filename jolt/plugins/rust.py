@@ -16,9 +16,10 @@ class Rust(Task):
 
     def run(self, deps, tools):
         self.builddir = tools.builddir(incremental=True)
+        self.installdir = tools.builddir("install")
         with tools.cwd(self.srcdir or self.joltdir):
-            tools.run("cargo build --release --manifest-path=Cargo.toml --target-dir={builddir}")
+            tools.run("cargo install --path . --target-dir={builddir} --root={installdir}")
 
     def publish(self, artifact, tools):
-        with tools.cwd(self.builddir, "release"):
+        with tools.cwd(self.installdir):
             artifact.collect("*", symlinks=True)
