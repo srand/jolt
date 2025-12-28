@@ -1,4 +1,6 @@
+from jolt import attributes
 from jolt import filesystem as fs
+from jolt import utils
 
 
 class PkgConfigHelper(object):
@@ -12,6 +14,7 @@ class PkgConfigHelper(object):
         return fs.path.relpath(path, self.artifact.path)
 
     def cflags(self, package):
+        package = " ".join(utils.as_list(package))
         try:
             with self.tools.environ(**self.environ):
                 output = self.tools.run("{} --cflags-only-other {}", self.pkgconfig, package, output=False)
@@ -20,6 +23,7 @@ class PkgConfigHelper(object):
             return []
 
     def incpaths(self, package):
+        package = " ".join(utils.as_list(package))
         try:
             with self.tools.environ(**self.environ):
                 output = self.tools.run("{} --cflags-only-I {}", self.pkgconfig, package, output=False)
@@ -28,6 +32,7 @@ class PkgConfigHelper(object):
             return []
 
     def linkflags(self, package):
+        package = " ".join(utils.as_list(package))
         try:
             with self.tools.environ(**self.environ):
                 output = self.tools.run("{} --libs-only-other {}", self.pkgconfig, package, output=False)
@@ -36,6 +41,7 @@ class PkgConfigHelper(object):
             return []
 
     def libpaths(self, package):
+        package = " ".join(utils.as_list(package))
         try:
             with self.tools.environ(**self.environ):
                 output = self.tools.run("{} --libs-only-L {}", self.pkgconfig, package, output=False)
@@ -44,6 +50,7 @@ class PkgConfigHelper(object):
             return []
 
     def libraries(self, package):
+        package = " ".join(utils.as_list(package))
         try:
             with self.tools.environ(**self.environ):
                 output = self.tools.run("{} --libs-only-l {}", self.pkgconfig, package, output=False)
@@ -59,18 +66,21 @@ class PkgConfigHelper(object):
     def environ(self):
         path = self.artifact.environ.get("PKG_CONFIG_PATH")
         if path is None:
-            self.verbose("No PKG_CONFIG_PATH in artifact environment; skipping pkg-config.")
-            return {}
+            self.tools._task.verbose("No PKG_CONFIG_PATH in artifact environment")
 
         # Path from the artifact environment
         path = str(path).split(fs.pathsep)
         path = ":".join(fs.path.join(self.artifact.path, p) for p in path)
 
+        # Append existing PKG_CONFIG_PATH from the tools environment
+        if self.tools.getenv("PKG_CONFIG_PATH"):
+            path = path + ":" + self.tools.getenv("PKG_CONFIG_PATH")
+
         return {"PKG_CONFIG_PATH": path}
 
 
 def cxxinfo(
-    pkg: str,
+    pkg: list | str,
     cflags: bool = True,
     cxxflags: bool = True,
     incpaths: bool = True,
@@ -124,6 +134,19 @@ def cxxinfo(
                 artifact.cxxinfo.libraries.extend(pc.libraries(pkg))
 
         cls.publish = publish
+        return cls
+
+    return decorate
+
+
+def requires():
+    """ Decorator to add pkg-config requirements to a task. """
+
+    import jolt.pkgs.pkgconfig
+
+    def decorate(cls):
+        cls = attributes.requires("requires_pkgconf")(cls)
+        cls.requires_pkgconf = ["pkg-config"]
         return cls
 
     return decorate
