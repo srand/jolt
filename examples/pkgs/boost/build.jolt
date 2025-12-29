@@ -1,0 +1,18 @@
+from jolt import Alias
+from jolt.plugins import ninja
+from jolt.pkgs import boost
+
+
+class App(ninja.CXXExecutable):
+    """
+    Simple application that uses Boost libraries
+    """
+    requires = ["boost"]
+    sources = ["main.cpp"]
+
+
+class Default(Alias):
+    """
+    Default build target
+    """
+    requires = ["app"]
