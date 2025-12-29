@@ -7,7 +7,7 @@ from jolt.tasks import TaskRegistry
 @attributes.requires("requires_git")
 @attributes.requires("requires_xproto")
 @attributes.requires("requires_xorg_macros")
-@pkgconfig.cxxinfo(["xshmfence"])
+@pkgconfig.to_cxxinfo(["xshmfence"])
 @pkgconfig.requires()
 @autotools.requires()
 @libtool.relocate()

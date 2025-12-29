@@ -6,7 +6,7 @@ from jolt.tasks import TaskRegistry
 
 @attributes.requires("requires_cmake")
 @attributes.requires("requires_git")
-@pkgconfig.cxxinfo(["spdlog"])
+@pkgconfig.to_cxxinfo(["spdlog"])
 class Spdlog(cmake.CMake):
     name = "spdlog"
     version = Parameter("1.16.0", help="spdlog version.")

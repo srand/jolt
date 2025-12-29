@@ -5,7 +5,7 @@ from jolt.tasks import TaskRegistry
 
 @attributes.requires("requires_git")
 @attributes.common_metadata()
-@pkgconfig.cxxinfo(["openssl"])
+@pkgconfig.to_cxxinfo(["openssl"])
 class OpenSSL(Task):
     name = "openssl"
     version = Parameter("3.6.0", help="openssl version.")

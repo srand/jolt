@@ -6,7 +6,7 @@ from jolt.tasks import TaskRegistry
 
 @attributes.requires("requires_cmake")
 @attributes.requires("requires_git")
-@pkgconfig.cxxinfo(["libxml-2.0"])
+@pkgconfig.to_cxxinfo(["libxml-2.0"])
 class Libxml2(cmake.CMake):
     name = "libxml2"
     version = Parameter("2.15.1", help="Libxml2 version.")

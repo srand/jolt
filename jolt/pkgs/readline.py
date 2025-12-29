@@ -4,7 +4,7 @@ from jolt.tasks import TaskRegistry
 
 
 @attributes.requires("requires_src")
-@pkgconfig.cxxinfo(["readline"])
+@pkgconfig.to_cxxinfo(["readline"])
 class Readline(autotools.Autotools):
     name = "readline"
     version = Parameter("8.2", help="Readline version.")

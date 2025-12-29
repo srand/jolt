@@ -6,7 +6,7 @@ from jolt.tasks import TaskRegistry
 
 @attributes.requires("requires_cmake")
 @attributes.requires("requires_git")
-@pkgconfig.cxxinfo(["libzstd"])
+@pkgconfig.to_cxxinfo(["libzstd"])
 class Zstd(cmake.CMake):
     name = "zstd"
     version = Parameter("ebc93b0", help="zstd version.")

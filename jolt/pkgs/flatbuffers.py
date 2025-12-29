@@ -6,7 +6,7 @@ from jolt.tasks import TaskRegistry
 
 @attributes.requires("requires_cmake")
 @attributes.requires("requires_git")
-@pkgconfig.cxxinfo(["flatbuffers"])
+@pkgconfig.to_cxxinfo(["flatbuffers"])
 class Flatbuffers(cmake.CMake):
     name = "flatbuffers"
     version = Parameter("25.9.23", help="Flatbuffers version.")

@@ -6,7 +6,7 @@ from jolt.tasks import TaskRegistry
 
 @attributes.requires("requires_cmake")
 @attributes.requires("requires_git")
-@pkgconfig.cxxinfo(["jsoncpp"])
+@pkgconfig.to_cxxinfo(["jsoncpp"])
 class JsonCPP(cmake.CMake):
     name = "jsoncpp"
     version = Parameter("1.9.6", help="JsonCPP version.")

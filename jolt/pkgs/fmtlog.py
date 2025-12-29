@@ -6,7 +6,7 @@ from jolt.tasks import TaskRegistry
 
 @attributes.requires("requires_cmake")
 @attributes.requires("requires_git")
-@pkgconfig.cxxinfo(["fmtlog"])
+@pkgconfig.to_cxxinfo(["fmtlog"])
 class FmtLog(cmake.CMake):
     name = "fmtlog"
     version = Parameter("2.3.0", help="FmtLog version.")

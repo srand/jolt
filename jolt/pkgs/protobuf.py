@@ -7,7 +7,7 @@ from jolt.tasks import TaskRegistry
 @attributes.requires("requires_abseil")
 @attributes.requires("requires_cmake")
 @attributes.requires("requires_git")
-@pkgconfig.cxxinfo(["protobuf"])
+@pkgconfig.to_cxxinfo(["protobuf"])
 class Protobuf(cmake.CMake):
     name = "protobuf"
     version = Parameter("33.2", help="Protobuf version.")

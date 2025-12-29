@@ -97,7 +97,7 @@ class Xtrans(autotools.Autotools):
 @attributes.requires("requires_xtrans")
 @autotools.requires()
 @pkgconfig.requires()
-@pkgconfig.cxxinfo(["x11", "x11-xcb"])
+@pkgconfig.to_cxxinfo(["x11", "x11-xcb"])
 @libtool.relocate()
 class Libx11(autotools.Autotools):
     name = "libx11"

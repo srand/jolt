@@ -1,0 +1,26 @@
+from jolt import influence
+from jolt.plugins.cmake import CMake
+from jolt.plugins.ninja import CXXExecutable
+from jolt.pkgs import cmake, ninja
+
+
+class AppWithJolt(CXXExecutable):
+    """ 
+    Build app with Jolt's Ninja plugin. 
+
+    Consumes the library built with CMake via pkg-config file / cxxinfo.
+    """
+    name = "app/jolt"
+    requires = ["lib/cmake", "ninja"]
+    sources = ["main.cpp"]
+    
+
+@influence.files("*")
+class AppWithCMake(CMake):
+    """ 
+    Build app with CMake.
+    
+    Consumes the library built with Jolt's Ninja plugin via pkg-config file.
+    """
+    name = "app/cmake"
+    requires = ["cmake", "lib/cmake", "ninja"]

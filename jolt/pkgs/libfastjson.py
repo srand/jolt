@@ -4,7 +4,7 @@ from jolt.tasks import TaskRegistry
 
 
 @attributes.requires("requires_git")
-@pkgconfig.cxxinfo("libfastjson")
+@pkgconfig.to_cxxinfo("libfastjson")
 @autotools.requires(libtool=False)
 @libtool.relocate()
 @libtool.requires()

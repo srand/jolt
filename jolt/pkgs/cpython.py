@@ -13,7 +13,7 @@ class CPython(autotools.Autotools):
     srcdir = "{git[cpython]}"
 
 
-@pkgconfig.cxxinfo("python3-embed")
+@pkgconfig.to_cxxinfo("python3-embed")
 @attributes.common_metadata()
 class CPythonEmbed(Task):
     name = "cpython/embed"
@@ -28,7 +28,7 @@ class CPythonEmbed(Task):
             artifact.collect("*", symlinks=True)
 
 
-@pkgconfig.cxxinfo("python3")
+@pkgconfig.to_cxxinfo("python3")
 @attributes.common_metadata()
 class CPythonExtend(Task):
     name = "cpython/extend"

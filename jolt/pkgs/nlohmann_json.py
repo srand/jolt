@@ -6,7 +6,7 @@ from jolt.tasks import TaskRegistry
 
 @attributes.requires("requires_cmake")
 @attributes.requires("requires_git")
-@pkgconfig.cxxinfo(["nlohmann_json"])
+@pkgconfig.to_cxxinfo(["nlohmann_json"])
 class NlohmannJson(cmake.CMake):
     name = "nlohmann/json"
     version = Parameter("3.12.0", help="nlohmann/json version.")

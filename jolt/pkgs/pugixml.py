@@ -6,7 +6,7 @@ from jolt.tasks import TaskRegistry
 
 @attributes.requires("requires_cmake")
 @attributes.requires("requires_git")
-@pkgconfig.cxxinfo(["pugixml"])
+@pkgconfig.to_cxxinfo(["pugixml"])
 class PugiXML(cmake.CMake):
     name = "pugixml"
     version = Parameter("1.15", help="PugiXML version.")

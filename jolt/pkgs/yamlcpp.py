@@ -6,7 +6,7 @@ from jolt.tasks import TaskRegistry
 
 @attributes.requires("requires_cmake")
 @attributes.requires("requires_git")
-@pkgconfig.cxxinfo(["yaml-cpp"])
+@pkgconfig.to_cxxinfo(["yaml-cpp"])
 class YamlCPP(cmake.CMake):
     name = "yaml-cpp"
     version = Parameter("bbf8bdb", help="yaml-cpp version.")

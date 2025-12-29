@@ -4,7 +4,7 @@ from jolt.tasks import TaskRegistry
 
 
 @attributes.requires("requires_git")
-@pkgconfig.cxxinfo(["sqlite3"])
+@pkgconfig.to_cxxinfo(["sqlite3"])
 class SQLite(autotools.Autotools):
     name = "sqlite"
     version = Parameter("3.51.1", help="sqlite version.")

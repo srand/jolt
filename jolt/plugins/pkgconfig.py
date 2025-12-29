@@ -4,6 +4,20 @@ from jolt import utils
 
 
 class PkgConfigHelper(object):
+
+    TEMPLATE_PKGCONFIG = """
+prefix={{ artifact.final_path }}
+
+Name: {{ pkgname }}
+Description: {{ pkgname }} package
+Version: {{ artifact.identity }}
+
+Cflags: {% for flag in cxxflags %}{{ flag }} {% endfor %}{% for inc in incpaths %}-I${prefix}/{{ inc }} {% endfor %}{% for macro in macros %}-D{{ macro }} {% endfor %}
+
+Libs: {% for flag in ldflags %}{{ flag }} {% endfor %}{% for libpath in libpaths %}-L${prefix}/{{ libpath }} {% endfor %}{% for library in libraries %}-l{{ library }} {% endfor %}
+
+"""
+
     def __init__(self, artifact, tools):
         self.artifact = artifact
         self.tools = tools
@@ -58,6 +72,21 @@ class PkgConfigHelper(object):
         except Exception:
             return []
 
+    def write_pc(self, package):
+        with self.tools.tmpdir() as tmpdir, self.tools.cwd(tmpdir):
+            content = self.tools.render(
+                self.TEMPLATE_PKGCONFIG,
+                artifact=self.artifact,
+                pkgname=package,
+                macros=list(self.artifact.cxxinfo.macros),
+                incpaths=list(self.artifact.cxxinfo.incpaths),
+                libpaths=list(self.artifact.cxxinfo.libpaths),
+                libraries=list(self.artifact.cxxinfo.libraries),
+            )
+            print(content)
+            self.tools.write_file(f"{package}.pc", content, expand=False)
+            self.artifact.collect(f"{package}.pc", "lib/pkgconfig/")
+
     @property
     def pkgconfig(self):
         return self.tools.which(self.tools.getenv("PKG_CONFIG", "pkg-config"))
@@ -79,7 +108,7 @@ class PkgConfigHelper(object):
         return {"PKG_CONFIG_PATH": path}
 
 
-def cxxinfo(
+def to_cxxinfo(
     pkg: list | str,
     cflags: bool = True,
     cxxflags: bool = True,
@@ -134,6 +163,35 @@ def cxxinfo(
                 artifact.cxxinfo.libraries.extend(pc.libraries(pkg))
 
         cls.publish = publish
+        return cls
+
+    return decorate
+
+
+def from_cxxinfo(package):
+    """
+    Decorator to write a pkg-config file for the given package
+    based on the cxxinfo metadata of the artifact.
+    """
+
+    def decorate(cls):
+        original_publish = cls.publish
+        original_unpack = cls.unpack
+
+        def publish(self, artifact, tools):
+            original_publish(self, artifact, tools)
+
+            pc = PkgConfigHelper(artifact, tools)
+            pc.write_pc(package)
+
+        def unpack(self, artifact, tools):
+            original_unpack(self, artifact, tools)
+
+            pc = PkgConfigHelper(artifact, tools)
+            pc.write_pc(package)
+
+        cls.publish = publish
+        cls.unpack = unpack
         return cls
 
     return decorate

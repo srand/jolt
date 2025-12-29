@@ -6,7 +6,7 @@ from jolt.tasks import TaskRegistry
 
 @attributes.requires("requires_cmake")
 @attributes.requires("requires_git")
-@pkgconfig.cxxinfo(["sdl2"])
+@pkgconfig.to_cxxinfo(["sdl2"])
 class SDL(cmake.CMake):
     name = "sdl"
     version = Parameter("3.2.28", help="SDL version.")

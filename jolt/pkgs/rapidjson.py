@@ -6,7 +6,7 @@ from jolt.tasks import TaskRegistry
 
 @attributes.requires("requires_cmake")
 @attributes.requires("requires_git")
-@pkgconfig.cxxinfo(["RapidJSON"])
+@pkgconfig.to_cxxinfo(["RapidJSON"])
 class RapidJSON(cmake.CMake):
     name = "rapidjson"
     version = Parameter("24b5e7a", help="rapidjson version.")

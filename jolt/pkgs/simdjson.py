@@ -6,7 +6,7 @@ from jolt.tasks import TaskRegistry
 
 @attributes.requires("requires_cmake")
 @attributes.requires("requires_git")
-@pkgconfig.cxxinfo(["simdjson"])
+@pkgconfig.to_cxxinfo(["simdjson"])
 class Simdjson(cmake.CMake):
     name = "simdjson"
     version = Parameter("4.2.4", help="simdjson version.")

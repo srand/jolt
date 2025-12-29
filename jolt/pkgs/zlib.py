@@ -6,7 +6,7 @@ from jolt.tasks import TaskRegistry
 
 @attributes.requires("requires_cmake")
 @attributes.requires("requires_git")
-@pkgconfig.cxxinfo(["zlib"])
+@pkgconfig.to_cxxinfo(["zlib"])
 class Zlib(cmake.CMake):
     name = "zlib"
     version = Parameter("1.3.1", help="Zlib version.")

@@ -1,0 +1,12 @@
+from jolt import include, Alias
+
+# This example demonstrates cross-consumption of libraries built with 
+# Jolt and CMake via pkg-config files. An application built with Jolt's
+# Ninja plugin consumes a library built with CMake, and vice versa.
+
+include("lib/build.jolt", "lib")
+include("app/build.jolt", "app")
+
+
+class Default(Alias):
+    requires = ["app/cmake", "app/jolt"]

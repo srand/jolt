@@ -4,7 +4,7 @@ from jolt.tasks import TaskRegistry
 
 
 @attributes.requires("requires_git")
-@pkgconfig.cxxinfo("asio")
+@pkgconfig.to_cxxinfo("asio")
 @autotools.requires()
 class Asio(autotools.Autotools):
     name = "asio"
