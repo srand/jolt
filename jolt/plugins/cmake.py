@@ -101,3 +101,16 @@ class CXXExecutable(_CMakeCXX):
 
     def publish(self, artifact, tools):
         super().publish(artifact, tools)
+
+
+def requires(version=None):
+    """ Decorator to add CMake requirements to a task. """
+
+    import jolt.pkgs.cmake
+
+    def decorate(cls):
+        cls = attributes.requires("requires_cmake")(cls)
+        cls.requires_cmake = ["cmake" + (f":version={version}" if version else "")]
+        return cls
+
+    return decorate

@@ -4,14 +4,13 @@ from jolt.plugins import git, cmake, pkgconfig
 from jolt.tasks import TaskRegistry
 
 
-@attributes.requires("requires_cmake")
 @attributes.requires("requires_git")
 @pkgconfig.to_cxxinfo(["yaml-cpp"])
+@cmake.requires()
 class YamlCPP(cmake.CMake):
     name = "yaml-cpp"
     version = Parameter("bbf8bdb", help="yaml-cpp version.")
     shared = BooleanParameter(True, help="Build shared libraries.")
-    requires_cmake = ["cmake"]
     requires_git = ["git:url=https://github.com/jbeder/yaml-cpp.git,rev={version}"]
     srcdir = "{git[yaml-cpp]}"
     options = [

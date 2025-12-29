@@ -4,13 +4,11 @@ from jolt.tasks import TaskRegistry
 from jolt.plugins import git, cmake
 
 
-@attributes.requires("requires_cmake")
 @attributes.requires("requires_git")
+@cmake.requires()
 class GoogleBenchmark(cmake.CMake):
     name = "google/benchmark"
     version = Parameter("1.9.4", help="Benchmark version.")
-
-    requires_cmake = ["cmake"]
     requires_git = ["git:url=https://github.com/google/benchmark.git,rev=v{version},submodules=true"]
     options = ["BENCHMARK_ENABLE_TESTING=OFF"]
     srcdir = "{git[benchmark]}"

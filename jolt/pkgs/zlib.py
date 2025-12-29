@@ -4,14 +4,12 @@ from jolt.plugins import git, cmake, pkgconfig
 from jolt.tasks import TaskRegistry
 
 
-@attributes.requires("requires_cmake")
 @attributes.requires("requires_git")
 @pkgconfig.to_cxxinfo(["zlib"])
+@cmake.requires()
 class Zlib(cmake.CMake):
     name = "zlib"
     version = Parameter("1.3.1", help="Zlib version.")
-
-    requires_cmake = ["cmake"]
     requires_git = ["git:url=https://github.com/madler/zlib.git,rev=v{version}"]
     srcdir = "{git[zlib]}"
 

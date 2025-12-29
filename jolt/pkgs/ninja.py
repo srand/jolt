@@ -14,14 +14,13 @@ class NinjaBin(Download):
     collect = [{"files": "*", "dest": "bin/"}]
 
 
-@attributes.requires("requires_cmake")
 @attributes.requires("requires_git")
 @attributes.requires("requires_re2c")
+@cmake.requires()
 class NinjaSrc(cmake.CMake):
     name = "ninja/src"
     version = Parameter("1.13.2", help="Ninja version.")
     tests = BooleanParameter(False, help="Build tests.")
-    requires_cmake = ["cmake"]
     requires_git = ["git:url=https://github.com/ninja-build/ninja.git,rev=v{version}"]
     requires_re2c = ["re2c"]
     srcdir = "{git[ninja]}"

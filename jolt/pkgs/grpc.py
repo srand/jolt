@@ -6,17 +6,16 @@ from jolt.tasks import TaskRegistry
 
 @attributes.requires("requires_abseil")
 @attributes.requires("requires_cares")
-@attributes.requires("requires_cmake")
 @attributes.requires("requires_git")
 @attributes.requires("requires_protobuf")
 @attributes.requires("requires_re2")
 @attributes.requires("requires_zlib")
+@cmake.requires()
 class Grpc(cmake.CMake):
     name = "grpc"
     version = Parameter("1.76.0", help="Grpc version.")
     requires_abseil = ["abseil"]
     requires_cares = ["c-ares"]
-    requires_cmake = ["cmake"]
     requires_git = ["git:url=https://github.com/grpc/grpc.git,depth=1,rev=v{version},submodules=true"]
     requires_protobuf = ["protobuf"]
     requires_re2 = ["re2"]

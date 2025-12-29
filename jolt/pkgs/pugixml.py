@@ -4,13 +4,12 @@ from jolt.plugins import git, cmake, pkgconfig
 from jolt.tasks import TaskRegistry
 
 
-@attributes.requires("requires_cmake")
 @attributes.requires("requires_git")
 @pkgconfig.to_cxxinfo(["pugixml"])
+@cmake.requires()
 class PugiXML(cmake.CMake):
     name = "pugixml"
     version = Parameter("1.15", help="PugiXML version.")
-    requires_cmake = ["cmake"]
     requires_git = ["git:url=https://github.com/zeux/pugixml.git,rev=v{version}"]
     srcdir = "{git[pugixml]}"
 

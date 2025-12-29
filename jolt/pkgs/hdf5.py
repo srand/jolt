@@ -3,12 +3,11 @@ from jolt.plugins import git, cmake
 from jolt.tasks import TaskRegistry
 
 
-@attributes.requires("requires_cmake")
 @attributes.requires("requires_git")
+@cmake.requires()
 class HDF5(cmake.CMake):
     name = "hdf5"
     version = Parameter("2.0.0", help="hdf5 version.")
-    requires_cmake = ["cmake"]
     requires_git = ["git:url=https://github.com/HDFGroup/hdf5.git,rev={version}"]
     srcdir = "{git[hdf5]}"
     options = [

@@ -4,14 +4,12 @@ from jolt.plugins import git, cmake, pkgconfig
 from jolt.tasks import TaskRegistry
 
 
-@attributes.requires("requires_cmake")
 @attributes.requires("requires_git")
+@cmake.requires()
 @pkgconfig.to_cxxinfo(["flatbuffers"])
 class Flatbuffers(cmake.CMake):
     name = "flatbuffers"
     version = Parameter("25.9.23", help="Flatbuffers version.")
-
-    requires_cmake = ["cmake"]
     requires_git = ["git:url=https://github.com/google/flatbuffers.git,rev=v{version}"]
     srcdir = "{git[flatbuffers]}"
 

@@ -4,14 +4,13 @@ from jolt.plugins import git, cmake
 from jolt.tasks import TaskRegistry
 
 
-@attributes.requires("requires_cmake")
 @attributes.requires("requires_gflags")
 @attributes.requires("requires_git")
+@cmake.requires()
 class Glog(cmake.CMake):
     name = "glog"
     version = Parameter("0.7.1", help="glog version.")
     options = ["BUILD_SHARED_LIBS=ON"]
-    requires_cmake = ["cmake"]
     requires_gflags = ["gflags"]
     requires_git = ["git:url=https://github.com/google/glog.git,rev=v{version}"]
     srcdir = "{git[glog]}"

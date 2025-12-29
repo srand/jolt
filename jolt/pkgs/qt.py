@@ -4,20 +4,19 @@ from jolt.plugins import git, cmake
 from jolt.tasks import TaskRegistry
 
 
-@attributes.requires("requires_cmake")
 @attributes.requires("requires_dbus")
 @attributes.requires("requires_git")
 @attributes.requires("requires_gl_{gl}")
 @attributes.requires("requires_ninja")
 @attributes.requires("requires_protobuf")
 @attributes.attribute("options", "options_gl_{gl}")
+@cmake.requires()
 class Qt(cmake.CMake):
     name = "qt"
     version = Parameter("6.10.1", help="Qt version.")
     gl = BooleanParameter(True, help="Enable OpenGL support.")
 
     generator = "Ninja"
-    requires_cmake = ["cmake"]
     requires_dbus = ["dbus"]
     requires_git = ["git:depth=1,url=https://github.com/qt/qt5.git,rev=v{version},submodules=true"]
     requires_ninja = ["ninja"]

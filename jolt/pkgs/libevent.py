@@ -4,13 +4,12 @@ from jolt.plugins import git, cmake
 from jolt.tasks import TaskRegistry
 
 
-@attributes.requires("requires_cmake")
 @attributes.requires("requires_git")
+@cmake.requires()
 class LibEvent(cmake.CMake):
     name = "libevent"
     version = Parameter("2.1.12", help="libevent version.")
     options = ["CMAKE_POLICY_VERSION_MINIMUM=3.5"]
-    requires_cmake = ["cmake"]
     requires_git = ["git:url=https://github.com/libevent/libevent.git,rev=release-{version}-stable"]
     srcdir = "{git[libevent]}"
 

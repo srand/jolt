@@ -15,9 +15,9 @@ class LLVMFromBin(Download):
     collect = [{"files": "*", "cwd": "LLVM-{version}-Linux-X64"}]
 
 
-@attributes.requires("requires_cmake")
 @attributes.requires("requires_git")
 @attributes.requires("requires_ninja")
+@cmake.requires()
 class LLVMFromSrc(cmake.CMake):
     name = "llvm/src"
 
@@ -45,7 +45,6 @@ class LLVMFromSrc(cmake.CMake):
     )
     version = Parameter("21.1.8", help="LLVM version.")
 
-    requires_cmake = ["cmake"]
     requires_ninja = ["ninja"]
     requires_git = [
         "git:url=https://github.com/llvm/llvm-project.git,depth=1,rev=llvmorg-{version}"

@@ -4,13 +4,12 @@ from jolt.plugins import git, cmake, pkgconfig
 from jolt.tasks import TaskRegistry
 
 
-@attributes.requires("requires_cmake")
 @attributes.requires("requires_git")
 @pkgconfig.to_cxxinfo(["spdlog"])
+@cmake.requires()
 class Spdlog(cmake.CMake):
     name = "spdlog"
     version = Parameter("1.16.0", help="spdlog version.")
-    requires_cmake = ["cmake"]
     requires_git = ["git:url=https://github.com/gabime/spdlog.git,rev=v{version}"]
     srcdir = "{git[spdlog]}"
     options = [

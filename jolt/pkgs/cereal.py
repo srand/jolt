@@ -5,14 +5,13 @@ from jolt.tasks import TaskRegistry
 
 
 @attributes.requires("requires_boost")
-@attributes.requires("requires_cmake")
 @attributes.requires("requires_git")
+@cmake.requires()
 class Cereal(cmake.CMake):
     name = "cereal"
     version = Parameter("1.3.2", help="Cereal version.")
     tests = BooleanParameter(False, help="Build tests.")
     requires_boost = ["boost"]
-    requires_cmake = ["cmake"]
     requires_git = ["git:url=https://github.com/USCiLab/cereal.git,rev=v{version}"]
     srcdir = "{git[cereal]}"
     options = [

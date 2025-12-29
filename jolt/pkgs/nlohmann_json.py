@@ -4,15 +4,13 @@ from jolt.plugins import git, cmake, pkgconfig
 from jolt.tasks import TaskRegistry
 
 
-@attributes.requires("requires_cmake")
 @attributes.requires("requires_git")
 @pkgconfig.to_cxxinfo(["nlohmann_json"])
+@cmake.requires()
 class NlohmannJson(cmake.CMake):
     name = "nlohmann/json"
     version = Parameter("3.12.0", help="nlohmann/json version.")
     tests = BooleanParameter(False, help="Build tests.")
-
-    requires_cmake = ["cmake"]
     requires_git = ["git:url=https://github.com/nlohmann/json.git,rev=v{version}"]
     srcdir = "{git[json]}"
     options = [

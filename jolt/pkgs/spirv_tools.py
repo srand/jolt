@@ -5,12 +5,11 @@ from jolt.tasks import TaskRegistry
 
 
 @attributes.requires("requires_git")
-@attributes.requires("requires_cmake")
+@cmake.requires()
 class SpirvTools(cmake.CMake):
     name = "spirv-tools"
     version = Parameter("2024.4", help="SPIRV-Tools version.")
     tests = BooleanParameter(False, help="Build tests.")
-    requires_cmake = ["cmake"]
     requires_git = ["git:url=https://github.com/KhronosGroup/SPIRV-Tools.git,rev=v{version}"]
     srcdir = "{git[SPIRV-Tools]}"
     options = ["SPIRV_SKIP_TESTS={tests[OFF,ON]}"]

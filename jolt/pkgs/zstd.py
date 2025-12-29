@@ -4,14 +4,12 @@ from jolt.plugins import git, cmake, pkgconfig
 from jolt.tasks import TaskRegistry
 
 
-@attributes.requires("requires_cmake")
 @attributes.requires("requires_git")
 @pkgconfig.to_cxxinfo(["libzstd"])
+@cmake.requires()
 class Zstd(cmake.CMake):
     name = "zstd"
     version = Parameter("ebc93b0", help="zstd version.")
-
-    requires_cmake = ["cmake"]
     requires_git = ["git:url=https://github.com/facebook/zstd.git,rev={version}"]
     srcdir = "{git[zstd]}"
 

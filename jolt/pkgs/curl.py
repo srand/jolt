@@ -4,13 +4,11 @@ from jolt.plugins import git, cmake
 from jolt.tasks import TaskRegistry
 
 
-@attributes.requires("requires_cmake")
 @attributes.requires("requires_git")
+@cmake.requires()
 class Curl(cmake.CMake):
     name = "curl"
     version = Parameter("8.17.0", help="Curl version.")
-
-    requires_cmake = ["cmake"]
     requires_git = ["git:url=https://github.com/curl/curl.git,rev=curl-{_version_tag},submodules=true"]
     options = ["CURL_USE_LIBPSL=OFF"]
     srcdir = "{git[curl]}"
