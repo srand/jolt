@@ -27,6 +27,7 @@ from jolt.pkgs import gflags
 from jolt.pkgs import glib
 from jolt.pkgs import glog
 from jolt.pkgs import glslang
+from jolt.pkgs import golang
 from jolt.pkgs import googlebenchmark
 from jolt.pkgs import googletest
 from jolt.pkgs import gperf
@@ -122,6 +123,7 @@ class Default(Alias):
         "glib",
         "glog",
         "glslang",
+        "golang",
         "google/benchmark",
         "googletest",
         "gperf",
