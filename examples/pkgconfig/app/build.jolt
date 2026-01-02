@@ -26,3 +26,4 @@ class AppWithCMake(CMake):
     """
     name = "app/cmake"
     requires = ["cmake", "lib/cmake", "ninja"]
+    generator = "Ninja"

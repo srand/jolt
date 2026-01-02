@@ -8,9 +8,9 @@ from jolt.pkgs import cmake, ninja
 @attributes.common_metadata()  # Add common metadata to artifact (PKG_CONFIG_PATH)
 @pkgconfig.from_cxxinfo("lib")  # Create and publish pkg-config file from cxxinfo metadata
 class LibWithJolt(CXXLibrary):
-    """ 
-    Build lib with Jolt's Ninja plugin and publish pkg-config file. 
-    
+    """
+    Build lib with Jolt's Ninja plugin and publish pkg-config file.
+
     The pkg-config file makes the library easily discoverable by other projects,
     including those built with different build systems.
     """
@@ -24,8 +24,8 @@ class LibWithJolt(CXXLibrary):
 @pkgconfig.requires()
 @influence.files("*")  # Build library with CMake plugin
 class LibWithCMake(CMake):
-    """ 
-    Build lib with CMake and publish pkg-config file. 
+    """
+    Build lib with CMake and publish pkg-config file.
 
     The pkg-config file is imported to populate cxxinfo metadata,
     making the library easily consumable by other Jolt tasks that use the Ninja plugin.
@@ -33,3 +33,4 @@ class LibWithCMake(CMake):
 
     name = "lib/cmake"
     requires = ["cmake", "ninja"]
+    generator = "Ninja"
