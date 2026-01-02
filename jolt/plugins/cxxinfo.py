@@ -1,9 +1,14 @@
 from jolt.cache import ArtifactListAttribute
+from jolt.cache import ArtifactStringAttribute
 from jolt.cache import ArtifactAttributeSet
 from jolt.cache import ArtifactAttributeSetProvider
 
 
 class CppInfoListVariable(ArtifactListAttribute):
+    pass
+
+
+class CppInfoStringVariable(ArtifactStringAttribute):
     pass
 
 
@@ -26,6 +31,8 @@ class CppInfo(ArtifactAttributeSet):
             return CppInfoListVariable(self._artifact, "asflags")
         if name == "cflags":
             return CppInfoListVariable(self._artifact, "cflags")
+        if name == "crt":
+            return CppInfoStringVariable(self._artifact, "crt")
         if name == "cxxflags":
             return CppInfoListVariable(self._artifact, "cxxflags")
         if name == "incpaths":

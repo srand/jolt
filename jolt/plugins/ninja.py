@@ -1686,6 +1686,62 @@ class MSVCArchiver(Rule):
         return "MSVCArchiver" + super().get_influence(task)
 
 
+class MSVCCRT(Variable):
+    def __init__(self, default="/MT", flagsfn=None):
+        self.default = default
+        self.flagsfn = flagsfn
+
+    def _combine(self, project, crt1, crt2):
+        if crt1 is None:
+            return crt2
+        if crt2 is None:
+            return crt1
+        raise_task_error_if(crt1 != crt2, project, "Mismatching Windows CRT library types (/MT vs /MD)")
+        return crt1
+
+    def _select_flag(self, flags):
+        """ Look for /Mxx flag in the list of flags """
+        if flags is None:
+            return None
+        if "Static" in flags:
+            return "/MT"
+        if "StaticDebug" in flags:
+            return "/MTd"
+        if "Dynamic" in flags:
+            return "/MD"
+        if "DynamicDebug" in flags:
+            return "/MDd"
+        if "/MT" in flags:
+            return "/MT"
+        if "/MTd" in flags:
+            return "/MTd"
+        if "/MD" in flags:
+            return "/MD"
+        if "/MDd" in flags:
+            return "/MDd"
+        return None
+
+    def _select_dep_flags(self, project, dep):
+        crt = self._select_flag(dep.cxxinfo.asflags.items())
+        if hasattr(dep.cxxinfo, "crt"):
+            crt = self._combine(project, crt, self._select_flag([str(dep.cxxinfo.crt)]))
+        crt = self._combine(project, crt, self._select_flag(dep.cxxinfo.cflags.items()))
+        return self._combine(project, crt, self._select_flag(dep.cxxinfo.cxxflags.items()))
+
+    def create(self, project, writer, deps, tools):
+        crt = self._select_flag(getattr(project, "crt", None))
+        crt = self._combine(project, crt, self._select_flag(project._asflags()))
+        crt = self._combine(project, crt, self._select_flag(project._cflags()))
+        crt = self._combine(project, crt, self._select_flag(project._cxxflags()))
+        for _, artifact in deps.items():
+            crt = self._combine(project, crt, self._select_dep_flags(project, artifact))
+        writer.variable(self.name, crt or self.default)
+
+    @utils.cached.instance
+    def get_influence(self, task):
+        return "CRT"
+
+
 MSVCCompiler = GNUCompiler
 MSVCLinker = GNULinker
 MSVCDepImporter = GNUDepImporter
@@ -1707,12 +1763,15 @@ class MSVCToolchain(Toolchain):
     flatc = ToolEnvironmentVariable(default="flatc", envname="FLATC", abspath=True)
     protoc = ToolEnvironmentVariable(default="protoc", envname="PROTOC", abspath=True)
 
+    win32flags = Variable("/DWIN32 /D_WINDOWS /D_WIN32_WINNT=0x0601 /EHsc")
     asflags = EnvironmentVariable(default="")
-    cflags = EnvironmentVariable(default="/EHsc")
-    cxxflags = EnvironmentVariable(default="/EHsc")
+    cflags = EnvironmentVariable(default="")
+    cxxflags = EnvironmentVariable(default="")
     fbflags = EnvironmentVariable(default="")
     ldflags = EnvironmentVariable(default="")
     protoflags = EnvironmentVariable(default="")
+
+    crt = MSVCCRT()
 
     extra_asflags = ProjectVariable(attrib="asflags")
     extra_cflags = ProjectVariable(attrib="cflags")
@@ -1728,7 +1787,7 @@ class MSVCToolchain(Toolchain):
     libraries = Libraries(suffix=".lib")
 
     compile_asm = MSVCCompiler(
-        command="$cl /nologo /showIncludes $asflags $extra_asflags $macros $incpaths /c /Tc$in /Fo$out",
+        command="$cl /nologo /showIncludes $crt $win32flags $asflags $extra_asflags $macros $incpaths /c /Tc$in /Fo$out",
         deps="msvc",
         infiles=[".asm", ".s", ".S"],
         outfiles=["{outdir}/{binary}.dir/{in_path}/{in_base}.obj"],
@@ -1736,7 +1795,7 @@ class MSVCToolchain(Toolchain):
         implicit=["$cl_path"])
 
     compile_c = MSVCCompiler(
-        command="$cl /nologo /showIncludes $cxxflags $extra_cxxflags $macros $incpaths /c /Tc$in /Fo$out",
+        command="$cl /nologo /showIncludes $crt $win32flags $cxxflags $extra_cxxflags $macros $incpaths /c /Tc$in /Fo$out",
         deps="msvc",
         infiles=[".c"],
         outfiles=["{outdir}/{binary}.dir/{in_path}/{in_base}.obj"],
@@ -1744,7 +1803,7 @@ class MSVCToolchain(Toolchain):
         implicit=["$cl_path"])
 
     compile_cxx = MSVCCompiler(
-        command="$cl /nologo /showIncludes $cxxflags $extra_cxxflags $macros $incpaths /c /Tp$in /Fo$out",
+        command="$cl /nologo /showIncludes $crt $win32flags $cxxflags $extra_cxxflags $macros $incpaths /c /Tp$in /Fo$out",
         deps="msvc",
         infiles=[".cc", ".cpp", ".cxx"],
         outfiles=["{outdir}/{binary}.dir/{in_path}/{in_base}.obj"],
@@ -2267,7 +2326,10 @@ if __name__ == "__main__":
         except JoltCommandError as e:
             self.buildlog = "\n".join(e.stdout)
             report = self._report_errors(self.buildlog)
-            raise CompileError(self._first_reported_error(report) or str(e))
+            error = self._first_reported_error(report)
+            if error:
+                raise CompileError(error)
+            raise e
 
         if bool(getattr(self, "coverage", False)):
             self.covdatadir = tools.builddir("coverage-data")
