@@ -197,7 +197,7 @@ class Parameter(object):
         def highlight(value):
             return colors.bright(value) if self._is_default(value) else colors.dim(value)
 
-        return "[{}]".format(", ".join([highlight(value) for value in accepted])) if accepted else ""
+        return "[{}]".format(", ".join([highlight(str(value)) for value in accepted])) if accepted else ""
 
     def __str__(self):
         """ Returns the parameter value as a string """
