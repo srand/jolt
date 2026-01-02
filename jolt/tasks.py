@@ -2756,7 +2756,7 @@ class ReportProxy(object):
             if not filterfn(error):
                 continue
             if error["location"] not in errors_by_location:
-                errors_by_location[error["location"]] = (error, [error["message"]], error["details"])
+                errors_by_location[error["location"]] = (error, [error["message"]], error.get("details", ""))
             else:
                 errors_by_location[error["location"]][1].append(error["message"])
 
