@@ -3043,6 +3043,7 @@ class Download(Task):
     Once downloaded, archives are extracted and all of their files are published.
     If the file is not an archive it is published as is. Recognized archive extensions are:
 
+        - .7z
         - .tar
         - .tar.bz2
         - .tar.gz
@@ -3105,7 +3106,7 @@ class Download(Task):
         return fs.posixpath.basename(url.path) or "file"
 
     def run(self, deps, tools):
-        supported_formats = [".tar", ".tar.bz2", ".tar.gz", ".tar.xz", ".tgz", ".zip"]
+        supported_formats = [".7z", ".tar", ".tar.bz2", ".tar.gz", ".tar.xz", ".tgz", ".zip"]
 
         raise_task_error_if(not self.url, self, "No URL(s) specified")
 

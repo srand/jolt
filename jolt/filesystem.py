@@ -88,10 +88,10 @@ def move(src, dst):
 
 def onerror_warning(func, path, exc_info):
     from jolt import log
-    if type(exc_info[1]) is OSError:
+    if hasattr(exc_info[1], "strerror"):
         msg = exc_info[1].strerror
     else:
-        msg = "Reason unknown"
+        msg = "Reason unknown: " + str(exc_info[1])
     if os.path.exists(path):
         log.warning("Could not remove file or directory: {} ({})", path, msg)
 

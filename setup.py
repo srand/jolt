@@ -85,6 +85,7 @@ setup(
         "protobuf",
         "psutil",
         "pygit2",
+        "py7zr",
         "requests",
         "zstandard",
         "tqdm",

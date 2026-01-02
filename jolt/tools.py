@@ -1,3 +1,4 @@
+import py7zr
 import bz2
 import copy
 import getpass
@@ -548,6 +549,12 @@ class Tools(object):
                         zf.write(path, zippath)
         return filename
 
+    def _make_7zfile(self, filename, fmt, rootdir):
+        self.mkdirname(filename)
+        with py7zr.SevenZipFile(filename, 'w') as archive:
+            archive.writeall(rootdir, ".")
+        return filename
+
     def _make_tarfile(self, filename, fmt, rootdir):
         self.mkdirname(filename)
         with tarfile.open(filename, 'w|%s' % fmt) as tar:
@@ -580,6 +587,7 @@ class Tools(object):
         The type of archive to create is determined by the filename extension.
         Supported formats are:
 
+        - 7z
         - tar
         - tar.bz2
         - tar.gz
@@ -615,12 +623,16 @@ class Tools(object):
             fmt = "tarbz2"
         elif filename.endswith(".tar.xz"):
             fmt = "tarxz"
+        elif filename.endswith(".7z"):
+            fmt = "7z"
         raise_task_error_if(
             not fmt, self._task,
             "unknown archive type '{0}'", fs.path.basename(filename))
         try:
             if fmt == "zip":
                 outfile = self._make_zipfile(filename, fmt, rootdir=pathname)
+            elif fmt == "7z":
+                outfile = self._make_7zfile(filename, fmt, rootdir=pathname)
             else:
                 outfile = self._make_tarfile(filename, fmt[3:], rootdir=pathname)
             if outfile != filename:
@@ -789,7 +801,7 @@ class Tools(object):
                     compressor = zstandard.ZstdCompressor(threads=self.thread_count())
                     with compressor.stream_writer(outfp) as stream:
                         for block in iter(lambda: infp.read(0x10000), b''):
-                            stream.write(block)
+                            stream.write(block)            
 
     def copy(self, src, dst, symlinks=False):
         """ Copies file and directories (recursively).
@@ -1075,6 +1087,7 @@ class Tools(object):
 
         Supported formats are:
 
+        - 7z
         - tar
         - tar.bz2
         - tar.gz
@@ -1138,6 +1151,13 @@ class Tools(object):
                     self._extract_tarzstd(filename, filepath, files)
                 except tarfile.StreamError as e:
                     raise_task_error(self._task, "failed to extract archive '{0}': {1}", filename, str(e))
+            elif filename.endswith(".7z"):
+                with py7zr.SevenZipFile(filename, 'r') as archive:
+                    if files:
+                        for file in files:
+                            archive.extract(file, filepath)
+                    else:
+                        archive.extractall(filepath)
             else:
                 raise_task_error(self._task, "unknown archive type '{0}'", fs.path.basename(filename))
         except Exception:
