@@ -1,5 +1,6 @@
 from jolt import Alias
 from jolt.tasks import TaskRegistry
+from jolt.pkgs import python
 
 
 class Meson(Alias):

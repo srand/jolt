@@ -1,5 +1,5 @@
 from jolt import attributes, Task, Parameter
-from jolt.pkgs import libtool
+from jolt.pkgs import libtool, meson
 from jolt.plugins import git, meson
 from jolt.tasks import TaskRegistry
 
@@ -13,7 +13,7 @@ class PkgConf(meson.Meson):
     name = "pkgconf"
     version = Parameter("2.5.1", help="pkg-config version.")
     requires_git = ["git:url=https://github.com/pkgconf/pkgconf.git,rev=pkgconf-{version}"]
-    requires_libtool = ["libtool"]
+    #requires_libtool = ["libtool"]
     requires_meson = ["meson"]
     srcdir = "{git[pkgconf]}"
     options = [
@@ -23,6 +23,7 @@ class PkgConf(meson.Meson):
 
 
 @attributes.common_metadata()
+@attributes.system
 class PkgConfig(Task):
     """ Package that provides the 'pkg-config' binary using 'pkgconf'. """
 
@@ -36,6 +37,10 @@ class PkgConfig(Task):
     def publish(self, artifact, tools):
         with tools.cwd(self.pkgconf.path):
             artifact.collect("*", symlinks=True)
+            artifact.environ.PKG_CONFIG = "pkgconf"
+
+        if self.system == "windows":
+            return
 
         # Create a pkg-config symlink
         with tools.cwd(artifact.path, "bin"):

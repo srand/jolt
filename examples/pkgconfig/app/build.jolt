@@ -1,4 +1,5 @@
 from jolt import influence
+from jolt.plugins import pkgconfig
 from jolt.plugins.cmake import CMake
 from jolt.plugins.ninja import CXXExecutable
 from jolt.pkgs import cmake, ninja
@@ -16,6 +17,7 @@ class AppWithJolt(CXXExecutable):
     
 
 @influence.files("*")
+@pkgconfig.requires()
 class AppWithCMake(CMake):
     """ 
     Build app with CMake.

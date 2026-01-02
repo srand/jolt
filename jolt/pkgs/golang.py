@@ -6,24 +6,24 @@ from jolt.tasks import TaskRegistry
 import platform
 
 
+@jolt_attributes.arch
 @jolt_attributes.system
 @jolt_attributes.attribute("url", "url_{system}")
 class Golang(Download):
     name = "golang"
     version = Parameter("1.25.5", help="Go version.")
-    url_linux = "https://go.dev/dl/go{version}.linux-{arch}.tar.gz"
-    url_windows = "https://go.dev/dl/go{version}.windows-{arch}.zip"
+    url_linux = "https://go.dev/dl/go{version}.linux-{go_arch}.tar.gz"
+    url_windows = "https://go.dev/dl/go{version}.windows-{go_arch}.zip"
 
     @property
-    def arch(self):
-        arch = platform.machine()
-        if arch == "x86_64":
+    def go_arch(self):
+        if self.arch in ["amd64", "x86_64"]:
             return "amd64"
-        if arch in ["i386", "i486", "i586", "i686"]:
+        if self.arch in ["i386", "i486", "i586", "i686"]:
             return "i386"
-        if arch in ["arm", "armv6l", "armv7l"]:
+        if self.arch in ["arm", "armv6l", "armv7l"]:
             return "armv6l"
-        if arch in ["arm64", "armv8l", "aarch64"]:
+        if self.arch in ["arm64", "armv8l", "aarch64"]:
             return "arm64"
         return None
 

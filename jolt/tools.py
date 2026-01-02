@@ -304,6 +304,7 @@ class _Meson(object):
         self.tools = tools
         self.builddir = self.tools.builddir(incremental=incremental)
         self.installdir = self.tools.builddir("install", incremental=False)
+        self.prefix = "/jolt-prefix" if os.name != "nt" else "C:\\jolt-prefix"
 
     def clean(self):
         self.tools.rmtree(self.builddir, ignore_errors=True)
@@ -313,21 +314,20 @@ class _Meson(object):
         sourcedir = self.tools.expand_path(sourcedir)
         options = " ".join([f"-D{arg}" for arg in args]) + " "
         options += " ".join(["-D{0}={1}".format(key, self.tools.expand(val)) for key, val in kwargs.items()])
-        self.tools.run("meson setup --prefix=/jolt-prefix {1} {2} {3}", self.installdir, sourcedir, self.builddir, options,
+        self.tools.run("meson setup --prefix={0} {1} {2} {3}", self.prefix, sourcedir, self.builddir, options,
                        output=True)
 
     def build(self, *args, **kwargs):
         self.tools.run("ninja -C {0} ", self.builddir, output=True)
 
     def install(self, *args, **kwargs):
-        self.tools.run("DESTDIR={0} ninja -C {1} install",
-                       self.installdir, self.builddir,
-                       output=True)
+        with self.tools.environ(DESTDIR=self.installdir):
+            self.tools.run("ninja -C {0} install", self.builddir, output=True)
 
     def publish(self, artifact, files='*', *args, **kwargs):
         with self.tools.cwd(self.installdir, "jolt-prefix"):
             artifact.collect(files, *args, **kwargs)
-        artifact.strings.install_prefix = "/jolt-prefix"
+        artifact.strings.install_prefix = self.prefix
 
 
 class _AutoTools(object):
@@ -916,7 +916,7 @@ class Tools(object):
                         pbar.update(len(data))
                 actual_size = self.file_size(pathname)
                 raise_error_if(
-                    size != 0 and size != actual_size,
+                    size != 0 and size > actual_size,
                     f"Downloaded file was truncated to {actual_size}/{size} bytes: {name}")
 
             return response.status_code == 200

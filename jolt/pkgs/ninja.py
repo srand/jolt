@@ -4,14 +4,21 @@ from jolt.plugins import git, cmake
 from jolt.tasks import TaskRegistry
 
 
-@attributes.arch
 @attributes.system
 @attributes.common_metadata()
 class NinjaBin(Download):
     name = "ninja/bin"
     version = Parameter("1.13.2", help="Ninja version.")
-    url = ["https://github.com/ninja-build/ninja/releases/download/v{version}/ninja-{system}.zip"]
+    url = ["https://github.com/ninja-build/ninja/releases/download/v{version}/ninja-{ninja_system}.zip"]
     collect = [{"files": "*", "dest": "bin/"}]
+
+    @property
+    def ninja_system(self):
+        if self.system == "darwin":
+            return "mac"
+        if self.system == "windows":
+            return "win"
+        return self.system
 
 
 @attributes.requires("requires_git")

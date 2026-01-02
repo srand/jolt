@@ -1,6 +1,7 @@
 import sys
 
 from jolt import Task
+from jolt import attributes
 from jolt import filesystem as fs
 from jolt.cache import ArtifactStringAttribute
 from jolt.cache import ArtifactAttributeSet
@@ -101,6 +102,7 @@ class PythonProvider(ArtifactAttributeSetProvider):
         artifact.python.unapply(task, artifact)
 
 
+@attributes.system
 class PythonEnv(Task):
     """
     Base class for Python virtual environment tasks.
@@ -133,7 +135,8 @@ class PythonEnv(Task):
                 "requirements.txt",
                 "\n".join(self.requirements) + "\n"
             )
-            pip_executable = fs.path.join(self.installdir, "bin", "pip")
+            bindir = "Scripts" if self.system == "windows" else "bin"  
+            pip_executable = fs.path.join(self.installdir, bindir, "pip")
             tools.run([pip_executable, "install", "-r", "requirements.txt"], shell=False)
 
     def publish(self, artifact, tools):
@@ -141,7 +144,8 @@ class PythonEnv(Task):
             # Collect installed files
             artifact.collect("*", symlinks=True)
 
-        artifact.environ.PATH.append("bin")
+        bindir = "Scripts" if self.system == "windows" else "bin"  
+        artifact.environ.PATH.append(bindir)
         artifact.strings.install_prefix = self.installdir
         self.unpack(artifact, tools)
 
@@ -150,7 +154,9 @@ class PythonEnv(Task):
             # Adjust paths in pyvenv.cfg
             tools.replace_in_file("pyvenv.cfg", artifact.strings.install_prefix, artifact.final_path)
 
-        with tools.cwd(artifact.path, "bin"):
+        bindir = "Scripts" if self.system == "windows" else "bin"  
+
+        with tools.cwd(artifact.path, bindir):
             # Adjust paths in scripts
             for script in tools.glob("*"):
                 # Ignore python executables

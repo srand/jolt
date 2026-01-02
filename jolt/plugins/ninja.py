@@ -1695,9 +1695,10 @@ class MSVCToolchain(Toolchain):
     hh = Skip(infiles=[".h", ".hh", ".hpp", ".hxx"])
     bin = Skip(infiles=[".dll", ".exe"])
 
-    builddir = ProjectVariable(attrib="outdir")
     joltdir = ProjectVariable()
+    builddir = ProjectVariable(attrib="outdir")
     outdir = ProjectVariable()
+    outdir_rel = ProjectVariable()
     binary = ProjectVariable()
 
     cl = ToolEnvironmentVariable(default="cl", envname="cl_exe", abspath=True)

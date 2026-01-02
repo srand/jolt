@@ -927,7 +927,7 @@ class attributes:
     def arch(cls):
         """ Return the architecture name (x86_64, arm64, etc.). """
 
-        cls._arch = Export(lambda t: platform.machine().lower())
+        cls._arch = Export(lambda t: platform.machine().lower().replace("amd64", "x86_64"))
         cls.arch = property(lambda t: t._arch.value)
         return cls
 

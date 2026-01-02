@@ -21,6 +21,7 @@ class LibWithJolt(CXXLibrary):
 
 
 @pkgconfig.to_cxxinfo("lib")  # Import pkg-config file and populate cxxinfo metadata
+@pkgconfig.requires()
 @influence.files("*")  # Build library with CMake plugin
 class LibWithCMake(CMake):
     """ 

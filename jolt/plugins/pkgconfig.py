@@ -1,6 +1,8 @@
 from jolt import attributes
 from jolt import filesystem as fs
+from jolt import log
 from jolt import utils
+from jolt.error import raise_error_if
 
 
 class PkgConfigHelper(object):
@@ -33,7 +35,8 @@ Libs: {% for flag in ldflags %}{{ flag }} {% endfor %}{% for libpath in libpaths
             with self.tools.environ(**self.environ):
                 output = self.tools.run("{} --cflags-only-other {}", self.pkgconfig, package, output=False)
                 return output.strip().split()
-        except Exception:
+        except Exception as e:
+            log.debug("PkgConfig.cflags: {}", str(e))
             return []
 
     def incpaths(self, package):
@@ -42,7 +45,8 @@ Libs: {% for flag in ldflags %}{{ flag }} {% endfor %}{% for libpath in libpaths
             with self.tools.environ(**self.environ):
                 output = self.tools.run("{} --cflags-only-I {}", self.pkgconfig, package, output=False)
                 return [self._mkpath(inc[2:]) for inc in output.strip().split()]
-        except Exception:
+        except Exception as e:
+            log.debug("PkgConfig.incpaths: {}", str(e))
             return []
 
     def linkflags(self, package):
@@ -51,7 +55,8 @@ Libs: {% for flag in ldflags %}{{ flag }} {% endfor %}{% for libpath in libpaths
             with self.tools.environ(**self.environ):
                 output = self.tools.run("{} --libs-only-other {}", self.pkgconfig, package, output=False)
                 return output.strip().split()
-        except Exception:
+        except Exception as e:
+            log.debug("PkgConfig.linkflags: {}", str(e))
             return []
 
     def libpaths(self, package):
@@ -60,7 +65,8 @@ Libs: {% for flag in ldflags %}{{ flag }} {% endfor %}{% for libpath in libpaths
             with self.tools.environ(**self.environ):
                 output = self.tools.run("{} --libs-only-L {}", self.pkgconfig, package, output=False)
                 return [self._mkpath(lib[2:]) for lib in output.strip().split()]
-        except Exception:
+        except Exception as e:
+            log.debug("PkgConfig.libpaths: {}", str(e))
             return []
 
     def libraries(self, package):
@@ -69,7 +75,8 @@ Libs: {% for flag in ldflags %}{{ flag }} {% endfor %}{% for libpath in libpaths
             with self.tools.environ(**self.environ):
                 output = self.tools.run("{} --libs-only-l {}", self.pkgconfig, package, output=False)
                 return [lib[2:] for lib in output.strip().split()]
-        except Exception:
+        except Exception as e:
+            log.debug("PkgConfig.libraries: {}", str(e))
             return []
 
     def write_pc(self, package):
@@ -89,7 +96,9 @@ Libs: {% for flag in ldflags %}{{ flag }} {% endfor %}{% for libpath in libpaths
 
     @property
     def pkgconfig(self):
-        return self.tools.which(self.tools.getenv("PKG_CONFIG", "pkg-config"))
+        pkgconf = self.tools.which(self.tools.getenv("PKG_CONFIG", "pkg-config"))
+        raise_error_if(not pkgconf, "No pkg-config tool found in PATH")
+        return pkgconf
 
     @property
     def environ(self):
@@ -99,11 +108,11 @@ Libs: {% for flag in ldflags %}{{ flag }} {% endfor %}{% for libpath in libpaths
 
         # Path from the artifact environment
         path = str(path).split(fs.pathsep)
-        path = ":".join(fs.path.join(self.artifact.path, p) for p in path)
+        path = fs.pathsep.join(fs.path.join(self.artifact.path, p) for p in path)
 
         # Append existing PKG_CONFIG_PATH from the tools environment
         if self.tools.getenv("PKG_CONFIG_PATH"):
-            path = path + ":" + self.tools.getenv("PKG_CONFIG_PATH")
+            path = path + fs.pathsep + self.tools.getenv("PKG_CONFIG_PATH")
 
         return {"PKG_CONFIG_PATH": path}
 
