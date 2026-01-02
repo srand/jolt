@@ -15,9 +15,14 @@ class CMake(Task):
     cmakelists = "CMakeLists.txt"
     """ Path to CMakeLists.txt or directory containing CMakelists.txt """
 
+    config = "Release"
+    """ The default build configuration to use """
+
     generator = None
+    """ The build file generator that CMake should use """
 
     incremental = True
+    """ Keep build directories between Jolt invocations """
 
     options = []
     """ List of options and their values (``option[:type]=value``) """
@@ -33,9 +38,12 @@ class CMake(Task):
         self.deps = deps
         raise_task_error_if(not self.cmakelists, self, "cmakelists attribute has not been defined")
 
+        options = self.options
+        options += ["CMAKE_BUILD_TYPE=" + str(self.config)]
+
         with tools.cwd(self.srcdir or self.joltdir):
             cmake = tools.cmake(deps, incremental=self.incremental)
-            cmake.configure(tools.expand(self.cmakelists), *["-D" + tools.expand(option) for option in self.options], generator=self.generator)
+            cmake.configure(tools.expand(self.cmakelists), *["-D" + tools.expand(option) for option in options], generator=self.generator)
             cmake.build()
             cmake.install()
 

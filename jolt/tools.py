@@ -282,16 +282,14 @@ class _CMake(object):
                 extra_args,
                 output=True)
 
-    def build(self, release=True, *args, **kwargs):
+    def build(self, *args, **kwargs):
         threading_args = ' -j {}'.format(kwargs.get("threads", self.tools.thread_count()))
         with self.tools.cwd(self.builddir):
-            release = "--config Release" if release else ""
-            self.tools.run("cmake --build . {0}{1}", release, threading_args, output=True)
+            self.tools.run("cmake --build . {0}", threading_args, output=True)
 
-    def install(self, release=True, *args, **kwargs):
+    def install(self, *args, **kwargs):
         with self.tools.cwd(self.builddir), self.tools.environ(DESTDIR=self.installdir):
-            release = "--config Release" if release else ""
-            self.tools.run("cmake --build . --target install {0}", release, output=True)
+            self.tools.run("cmake --build . --target install", output=True)
 
     def publish(self, artifact, files='*', symlinks=True, *args, **kwargs):
         with self.tools.cwd(self.installdir, "jolt-prefix"):
