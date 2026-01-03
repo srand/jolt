@@ -467,6 +467,9 @@ class Git(WorkspaceResource, FileInfluence):
     submodules = BooleanParameter(default=False, help="Initialize and update git submodules after cloning.")
     """ Initialize and update git submodules after cloning. Default ``False``. Optional. """
 
+    clean = BooleanParameter(default=False, help="Clean repository after it has been used")
+    """ Removes untracked files from the repository. """
+
     _revision = Export(value=lambda t: t._export_revision())
     """ To worker exported value of the revision to be checked out. """
 
@@ -529,6 +532,10 @@ class Git(WorkspaceResource, FileInfluence):
         self._acquire_ws()
         self._assign_git(owner)
         artifact.worktree = fs.path.relpath(self.abspath, owner.joltdir)
+
+    def release(self, artifact, deps, tools, owner):
+        if self.clean:
+            self.git.clean()
 
     def prepare_ws_for(self, task):
         """ Prepare the workspace for the task.
