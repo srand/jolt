@@ -219,6 +219,10 @@ class _SafeDict(object):
         value = self.values.get(key)
         if value is None:
             value = call_and_catch(getattr, self.values.get("_instance", object()), key)
+        if value is None and key == "buildroot":
+            tools = getattr(self.values.get("_instance", object()), "tools", None)
+            if tools:
+                value = tools.buildroot
         if value is None:
             value = self._envget(key)
         if type(value) is list:
