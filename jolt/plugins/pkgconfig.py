@@ -33,7 +33,7 @@ Libs: {% for flag in ldflags %}{{ flag }} {% endfor %}{% for libpath in libpaths
         package = " ".join(utils.as_list(package))
         try:
             with self.tools.environ(**self.environ):
-                output = self.tools.run("{} --cflags-only-other {}", self.pkgconfig, package, output=False)
+                output = self.tools.run("{} --maximum-traverse-depth=1 --cflags-only-other {}", self.pkgconfig, package, output=False)
                 return output.strip().split()
         except Exception as e:
             log.debug("PkgConfig.cflags: {}", str(e))
@@ -43,7 +43,7 @@ Libs: {% for flag in ldflags %}{{ flag }} {% endfor %}{% for libpath in libpaths
         package = " ".join(utils.as_list(package))
         try:
             with self.tools.environ(**self.environ):
-                output = self.tools.run("{} --cflags-only-I {}", self.pkgconfig, package, output=False)
+                output = self.tools.run("{} --maximum-traverse-depth=1 --cflags-only-I {}", self.pkgconfig, package, output=False)
                 return [self._mkpath(inc[2:]) for inc in output.strip().split()]
         except Exception as e:
             log.debug("PkgConfig.incpaths: {}", str(e))
@@ -53,7 +53,7 @@ Libs: {% for flag in ldflags %}{{ flag }} {% endfor %}{% for libpath in libpaths
         package = " ".join(utils.as_list(package))
         try:
             with self.tools.environ(**self.environ):
-                output = self.tools.run("{} --libs-only-other {}", self.pkgconfig, package, output=False)
+                output = self.tools.run("{} --maximum-traverse-depth=1 --libs-only-other {}", self.pkgconfig, package, output=False)
                 return output.strip().split()
         except Exception as e:
             log.debug("PkgConfig.linkflags: {}", str(e))
@@ -63,7 +63,7 @@ Libs: {% for flag in ldflags %}{{ flag }} {% endfor %}{% for libpath in libpaths
         package = " ".join(utils.as_list(package))
         try:
             with self.tools.environ(**self.environ):
-                output = self.tools.run("{} --libs-only-L {}", self.pkgconfig, package, output=False)
+                output = self.tools.run("{} --maximum-traverse-depth=1 --libs-only-L {}", self.pkgconfig, package, output=False)
                 return [self._mkpath(lib[2:]) for lib in output.strip().split()]
         except Exception as e:
             log.debug("PkgConfig.libpaths: {}", str(e))
@@ -73,7 +73,7 @@ Libs: {% for flag in ldflags %}{{ flag }} {% endfor %}{% for libpath in libpaths
         package = " ".join(utils.as_list(package))
         try:
             with self.tools.environ(**self.environ):
-                output = self.tools.run("{} --libs-only-l {}", self.pkgconfig, package, output=False)
+                output = self.tools.run("{} --maximum-traverse-depth=1 --libs-only-l {}", self.pkgconfig, package, output=False)
                 return [lib[2:] for lib in output.strip().split()]
         except Exception as e:
             log.debug("PkgConfig.libraries: {}", str(e))
