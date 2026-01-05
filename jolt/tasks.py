@@ -1260,11 +1260,11 @@ class attributes:
                         artifact.environ.PKG_CONFIG_PATH.append(pcdir)
 
                     if cmake and tools.exists("lib/cmake"):
-                        artifact.environ.CMAKE_PREFIX_PATH.append("lib/cmake")
+                        artifact.environ.CMAKE_PREFIX_PATH.append(".")
                     if cmake and tools.exists("lib64/cmake"):
-                        artifact.environ.CMAKE_PREFIX_PATH.append("lib64/cmake")
+                        artifact.environ.CMAKE_PREFIX_PATH.append(".")
                     if cmake and tools.exists("share/cmake"):
-                        artifact.environ.CMAKE_PREFIX_PATH.append("share/cmake")
+                        artifact.environ.CMAKE_PREFIX_PATH.append(".")
 
                     if aclocal and tools.exists("share/aclocal"):
                         artifact.environ.ACLOCAL_PATH.append("share/aclocal")
