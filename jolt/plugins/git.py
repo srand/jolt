@@ -489,6 +489,9 @@ class Git(WorkspaceResource, FileInfluence):
             self.abspath = fs.path.join(self.joltdir, str(self.path) or self._get_name())
             self.relpath = fs.path.relpath(self.abspath, self.tools.wsroot)
 
+        self.abspath = fs.path.normpath(self.abspath)
+        self.relpath = fs.path.normpath(self.relpath)
+
         # Create the git repository
         self.refspecs = kwargs.get("refspecs", [])
         self.git = new_git(self.url, self.abspath, self.relpath, self.refspecs)
@@ -536,6 +539,7 @@ class Git(WorkspaceResource, FileInfluence):
     def release(self, artifact, deps, tools, owner):
         if self.clean:
             self.git.clean()
+            self.git.reset()
 
     def prepare_ws_for(self, task):
         """ Prepare the workspace for the task.
