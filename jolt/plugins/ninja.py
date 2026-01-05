@@ -1687,7 +1687,7 @@ class MSVCArchiver(Rule):
 
 
 class MSVCCRT(Variable):
-    def __init__(self, default="/MT", flagsfn=None):
+    def __init__(self, default="/MD", flagsfn=None):
         self.default = default
         self.flagsfn = flagsfn
 
