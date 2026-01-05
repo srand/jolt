@@ -5,8 +5,8 @@ from jolt.tasks import TaskRegistry
 
 
 @attributes.requires("requires_git")
-@pkgconfig.to_cxxinfo(["nlohmann_json"])
 @cmake.requires()
+@cmake.use_ninja()
 class NlohmannJson(cmake.CMake):
     name = "nlohmann/json"
     version = Parameter("3.12.0", help="nlohmann/json version.")
@@ -16,6 +16,10 @@ class NlohmannJson(cmake.CMake):
     options = [
         "JSON_BuildTests={tests[ON,OFF]}",
     ]
+
+    def publish(self, artifact, tools):
+        super().publish(artifact, tools)
+        artifact.cxxinfo.incpaths.append("include")
 
 
 TaskRegistry.get().add_task_class(NlohmannJson)

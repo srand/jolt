@@ -6,6 +6,7 @@ from jolt.tasks import TaskRegistry
 
 @attributes.requires("requires_git")
 @cmake.requires()
+@cmake.use_ninja()
 class TomlPlusPlus(cmake.CMake):
     name = "tomlplusplus"
     version = Parameter("3.4.0", help="TomlPlusPlus version.")

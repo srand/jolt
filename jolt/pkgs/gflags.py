@@ -6,6 +6,7 @@ from jolt.tasks import TaskRegistry
 
 @attributes.requires("requires_git")
 @cmake.requires()
+@cmake.use_ninja()
 class GFlags(cmake.CMake):
     name = "gflags"
     version = Parameter("2.3.0", help="gflags version.")

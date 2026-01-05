@@ -6,6 +6,7 @@ from jolt.tasks import TaskRegistry
 
 @attributes.requires("requires_git")
 @cmake.requires()
+@cmake.use_ninja()
 class Glslang(cmake.CMake):
     name = "glslang"
     version = Parameter("16.1.0", help="Glslang version.")
@@ -13,7 +14,7 @@ class Glslang(cmake.CMake):
 
     def run(self, deps, tools):
         with tools.cwd("{git[glslang]}"):
-            tools.run("./update_glslang_sources.py")
+            tools.run("python3 update_glslang_sources.py")
             super().run(deps, tools)
 
 

@@ -4,10 +4,11 @@ from jolt.tasks import TaskRegistry
 
 
 @attributes.requires("requires_git")
-@pkgconfig.to_cxxinfo("libfastjson")
 @autotools.requires(libtool=False)
 @libtool.relocate()
 @libtool.requires()
+@pkgconfig.requires()
+@pkgconfig.to_cxxinfo("libfastjson")
 class Libfastjson(autotools.Autotools):
     """ Builds and publishes liblibraries and headers. """
 

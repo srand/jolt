@@ -1,18 +1,22 @@
 from jolt import attributes, Parameter
 from jolt.pkgs import cmake
-from jolt.plugins import git, cmake, pkgconfig
+from jolt.plugins import git, cmake
 from jolt.tasks import TaskRegistry
 
 
 @attributes.requires("requires_git")
-@pkgconfig.to_cxxinfo(["RapidJSON"])
 @cmake.requires()
+@cmake.use_ninja()
 class RapidJSON(cmake.CMake):
     name = "rapidjson"
     version = Parameter("24b5e7a", help="rapidjson version.")
     options = ["CMAKE_POLICY_VERSION_MINIMUM=3.5"]
     requires_git = ["git:url=https://github.com/Tencent/rapidjson.git,rev={version}"]
     srcdir = "{git[rapidjson]}"
+
+    def publish(self, artifact, tools):
+        super().publish(artifact, tools)
+        artifact.cxxinfo.incpaths.append("include")
 
 
 TaskRegistry.get().add_task_class(RapidJSON)

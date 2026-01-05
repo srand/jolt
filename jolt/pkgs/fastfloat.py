@@ -6,11 +6,16 @@ from jolt.tasks import TaskRegistry
 
 @attributes.requires("requires_git")
 @cmake.requires()
+@cmake.use_ninja()
 class FastFloat(cmake.CMake):
     name = "fastfloat"
     version = Parameter("8.1.0", help="fastfloat version.")
     requires_git = ["git:url=https://github.com/fastfloat/fast_float.git,rev=v{version}"]
     srcdir = "{git[fast_float]}"
+
+    def publish(self, artifact, tools):
+        super().publish(artifact, tools)
+        artifact.cxxinfo.incpaths.append("include")
 
 
 TaskRegistry.get().add_task_class(FastFloat)

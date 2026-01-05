@@ -4,27 +4,29 @@ from jolt.plugins import git, cmake
 from jolt.tasks import TaskRegistry
 
 
-@attributes.requires("requires_dbus")
+@attributes.requires("requires_dbus_{system}")
 @attributes.requires("requires_git")
-@attributes.requires("requires_gl_{gl}")
+@attributes.requires("requires_{system}_gl_{gl}")
 @attributes.requires("requires_ninja")
 @attributes.requires("requires_protobuf")
-@attributes.attribute("options", "options_gl_{gl}")
+@attributes.system
+@cmake.options("options_{system}_gl_{gl}")
 @cmake.requires()
+@cmake.use_ninja()
 class Qt(cmake.CMake):
     name = "qt"
     version = Parameter("6.10.1", help="Qt version.")
     gl = BooleanParameter(True, help="Enable OpenGL support.")
 
     generator = "Ninja"
-    requires_dbus = ["dbus"]
-    requires_git = ["git:depth=1,url=https://github.com/qt/qt5.git,rev=v{version},submodules=true"]
+    requires_dbus_linux = ["dbus"]
+    requires_git = ["git:path={buildroot}/git-qt,url=https://github.com/qt/qt5.git,rev=v{version},submodules=true"]
     requires_ninja = ["ninja"]
-    requires_gl_true = ["libglvnd"]
+    requires_linux_gl_true = ["libglvnd"]
     requires_protobuf = ["protobuf"]
     srcdir = "{git[qt5]}"
 
-    options_gl_true = [
+    options_linux_gl_true = [
         "CMAKE_PREFIX_PATH={deps[libglvnd].path}",
         "CMAKE_INSTALL_RPATH={deps[libglvnd].path}/lib",
         "CMAKE_LIBRARY_PATH={deps[libglvnd].path}/lib",

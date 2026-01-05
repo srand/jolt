@@ -15,7 +15,7 @@ class NASM(Task):
     requires_autotools_linux = ["autoconf", "automake"]
     requires_git = ["git:url=https://github.com/netwide-assembler/nasm.git,rev=nasm-{version}"]
     requires_zlib = ["zlib"]
-    requires_perl = ["perl"]
+    requires_perl = ["virtual/perl"]
     srcdir = "{git[nasm]}"
 
     def run(self, deps, tools):

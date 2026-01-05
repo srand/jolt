@@ -7,6 +7,7 @@ from jolt.tasks import TaskRegistry
 @attributes.requires("requires_git")
 @attributes.requires("requires_json")
 @cmake.requires()
+@cmake.use_ninja()
 class Inja(cmake.CMake):
     name = "inja"
     version = Parameter("3.5.0", help="Inja version.")

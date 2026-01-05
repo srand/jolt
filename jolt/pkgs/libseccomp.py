@@ -7,6 +7,7 @@ from jolt.tasks import TaskRegistry
 @attributes.requires("requires_git")
 @attributes.requires("requires_gperf")
 @attributes.requires("requires_libtool")
+@pkgconfig.requires()
 @pkgconfig.to_cxxinfo("libseccomp")
 class Libseccomp(autotools.Autotools):
     name = "libseccomp"

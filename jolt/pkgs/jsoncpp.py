@@ -5,8 +5,9 @@ from jolt.tasks import TaskRegistry
 
 
 @attributes.requires("requires_git")
-@pkgconfig.to_cxxinfo(["jsoncpp"])
+@attributes.system
 @cmake.requires()
+@cmake.use_ninja()
 class JsonCPP(cmake.CMake):
     name = "jsoncpp"
     version = Parameter("1.9.6", help="JsonCPP version.")
@@ -16,6 +17,15 @@ class JsonCPP(cmake.CMake):
     options = [
         "JSONCPP_WITH_TESTS={tests[ON,OFF]}",
     ]
+
+    def publish(self, artifact, tools):
+        super().publish(artifact, tools)
+        artifact.cxxinfo.incpaths.append("include")
+        artifact.cxxinfo.libpaths.append("lib")
+        if self.system == "windows":
+            artifact.cxxinfo.libraries.append("jsoncpp_static")
+        else:
+            artifact.cxxinfo.libraries.append("jsoncpp")
 
 
 TaskRegistry.get().add_task_class(JsonCPP)

@@ -6,6 +6,7 @@ from jolt.tasks import TaskRegistry
 
 @attributes.requires("requires_git")
 @cmake.requires()
+@cmake.use_ninja()
 class SpirvTools(cmake.CMake):
     name = "spirv-tools"
     version = Parameter("2024.4", help="SPIRV-Tools version.")

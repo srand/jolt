@@ -7,6 +7,7 @@ from jolt.tasks import TaskRegistry
 @attributes.requires("requires_gflags")
 @attributes.requires("requires_git")
 @cmake.requires()
+@cmake.use_ninja()
 class Glog(cmake.CMake):
     name = "glog"
     version = Parameter("0.7.1", help="glog version.")

@@ -1,12 +1,12 @@
-from jolt import attributes, Download, Parameter
+from jolt import attributes, Alias, Download, Parameter
 from jolt.tasks import TaskRegistry
 
 
 @attributes.arch
 @attributes.system
 @attributes.common_metadata()
-class CMake(Download):
-    name = "cmake"
+class CMakeBin(Download):
+    name = "cmake/bin"
     version = Parameter("4.2.1", help="CMake version.")
     url = ["https://github.com/Kitware/CMake/releases/download/v{version}/cmake-{version}-{system}-{cmake_arch}{cmake_ext}"]
     collect = [{"files": "*", "cwd": "cmake-{version}-{system}-{cmake_arch}"}]
@@ -26,4 +26,11 @@ class CMake(Download):
         return ".tar.gz"
 
 
+class CMake(Alias):
+    name = "cmake"
+    version = Parameter("4.2.1", help="CMake version.")
+    requires = ["cmake/bin:version={version}"]
+
+
 TaskRegistry.get().add_task_class(CMake)
+TaskRegistry.get().add_task_class(CMakeBin)

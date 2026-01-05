@@ -1,3 +1,4 @@
+from jolt import attributes
 from jolt import Alias
 
 from jolt.pkgs import abseil
@@ -5,10 +6,10 @@ from jolt.pkgs import asio
 from jolt.pkgs import autoconf
 from jolt.pkgs import automake
 from jolt.pkgs import boost
+from jolt.pkgs import boringssl
 from jolt.pkgs import cares
 from jolt.pkgs import catch2
 from jolt.pkgs import cbindgen
-from jolt.pkgs import cereal
 from jolt.pkgs import cista
 from jolt.pkgs import clang
 from jolt.pkgs import cmake
@@ -41,6 +42,7 @@ from jolt.pkgs import libevent
 from jolt.pkgs import libfastjson
 from jolt.pkgs import libglvnd
 from jolt.pkgs import libpciaccess
+from jolt.pkgs import libressl
 from jolt.pkgs import libseccomp
 from jolt.pkgs import libtool
 from jolt.pkgs import libunwind
@@ -92,17 +94,16 @@ from jolt.pkgs import zlib
 from jolt.pkgs import zstd
 
 
+@attributes.system
+@attributes.requires("requires_{system}")
 class Default(Alias):
     requires = [
         "abseil",
-        "asio",
-        "autoconf",
-        "automake",
         "boost",
+        "boringssl",
         "c-ares",
         "catch2",
         "cbindgen",
-        "cereal",
         "cista",
         "clang",
         "cmake",
@@ -111,7 +112,6 @@ class Default(Alias):
         "cpython/extend",
         "crun",
         "curl",
-        "dbus",
         "double-conversion",
         "fastfloat",
         "ffmpeg",
@@ -126,36 +126,26 @@ class Default(Alias):
         "golang",
         "google/benchmark",
         "googletest",
-        "gperf",
         "grpc",
+        "grpc/c",
+        "grpc/c++",
         "hdf5",
         "help2man",
         "inja",
         "jsoncpp",
-        "libdrm",
         "libevent",
         "libfastjson",
-        "libglvnd",
-        "libpciaccess",
-        "libseccomp",
+        "libressl",
         "libtool",
         "libunwind",
         "libva",
         "libvorbis",
-        "libx11",
-        "libxcb",
-        "libxcb-keysyms",
-        "libxcb-proto",
         "libxml2",
         "libxslt",
-        "libxshmfence",
         "libyajl",
         "llvm",
         "lua",
-        "texinfo",
-        "m4",
         "make",
-        "mesa",
         "nasm",
         "ng-log",
         "ninja",
@@ -167,13 +157,15 @@ class Default(Alias):
         "pkg-config",
         "poco",
         "protobuf",
+        "protobuf/lib",
+        "protobuf/lib-compiler",
+        "protobuf/lib-lite",
         "pugixml",
         "python",
         "qt",
         "rapidjson",
         "re2",
         "re2c",
-        "readline",
         "rust",
         "sdl",
         "simdjson",
@@ -183,10 +175,34 @@ class Default(Alias):
         "spirv-tools",
         "sqlite",
         "tomlplusplus",
-        "wayland",
-        "xorg/macros",
         "xz",
         "yaml-cpp",
         "zlib",
         "zstd",
+    ]
+
+    requires_darwin = [
+        "asio",
+        "autoconf",
+        "automake",
+        "dbus",
+        "gperf",
+        "m4",
+        "readline",
+        "texinfo",
+    ]
+
+    requires_linux = requires_darwin + [
+        "libdrm",
+        "libglvnd",
+        "libpciaccess",
+        "libseccomp",
+        "libx11",
+        "libxcb",
+        "libxcb-keysyms",
+        "libxcb-proto",
+        "libxshmfence",
+        "mesa",
+        "wayland",
+        "xorg/macros",
     ]

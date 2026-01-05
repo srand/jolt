@@ -1,5 +1,4 @@
 from jolt import attributes, Parameter, Task
-from jolt.pkgs import autoconf, makeinfo
 from jolt.plugins import git, autotools
 from jolt.tasks import TaskRegistry
 

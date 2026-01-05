@@ -8,6 +8,7 @@ from jolt.tasks import TaskRegistry
 @attributes.requires("requires_llvm")
 @attributes.requires("requires_spirv_tools")
 @cmake.requires()
+@cmake.use_ninja()
 class SpirvLLVM(cmake.CMake):
     name = "spirv-llvm-translator"
     version = Parameter("21.1.3", help="SPIRV-LLVM version.")

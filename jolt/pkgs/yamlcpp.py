@@ -5,19 +5,26 @@ from jolt.tasks import TaskRegistry
 
 
 @attributes.requires("requires_git")
-@pkgconfig.to_cxxinfo(["yaml-cpp"])
+@attributes.system
 @cmake.requires()
+@cmake.use_ninja()
 class YamlCPP(cmake.CMake):
     name = "yaml-cpp"
     version = Parameter("bbf8bdb", help="yaml-cpp version.")
-    shared = BooleanParameter(True, help="Build shared libraries.")
+    shared = BooleanParameter(False, help="Build shared libraries.")
     requires_git = ["git:url=https://github.com/jbeder/yaml-cpp.git,rev={version}"]
     srcdir = "{git[yaml-cpp]}"
     options = [
         "CMAKE_POLICY_VERSION_MINIMUM=3.5",
-        "YAML_BUILD_SHARED_LIBS={shared[ON,OFF]}"
-        "YAML_BUILD_TOOLS=OFF"
+        "YAML_BUILD_SHARED_LIBS={shared[ON,OFF]}",
+        "YAML_BUILD_TOOLS=OFF",
     ]
+
+    def publish(self, artifact, tools):
+        super().publish(artifact, tools)
+        artifact.cxxinfo.incpaths.append("include")
+        artifact.cxxinfo.libpaths.append("lib")
+        artifact.cxxinfo.libraries.append("yaml-cpp")
 
 
 TaskRegistry.get().add_task_class(YamlCPP)

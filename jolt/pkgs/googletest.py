@@ -6,6 +6,7 @@ from jolt.tasks import TaskRegistry
 
 @attributes.requires("requires_git")
 @cmake.requires()
+@cmake.use_ninja()
 class GoogleTest(cmake.CMake):
     name = "googletest"
     version = Parameter("1.12.1", help="GoogleTest version.")

@@ -6,6 +6,7 @@ from jolt.tasks import TaskRegistry
 
 @attributes.requires("requires_git")
 @cmake.requires()
+@cmake.use_ninja()
 class Re2c(cmake.CMake):
     name = "re2c"
     version = Parameter("4.4", help="re2c version.")

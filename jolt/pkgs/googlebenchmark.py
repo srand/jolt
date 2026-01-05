@@ -6,6 +6,7 @@ from jolt.plugins import git, cmake
 
 @attributes.requires("requires_git")
 @cmake.requires()
+@cmake.use_ninja()
 class GoogleBenchmark(cmake.CMake):
     name = "google/benchmark"
     version = Parameter("1.9.4", help="Benchmark version.")

@@ -18,6 +18,7 @@ class LLVMFromBin(Download):
 @attributes.requires("requires_git")
 @attributes.requires("requires_ninja")
 @cmake.requires()
+@cmake.use_ninja()
 class LLVMFromSrc(cmake.CMake):
     name = "llvm/src"
 

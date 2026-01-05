@@ -6,6 +6,7 @@ from jolt.tasks import TaskRegistry
 
 @attributes.requires("requires_git")
 @cmake.requires()
+@cmake.use_ninja()
 class DBus(cmake.CMake):
     name = "dbus"
     version = Parameter("1.16.2", help="DBus version.")

@@ -1,12 +1,12 @@
 from jolt import attributes, Parameter
 from jolt.pkgs import cmake
-from jolt.plugins import git, cmake, pkgconfig
+from jolt.plugins import git, cmake
 from jolt.tasks import TaskRegistry
 
 
 @attributes.requires("requires_git")
-@pkgconfig.to_cxxinfo(["spdlog"])
 @cmake.requires()
+@cmake.use_ninja()
 class Spdlog(cmake.CMake):
     name = "spdlog"
     version = Parameter("1.16.0", help="spdlog version.")
@@ -16,6 +16,12 @@ class Spdlog(cmake.CMake):
         "SPDLOG_BUILD_TESTS=OFF",
         "SPDLOG_BUILD_BENCH=OFF",
     ]
+
+    def publish(self, artifact, tools):
+        super().publish(artifact, tools)
+        artifact.cxxinfo.incpaths.append("include")
+        artifact.cxxinfo.libpaths.append("lib")
+        artifact.cxxinfo.libraries.append("stdlog")
 
 
 TaskRegistry.get().add_task_class(Spdlog)

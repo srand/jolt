@@ -19,8 +19,7 @@ class StrawberryPerl(Download):
 @attributes.system
 @attributes.requires("requires_{system}")
 class Perl(Alias):
-    name = "perl"
-
+    name = "virtual/perl"
     requires_windows = ["perl/strawberry"]
 
 
