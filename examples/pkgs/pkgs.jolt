@@ -62,6 +62,7 @@ from jolt.pkgs import ninja
 from jolt.pkgs import nlohmann_json
 from jolt.pkgs import nodejs
 from jolt.pkgs import opencv
+from jolt.pkgs import openjdk
 from jolt.pkgs import openssl
 from jolt.pkgs import pkgconfig
 from jolt.pkgs import poco
@@ -150,6 +151,7 @@ class Default(Alias):
         "nlohmann/json",
         "nodejs",
         "opencv",
+        "openjdk",
         "openssl",
         "pkg-config",
         "poco",
