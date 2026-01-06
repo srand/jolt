@@ -5,14 +5,13 @@ from jolt.tasks import TaskRegistry
 
 
 @attributes.requires("requires_git")
-@attributes.requires("requires_meson")
+@meson.requires()
 class PkgConf(meson.Meson):
     """ Package that provides the 'pkgconf' binary, an alternative implementation of 'pkg-config'. """
 
     name = "pkgconf"
     version = Parameter("2.5.1", help="pkg-config version.")
     requires_git = ["git:url=https://github.com/pkgconf/pkgconf.git,rev=pkgconf-{version}"]
-    requires_meson = ["meson"]
     srcdir = "{git[pkgconf]}"
     options = [
         "default_library=static",

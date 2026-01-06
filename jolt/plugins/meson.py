@@ -41,3 +41,21 @@ class Meson(Task):
     def publish(self, artifact, tools):
         at = tools.meson(incremental=self.incremental)
         at.publish(artifact)
+
+
+def requires(meson=True, ninja=True):
+    """ Decorator to add Meson and Ninja requirements to a task. """
+
+    import jolt.pkgs.meson
+    import jolt.pkgs.ninja
+
+    def decorate(cls):
+        if meson:
+            cls = attributes.requires("requires_meson")(cls)
+            cls.requires_meson = ["meson"]
+        if ninja:
+            cls = attributes.requires("requires_ninja")(cls)
+            cls.requires_ninja = ["ninja"]
+        return cls
+
+    return decorate

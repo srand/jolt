@@ -5,8 +5,8 @@ from jolt.tasks import TaskRegistry
 
 
 @attributes.requires("requires_git")
-@attributes.requires("requires_meson")
 @attributes.requires("requires_{intel[intel,no_intel]}")
+@meson.requires()
 class Libdrm(meson.Meson):
     name = "libdrm"
     version = Parameter("2.4.131", help="Libdrm version.")
@@ -25,7 +25,6 @@ class Libdrm(meson.Meson):
 
     requires_git = ["git:url=https://gitlab.freedesktop.org/mesa/drm.git,rev=libdrm-{version}"]
     requires_intel = ["libpciaccess"]
-    requires_meson = ["meson"]
     srcdir = "{git[drm]}"
     options = [
         "amdgpu={amdgpu[enabled,disabled]}",
