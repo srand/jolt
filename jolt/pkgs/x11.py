@@ -1,6 +1,7 @@
 from jolt import Alias
 from jolt.tasks import TaskRegistry
 
+
 class GlProto(Alias):
     name = "glproto"
     requires = ["xorg/glproto"]

@@ -1,5 +1,5 @@
 from jolt import attributes, Parameter, Task
-from jolt.pkgs import cbindgen, glslang, libdrm, libglvnd, libva, x11 
+from jolt.pkgs import cbindgen, glslang, libdrm, libglvnd, libva, x11
 from jolt.pkgs import meson, rust, spirv_llvm, wayland
 from jolt.plugins import git
 from jolt.tasks import TaskRegistry

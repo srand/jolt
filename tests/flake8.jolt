@@ -1,10 +1,19 @@
 from jolt import *
-from jolt.plugins import git
+from jolt.plugins import git, python
+
+
+class PythonFlake8(python.PythonEnv):
+    name = "python-flake8"
+    requirements = [
+        "flake8",
+    ]
+
 
 @git.influence("..")
 class Flake8(Task):
+    requires = ["python-flake8"]
+
     def run(self, deps, tools):
         with tools.cwd(".."):
-            tools.run("pip install --break-system-packages flake8")
             tools.run("flake8 --exclude '*pb2*,pkgs' --ignore=E501,E502,F401,F824 jolt")
             tools.run("flake8 --ignore=E501,E502,F401,F811,F824 jolt/pkgs")
