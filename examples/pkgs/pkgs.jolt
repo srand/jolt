@@ -60,6 +60,7 @@ from jolt.pkgs import nasm
 from jolt.pkgs import ng_log
 from jolt.pkgs import ninja
 from jolt.pkgs import nlohmann_json
+from jolt.pkgs import nodejs
 from jolt.pkgs import opencv
 from jolt.pkgs import openssl
 from jolt.pkgs import pkgconfig
@@ -147,6 +148,7 @@ class Default(Alias):
         "ninja/bin",
         "ninja/src",
         "nlohmann/json",
+        "nodejs",
         "opencv",
         "openssl",
         "pkg-config",

@@ -7,20 +7,28 @@ import platform
 
 
 @attributes.system
-@attributes.attribute("bin", "bin_{system}")
-@attributes.attribute("url", "url_{system}")
 class NodeJS(Download):
     name = "nodejs"
-    version = Parameter("16.15.1", help="NodeJS version.")
-    url_linux = "https://nodejs.org/dist/v{version}/node-v{version}-linux-{arch}.tar.gz"
-    url_windows = "https://nodejs.org/dist/v{version}/node-v{version}-win-{arch}.zip"
-    bin_linux = "node-v{version}-linux-{arch}/bin"
-    bin_windows = "node-v{version}-win-{arch}/bin"
+    version = Parameter("25.2.1", help="NodeJS version.")
+    url = "https://nodejs.org/dist/v{version}/node-v{version}-{os}-{arch}.{ext}"
+    bin = "node-v{version}-{os}-{arch}/bin"
+
+    @property
+    def os(self):
+        if self.system == "windows":
+            return "win"
+        return self.system
+
+    @property
+    def ext(self):
+        if self.system == "windows":
+            return "zip"
+        return "tar.gz"
 
     @property
     def arch(self):
         arch = platform.machine()
-        if arch == "x86_64":
+        if arch in ["amd64", "x86_64"]:
             return "x64"
         if arch in ["i386", "i486", "i586", "i686"]:
             return "x86"
