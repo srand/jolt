@@ -76,6 +76,9 @@ class CMake(Task):
     srcdir = None
     """ Source directory. If not specified, the task working directory is used. """
 
+    install = ["install"]
+    """ List of install build targets. If empty, the default install target is used. """
+
     def clean(self, tools):
         cmake = tools.cmake(incremental=self.incremental)
         cmake.clean()
@@ -91,8 +94,8 @@ class CMake(Task):
         with tools.cwd(self.srcdir or self.joltdir):
             cmake = tools.cmake(deps, incremental=self.incremental)
             cmake.configure(tools.expand(self.cmakelists), *["-D" + tools.expand(option) for option in options], generator=self.generator)
-            cmake.build(config=config)
-            cmake.install(config=config)
+            for target in self.install or ["install"]:
+                cmake.install(config=config, target=target)
 
     def publish(self, artifact, tools):
         cmake = tools.cmake(incremental=self.incremental)

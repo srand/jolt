@@ -287,9 +287,9 @@ class _CMake(object):
         with self.tools.cwd(self.builddir):
             self.tools.run("cmake --build . --config {0} {1}", config, threading_args, output=True)
 
-    def install(self, *args, config="Release", **kwargs):
+    def install(self, target="install", config="Release", **kwargs):
         with self.tools.cwd(self.builddir), self.tools.environ(DESTDIR=self.installdir):
-            self.tools.run("cmake --build . --config {0} --target install", config, output=True)
+            self.tools.run("cmake --build . --config {0} --target {1}", config, target, output=True)
 
     def publish(self, artifact, files='*', symlinks=True, *args, **kwargs):
         with self.tools.cwd(self.installdir, "jolt-prefix"):
