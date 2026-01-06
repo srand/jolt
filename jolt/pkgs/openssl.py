@@ -5,8 +5,8 @@ from jolt.tasks import TaskRegistry
 
 
 @attributes.requires("requires_git")
-@attributes.requires("requires_perl_{system}")
-@attributes.requires("requires_nasm")
+@attributes.requires("requires_perl")
+@attributes.requires("requires_{system}_nasm")
 @attributes.common_metadata()
 @attributes.system
 class OpenSSL(Task):
@@ -14,8 +14,8 @@ class OpenSSL(Task):
     version = Parameter("3.6.0", help="openssl version.")
 
     requires_git = ["git:url=https://github.com/openssl/openssl.git,rev=openssl-{version}"]
-    requires_perl_windows = ["virtual/perl"]
-    requires_nasm = ["nasm"]
+    requires_perl = ["virtual/perl"]
+    requires_windows_nasm = ["nasm"]
 
     def clean(self):
         pass
@@ -43,6 +43,7 @@ class OpenSSL(Task):
         artifact.cxxinfo.libpaths.append("lib")
         artifact.cxxinfo.libraries.append("ssl")
         artifact.cxxinfo.libraries.append("crypto")
+        artifact.strings.install_prefix = self.installdir
         if self.system == "windows":
             self.publish_pkgconfig(artifact, tools)
 

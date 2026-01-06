@@ -1,29 +1,33 @@
 from jolt import attributes, BooleanParameter, Parameter
-from jolt.pkgs import boost, cmake, sqlite
+from jolt.pkgs import boost, cmake, mysql, sqlite
 from jolt.plugins import git, cmake
 from jolt.tasks import TaskRegistry
 
 
 @attributes.requires("requires_boost_{boost[on,off]}")
 @attributes.requires("requires_git")
+@attributes.requires("requires_mysql_{mysql[on,off]}")
 @attributes.requires("requires_sqlite_{sqlite[on,off]}")
 @cmake.requires()
 @cmake.use_ninja()
 class Soci(cmake.CMake):
     name = "soci"
-    version = Parameter("4.1.2", help="soci version.")
+    version = Parameter("4.1.2", help="Soci version")
     shared = BooleanParameter(False, help="Build shared libraries")
     boost = BooleanParameter(False, help="Enable boost support")
+    mysql = BooleanParameter(True, "Enable MySQL support")
     sqlite = BooleanParameter(True, "Enable sqlite support")
 
     requires_boost_on = ["boost"]
     requires_git = ["git:url=https://github.com/SOCI/soci.git,rev=v{version}"]
+    requires_mysql_on = ["libmysqlclient"]
     requires_sqlite_on = ["sqlite"]
     srcdir = "{git[soci]}"
     options = [
         "SOCI_TESTS=OFF",
         "SOCI_SHARED={shared[ON,OFF]}",
         "SOCI_SQLITE3={sqlite[ON,OFF]}",
+        "SOCI_MYSQL={mysql[ON,OFF]}",
         "WITH_BOOST={boost[ON,OFF]}"
     ]
 

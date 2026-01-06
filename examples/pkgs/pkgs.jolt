@@ -57,6 +57,7 @@ from jolt.pkgs import lua
 from jolt.pkgs import m4
 from jolt.pkgs import make
 from jolt.pkgs import mesa
+from jolt.pkgs import mysql
 from jolt.pkgs import nasm
 from jolt.pkgs import ng_log
 from jolt.pkgs import ninja
@@ -136,6 +137,7 @@ class Default(Alias):
         "jsoncpp",
         "libevent",
         "libfastjson",
+        "libmysqlclient",
         "libtool",
         "libunwind",
         "libva",
