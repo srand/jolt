@@ -1,5 +1,5 @@
 from jolt import attributes, Parameter
-from jolt.pkgs import libx11
+from jolt.pkgs import x11
 from jolt.tasks import TaskRegistry
 from jolt.plugins import autotools, git, libtool, pkgconfig
 

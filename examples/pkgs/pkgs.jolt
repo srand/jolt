@@ -40,20 +40,15 @@ from jolt.pkgs import jsoncpp
 from jolt.pkgs import libdrm
 from jolt.pkgs import libevent
 from jolt.pkgs import libfastjson
+from jolt.pkgs import libffi
 from jolt.pkgs import libglvnd
 from jolt.pkgs import libpciaccess
-from jolt.pkgs import libressl
 from jolt.pkgs import libseccomp
 from jolt.pkgs import libtool
 from jolt.pkgs import libunwind
 from jolt.pkgs import libva
 from jolt.pkgs import libvorbis
-from jolt.pkgs import libx11
-from jolt.pkgs import libxcb
-from jolt.pkgs import libxcb_keysyms
-from jolt.pkgs import libxcb_proto
 from jolt.pkgs import libxml2
-from jolt.pkgs import libxshmfence
 from jolt.pkgs import libxslt
 from jolt.pkgs import libyajl
 from jolt.pkgs import llvm
@@ -87,7 +82,8 @@ from jolt.pkgs import sqlite
 from jolt.pkgs import texinfo
 from jolt.pkgs import tomlplusplus
 from jolt.pkgs import wayland
-from jolt.pkgs import xorg_macros
+from jolt.pkgs import x11
+from jolt.pkgs import xorg
 from jolt.pkgs import xz
 from jolt.pkgs import yamlcpp
 from jolt.pkgs import zlib
@@ -135,7 +131,6 @@ class Default(Alias):
         "jsoncpp",
         "libevent",
         "libfastjson",
-        "libressl",
         "libtool",
         "libunwind",
         "libva",
@@ -157,9 +152,9 @@ class Default(Alias):
         "pkg-config",
         "poco",
         "protobuf",
-        "protobuf/lib",
         "protobuf/lib-compiler",
         "protobuf/lib-lite",
+        "protobuf/lib",
         "pugixml",
         "python",
         "qt",
@@ -194,15 +189,31 @@ class Default(Alias):
 
     requires_linux = requires_darwin + [
         "libdrm",
+        "libffi",
         "libglvnd",
         "libpciaccess",
         "libseccomp",
-        "libx11",
-        "libxcb",
-        "libxcb-keysyms",
-        "libxcb-proto",
-        "libxshmfence",
         "mesa",
         "wayland",
+        "xorg/glproto",
+        "xorg/inputproto",
+        "xorg/kbproto",
+        "xorg/libx11-xcb",
+        "xorg/libx11",
+        "xorg/libxau",
+        "xorg/libxcb",
+        "xorg/libxdmcp",
+        "xorg/libxext",
+        "xorg/libxrandr",
+        "xorg/libxrender",
+        "xorg/libxshmfence",
         "xorg/macros",
+        "xorg/randrproto",
+        "xorg/renderproto",
+        "xorg/xcb-keysyms",
+        "xorg/xcb-proto",
+        "xorg/xextproto",
+        "xorg/xf86vidmodeproto",
+        "xorg/xproto",
+        "xorg/xtrans",
     ]

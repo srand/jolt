@@ -5,6 +5,7 @@ from jolt.tasks import TaskRegistry
 
 
 @attributes.requires("requires_git")
+@attributes.system
 @cmake.requires()
 @cmake.use_ninja()
 class Curl(cmake.CMake):

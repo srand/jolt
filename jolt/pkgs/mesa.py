@@ -1,6 +1,6 @@
 from jolt import attributes, Parameter, Task
-from jolt.pkgs import cbindgen, glslang, libdrm, libglvnd, libva
-from jolt.pkgs import libx11, libxshmfence, meson, rust, spirv_llvm, wayland
+from jolt.pkgs import cbindgen, glslang, libdrm, libglvnd, libva, x11 
+from jolt.pkgs import meson, rust, spirv_llvm, wayland
 from jolt.plugins import git
 from jolt.tasks import TaskRegistry
 
@@ -14,10 +14,12 @@ from jolt.tasks import TaskRegistry
 @attributes.requires("requires_libva")
 @attributes.requires("requires_libx11_xcb")
 @attributes.requires("requires_libxshmfence")
+@attributes.requires("requires_libxxf86vm")
 @attributes.requires("requires_meson")
 @attributes.requires("requires_rust")
 @attributes.requires("requires_spirv_llvm")
 @attributes.requires("requires_wayland")
+@attributes.requires("requires_xrandr")
 @attributes.common_metadata()
 class Mesa(Task):
     name = "mesa"
@@ -30,12 +32,14 @@ class Mesa(Task):
     requires_libglvnd = ["libglvnd"]
     requires_libx11_xcb = ["libx11-xcb"]
     requires_libxshmfence = ["libxshmfence"]
+    requires_libxxf86vm = ["libxxf86vm"]
     requires_llvm = ["clang", "llvm"]
     requires_libva = ["libva"]
     requires_meson = ["meson"]
     requires_rust = ["rust", "rust-bindgen"]
     requires_spirv_llvm = ["spirv-llvm-translator"]
     requires_wayland = ["wayland"]
+    requires_xrandr = ["libxrandr"]
 
     def run(self, deps, tools):
         try:

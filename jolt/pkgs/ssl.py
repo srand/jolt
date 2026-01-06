@@ -1,5 +1,5 @@
 from jolt import Alias
-from jolt.pkgs import boringssl, libressl, openssl
+from jolt.pkgs import boringssl, openssl
 from jolt.tasks import TaskRegistry
 
 
