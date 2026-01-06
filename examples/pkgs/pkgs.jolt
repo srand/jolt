@@ -54,6 +54,7 @@ from jolt.pkgs import libxslt
 from jolt.pkgs import libyajl
 from jolt.pkgs import llvm
 from jolt.pkgs import lua
+from jolt.pkgs import lz4
 from jolt.pkgs import m4
 from jolt.pkgs import make
 from jolt.pkgs import mesa
@@ -153,6 +154,7 @@ class Default(Alias):
         "libzmq",
         "llvm",
         "lua",
+        "lz4",
         "make",
         "nasm",
         "ng-log",
