@@ -64,6 +64,7 @@ from jolt.pkgs import nodejs
 from jolt.pkgs import opencv
 from jolt.pkgs import openjdk
 from jolt.pkgs import openssl
+from jolt.pkgs import perl
 from jolt.pkgs import pkgconfig
 from jolt.pkgs import poco
 from jolt.pkgs import protobuf
@@ -72,6 +73,7 @@ from jolt.pkgs import python
 from jolt.pkgs import qt
 from jolt.pkgs import rapidjson
 from jolt.pkgs import re2
+from jolt.pkgs import re2c
 from jolt.pkgs import readline
 from jolt.pkgs import rust
 from jolt.pkgs import sdl
@@ -174,6 +176,8 @@ class Default(Alias):
         "spirv-tools",
         "sqlite",
         "tomlplusplus",
+        "virtual/perl",
+        "virtual/ssl",
         "xz",
         "yaml-cpp",
         "zlib",

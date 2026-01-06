@@ -1,5 +1,7 @@
-from jolt import attributes, Alias, Download, Parameter
+from jolt import attributes, influence
+from jolt import Alias, Download, Parameter, Task
 from jolt.tasks import TaskRegistry
+from jolt.error import raise_task_error_if
 
 
 class StrawberryPerl(Download):
@@ -17,11 +19,24 @@ class StrawberryPerl(Download):
 
 
 @attributes.system
+@influence.string("{system}")
+class HostPerl(Task):
+    name = "perl/host"
+
+    def run(self, deps, tools):
+        raise_task_error_if(not tools.which("perl"), "Perl is not installed on the host system.")
+
+
+@attributes.system
 @attributes.requires("requires_{system}")
 class Perl(Alias):
     name = "virtual/perl"
+
+    requires_darwin = ["perl/host"]
+    requires_linux = ["perl/host"]
     requires_windows = ["perl/strawberry"]
 
 
 TaskRegistry.get().add_task_class(Perl)
+TaskRegistry.get().add_task_class(HostPerl)
 TaskRegistry.get().add_task_class(StrawberryPerl)
