@@ -93,6 +93,7 @@ from jolt.pkgs import x11
 from jolt.pkgs import xorg
 from jolt.pkgs import xz
 from jolt.pkgs import yamlcpp
+from jolt.pkgs import zeromq
 from jolt.pkgs import zlib
 from jolt.pkgs import zstd
 
@@ -110,6 +111,7 @@ class Default(Alias):
         "cista",
         "clang",
         "cmake",
+        "cppzmq",
         "cpython",
         "cpython/embed",
         "cpython/extend",
@@ -146,6 +148,7 @@ class Default(Alias):
         "libxml2",
         "libxslt",
         "libyajl",
+        "libzmq",
         "llvm",
         "lua",
         "make",
