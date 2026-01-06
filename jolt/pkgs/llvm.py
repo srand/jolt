@@ -48,7 +48,7 @@ class LLVMFromSrc(cmake.CMake):
 
     requires_ninja = ["ninja"]
     requires_git = [
-        "git:url=https://github.com/llvm/llvm-project.git,depth=1,rev=llvmorg-{version}"
+        "git:url=https://github.com/llvm/llvm-project.git,rev=llvmorg-{version}"
     ]
 
     options = [

@@ -10,7 +10,7 @@ from jolt.tasks import TaskRegistry
 class CAres(cmake.CMake):
     name = "c-ares"
     version = Parameter("1.34.6", help="c-ares version.")
-    requires_git = ["git:url=https://github.com/c-ares/c-ares.git,depth=1,rev=v{version}"]
+    requires_git = ["git:url=https://github.com/c-ares/c-ares.git,rev=v{version}"]
     srcdir = "{git[c-ares]}"
 
     def publish(self, artifact, tools):

@@ -15,7 +15,7 @@ class Boost(Task):
     version = Parameter("1.90.0", help="Boost version.")
     shared = BooleanParameter(False, "Build shared libraries")
     bits = IntParameter(64, values=[32, 64], help="Boost address-model")
-    requires_git = ["git:url=https://github.com/boostorg/boost.git,depth=1,path={buildroot}/git-boost,rev=boost-{version},submodules=true"]
+    requires_git = ["git:url=https://github.com/boostorg/boost.git,path={buildroot}/git-boost,rev=boost-{version},submodules=true"]
     requires_python = ["cpython"]
 
     def run(self, artifact, tools):

@@ -76,7 +76,7 @@ class GitRepository(object):
     def is_indexed(self):
         return self.is_cloned() and fs.path.exists(self._git_index())
 
-    def clone(self, depth=None, submodules=False):
+    def clone(self, submodules=False):
         log.info("Cloning into {0}", self.path)
 
         # Get reference repository path
@@ -111,20 +111,16 @@ class GitRepository(object):
 
                 utils.call_and_catch(self.tools.run, "git remote remove origin", output=False)
                 self.tools.run("git remote add origin {}", self.url, output_on_error=True)
-                self._fetch_origin(depth=depth, submodules=submodules)
+                self._fetch_origin(submodules=submodules)
                 self.tools.run("git checkout -f FETCH_HEAD", output_on_error=True)
         else:
             # Get configurable extra clone options
             extra_clone_options = config.get("git", "clone_options", "")
 
-            depth = "--depth {}".format(depth) if depth and depth > 0 else ""
-            if submodules:
-                depth += " --shallow-submodules --recurse-submodules"
-
             if refpath and os.path.isdir(refpath):
-                self.tools.run("git clone --reference-if-able  {0} {1} {2} {3} {4}", refpath, extra_clone_options, depth, self.url, self.path, output_on_error=True)
+                self.tools.run("git clone --reference-if-able  {0} {1} {2} {3}", refpath, extra_clone_options, self.url, self.path, output_on_error=True)
             else:
-                self.tools.run("git clone {0} {1} {2} {3}", extra_clone_options, depth, self.url, self.path, output_on_error=True)
+                self.tools.run("git clone {0} {1} {2}", extra_clone_options, self.url, self.path, output_on_error=True)
 
         self._init_repo()
         raise_error_if(
@@ -132,16 +128,12 @@ class GitRepository(object):
             "Failed to clone repository '{0}'", self.relpath)
 
     @utils.retried.on_exception(JoltCommandError, pattern="Command failed: git fetch", count=6, backoff=[2, 5, 10, 15, 20, 30])
-    def _fetch_origin(self, depth=None, submodules=False):
+    def _fetch_origin(self, submodules=False):
         # Get configurable extra clone options
         extra_fetch_options = config.get("git", "fetch_options", "")
 
-        depth = "--depth {}".format(depth) if depth and depth > 0 else ""
-        if submodules:
-            depth += " --recurse-submodules"
-
         with self.tools.cwd(self.path):
-            self.tools.run("git fetch {0} {1} origin", depth, extra_fetch_options, output_on_error=True)
+            self.tools.run("git fetch {0} {1} origin", "", extra_fetch_options, output_on_error=True)
 
     @utils.cached.instance
     def diff_unchecked(self):
@@ -284,7 +276,7 @@ class GitRepository(object):
                 what=commit or refspec or '',
                 output_on_error=True)
 
-    def checkout(self, rev, commit=None, submodules=False, depth=None):
+    def checkout(self, rev, commit=None, submodules=False):
         if rev == self._last_rev:
             log.debug("Checkout skipped, already @ {}", rev)
             return False
@@ -293,24 +285,22 @@ class GitRepository(object):
             try:
                 self.tools.run("git checkout -f {rev}", rev=rev, output=False)
                 if submodules:
-                    self._update_submodules(depth=depth)
+                    self._update_submodules()
             except Exception:
                 self.fetch(commit=commit)
                 try:
                     self.tools.run("git checkout -f {rev}", rev=rev, output_on_error=True)
                     if submodules:
-                        self._update_submodules(depth=depth)
+                        self._update_submodules()
                 except Exception:
                     raise_error("Commit does not exist in remote for '{}': {}", self.relpath, rev)
         self._original_head = False
         self._last_rev = rev
         return True
 
-    def _update_submodules(self, depth=None):
-        depth = "--depth {}".format(depth) if depth and depth > 0 else ""
+    def _update_submodules(self):
         with self.tools.cwd(self.path):
-            self.tools.run("git submodule update {0} --init --recursive", depth, output_on_error=True)
-
+            self.tools.run("git submodule update --init --recursive", output_on_error=True)
 
 _gits = {}
 
@@ -461,9 +451,6 @@ class Git(WorkspaceResource, FileInfluence):
     path = Parameter(required=False, help="Local path where the repository should be cloned.")
     """ Alternative path where the repository should be cloned. Relative to ``joltdir``. Optional. """
 
-    depth = IntParameter(default=0, min=0, help="Depth for shallow clone. 0 means full clone. Optional.")
-    """ Depth for shallow clone. 0 means full clone. Optional. """
-
     submodules = BooleanParameter(default=False, help="Initialize and update git submodules after cloning.")
     """ Initialize and update git submodules after cloning. Default ``False``. Optional. """
 
@@ -565,7 +552,7 @@ class Git(WorkspaceResource, FileInfluence):
     def _acquire_ws(self):
         commit = None
         if not self.git.is_cloned():
-            self.git.clone(depth=int(self.depth) if self.depth.is_set() else None, submodules=bool(self.submodules))
+            self.git.clone(submodules=bool(self.submodules))
         if not self._revision.is_imported:
             self.git.diff_unchecked()
         else:
@@ -578,7 +565,7 @@ class Git(WorkspaceResource, FileInfluence):
             # Should be safe to do this now
             rev = self.git.rev_parse(rev)
             if not self.git.is_head(rev) or self._revision.is_imported:
-                if self.git.checkout(rev, commit=commit, submodules=bool(self.submodules), depth=int(self.depth) if self.depth.is_set() else None):
+                if self.git.checkout(rev, commit=commit, submodules=bool(self.submodules)):
                     self.git.clean()
                     self.git.patch(self._diff.value)
 
@@ -609,7 +596,7 @@ class Git(WorkspaceResource, FileInfluence):
     @utils.cached.instance
     def get_influence(self, task):
         if not self.git.is_cloned():
-            self.git.clone(depth=int(self.depth) if self.depth.is_set() else None, submodules=bool(self.submodules))
+            self.git.clone(submodules=bool(self.submodules))
         if not self._revision.is_imported:
             self.git.diff_unchecked()
         rev = self._get_revision()

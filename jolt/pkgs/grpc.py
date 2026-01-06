@@ -21,7 +21,7 @@ class Grpc(cmake.CMake):
     generator = "Ninja"
     requires_abseil = ["abseil"]
     requires_cares = ["c-ares"]
-    requires_git = ["git:url=https://github.com/grpc/grpc.git,depth=1,path={buildroot}/git_grpc,rev=v{version},submodules=true"]
+    requires_git = ["git:url=https://github.com/grpc/grpc.git,path={buildroot}/git_grpc,rev=v{version},submodules=true"]
     requires_nasm_windows = ["nasm"]
     requires_protobuf = ["protobuf"]
     requires_re2 = ["re2"]
