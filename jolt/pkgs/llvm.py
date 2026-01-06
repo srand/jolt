@@ -4,6 +4,9 @@ from jolt.plugins import git, cmake
 from jolt.tasks import TaskRegistry
 
 
+VERSION = "21.1.8"
+
+
 @attributes.common_metadata()
 class LLVMFromBin(Download):
     name = "llvm/bin"
@@ -23,7 +26,7 @@ class LLVMFromSrc(cmake.CMake):
     name = "llvm/src"
 
     projects = ListParameter(
-        ["clang", "clang-tools-extra", "lld", "libclc", ],
+        ["clang", "clang-tools-extra", "lld", "libclc"],
         values=[
             "clang",
             "clang-tools-extra",
@@ -44,12 +47,10 @@ class LLVMFromSrc(cmake.CMake):
         values=["X86", "AMDGPU", "ARM", "AArch64", "RISCV", "Mips", "PowerPC", "SystemZ"],
         help="LLVM targets to build.",
     )
-    version = Parameter("21.1.8", help="LLVM version.")
+    version = Parameter(VERSION, help="LLVM version.")
 
     requires_ninja = ["ninja"]
-    requires_git = [
-        "git:url=https://github.com/llvm/llvm-project.git,rev=llvmorg-{version}"
-    ]
+    requires_git = ["git:url=https://github.com/llvm/llvm-project.git,rev=llvmorg-{version}"]
 
     options = [
         "CMAKE_BUILD_TYPE={release[Release,Debug]}",
@@ -71,7 +72,7 @@ class LLVMFromSrc(cmake.CMake):
 
 class LLVM(Alias):
     name = "llvm"
-    version = Parameter("21.1.8", help="LLVM version.")
+    version = Parameter(VERSION, help="LLVM version.")
     requires = ["llvm/src:version={version},release=true"]
 
 

@@ -110,6 +110,8 @@ class Default(Alias):
         "cbindgen",
         "cista",
         "clang",
+        "clang-format",
+        "clang-tidy",
         "cmake",
         "cppzmq",
         "cpython",
