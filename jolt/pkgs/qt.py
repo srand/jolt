@@ -26,16 +26,5 @@ class Qt(cmake.CMake):
     requires_protobuf = ["protobuf"]
     srcdir = "{git[qt5]}"
 
-    options_linux_gl_true = [
-        "CMAKE_PREFIX_PATH={deps[libglvnd].path}",
-        "CMAKE_INSTALL_RPATH={deps[libglvnd].path}/lib",
-        "CMAKE_LIBRARY_PATH={deps[libglvnd].path}/lib",
-        "CMAKE_INCLUDE_PATH={deps[libglvnd].path}/include",
-        "OPENGL_gl_LIBRARY={deps[libglvnd].path}/lib/libGL.so",
-        "OPENGL_INCLUDE_DIR={deps[libglvnd].path}/include",
-        "OPENGL_glx_LIBRARY={deps[libglvnd].path}/lib/libGLX.so",
-        "OPENGL_glx_INCLUDE_DIR={deps[libglvnd].path}/include",
-    ]
-
 
 TaskRegistry.get().add_task_class(Qt)
