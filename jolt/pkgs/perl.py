@@ -6,7 +6,7 @@ class StrawberryPerl(Download):
     name = "perl/strawberry"
     version = Parameter("5.42.0.1", help="poco version.")
     url = "https://github.com/StrawberryPerl/Perl-Dist-Strawberry/releases/download/SP_{version_compact}_64bit/strawberry-perl-{version}-64bit-portable.zip"
-    
+
     @property
     def version_compact(self):
         return str(self.version).replace(".", "")

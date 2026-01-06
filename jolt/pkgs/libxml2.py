@@ -13,7 +13,6 @@ class Libxml2(cmake.CMake):
     requires_git = ["git:url=https://gitlab.gnome.org/GNOME/libxml2.git,rev=v{version}"]
     srcdir = "{git[libxml2]}"
     options = ["LIBXML2_WITH_ICONV=OFF"]
-    
 
 
 TaskRegistry.get().add_task_class(Libxml2)

@@ -33,7 +33,6 @@ class NASM(Task):
             with tools.cwd(self.srcdir):
                 tools.run("nmake -f Mkfiles/msvc.mak")
 
-
     def publish(self, artifact, tools):
         if self.system == "windows":
             with tools.cwd(self.srcdir):

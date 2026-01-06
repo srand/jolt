@@ -22,7 +22,7 @@ class LibreSSL(cmake.CMake):
         artifact.cxxinfo.incpaths.append("include")
         artifact.cxxinfo.libpaths.append("lib")
         artifact.cxxinfo.libraries.append("ssl")
-        artifact.cxxinfo.libraries.append("crypto")        
+        artifact.cxxinfo.libraries.append("crypto")
 
 
 TaskRegistry.get().add_task_class(LibreSSL)

@@ -30,7 +30,7 @@ class SQLiteWin32(Task):
     def run(self, deps, tools):
         self.srcdir = tools.expand_path(self.srcdir)
         with tools.cwd(self.srcdir):
-            tools.run(f"nmake -f Makefile.msc sqlite3.exe sqlite3.dll")
+            tools.run("nmake -f Makefile.msc sqlite3.exe sqlite3.dll")
             tools.write_file(
                 "sqlite3.pc",
                 """

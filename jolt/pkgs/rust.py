@@ -13,7 +13,7 @@ class Rust(Download):
     url = "https://static.rust-lang.org/dist/rust-{version}-{triple}.tar.xz"
     collect = [{"files": "*", "cwd": "rust-{version}-{triple}"}]
     components = ["cargo", "rustc", "rust-std-{triple}"]
-    
+
     triple_linux_x86_64 = "x86_64-unknown-linux-gnu"
     triple_windows_x86_64 = "x86_64-pc-windows-msvc"
     triple_darwin_x86_64 = "x86_64-apple-darwin"

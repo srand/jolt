@@ -135,7 +135,7 @@ class PythonEnv(Task):
                 "requirements.txt",
                 "\n".join(self.requirements) + "\n"
             )
-            bindir = "Scripts" if self.system == "windows" else "bin"  
+            bindir = "Scripts" if self.system == "windows" else "bin"
             pip_executable = fs.path.join(self.installdir, bindir, "pip")
             tools.run([pip_executable, "install", "-r", "requirements.txt"], shell=False)
 
@@ -144,7 +144,7 @@ class PythonEnv(Task):
             # Collect installed files
             artifact.collect("*", symlinks=True)
 
-        bindir = "Scripts" if self.system == "windows" else "bin"  
+        bindir = "Scripts" if self.system == "windows" else "bin"
         artifact.environ.PATH.append(bindir)
         artifact.strings.install_prefix = self.installdir
         self.unpack(artifact, tools)
@@ -154,7 +154,7 @@ class PythonEnv(Task):
             # Adjust paths in pyvenv.cfg
             tools.replace_in_file("pyvenv.cfg", artifact.strings.install_prefix, artifact.final_path)
 
-        bindir = "Scripts" if self.system == "windows" else "bin"  
+        bindir = "Scripts" if self.system == "windows" else "bin"
 
         with tools.cwd(artifact.path, bindir):
             # Adjust paths in scripts

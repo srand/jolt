@@ -799,7 +799,7 @@ class Tools(object):
                     compressor = zstandard.ZstdCompressor(threads=self.thread_count())
                     with compressor.stream_writer(outfp) as stream:
                         for block in iter(lambda: infp.read(0x10000), b''):
-                            stream.write(block)            
+                            stream.write(block)
 
     def copy(self, src, dst, symlinks=False):
         """ Copies file and directories (recursively).
