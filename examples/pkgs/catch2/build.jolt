@@ -1,0 +1,25 @@
+from jolt import Alias, Runner
+from jolt.plugins import ninja
+from jolt.pkgs import catch2
+
+
+class App(ninja.CXXExecutable):
+    """
+    Simple application that uses Catch2 libraries
+    """
+    requires = ["catch2/main"]
+    sources = ["main.cpp"]
+
+
+class Run(Runner):
+    """
+    Run all tests
+    """
+    requires = ["app"]
+
+
+class Default(Alias):
+    """
+    Default build target
+    """
+    requires = ["run"]
