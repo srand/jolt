@@ -66,6 +66,7 @@ from jolt.pkgs import nodejs
 from jolt.pkgs import opencv
 from jolt.pkgs import openjdk
 from jolt.pkgs import openssl
+from jolt.pkgs import paho
 from jolt.pkgs import perl
 from jolt.pkgs import pkgconfig
 from jolt.pkgs import poco
@@ -158,6 +159,8 @@ class Default(Alias):
         "opencv",
         "openjdk",
         "openssl",
+        "paho/mqtt-c",
+        "paho/mqtt-cxx",
         "pkg-config",
         "poco",
         "protobuf",
