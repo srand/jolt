@@ -90,6 +90,7 @@ from jolt.pkgs import sqlite
 from jolt.pkgs import texinfo
 from jolt.pkgs import tomlplusplus
 from jolt.pkgs import wayland
+from jolt.pkgs import xerces_c
 from jolt.pkgs import x11
 from jolt.pkgs import xorg
 from jolt.pkgs import xz
@@ -191,6 +192,7 @@ class Default(Alias):
         "tomlplusplus",
         "virtual/perl",
         "virtual/ssl",
+        "xerces-c",
         "xz",
         "yaml-cpp",
         "zlib",
