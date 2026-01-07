@@ -42,11 +42,17 @@ class LibXrandr(Alias):
     requires = ["xorg/libxrandr"]
 
 
+class LibXxf86vm(Alias):
+    name = "libxxf86vm"
+    requires = ["xorg/libxxf86vm"]
+
+
 TaskRegistry.get().add_task_class(GlProto)
 TaskRegistry.get().add_task_class(Libx11)
 TaskRegistry.get().add_task_class(LibX11Xcb)
 TaskRegistry.get().add_task_class(LibXcb)
 TaskRegistry.get().add_task_class(Libxext)
 TaskRegistry.get().add_task_class(LibXrandr)
+TaskRegistry.get().add_task_class(LibXxf86vm)
 TaskRegistry.get().add_task_class(Libxshmfence)
 TaskRegistry.get().add_task_class(Xproto)

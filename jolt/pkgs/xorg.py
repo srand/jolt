@@ -260,30 +260,6 @@ class Libxcb(autotools.Autotools):
     srcdir = "{fetch[src]}/libxcb-{version}"
 
 
-@attributes.common_metadata()
-@attributes.requires("requires_libx11")
-@attributes.requires("requires_src")
-@attributes.requires("requires_xext")
-@attributes.requires("requires_xextproto")
-@attributes.requires("requires_xf86vidmodeproto")
-@attributes.requires("requires_xorg_macros")
-@attributes.requires("requires_xproto")
-@autotools.requires()
-@pkgconfig.requires()
-@libtool.relocate()
-class Libxxf86vm(autotools.Autotools):
-    name = "libxxf86vm"
-    version = "1.1.6"
-    requires_src = ["fetch:alias=src,url=https://www.x.org/releases/individual/lib/libXxf86vm-{version}.tar.gz"]
-    srcdir = "{git[libxxf86vm]}"
-    requires_libx11 = ["xorg/libx11"]
-    requires_xext = ["xorg/libxext"]
-    requires_xextproto = ["xorg/xextproto"]
-    requires_xf86vidmodeproto = ["xorg/xf86vidmodeproto"]
-    requires_xorg_macros = ["xorg/macros"]
-    requires_xproto = ["xorg/xproto"]
-
-
 @attributes.requires("requires_inputproto")
 @attributes.requires("requires_kbproto")
 @attributes.requires("requires_libxau")
