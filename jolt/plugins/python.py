@@ -158,6 +158,9 @@ class PythonEnv(Task):
             f"Python executable '{self.executable}' not found in PATH.",
         )
 
+        # Follow symlinks to get the real executable
+        py_exe = fs.path.realpath(py_exe)
+
         # Determine the Python home directory
         py_home = fs.path.dirname(fs.path.dirname(py_exe))
 
@@ -166,11 +169,16 @@ class PythonEnv(Task):
             py_exe + " -c 'import sys; print(\"{{}}.{{}}\".format(sys.version_info[0], sys.version_info[1]))'",
             output_on_error=True).strip()
 
+        self.info("Python executable: {0}", py_exe)
+        self.info("Python home: {0}", py_home)
+        self.info("Python version: {0}", self.version_major)
+
         # Copy the Python installation to the artifact path
         with tools.cwd(py_home):
             artifact.collect(py_exe, "bin/python3")
             artifact.collect("lib/python3")
             artifact.collect("lib/python{version_major}")
+            artifact.collect("lib/libpython{version_major}.*")
 
         # Create common symlinks
         if self.system != "windows":
