@@ -12,6 +12,16 @@ class CPythonPosix(autotools.Autotools):
     requires_git = ["git:url=https://github.com/python/cpython.git,rev=v{version}"]
     srcdir = "{git[cpython]}"
 
+    @property
+    def version_major(self):
+        ver = str(self.version).split(".")
+        return f"{ver[0]}.{ver[1]}"
+
+    def publish(self, artifact, tools):
+        super().publish(artifact, tools)
+        artifact.strings.version = str(self.version)
+        artifact.strings.version_major = str(self.version_major)
+
 
 @attributes.requires("requires_git")
 @attributes.common_metadata()
@@ -39,6 +49,8 @@ class CPythonWin32(Task):
 
     def publish(self, artifact, tools):
         artifact.environ.CMAKE_PREFIX_PATH.append(".")
+        artifact.strings.version = str(self.version)
+        artifact.strings.version_major = str(self.version_major)
         with tools.cwd(self.srcdir):
             artifact.collect("Include", "include")
             artifact.collect("Lib", "lib")
