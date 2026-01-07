@@ -13,6 +13,7 @@ from jolt.pkgs import catch2
 from jolt.pkgs import cbindgen
 from jolt.pkgs import cista
 from jolt.pkgs import clang
+from jolt.pkgs import cli11
 from jolt.pkgs import cmake
 from jolt.pkgs import cpython
 from jolt.pkgs import crun
@@ -115,6 +116,7 @@ class Default(Alias):
         "clang",
         "clang-format",
         "clang-tidy",
+        "cli11",
         "cmake",
         "cppzmq",
         "cpython",
