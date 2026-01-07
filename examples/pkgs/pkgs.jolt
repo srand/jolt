@@ -59,6 +59,7 @@ from jolt.pkgs import lz4
 from jolt.pkgs import m4
 from jolt.pkgs import make
 from jolt.pkgs import mesa
+from jolt.pkgs import mstch
 from jolt.pkgs import mysql
 from jolt.pkgs import nasm
 from jolt.pkgs import ng_log
@@ -160,6 +161,7 @@ class Default(Alias):
         "lua",
         "lz4",
         "make",
+        "mstch",
         "nasm",
         "ng-log",
         "ninja",
