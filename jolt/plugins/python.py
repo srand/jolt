@@ -6,6 +6,7 @@ from jolt import filesystem as fs
 from jolt.cache import ArtifactStringAttribute
 from jolt.cache import ArtifactAttributeSet
 from jolt.cache import ArtifactAttributeSetProvider
+from jolt.error import raise_task_error_if
 
 
 class PythonVariable(ArtifactStringAttribute):
@@ -103,6 +104,7 @@ class PythonProvider(ArtifactAttributeSetProvider):
 
 
 @attributes.system
+@attributes.requires("requires_python")
 class PythonEnv(Task):
     """
     Base class for Python virtual environment tasks.
@@ -116,6 +118,9 @@ class PythonEnv(Task):
     abstract = True
     """ This is an abstract base class that should be inherited by concrete tasks. """
 
+    executable = "python3"
+    """ Python executable to use for creating the virtual environment. """
+
     requirements = []
     """
     List of Python packages to install in the virtual environment.
@@ -123,45 +128,89 @@ class PythonEnv(Task):
     Each entry should be a string suitable for pip, e.g., "package==version".
     """
 
-    def run(self, deps, tools):
-        self.installdir = tools.builddir("python-env")
+    def _verify_influence(self, deps, artifact, tools, sources=None):
+        # No influence to verify
+        return
 
-        import venv
-        builder = venv.EnvBuilder(with_pip=True)
-        builder.create(self.installdir)
-
-        with tools.tmpdir() as tmp, tools.cwd(tmp):
-            tools.write_file(
-                "requirements.txt",
-                "\n".join(self.requirements) + "\n"
-            )
-            bindir = "Scripts" if self.system == "windows" else "bin"
-            pip_executable = fs.path.join(self.installdir, bindir, "pip")
-            tools.run([pip_executable, "install", "-r", "requirements.txt"], shell=False)
-
-    def publish(self, artifact, tools):
-        with tools.cwd(self.installdir):
-            # Collect installed files
-            artifact.collect("*", symlinks=True)
-
-        bindir = "Scripts" if self.system == "windows" else "bin"
-        artifact.environ.PATH.append(bindir)
-        artifact.strings.install_prefix = self.installdir
-        self.unpack(artifact, tools)
-
-    def unpack(self, artifact, tools):
-        with tools.cwd(artifact.path):
-            # Adjust paths in pyvenv.cfg
-            tools.replace_in_file("pyvenv.cfg", artifact.strings.install_prefix, artifact.final_path)
-
+    def relocate_scripts(self, artifact, tools, frompath, topath):
         bindir = "Scripts" if self.system == "windows" else "bin"
 
         with tools.cwd(artifact.path, bindir):
-            # Adjust paths in scripts
             for script in tools.glob("*"):
-                # Ignore python executables
                 if script.startswith("python"):
                     continue
-                tools.replace_in_file(script, artifact.strings.install_prefix, artifact.final_path)
+                tools.replace_in_file(script, frompath, topath)
+
+        with tools.cwd(artifact.path):
+            if not tools.exists("local/bin"):
+                return
+            with tools.cwd("local", "bin"):
+                for script in tools.glob("*"):
+                    tools.replace_in_file(script, frompath, topath)
+
+    def publish(self, artifact, tools):
+        # Create a parallel installation by copying a Python installation
+
+        # First locate the Python executable to copy
+        py_exe = tools.which(self.executable)
+        raise_task_error_if(
+            py_exe is None, self,
+            f"Python executable '{self.executable}' not found in PATH.",
+        )
+
+        # Determine the Python home directory
+        py_home = fs.path.dirname(fs.path.dirname(py_exe))
+
+        # Determine the Python version
+        self.version_major = tools.run(
+            py_exe + " -c 'import sys; print(\"{{}}.{{}}\".format(sys.version_info[0], sys.version_info[1]))'",
+            output_on_error=True).strip()
+
+        # Copy the Python installation to the artifact path
+        with tools.cwd(py_home):
+            artifact.collect(py_exe, "bin/python3")
+            artifact.collect("lib/python3")
+            artifact.collect("lib/python{version_major}")
+
+        # Create common symlinks
+        if self.system != "windows":
+            with tools.cwd(artifact.path, "bin"):
+                tools.symlink("python3", "python")
+                tools.symlink("python3", "python{version_major}")
+
+        # Install required packages into the artifact using pip
+        with tools.environ(PYTHONHOME=artifact.path):
+            py_exe = fs.path.join(artifact.path, "bin", "python3")
+            with tools.tmpdir() as tmp, tools.cwd(tmp):
+                tools.write_file(
+                    "requirements.txt",
+                    "\n".join(self.requirements) + "\n"
+                )
+                tools.run([py_exe, "-m", "pip", "install", "-r", "requirements.txt", "--break-system-packages"], shell=False)
+
+        artifact.environ.PATH.append("bin")
+        artifact.environ.PATH.append("local/bin")
+        artifact.strings.install_prefix = artifact.path
+
+    def unpack(self, artifact, tools):
+        # Relocate the virtual environment by adjusting script paths
+        frompath = artifact.strings.install_prefix
+        topath = artifact.final_path
+        self.relocate_scripts(artifact, tools, frompath, topath)
 
         artifact.strings.install_prefix = artifact.final_path
+
+
+def requires(python=True):
+    """ Decorator to add Python requirements to a task. """
+
+    import jolt.pkgs.cpython
+
+    def decorate(cls):
+        if python:
+            cls = attributes.requires("requires_python")(cls)
+            cls.requires_python = ["cpython"]
+
+        return cls
+
+    return decorate

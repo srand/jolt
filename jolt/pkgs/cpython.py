@@ -3,6 +3,20 @@ from jolt.plugins import autotools, git, pkgconfig
 from jolt.tasks import TaskRegistry
 
 
+def _unpack_adjust_scripts(artifact, tools):
+    bindir = "Scripts" if artifact.strings.system == "windows" else "bin"
+
+    with tools.cwd(artifact.path, bindir):
+        # Adjust paths in scripts
+        for script in tools.glob("*"):
+            # Ignore python executables
+            if script.startswith("python"):
+                continue
+            tools.replace_in_file(script, artifact.strings.install_prefix, artifact.final_path)
+
+    artifact.strings.install_prefix = artifact.final_path
+
+
 @attributes.requires("requires_git")
 class CPythonPosix(autotools.Autotools):
     """ Builds and publishes CPython libraries and headers. """
@@ -21,6 +35,10 @@ class CPythonPosix(autotools.Autotools):
         super().publish(artifact, tools)
         artifact.strings.version = str(self.version)
         artifact.strings.version_major = str(self.version_major)
+
+    def unpack(self, artifact, tools):
+        super().unpack(artifact, tools)
+        _unpack_adjust_scripts(artifact, tools)
 
 
 @attributes.requires("requires_git")
@@ -91,6 +109,10 @@ Libs: -L${{libdir}} -lpython{version_major_compact}
 Cflags: -I${{includedir}}
 """)
             artifact.collect("*.pc", "lib/pkgconfig/")
+
+    def unpack(self, artifact, tools):
+        super().unpack(artifact, tools)
+        _unpack_adjust_scripts(artifact, tools)
 
 
 @attributes.requires("requires_{system}")
