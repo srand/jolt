@@ -91,6 +91,7 @@ class PluginGroup(click.Group):
               help="Add salt as task influence.")
 @click.option("-g", "--debug", is_flag=True, default=False, hidden=True,
               help="Start debug shell before executing task.")
+@click.option("-m", "--mute", is_flag=True, help="Display task log only if it fails.")
 @click.option("-n", "--network", is_flag=True, default=False, hidden=True,
               help="Build on network.")
 @click.option("-l", "--local", is_flag=True, default=False, hidden=True,
@@ -102,7 +103,7 @@ class PluginGroup(click.Group):
 @click.option("-h", "--help", is_flag=True, help="Show this message and exit.")
 @click.pass_context
 def cli(ctx, verbose, config_file, debugger, profile,
-        force, salt, debug, network, local, keep_going, jobs, help, machine_interface, chdir):
+        force, salt, debug, mute, network, local, keep_going, jobs, help, machine_interface, chdir):
     """
     A task execution tool.
 
@@ -171,7 +172,7 @@ def cli(ctx, verbose, config_file, debugger, profile,
         task = config.get("jolt", "default", "default")
         taskname, _ = utils.parse_task_name(task)
         if registry.get_task_class(taskname) is not None:
-            ctx.invoke(build, task=[task], force=force, salt=salt, debug=debug,
+            ctx.invoke(build, task=[task], force=force, salt=salt, debug=debug, mute=mute,
                        network=network, local=local, keep_going=keep_going, jobs=jobs)
         else:
             print(cli.get_help(ctx))
