@@ -1683,7 +1683,7 @@ class DarwinGNUToolchain(GNUToolchain):
     linker = GNULinker(
         command=" && ".join([
             "$ld $ldflags $imported_ldflags $extra_ldflags $covflags $libpaths @$outdir_rel/objects.list -o $out $libraries",
-            "$dsymutil $out -o $outdir_rel/.debug/$out.dSYM",
+            "$dsymutil $out -o $outdir_rel/.debug/$binary.dSYM",
             "$strip $out",
         ]),
         infiles=[".o", ".obj", ".a"],
@@ -1694,7 +1694,7 @@ class DarwinGNUToolchain(GNUToolchain):
     dynlinker = GNULinker(
         command=" && ".join([
             "$ld $ldflags -shared $imported_ldflags $extra_ldflags $covflags $libpaths @$outdir_rel/objects.list -o $out $libraries",
-            "$dsymutil $out -o $outdir_rel/.debug/$out.dSYM",
+            "$dsymutil $out -o $outdir_rel/.debug/$binary.dSYM",
             "$strip $out",
         ]),
         infiles=[".o", ".obj", ".a"],
