@@ -8,12 +8,12 @@ from jolt.tasks import TaskRegistry
 class CMakeBin(Download):
     name = "cmake/bin"
     version = Parameter("4.2.1", help="CMake version.")
-    url = ["https://github.com/Kitware/CMake/releases/download/v{version}/cmake-{version}-{system}-{cmake_arch}{cmake_ext}"]
-    collect = [{"files": "*", "cwd": "cmake-{version}-{system}-{cmake_arch}"}]
+    url = ["https://github.com/Kitware/CMake/releases/download/v{version}/cmake-{version}-{cmake_system}-{cmake_arch}{cmake_ext}"]
+    collect = [{"files": "*", "cwd": "cmake-{version}-{cmake_system}-{cmake_arch}{cmake_contents}"}]
 
     @property
     def cmake_arch(self):
-        if self.system == "macos":
+        if self.system == "darwin":
             return "universal"
         if self.arch == "amd64":
             return "x86_64"
@@ -24,6 +24,18 @@ class CMakeBin(Download):
         if self.system == "windows":
             return ".zip"
         return ".tar.gz"
+
+    @property
+    def cmake_system(self):
+        if self.system == "darwin":
+            return "macos"
+        return self.system
+
+    @property
+    def cmake_contents(self):
+        if self.system == "darwin":
+            return "/CMake.app/Contents"
+        return ""
 
 
 class CMake(Alias):

@@ -12,6 +12,7 @@ class Fmt(cmake.CMake):
     version = Parameter("12.1.0", help="Fmt version.")
     requires_git = ["git:url=https://github.com/fmtlib/fmt.git,rev={version}"]
     srcdir = "{git[fmt]}"
+    options = ["FMT_TEST=OFF"]
 
     def publish(self, artifact, tools):
         super().publish(artifact, tools)

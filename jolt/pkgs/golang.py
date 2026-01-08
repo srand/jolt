@@ -8,12 +8,10 @@ import platform
 
 @jolt_attributes.arch
 @jolt_attributes.system
-@jolt_attributes.attribute("url", "url_{system}")
 class Golang(Download):
     name = "golang"
     version = Parameter("1.25.5", help="Go version.")
-    url_linux = "https://go.dev/dl/go{version}.linux-{go_arch}.tar.gz"
-    url_windows = "https://go.dev/dl/go{version}.windows-{go_arch}.zip"
+    url = "https://go.dev/dl/go{version}.{system}-{go_arch}{go_ext}"
 
     @property
     def go_arch(self):
@@ -26,6 +24,12 @@ class Golang(Download):
         if self.arch in ["arm64", "armv8l", "aarch64"]:
             return "arm64"
         return None
+
+    @property
+    def go_ext(self):
+        if self.system == "windows":
+            return ".zip"
+        return ".tar.gz"
 
     def publish(self, artifact, tools):
         super().publish(artifact, tools)
