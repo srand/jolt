@@ -4,6 +4,7 @@ import copy
 import functools
 from ninja import ninja_syntax as ninja
 import os
+import platform
 import re
 import sys
 
@@ -1153,7 +1154,8 @@ class Skip(Rule):
 
 @task_attributes.system
 class MakeDirectory(Rule):
-    command_linux = "mkdir -p $out"
+    command_darwin = "mkdir -p $out"
+    command_linux = command_darwin
     command_windows = "if not exist $out mkdir $out"
 
     def __init__(self, name):
@@ -1539,6 +1541,7 @@ class GNUToolchain(Toolchain):
     cxxwrap = EnvironmentVariable(default="")
     flatc = ToolEnvironmentVariable(default="flatc", envname="FLATC", abspath=True)
     protoc = ToolEnvironmentVariable(default="protoc", envname="PROTOC", abspath=True)
+    strip = ToolEnvironmentVariable(default="strip", envname="STRIP", abspath=True)
 
     asflags = EnvironmentVariable(default="")
     cflags = EnvironmentVariable(default="")
@@ -1656,6 +1659,55 @@ class GNUToolchain(Toolchain):
     depimport = GNUDepImporter(
         prefix="lib",
         suffix=".a")
+
+
+class BSDArchiver(Rule):
+    def __init__(self, *args, **kwargs):
+        super(BSDArchiver, self).__init__(*args, aggregate=True, **kwargs)
+
+    def build(self, project, writer, infiles, implicit=None, order_only=None):
+        writer._objects = infiles
+        project._binaries, _ = self._out(project, project.binary)
+        file_list = FileListWriter("objects", project._binaries)
+        file_list.build(project, writer, infiles)
+        super().build(project, writer, infiles, implicit=writer.depimports, order_only=order_only)
+
+    def get_influence(self, task):
+        return "BSDArchiver" + super().get_influence(task)
+
+
+class DarwinGNUToolchain(GNUToolchain):
+    libtool = ToolEnvironmentVariable(default="libtool", envname="LIBTOOL", abspath=True)
+    dsymutil = ToolEnvironmentVariable(default="dsymutil", envname="DSYMUTIL", abspath=True)
+
+    linker = GNULinker(
+        command=" && ".join([
+            "$ld $ldflags $imported_ldflags $extra_ldflags $covflags $libpaths @$outdir_rel/objects.list -o $out $libraries",
+            "$dsymutil $out -o $outdir_rel/.debug/$out.dSYM",
+            "$strip $out",
+        ]),
+        infiles=[".o", ".obj", ".a"],
+        outfiles=["{outdir}/{binary}"],
+        variables={"desc": "[LINK] {binary}"},
+        implicit=["$ld_path", "$dsymutil_path", "$strip_path", "$outdir_rel/.debug"])
+
+    dynlinker = GNULinker(
+        command=" && ".join([
+            "$ld $ldflags -shared $imported_ldflags $extra_ldflags $covflags $libpaths @$outdir_rel/objects.list -o $out $libraries",
+            "$dsymutil $out -o $outdir_rel/.debug/$out.dSYM",
+            "$strip $out",
+        ]),
+        infiles=[".o", ".obj", ".a"],
+        outfiles=["{outdir}/lib{binary}.so"],
+        variables={"desc": "[LINK] {binary}"},
+        implicit=["$ld_path", "$dsymutil_path", "$strip_path", "$outdir_rel/.debug"])
+
+    archiver = BSDArchiver(
+        command="$libtool -static -o $out @$outdir_rel/objects.list && $ranlib $out",
+        infiles=[".o", ".obj", ".a"],
+        outfiles=["{outdir}/lib{binary}.a"],
+        variables={"desc": "[AR] lib{binary}.a"},
+        implicit=["$libtool_path", "$ranlib_path"])
 
 
 class MinGWToolchain(GNUToolchain):
@@ -1834,11 +1886,15 @@ class MSVCToolchain(Toolchain):
 
 _toolchains = {
     GNUToolchain: GNUToolchain(),
+    DarwinGNUToolchain: DarwinGNUToolchain(),
     MSVCToolchain: MSVCToolchain(),
 }
 
-if os.name == "nt":
+_system = platform.system()
+if _system == "Windows":
     toolchain = _toolchains[MSVCToolchain]
+elif _system == "Darwin":
+    toolchain = _toolchains[DarwinGNUToolchain]
 else:
     toolchain = _toolchains[GNUToolchain]
 

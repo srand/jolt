@@ -159,7 +159,7 @@ global_string("{test}")
             try:
                 # FIXME
                 # self._log = self.tools.run("python -W error -m jolt -c test.conf -c net.conf " + command.format(*args, **kwargs), **kwargs)
-                self._log = self.tools.run("python -m jolt -c test.conf -c net.conf " + command.format(*args, **kwargs), **kwargs)
+                self._log = self.tools.run("python3 -m jolt -c test.conf -c net.conf " + command.format(*args, **kwargs), **kwargs)
                 return self._log
             except error.JoltCommandError as e:
                 self._log = "\n".join(e.stdout + e.stderr)
