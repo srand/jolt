@@ -2,15 +2,14 @@ from jolt import *
 from jolt.plugins.cmake import *
 from jolt import influence
 
+
 # influence.files is used to detect changes in source files
 # so they get built
 @influence.files("**/*.cpp")
 @influence.files("**/*.h")
 class HelloWorld_1(CMake):
-    verbose = "yes"
-    cmakelists = "./"
-    # or
-    #cmakelists = "CMakeLists.txt"
+	pass
+
 
 @influence.files("**/*.cpp")
 @influence.files("**/*.h")
