@@ -70,12 +70,15 @@ class Renderproto(autotools.Autotools):
 
 @attributes.requires("requires_macros")
 @attributes.requires("requires_src")
+@attributes.requires("requires_xcb")
 @autotools.requires()
+@pkgconfig.requires()
 class XcbKeysyms(autotools.Autotools):
     name = "xorg/xcb-keysyms"
     version = Parameter("0.4.1", help="XCB Keysyms version.")
     requires_macros = ["xorg/macros"]
     requires_src = ["fetch:alias=src,url=https://www.x.org/releases/individual/lib/xcb-util-keysyms-{version}.tar.xz"]
+    requires_xcb = ["xorg/libxcb"]
     srcdir = "{fetch[src]}/xcb-util-keysyms-{version}"
 
 
@@ -96,6 +99,7 @@ class XcbProto(autotools.Autotools):
 @attributes.requires("requires_xproto")
 @autotools.requires()
 @libtool.relocate()
+@pkgconfig.requires()
 class Xau(autotools.Autotools):
     name = "xorg/libxau"
     version = Parameter("1.0.12", help="Xau version.")
@@ -107,24 +111,34 @@ class Xau(autotools.Autotools):
 
 @attributes.requires("requires_macros")
 @attributes.requires("requires_src")
+@attributes.requires("requires_xproto")
 @autotools.requires()
 @libtool.relocate()
+@pkgconfig.requires()
 class LibXdmcp(autotools.Autotools):
     name = "xorg/libxdmcp"
     version = Parameter("1.1.5", help="LibXdmcp version.")
     requires_macros = ["xorg/macros"]
     requires_src = ["fetch:alias=src,url=https://www.x.org/releases/individual/lib/libXdmcp-{version}.tar.gz"]
+    requires_xproto = ["xorg/xproto"]
     srcdir = "{fetch[src]}/libXdmcp-{version}"
 
 
 @attributes.requires("requires_macros")
 @attributes.requires("requires_src")
+@attributes.requires("requires_x11")
+@attributes.requires("requires_xextproto")
+@attributes.requires("requires_xproto")
 @autotools.requires()
+@pkgconfig.requires()
 class Xext(autotools.Autotools):
     name = "xorg/libxext"
     version = Parameter("1.3.6", help="Xext version.")
     requires_macros = ["xorg/macros"]
     requires_src = ["fetch:alias=src,url=https://www.x.org/releases/individual/lib/libXext-{version}.tar.gz"]
+    requires_x11 = ["xorg/libx11"]
+    requires_xextproto = ["xorg/xextproto"]
+    requires_xproto = ["xorg/xproto"]
     srcdir = "{fetch[src]}/libXext-{version}"
 
 
@@ -174,6 +188,7 @@ class Xtrans(autotools.Autotools):
 
 @attributes.requires("requires_randrproto")
 @attributes.requires("requires_src")
+@attributes.requires("requires_xext")
 @attributes.requires("requires_xrender")
 @autotools.requires()
 @libtool.relocate()
@@ -182,6 +197,7 @@ class Xrandr(autotools.Autotools):
     version = Parameter("1.5.4", help="Xrandr version.")
     requires_randrproto = ["xorg/randrproto"]
     requires_src = ["fetch:alias=src,url=https://www.x.org/releases/individual/lib/libXrandr-{version}.tar.gz"]
+    requires_xext = ["xorg/libxext"]
     requires_xrender = ["xorg/libxrender"]
     srcdir = "{fetch[src]}/libXrandr-{version}"
 
@@ -189,14 +205,17 @@ class Xrandr(autotools.Autotools):
 @attributes.requires("requires_macros")
 @attributes.requires("requires_renderproto")
 @attributes.requires("requires_src")
+@attributes.requires("requires_x11")
 @autotools.requires()
 @libtool.relocate()
+@pkgconfig.requires()
 class Xrender(autotools.Autotools):
     name = "xorg/libxrender"
     version = Parameter("0.9.12", help="Xrender version.")
     requiers_macros = ["xorg/macros"]
     requires_renderproto = ["xorg/renderproto"]
     requires_src = ["fetch:alias=src,url=https://www.x.org/releases/individual/lib/libXrender-{version}.tar.gz"]
+    requires_x11 = ["xorg/libx11"]
     srcdir = "{fetch[src]}/libXrender-{version}"
 
 

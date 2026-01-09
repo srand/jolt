@@ -1,17 +1,16 @@
 from jolt import attributes, Parameter
 from jolt.pkgs import x11
 from jolt.tasks import TaskRegistry
-from jolt.plugins import autotools, git, libtool, pkgconfig
+from jolt.plugins import meson, git, pkgconfig
 
 
 @attributes.requires("requires_git")
 @attributes.requires("requires_glproto")
 @attributes.requires("requires_x11")
 @attributes.requires("requires_xext")
-@autotools.requires()
+@meson.requires()
 @pkgconfig.requires()
-@libtool.relocate()
-class Libglvnd(autotools.Autotools):
+class Libglvnd(meson.Meson):
     name = "libglvnd"
     version = Parameter("1.7.0", help="libglvnd version.")
 

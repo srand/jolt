@@ -335,7 +335,7 @@ class _AutoTools(object):
         self.tools = tools
         self.builddir = self.tools.builddir(incremental=incremental)
         self.installdir = self.tools.builddir("install", incremental=False)
-        self.prefix = "jolt-prefix-" + tools._task.short_qualified_name
+        self.prefix = "jolt-prefix"
 
     def clean(self):
         self.tools.rmtree(self.builddir, ignore_errors=True)

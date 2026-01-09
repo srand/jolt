@@ -1,4 +1,5 @@
-from jolt import attributes, Alias, Parameter, Task
+from jolt import attributes, Alias, BooleanParameter, Parameter, Task
+from jolt.pkgs import ssl
 from jolt.plugins import autotools, git, pkgconfig
 from jolt.tasks import TaskRegistry
 
@@ -18,12 +19,16 @@ def _unpack_adjust_scripts(artifact, tools):
 
 
 @attributes.requires("requires_git")
+@attributes.requires("requires_ssl_{ssl[on,off]}")
+@pkgconfig.requires()
 class CPythonPosix(autotools.Autotools):
     """ Builds and publishes CPython libraries and headers. """
 
     name = "cpython/posix"
     version = Parameter("3.14.2", help="CPython version.")
+    ssl = BooleanParameter(True, help="Enable SSL support")
     requires_git = ["git:url=https://github.com/python/cpython.git,rev=v{version}"]
+    requires_ssl_on = ["virtual/ssl"]
     srcdir = "{git[cpython]}"
 
     @property
@@ -42,13 +47,16 @@ class CPythonPosix(autotools.Autotools):
 
 
 @attributes.requires("requires_git")
+@attributes.requires("requires_ssl_{ssl[on,off]}")
 @attributes.common_metadata()
 class CPythonWin32(Task):
     """ Builds and publishes CPython libraries and headers. """
 
     name = "cpython/win32"
     version = Parameter("3.14.2", help="CPython version.")
+    ssl = BooleanParameter(True, help="Enable SSL support")
     requires_git = ["git:url=https://github.com/python/cpython.git,rev=v{version}"]
+    requires_ssl_on = ["virtual/ssl"]
     srcdir = "{git[cpython]}"
 
     @property

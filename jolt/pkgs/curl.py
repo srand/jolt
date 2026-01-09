@@ -1,10 +1,11 @@
 from jolt import attributes, Parameter
-from jolt.pkgs import cmake
+from jolt.pkgs import cmake, ssl
 from jolt.plugins import git, cmake
 from jolt.tasks import TaskRegistry
 
 
 @attributes.requires("requires_git")
+@attributes.requires("requires_ssl")
 @attributes.system
 @cmake.requires()
 @cmake.use_ninja()
@@ -12,6 +13,7 @@ class Curl(cmake.CMake):
     name = "curl"
     version = Parameter("8.17.0", help="Curl version.")
     requires_git = ["git:url=https://github.com/curl/curl.git,rev=curl-{_version_tag},submodules=true"]
+    requires_ssl = ["virtual/ssl"]
     options = ["CURL_USE_LIBPSL=OFF"]
     srcdir = "{git[curl]}"
 

@@ -213,7 +213,7 @@ def requires():
 
     def decorate(cls):
         cls = attributes.requires("requires_pkgconf")(cls)
-        cls.requires_pkgconf = ["pkg-config"]
+        cls.requires_pkgconf = ["pkgconf"]
         return cls
 
     return decorate

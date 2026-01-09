@@ -41,6 +41,7 @@ from jolt.pkgs import inja
 from jolt.pkgs import jsoncpp
 from jolt.pkgs import libdrm
 from jolt.pkgs import libevent
+from jolt.pkgs import libexpat
 from jolt.pkgs import libfastjson
 from jolt.pkgs import libffi
 from jolt.pkgs import libglvnd
@@ -62,6 +63,7 @@ from jolt.pkgs import mesa
 from jolt.pkgs import mstch
 from jolt.pkgs import mysql
 from jolt.pkgs import nasm
+from jolt.pkgs import ncurses
 from jolt.pkgs import ng_log
 from jolt.pkgs import ninja
 from jolt.pkgs import nlohmann_json
@@ -148,6 +150,7 @@ class Default(Alias):
         "inja",
         "jsoncpp",
         "libevent",
+        "libexpat",
         "libfastjson",
         "libmysqlclient",
         "libtool",
@@ -164,6 +167,7 @@ class Default(Alias):
         "make",
         "mstch",
         "nasm",
+        "ncurses",
         "ng-log",
         "ninja",
         "ninja/bin",
@@ -176,7 +180,6 @@ class Default(Alias):
         "paho/mqtt-c",
         "paho/mqtt-cxx",
         "patchelf",
-        "pkg-config",
         "poco",
         "protobuf",
         "protobuf/lib-compiler",
@@ -219,7 +222,7 @@ class Default(Alias):
     ]
 
     requires_linux = requires_darwin + [
-        "busybox",
+        # "busybox",
         "libdrm",
         "libffi",
         "libglvnd",
