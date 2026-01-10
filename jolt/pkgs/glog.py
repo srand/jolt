@@ -15,6 +15,7 @@ class Glog(cmake.CMake):
     requires_gflags = ["gflags"]
     requires_git = ["git:url=https://github.com/google/glog.git,rev=v{version}"]
     srcdir = "{git[glog]}"
+    options = ["CMAKE_CXX_STANDARD=14"]
 
     def run(self, deps, tools):
         self.warning("GLog is deprecated and unmaintained. Consider using ng-log instead.")
