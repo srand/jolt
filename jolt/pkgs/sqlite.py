@@ -6,7 +6,7 @@ from jolt.tasks import TaskRegistry
 @attributes.requires("requires_git")
 @autotools.requires()
 class SQLitePosix(autotools.Autotools):
-    name = "sqlite/src/posix"
+    name = "sqlite/posix"
     version = Parameter("3.51.1", help="sqlite version.")
     shared = BooleanParameter(False, help="Build shared libraries.")
     requires_git = ["git:url=https://github.com/sqlite/sqlite.git,rev=version-{version}"]
@@ -26,7 +26,7 @@ class SQLitePosix(autotools.Autotools):
 @attributes.common_metadata()
 @attributes.requires("requires_git")
 class SQLiteWin32(Task):
-    name = "sqlite/src/win32"
+    name = "sqlite/win32"
     version = Parameter("3.51.1", help="sqlite version.")
     shared = BooleanParameter(True, help="Build shared libraries.")
     requires_git = ["git:clean=true,url=https://github.com/sqlite/sqlite.git,rev=version-{version}"]
@@ -72,9 +72,9 @@ Cflags: -I${{includedir}}
 class SQLite(Alias):
     name = "sqlite"
     version = Parameter("3.51.1", help="sqlite version.")
-    requires_darwin = ["sqlite/src/posix:version={version}"]
+    requires_darwin = ["sqlite/posix:version={version}"]
     requires_linux = requires_darwin
-    requires_windows = ["sqlite/src/win32:version={version}"]
+    requires_windows = ["sqlite/win32:version={version}"]
 
 
 TaskRegistry.get().add_task_class(SQLite)
