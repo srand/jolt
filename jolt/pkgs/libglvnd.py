@@ -4,6 +4,7 @@ from jolt.tasks import TaskRegistry
 from jolt.plugins import meson, git, pkgconfig
 
 
+@attributes.arch
 @attributes.requires("requires_git")
 @attributes.requires("requires_glproto")
 @attributes.requires("requires_x11")
@@ -19,6 +20,11 @@ class Libglvnd(meson.Meson):
     requires_x11 = ["libx11"]
     requires_xext = ["libxext"]
     srcdir = "{git[libglvnd]}"
+
+    def publish(self, artifact, tools):
+        super().publish(artifact, tools)
+        artifact.environ.CMAKE_PREFIX_PATH.append(".")
+        artifact.environ.LD_LIBRARY_PATH.append("lib/{arch}-linux-gnu")
 
 
 TaskRegistry.get().add_task_class(Libglvnd)

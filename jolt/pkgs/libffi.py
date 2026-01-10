@@ -9,7 +9,7 @@ from jolt.tasks import TaskRegistry
 class Libffi(autotools.Autotools):
     name = "libffi"
     version = "3.5.2"
-    requires_src = ["git:url=https://github.com/libffi/libffi.git,rev=v{version}"]
+    requires_src = ["git:clean=true,url=https://github.com/libffi/libffi.git,rev=v{version}"]
     srcdir = "{git[libffi]}"
 
 

@@ -1,5 +1,5 @@
 from jolt import attributes, Alias, BooleanParameter, Parameter, Task
-from jolt.pkgs import ssl
+from jolt.pkgs import libffi, sqlite, ssl, zlib, zstd, xz
 from jolt.plugins import autotools, git, pkgconfig
 from jolt.tasks import TaskRegistry
 
@@ -19,17 +19,36 @@ def _unpack_adjust_scripts(artifact, tools):
 
 
 @attributes.requires("requires_git")
+@attributes.requires("requires_libffi_{libffi[on,off]}")
+@attributes.requires("requires_sqlite_{sqlite[on,off]}")
 @attributes.requires("requires_ssl_{ssl[on,off]}")
+@attributes.requires("requires_zlib_{zlib[on,off]}")
+@attributes.requires("requires_zstd_{zstd[on,off]}")
+@attributes.requires("requires_xz_{xz[on,off]}")
 @pkgconfig.requires()
 class CPythonPosix(autotools.Autotools):
     """ Builds and publishes CPython libraries and headers. """
 
     name = "cpython/posix"
     version = Parameter("3.14.2", help="CPython version.")
+    libffi = BooleanParameter(True, help="Enable libffi support")
+    sqlite = BooleanParameter(True, help="Enable SQLite support")
     ssl = BooleanParameter(True, help="Enable SSL support")
+    zlib = BooleanParameter(True, help="Enable zlib support")
+    zstd = BooleanParameter(True, help="Enable zstd support")
+    xz = BooleanParameter(True, help="Enable xz support")
     requires_git = ["git:url=https://github.com/python/cpython.git,rev=v{version}"]
+    requires_libffi_on = ["libffi"]
+    requires_sqlite_on = ["sqlite"]
     requires_ssl_on = ["virtual/ssl"]
+    requires_zlib_on = ["virtual/zlib"]
+    requires_zstd_on = ["zstd"]
+    requires_xz_on = ["xz:pic=true"]
     srcdir = "{git[cpython]}"
+    options = [
+        "--enable-optimizations",
+        "--with-ensurepip=install",
+    ]
 
     @property
     def version_major(self):

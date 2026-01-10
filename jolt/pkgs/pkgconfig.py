@@ -22,7 +22,6 @@ class PkgConfPosix(autotools.Autotools):
         # Install pkg-config symlink
         with tools.cwd(artifact.path, "bin"):
             tools.symlink("pkgconf", "pkg-config")
-        
 
 
 @attributes.requires("requires_git")

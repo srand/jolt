@@ -17,6 +17,7 @@ class Qt(cmake.CMake):
     name = "qt"
     version = Parameter("6.10.1", help="Qt version.")
     gl = BooleanParameter(True, help="Enable OpenGL support.")
+    webengine = BooleanParameter(False, help="Enable WebEngine module.")
 
     generator = "Ninja"
     requires_dbus_linux = ["dbus"]
@@ -25,6 +26,10 @@ class Qt(cmake.CMake):
     requires_linux_gl_true = ["libglvnd"]
     requires_protobuf = ["protobuf"]
     srcdir = "{git[qt5]}"
+
+    options = [
+        "BUILD_qtwebengine={webengine[ON,OFF]}",
+    ]
 
 
 TaskRegistry.get().add_task_class(Qt)

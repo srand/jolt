@@ -323,9 +323,9 @@ class _Meson(object):
         with self.tools.environ(DESTDIR=self.installdir):
             self.tools.run("ninja -C {0} install", self.builddir, output=True)
 
-    def publish(self, artifact, files='*', *args, **kwargs):
+    def publish(self, artifact, files='*', symlinks=True, *args, **kwargs):
         with self.tools.cwd(self.installdir, "jolt-prefix"):
-            artifact.collect(files, *args, **kwargs)
+            artifact.collect(files, *args, symlinks=symlinks, **kwargs)
         artifact.strings.install_prefix = self.prefix
 
 
@@ -365,9 +365,9 @@ class _AutoTools(object):
         with self.tools.cwd(self.builddir):
             self.tools.run("make DESTDIR={} {}", self.installdir, target, output=True)
 
-    def publish(self, artifact, files='*', *args, **kwargs):
+    def publish(self, artifact, files='*', symlinks=True, *args, **kwargs):
         with self.tools.cwd(self.installdir, self.prefix):
-            artifact.collect(files, *args, **kwargs)
+            artifact.collect(files, *args, symlinks=symlinks, **kwargs)
         artifact.strings.install_prefix = "/" + self.prefix
 
 

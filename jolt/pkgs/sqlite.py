@@ -1,4 +1,4 @@
-from jolt import attributes, Alias, Parameter, Task
+from jolt import BooleanParameter, attributes, Alias, Parameter, Task
 from jolt.plugins import git, autotools
 from jolt.tasks import TaskRegistry
 
@@ -8,8 +8,12 @@ from jolt.tasks import TaskRegistry
 class SQLitePosix(autotools.Autotools):
     name = "sqlite/src/posix"
     version = Parameter("3.51.1", help="sqlite version.")
+    shared = BooleanParameter(False, help="Build shared libraries.")
     requires_git = ["git:url=https://github.com/sqlite/sqlite.git,rev=version-{version}"]
     srcdir = "{git[sqlite]}"
+    options = [
+        "--{shared[enable,disable]}-shared",
+    ]
 
     def publish(self, artifact, tools):
         super().publish(artifact, tools)
@@ -24,6 +28,7 @@ class SQLitePosix(autotools.Autotools):
 class SQLiteWin32(Task):
     name = "sqlite/src/win32"
     version = Parameter("3.51.1", help="sqlite version.")
+    shared = BooleanParameter(True, help="Build shared libraries.")
     requires_git = ["git:clean=true,url=https://github.com/sqlite/sqlite.git,rev=version-{version}"]
     srcdir = "{git[sqlite]}"
 
@@ -48,9 +53,11 @@ Cflags: -I${{includedir}}
 
     def publish(self, artifact, tools):
         with tools.cwd(self.srcdir):
-            artifact.collect("libsqlite3.lib", "lib/")
-            artifact.collect("sqlite3.dll", "lib/")
-            artifact.collect("sqlite3.lib", "lib/")
+            if self.shared:
+                artifact.collect("sqlite3.dll", "bin/")
+                artifact.collect("sqlite3.lib", "lib/")
+            else:
+                artifact.collect("libsqlite3.lib", "lib/")
             artifact.collect("sqlite3.exe", "bin/")
             artifact.collect("sqlite*.h", "include/")
             artifact.collect("sqlite3.pc", "lib/pkgconfig/")

@@ -194,7 +194,19 @@ class PythonEnv(Task):
                     "requirements.txt",
                     "\n".join(self.requirements) + "\n"
                 )
-                tools.run([py_exe, "-m", "pip", "install", "-r", "requirements.txt", "--break-system-packages"], shell=False)
+
+                pip_cmd = [
+                    py_exe,
+                    "-m",
+                    "pip",
+                    "--isolated",
+                    "--no-cache-dir",
+                    "install",
+                    "-r",
+                    "requirements.txt",
+                    "--break-system-packages",
+                ]
+                tools.run(pip_cmd, shell=False)
 
         artifact.environ.PATH.append("bin")
         artifact.environ.PATH.append("local/bin")
