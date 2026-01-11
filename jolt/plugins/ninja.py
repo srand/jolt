@@ -752,6 +752,23 @@ class ProjectVariable(Variable):
         return "PV: default={},attrib={}".format(self._default, self._attrib)
 
 
+class OptimizationVariable(Variable):
+    def __init__(self, default, values, name=None):
+        self.name = name
+        self._default = default
+        self._values = values
+        assert type(values) is dict, "Optimization values must be dict with compiler flag mapping"
+
+    def create(self, project, writer, deps, tools):
+        value = str(getattr(project, "optimize", self._default))
+        raise_task_error_if(
+            value not in self._values,
+            project,
+            f"Illegal value assigned to 'optimize' ({value}). Expected: 'none', 'debug', 'size', or 'release'."
+        )
+        writer.variable(self.name, self._values[value])
+
+
 class SharedLibraryVariable(Variable):
     def __init__(self, name=None, default=None):
         self.name = name
@@ -1543,6 +1560,13 @@ class GNUToolchain(Toolchain):
     protoc = ToolEnvironmentVariable(default="protoc", envname="PROTOC", abspath=True)
     strip = ToolEnvironmentVariable(default="strip", envname="STRIP", abspath=True)
 
+    optflag = OptimizationVariable(default="release", values={
+        "none": "-O0",
+        "debug": "-Og",
+        "size": "-Os",
+        "release": "-O2",
+        None: "-O0",
+    })
     asflags = EnvironmentVariable(default="")
     cflags = EnvironmentVariable(default="")
     cxxflags = EnvironmentVariable(default="")
@@ -1573,7 +1597,7 @@ class GNUToolchain(Toolchain):
     mkdir_debug = MakeDirectory(name="$outdir_rel/.debug")
 
     compile_pch = GNUCompiler(
-        command="$cxxwrap $cxx -x c++-header $cxxflags $shared_flags $imported_cxxflags $extra_cxxflags $covflags $macros $incpaths -MMD -MF $out.d -c $in -o $out",
+        command="$cxxwrap $cxx -x c++-header $optflag $cxxflags $shared_flags $imported_cxxflags $extra_cxxflags $covflags $macros $incpaths -MMD -MF $out.d -c $in -o $out",
         deps="gcc",
         depfile="$out.d",
         infiles=[GNUPCHVariables.pch_ext],
@@ -1582,7 +1606,7 @@ class GNUToolchain(Toolchain):
         variables={"desc": "[PCH] {in_base}{in_ext}"})
 
     compile_c = GNUCompiler(
-        command="$ccwrap $cc -x c $pch_flags $cflags $shared_flags $imported_cflags $extra_cflags $covflags $macros $incpaths -MMD -MF $out.d -c $in -o $out",
+        command="$ccwrap $cc -x c $pch_flags $optflag $cflags $shared_flags $imported_cflags $extra_cflags $covflags $macros $incpaths -MMD -MF $out.d -c $in -o $out",
         deps="gcc",
         depfile="$out.d",
         infiles=[".c"],
@@ -1592,7 +1616,7 @@ class GNUToolchain(Toolchain):
         implicit=["$cc_path"])
 
     compile_cxx = GNUCompiler(
-        command="$cxxwrap $cxx -x c++ $pch_flags $cxxflags $shared_flags $imported_cxxflags $extra_cxxflags $covflags $macros $incpaths -MMD -MF $out.d -c $in -o $out",
+        command="$cxxwrap $cxx -x c++ $pch_flags $optflag $cxxflags $shared_flags $imported_cxxflags $extra_cxxflags $covflags $macros $incpaths -MMD -MF $out.d -c $in -o $out",
         deps="gcc",
         depfile="$out.d",
         infiles=[".cc", ".cpp", ".cxx"],
@@ -1815,6 +1839,14 @@ class MSVCToolchain(Toolchain):
     flatc = ToolEnvironmentVariable(default="flatc", envname="FLATC", abspath=True)
     protoc = ToolEnvironmentVariable(default="protoc", envname="PROTOC", abspath=True)
 
+
+    optflag = OptimizationVariable(default="speed", values={
+        "none": "/Od",
+        "debug": "/Od /Zi",
+        "size": "/O1",
+        "release": "/O2 /NDEBUG",
+        None: "/0d",
+    })
     win32flags = Variable("/DWIN32 /D_WINDOWS /D_WIN32_WINNT=0x0601 /EHsc")
     asflags = EnvironmentVariable(default="")
     cflags = EnvironmentVariable(default="")
@@ -1847,7 +1879,7 @@ class MSVCToolchain(Toolchain):
         implicit=["$cl_path"])
 
     compile_c = MSVCCompiler(
-        command="$cl /nologo /showIncludes $crt $win32flags $cxxflags $extra_cxxflags $macros $incpaths /c /Tc$in /Fo$out",
+        command="$cl /nologo /showIncludes $crt $win32flags $optflag $cflags $extra_cflags $macros $incpaths /c /Tc$in /Fo$out",
         deps="msvc",
         infiles=[".c"],
         outfiles=["{outdir}/{binary}.dir/{in_path}/{in_base}.obj"],
@@ -1855,7 +1887,7 @@ class MSVCToolchain(Toolchain):
         implicit=["$cl_path"])
 
     compile_cxx = MSVCCompiler(
-        command="$cl /nologo /showIncludes $crt $win32flags $cxxflags $extra_cxxflags $macros $incpaths /c /Tp$in /Fo$out",
+        command="$cl /nologo /showIncludes $crt $win32flags $optflag $cxxflags $extra_cxxflags $macros $incpaths /c /Tp$in /Fo$out",
         deps="msvc",
         infiles=[".cc", ".cpp", ".cxx"],
         outfiles=["{outdir}/{binary}.dir/{in_path}/{in_base}.obj"],
@@ -1954,6 +1986,18 @@ class CXXProject(Task):
 
     macros = []
     """ List of preprocessor macros to set """
+
+    optimize = "release"
+    """
+    Compiler optimization level.
+
+    Supported values are:
+
+        - "none" / None
+        - "debug"
+        - "size"
+        - "release"
+    """
 
     sources = []
     """ A list of sources to compile.

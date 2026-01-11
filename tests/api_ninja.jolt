@@ -1037,3 +1037,37 @@ class NinjaApi(JoltTest):
         ---
         """
         self.build("flake")
+
+    def test_optimize(self):
+        """
+        --- file: test.c
+        int main() {{return 0;}}
+
+        --- tasks:
+        class LibNone(CXXLibrary):
+            sources = ["test.c"]
+            optimize = "none"
+
+        class LibDebug(CXXLibrary):
+            sources = ["test.c"]
+            optimize = "debug"
+
+        class LibSize(CXXLibrary):
+            sources = ["test.c"]
+            optimize = "size"
+
+        class LibRelease(CXXLibrary):
+            sources = ["test.c"]
+            optimize = "release"
+
+        class LibIllegal(CXXLibrary):
+            sources = ["test.c"]
+            optimize = "illegal"
+        ---
+        """
+        self.build("libnone")
+        self.build("libdebug")
+        self.build("libsize")
+        self.build("librelease")
+        with self.assertRaises(Exception):
+            self.build("libillegal")

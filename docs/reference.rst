@@ -448,20 +448,21 @@ CXXExecutable
   .. autoattribute:: cflags
   .. autoattribute:: coverage
   .. autoattribute:: cxxflags
-  .. automethod:: debugshell
   .. autoattribute:: incpaths
   .. autoattribute:: incremental
   .. autoattribute:: ldflags
   .. autoattribute:: libpaths
   .. autoattribute:: libraries
   .. autoattribute:: macros
+  .. autoattribute:: optimize
   .. autoattribute:: publishdir
-  .. automethod:: publish
-  .. automethod:: run
   .. autoattribute:: selfsustained
   .. autoattribute:: sources
   .. autoattribute:: source_influence
   .. autoattribute:: strip
+  .. automethod:: debugshell
+  .. automethod:: publish
+  .. automethod:: run
 
 .. reference-ninja-cxxexecutable-end
 
@@ -484,15 +485,16 @@ CXXLibrary
   .. autoattribute:: libpaths
   .. autoattribute:: libraries
   .. autoattribute:: macros
-  .. automethod:: run
+  .. autoattribute:: optimize
   .. autoattribute:: publishapi
   .. autoattribute:: publishdir
-  .. automethod:: publish
   .. autoattribute:: selfsustained
-  .. automethod:: debugshell
   .. autoattribute:: sources
   .. autoattribute:: source_influence
   .. autoattribute:: strip
+  .. automethod:: debugshell
+  .. automethod:: publish
+  .. automethod:: run
 
 
 .. reference-ninja-cxxlibrary-end
