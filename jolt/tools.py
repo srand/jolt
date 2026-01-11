@@ -1741,11 +1741,15 @@ class Tools(object):
             fs.makedirs(path)
             for relsrcpath, reldstpath in artifact.files.items():
                 srcpath = fs.path.normpath(fs.path.join(artifact.task.joltdir, relsrcpath))
+                srcpath = self.expand_path(srcpath)
                 dstpath = fs.path.normpath(fs.path.join(path, reldstpath))
+                dstpath = self.expand_path(dstpath)
+
                 if dstpath != fs.path.realpath(dstpath):
                     log.debug("Cannot symlink '{} -> {}', parent directory already symlinked",
                               srcpath, dstpath)
                     continue
+
                 if fs.path.isdir(dstpath):
                     files = fs.scandir(srcpath)
                     for file in files:
@@ -1755,7 +1759,8 @@ class Tools(object):
                     self.symlink(srcpath, dstpath)
 
                 # Restore missing srcfiles if they resided in a build directory
-                if srcpath.startswith(artifact.tools.buildroot) and \
+                buildroot_abs = self.expand_path(artifact.tools.buildroot)
+                if srcpath.startswith(buildroot_abs) and \
                    not fs.path.exists(srcpath):
                     fs.copy(fs.path.join(artifact.path, reldstpath), srcpath, symlinks=True)
             self.write_file(meta, artifact.path)
