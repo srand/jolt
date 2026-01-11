@@ -22,6 +22,12 @@ from jolt.error import raise_task_error_if
 from jolt.error import JoltError, JoltCommandError
 
 
+c_standard_default = 17
+cxx_standard_default = 17
+c_standards_list = [90, 99, 11, 17, 23]
+cxx_standards_list = [98, 11, 14, 17, 20, 23, 26]
+
+
 class CompileError(JoltError):
     def __init__(self, error):
         if error:
@@ -750,6 +756,37 @@ class ProjectVariable(Variable):
     @utils.cached.instance
     def get_influence(self, task):
         return "PV: default={},attrib={}".format(self._default, self._attrib)
+
+
+class StdVariable(Variable):
+    def __init__(self, lang, flagfmt, values, supported=None, default=None):
+        self._lang = lang
+        self._flagfmt = flagfmt
+        self._values = values
+        self._supported = supported or values
+        self._default = default
+
+    def create(self, project, writer, deps, tools):
+        value = getattr(project, self.name, self._default) or self._default
+        if not value:
+            return
+        raise_task_error_if(
+            type(value) is not int,
+            project,
+            f"Illegal {self._lang} language standard: '{value}'. Expected integer."
+        )
+        raise_task_error_if(
+            value not in self._values,
+            project,
+            f"Illegal {self._lang} language standard: '{value}'. Expected one of: {", ".join([str(v) for v in self._values])}"
+        )
+
+        if value not in self._supported:
+            new_value = min(self._supported, key=lambda n: abs(n - value))
+            project.warning(f"{self._lang}{value} is not supported. Using {self._lang}{new_value} instead.")
+            value = new_value
+
+        writer.variable(self.name, self._flagfmt.format(value))
 
 
 class OptimizationVariable(Variable):
@@ -1560,6 +1597,8 @@ class GNUToolchain(Toolchain):
     protoc = ToolEnvironmentVariable(default="protoc", envname="PROTOC", abspath=True)
     strip = ToolEnvironmentVariable(default="strip", envname="STRIP", abspath=True)
 
+    cstd = StdVariable("C", "-std=c{}", values=c_standards_list, default=c_standard_default)
+    cxxstd = StdVariable("C++", "-std=c++{}", values=cxx_standards_list, default=cxx_standard_default)
     optflag = OptimizationVariable(default="release", values={
         "none": "-O0",
         "debug": "-Og",
@@ -1597,7 +1636,7 @@ class GNUToolchain(Toolchain):
     mkdir_debug = MakeDirectory(name="$outdir_rel/.debug")
 
     compile_pch = GNUCompiler(
-        command="$cxxwrap $cxx -x c++-header $optflag $cxxflags $shared_flags $imported_cxxflags $extra_cxxflags $covflags $macros $incpaths -MMD -MF $out.d -c $in -o $out",
+        command="$cxxwrap $cxx -x c++-header $cxxstd $optflag $cxxflags $shared_flags $imported_cxxflags $extra_cxxflags $covflags $macros $incpaths -MMD -MF $out.d -c $in -o $out",
         deps="gcc",
         depfile="$out.d",
         infiles=[GNUPCHVariables.pch_ext],
@@ -1606,7 +1645,7 @@ class GNUToolchain(Toolchain):
         variables={"desc": "[PCH] {in_base}{in_ext}"})
 
     compile_c = GNUCompiler(
-        command="$ccwrap $cc -x c $pch_flags $optflag $cflags $shared_flags $imported_cflags $extra_cflags $covflags $macros $incpaths -MMD -MF $out.d -c $in -o $out",
+        command="$ccwrap $cc -x c $cstd $pch_flags $optflag $cflags $shared_flags $imported_cflags $extra_cflags $covflags $macros $incpaths -MMD -MF $out.d -c $in -o $out",
         deps="gcc",
         depfile="$out.d",
         infiles=[".c"],
@@ -1616,7 +1655,7 @@ class GNUToolchain(Toolchain):
         implicit=["$cc_path"])
 
     compile_cxx = GNUCompiler(
-        command="$cxxwrap $cxx -x c++ $pch_flags $optflag $cxxflags $shared_flags $imported_cxxflags $extra_cxxflags $covflags $macros $incpaths -MMD -MF $out.d -c $in -o $out",
+        command="$cxxwrap $cxx -x c++ $cxxstd $pch_flags $optflag $cxxflags $shared_flags $imported_cxxflags $extra_cxxflags $covflags $macros $incpaths -MMD -MF $out.d -c $in -o $out",
         deps="gcc",
         depfile="$out.d",
         infiles=[".cc", ".cpp", ".cxx"],
@@ -1839,12 +1878,13 @@ class MSVCToolchain(Toolchain):
     flatc = ToolEnvironmentVariable(default="flatc", envname="FLATC", abspath=True)
     protoc = ToolEnvironmentVariable(default="protoc", envname="PROTOC", abspath=True)
 
-
+    cstd = StdVariable("C", "/std:c{}", values=c_standards_list, supported=[11, 17], default=c_standard_default)
+    cxxstd = StdVariable("C++", "/std:c++{}", values=cxx_standards_list, supported=[14, 17, 20], default=cxx_standard_default)
     optflag = OptimizationVariable(default="speed", values={
         "none": "/Od",
         "debug": "/Od /Zi",
         "size": "/O1",
-        "release": "/O2 /NDEBUG",
+        "release": "/O2 /DNDEBUG",
         None: "/0d",
     })
     win32flags = Variable("/DWIN32 /D_WINDOWS /D_WIN32_WINNT=0x0601 /EHsc")
@@ -1874,23 +1914,23 @@ class MSVCToolchain(Toolchain):
         command="$cl /nologo /showIncludes $crt $win32flags $asflags $extra_asflags $macros $incpaths /c /Tc$in /Fo$out",
         deps="msvc",
         infiles=[".asm", ".s", ".S"],
-        outfiles=["{outdir}/{binary}.dir/{in_path}/{in_base}.obj"],
+        outfiles=["{outdir}/{binary}.dir/{in_path}/{in_base}{in_ext}.obj"],
         variables={"desc": "[ASM] {in_base}{in_ext}"},
         implicit=["$cl_path"])
 
     compile_c = MSVCCompiler(
-        command="$cl /nologo /showIncludes $crt $win32flags $optflag $cflags $extra_cflags $macros $incpaths /c /Tc$in /Fo$out",
+        command="$cl /nologo /showIncludes $cstd $crt $win32flags $optflag $cflags $extra_cflags $macros $incpaths /c /Tc$in /Fo$out",
         deps="msvc",
         infiles=[".c"],
-        outfiles=["{outdir}/{binary}.dir/{in_path}/{in_base}.obj"],
+        outfiles=["{outdir}/{binary}.dir/{in_path}/{in_base}{in_ext}.obj"],
         variables={"desc": "[C] {in_base}{in_ext}"},
         implicit=["$cl_path"])
 
     compile_cxx = MSVCCompiler(
-        command="$cl /nologo /showIncludes $crt $win32flags $optflag $cxxflags $extra_cxxflags $macros $incpaths /c /Tp$in /Fo$out",
+        command="$cl /nologo /showIncludes $cxxstd $crt $win32flags $optflag $cxxflags $extra_cxxflags $macros $incpaths /c /Tp$in /Fo$out",
         deps="msvc",
         infiles=[".cc", ".cpp", ".cxx"],
-        outfiles=["{outdir}/{binary}.dir/{in_path}/{in_base}.obj"],
+        outfiles=["{outdir}/{binary}.dir/{in_path}/{in_base}{in_ext}.obj"],
         variables={"desc": "[CXX] {in_base}{in_ext}"},
         implicit=["$cl_path"])
 
@@ -1966,8 +2006,22 @@ class CXXProject(Task):
     cflags = []
     """ A list of compiler flags used when compiling C files. """
 
+    cstd = None
+    """
+    C language standard to use (int). Default: 17
+
+    If the chosen standard is not supported, the nearest supported standard is selected.
+    """
+
     cxxflags = []
     """ A list of compiler flags used when compiling C++ files. """
+
+    cxxstd = None
+    """
+    C++ language standard to use (int). Default: 17
+
+    If the chosen standard is not supported, the nearest supported standard is selected.
+    """
 
     depimports = []
     """ List of implicit dependencies """

@@ -447,7 +447,9 @@ CXXExecutable
   .. autoattribute:: binary
   .. autoattribute:: cflags
   .. autoattribute:: coverage
+  .. autoattribute:: cstd
   .. autoattribute:: cxxflags
+  .. autoattribute:: cxxstd
   .. autoattribute:: incpaths
   .. autoattribute:: incremental
   .. autoattribute:: ldflags
@@ -477,7 +479,9 @@ CXXLibrary
   .. autoattribute:: binary
   .. autoattribute:: cflags
   .. autoattribute:: coverage
+  .. autoattribute:: cstd
   .. autoattribute:: cxxflags
+  .. autoattribute:: cxxstd
   .. autoattribute:: headers
   .. autoattribute:: incpaths
   .. autoattribute:: incremental

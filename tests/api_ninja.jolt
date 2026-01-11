@@ -1071,3 +1071,36 @@ class NinjaApi(JoltTest):
         self.build("librelease")
         with self.assertRaises(Exception):
             self.build("libillegal")
+
+    def test_standard(self):
+        """
+        --- file: test.c
+        int main() {{return 0;}}
+
+        --- file: test.cpp
+        int main() {{return 0;}}
+
+        --- tasks:
+        class WithDefaults(CXXLibrary):
+            sources = ["test.c", "test.cpp"]
+
+        class WithExplicit(CXXLibrary):
+            sources = ["test.c", "test.cpp"]
+            cstd = 11
+            cxxstd = 14
+
+        class WithIllegal(CXXLibrary):
+            sources = ["test.cpp"]
+            cxxstd = 21
+        ---
+        """
+        r = self.build("withdefaults")
+        self.assertIn("c++17", r)
+        self.assertIn("c17", r)
+
+        r = self.build("withexplicit")
+        self.assertIn("c++14", r)
+        self.assertIn("c11", r)
+
+        with self.assertRaises(Exception):
+            self.build("withillegal")
