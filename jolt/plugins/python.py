@@ -166,7 +166,8 @@ class PythonEnv(Task):
 
         # Determine the Python version
         self.version_major = tools.run(
-            py_exe + " -c 'import sys; print(\"{{}}.{{}}\".format(sys.version_info[0], sys.version_info[1]))'",
+            [py_exe, "-c", "import sys; print(\"{{}}.{{}}\".format(sys.version_info[0], sys.version_info[1]))"],
+            shell=False,
             output_on_error=True).strip()
 
         self.info("Python executable: {0}", py_exe)
