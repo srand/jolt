@@ -8,6 +8,7 @@ from jolt.pkgs import automake
 from jolt.pkgs import boost
 from jolt.pkgs import boringssl
 from jolt.pkgs import busybox
+from jolt.pkgs import bzip2
 from jolt.pkgs import cares
 from jolt.pkgs import catch2
 from jolt.pkgs import cbindgen
@@ -38,6 +39,7 @@ from jolt.pkgs import hdf5
 from jolt.pkgs import help2man
 from jolt.pkgs import inja
 from jolt.pkgs import jsoncpp
+from jolt.pkgs import libarchive
 from jolt.pkgs import libdrm
 from jolt.pkgs import libevent
 from jolt.pkgs import libexpat
@@ -112,6 +114,7 @@ class Default(Alias):
         "abseil",
         "boost",
         "boringssl",
+        "libbzip2",
         "c-ares",
         "catch2",
         "cbindgen",
@@ -147,6 +150,7 @@ class Default(Alias):
         "help2man",
         "inja",
         "jsoncpp",
+        "libarchive",
         "libevent",
         "libexpat",
         "libfastjson",
