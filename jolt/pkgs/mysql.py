@@ -5,8 +5,8 @@ from jolt.tasks import TaskRegistry
 
 
 @attributes.requires("requires_curl")
-@attributes.requires("requires_libedit")
-@attributes.requires("requires_libtirpc")
+@attributes.requires("requires_{system}_libedit")
+@attributes.requires("requires_{system}_libtirpc")
 @attributes.requires("requires_lz4")
 @attributes.requires("requires_ncurses")
 @attributes.requires("requires_rapidjson")
@@ -14,6 +14,7 @@ from jolt.tasks import TaskRegistry
 @attributes.requires("requires_ssl")
 @attributes.requires("requires_zlib")
 @attributes.requires("requires_zstd")
+@attributes.system
 @cmake.requires()
 @cmake.use_ninja()
 @pkgconfig.requires()
@@ -21,8 +22,9 @@ class MySQLBase(cmake.CMake):
     abstract = True
     version = Parameter("9.5.0", help="MySQL version.")
     requires_curl = ["curl"]
-    requires_libedit = ["libedit:shared=true"]
-    requires_libtirpc = ["libtirpc"]
+    requires_darwin_libedit = ["libedit:shared=true"]
+    requires_linux_libedit = requires_darwin_libedit
+    requires_linux_libtirpc = ["libtirpc"]
     requires_lz4 = ["lz4"]
     requires_rapidjson = ["rapidjson"]
     requires_src = ["git:url=https://github.com/mysql/mysql-server,path={buildroot}/git-mysql,submodules=true"]

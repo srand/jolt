@@ -27,7 +27,7 @@ class NodeJS(Download):
 
     @property
     def arch(self):
-        arch = platform.machine()
+        arch = platform.machine().lower()
         if arch in ["amd64", "x86_64"]:
             return "x64"
         if arch in ["i386", "i486", "i586", "i686"]:
