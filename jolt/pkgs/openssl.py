@@ -1,4 +1,4 @@
-from jolt import attributes, Parameter, Task
+from jolt import attributes, BooleanParameter, Parameter, Task
 from jolt.pkgs import nasm, perl
 from jolt.plugins import git
 from jolt.tasks import TaskRegistry
@@ -12,6 +12,7 @@ from jolt.tasks import TaskRegistry
 class OpenSSL(Task):
     name = "openssl"
     version = Parameter("3.6.0", help="openssl version.")
+    shared = BooleanParameter(False, "Enable shared libraries.")
 
     requires_git = ["git:url=https://github.com/openssl/openssl.git,rev=openssl-{version}"]
     requires_perl = ["virtual/perl"]
@@ -28,11 +29,11 @@ class OpenSSL(Task):
             self.info("Configuring OpenSSL... {builddir}")
 
             if self.system == "windows":
-                tools.run("perl {srcdir}/Configure --prefix={installdir} --openssldir=ssl no-tests ")
+                tools.run("perl {srcdir}/Configure --prefix={installdir} --openssldir=ssl no-tests {shared[,no-shared]}")
                 tools.run("nmake")
                 tools.run("nmake install")
             else:
-                tools.run("{srcdir}/config --prefix={installdir} no-tests")
+                tools.run("{srcdir}/config --prefix={installdir} no-tests {shared[,no-shared]}")
                 tools.run("make -j{}", tools.cpu_count())
                 tools.run("make install")
 

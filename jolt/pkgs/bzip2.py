@@ -12,7 +12,7 @@ class LibBzip2(ninja.CXXLibrary):
     version = Parameter("1.0.8", help="bzip2 version.")
     pic = BooleanParameter(True, help="Build position independent code")
     shared = BooleanParameter(False, help="Build shared libraries")
-
+    cstd = 90
     cflags_darwin_pic_on = ["-fPIC"]
     cflags_linux_pic_on = ["-fPIC"]
     incremental = False

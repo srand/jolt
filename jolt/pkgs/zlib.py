@@ -1,4 +1,4 @@
-from jolt import attributes, Alias, Parameter
+from jolt import attributes, Alias, BooleanParameter, Parameter
 from jolt.pkgs import cmake
 from jolt.plugins import git, cmake
 from jolt.tasks import TaskRegistry
@@ -11,8 +11,13 @@ from jolt.tasks import TaskRegistry
 class Zlib(cmake.CMake):
     name = "zlib"
     version = Parameter("1.3.1", help="Zlib version.")
+    shared = BooleanParameter(False, "Enable shared libraries.")
     requires_git = ["git:clean=true,url=https://github.com/madler/zlib.git,rev=v{version}"]
     srcdir = "{git[zlib]}"
+    options = [
+        "BUILD_SHARED_LIBS={shared[ON,OFF]}",
+        "ZLIB_BUILD_EXAMPLES=OFF",
+    ]
 
     def publish(self, artifact, tools):
         super().publish(artifact, tools)

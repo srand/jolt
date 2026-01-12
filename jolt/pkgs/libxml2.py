@@ -27,7 +27,9 @@ class Libxml2(cmake.CMake):
         if self.system == "windows":
             artifact.cxxinfo.libraries.append("libxml2{shared[,s]}")
         else:
-            artifact.cxxinfo.libraries.append("xml2{shared[,s]}")
+            artifact.cxxinfo.libraries.append("xml2")
+            artifact.cxxinfo.libraries.append("m")
+            artifact.cxxinfo.libraries.append("dl")
 
 
 TaskRegistry.get().add_task_class(Libxml2)

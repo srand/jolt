@@ -1,4 +1,4 @@
-from jolt import attributes, Parameter
+from jolt import attributes, BooleanParameter, Parameter
 from jolt.pkgs import cmake
 from jolt.plugins import git, cmake
 from jolt.tasks import TaskRegistry
@@ -11,8 +11,14 @@ from jolt.tasks import TaskRegistry
 class Zstd(cmake.CMake):
     name = "zstd"
     version = Parameter("ebc93b0", help="zstd version.")
+    shared = BooleanParameter(False, "Enable shared libraries.")
     requires_git = ["git:url=https://github.com/facebook/zstd.git,rev={version}"]
     srcdir = "{git[zstd]}"
+    options = [
+        "ZSTD_BUILD_SHARED={shared[ON,OFF]}",
+        "ZSTD_BUILD_STATIC={shared[OFF,ON]}",
+        "ZSTD_BUILD_TESTS=OFF",
+    ]
 
     def publish(self, artifact, tools):
         super().publish(artifact, tools)

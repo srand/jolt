@@ -364,6 +364,9 @@ class _Progress(object):
     def reset(self, *args, **kwargs):
         pass
 
+    def set_description(self, *args, **kwargs):
+        pass
+
 
 def progress_log(desc, count, unit):
     return _Progress(desc)
@@ -376,8 +379,15 @@ def progress(desc, count, unit, estimates=True, debug=False):
     else:
         bar_format = '{desc}{n_fmt}{unit} [{elapsed}]'
     if not debug and is_interactive() and not is_verbose():
-        p = tqdm.tqdm(total=count, unit=unit, unit_scale=True, bar_format=bar_format, dynamic_ncols=True)
-        p.set_description("[   INFO] " + desc)
+        class ProgressTqdm(tqdm.tqdm):
+            def __init__(self, *args, **kwargs):
+                super(ProgressTqdm, self).__init__(*args, **kwargs)
+
+            def set_description(self, desc = None, refresh = True):
+                return super().set_description("[   INFO] " + desc, refresh)
+
+        p = ProgressTqdm(total=count, unit=unit, unit_scale=True, bar_format=bar_format, dynamic_ncols=True)
+        p.set_description(desc)
         return p
     return progress_log(desc, count, unit)
 
