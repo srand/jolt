@@ -1,4 +1,4 @@
-from jolt import attributes, Parameter, Task
+from jolt import attributes, BooleanParameter, Parameter, Task
 from jolt.pkgs import cmake
 from jolt.plugins import git, cmake
 from jolt.tasks import TaskRegistry
@@ -10,9 +10,13 @@ from jolt.tasks import TaskRegistry
 class GoogleTest(cmake.CMake):
     name = "google/test"
     version = Parameter("1.12.1", help="GoogleTest version.")
+    shared = BooleanParameter(False, help="Build shared libraries.")
     requires_git = ["git:url=https://github.com/google/googletest.git,rev=release-{version}"]
     srcdir = "{git[googletest]}"
-
+    options = [
+        "BUILD_SHARED_LIBS={shared[ON,OFF]}",
+    ]
+    
     def publish(self, artifact, tools):
         super().publish(artifact, tools)
         artifact.cxxinfo.incpaths.append("include")
