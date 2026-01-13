@@ -72,9 +72,10 @@ Cflags: -I${{includedir}}
 class SQLite(Alias):
     name = "sqlite"
     version = Parameter("3.51.1", help="sqlite version.")
-    requires_darwin = ["sqlite/posix:version={version}"]
+    shared = BooleanParameter(False, help="Build shared libraries.")
+    requires_darwin = ["sqlite/posix:shared={shared},version={version}"]
     requires_linux = requires_darwin
-    requires_windows = ["sqlite/win32:version={version}"]
+    requires_windows = ["sqlite/win32:shared={shared},version={version}"]
 
 
 TaskRegistry.get().add_task_class(SQLite)
