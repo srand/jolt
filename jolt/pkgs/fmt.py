@@ -1,4 +1,4 @@
-from jolt import attributes, Parameter
+from jolt import attributes, BooleanParameter, Parameter
 from jolt.plugins import git, cmake
 from jolt.tasks import TaskRegistry
 
@@ -9,9 +9,13 @@ from jolt.tasks import TaskRegistry
 class Fmt(cmake.CMake):
     name = "fmt"
     version = Parameter("12.1.0", help="Fmt version.")
+    shared = BooleanParameter(False, help="Build shared libraries.")
     requires_git = ["git:url=https://github.com/fmtlib/fmt.git,rev={version}"]
     srcdir = "{git[fmt]}"
-    options = ["FMT_TEST=OFF"]
+    options = [
+        "BUILD_SHARED_LIBS={shared[ON,OFF]}",
+        "FMT_TEST=OFF",
+    ]
 
     def publish(self, artifact, tools):
         super().publish(artifact, tools)
