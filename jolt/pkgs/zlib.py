@@ -25,7 +25,10 @@ class Zlib(cmake.CMake):
         artifact.cxxinfo.incpaths.append("include")
         artifact.cxxinfo.libpaths.append("lib")
         if self.system == "windows":
-            artifact.cxxinfo.libraries.append("zlibstatic")
+            if self.shared:
+                artifact.cxxinfo.libraries.append("zlib")
+            else:
+                artifact.cxxinfo.libraries.append("zlibstatic")
         else:
             artifact.cxxinfo.libraries.append("z")
 
@@ -37,9 +40,13 @@ class Zlib(cmake.CMake):
 class ZlibNg(cmake.CMake):
     name = "zlib-ng"
     version = Parameter("2.3.2", help="Zlib version.")
+    shared = BooleanParameter(False, "Enable shared libraries.")
     requires_git = ["git:url=https://github.com/zlib-ng/zlib-ng.git,rev={version}"]
     srcdir = "{git[zlib-ng]}"
-    options = ["BUILD_TESTING=OFF"]
+    options = [
+        "BUILD_SHARED_LIBS={shared[ON,OFF]}",
+        "BUILD_TESTING=OFF",
+    ]
 
     def publish(self, artifact, tools):
         super().publish(artifact, tools)
