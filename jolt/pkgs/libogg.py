@@ -1,4 +1,4 @@
-from jolt import attributes, Parameter
+from jolt import attributes, BooleanParameter, Parameter
 from jolt.pkgs import cmake
 from jolt.plugins import git, cmake
 from jolt.tasks import TaskRegistry
@@ -10,9 +10,13 @@ from jolt.tasks import TaskRegistry
 class Libogg(cmake.CMake):
     name = "libogg"
     version = Parameter("1.3.6", help="libogg version.")
-    options = ["CMAKE_POLICY_VERSION_MINIMUM=3.5"]
+    shared = BooleanParameter(False, help="Build shared libraries.")
     requires_git = ["git:url=https://github.com/xiph/ogg.git,rev=v{version}"]
     srcdir = "{git[ogg]}"
+    options = [
+        "BUILD_SHARED_LIBS={shared[ON,OFF]}",
+        "CMAKE_POLICY_VERSION_MINIMUM=3.5",
+    ]
 
     def publish(self, artifact, tools):
         super().publish(artifact, tools)
