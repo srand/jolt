@@ -32,10 +32,12 @@ class NinjaCoverageApi(JoltTest):
         --- tasks:
         class Lib(CXXLibrary):
             coverage = True
+            optimize = "none"
             sources = ["lib.cpp"]
 
         class Exe(CXXExecutable):
             coverage = True
+            optimize = "none"
             requires = ["lib"]
             sources = ["exe.cpp"]
 
@@ -101,10 +103,12 @@ class NinjaCoverageApi(JoltTest):
         --- tasks:
         class Lib(CXXLibrary):
             coverage = True
+            optimize = "none"
             sources = ["lib.cpp"]
 
         class Exe(CXXExecutable):
             coverage = True
+            optimize = "none"
             requires = ["lib"]
             sources = ["exe.cpp"]
 
