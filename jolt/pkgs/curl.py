@@ -1,4 +1,4 @@
-from jolt import attributes, Parameter
+from jolt import attributes, BooleanParameter, Parameter
 from jolt.pkgs import cmake, ssl
 from jolt.plugins import git, cmake
 from jolt.tasks import TaskRegistry
@@ -12,10 +12,14 @@ from jolt.tasks import TaskRegistry
 class Curl(cmake.CMake):
     name = "curl"
     version = Parameter("8.17.0", help="Curl version.")
+    shared = BooleanParameter(False, help="Build shared libraries.")
     requires_git = ["git:url=https://github.com/curl/curl.git,rev=curl-{_version_tag},submodules=true"]
     requires_ssl = ["virtual/ssl"]
-    options = ["CURL_USE_LIBPSL=OFF"]
     srcdir = "{git[curl]}"
+    options = [
+        "BUILD_SHARED_LIBS={shared[ON,OFF]}",
+        "CURL_USE_LIBPSL=OFF",
+    ]
 
     @property
     def _version_tag(self):
