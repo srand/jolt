@@ -18,7 +18,7 @@ class Protobuf(cmake.CMake):
     name = "protobuf"
     version = Parameter("33.2", help="Protobuf version.")
     shared = BooleanParameter(False, help="Build shared libraries")
-    requires_abseil = ["abseil"]
+    requires_abseil = ["abseil:shared={shared}"]
     requires_git = ["git:url=https://github.com/protocolbuffers/protobuf.git,rev=v{version}"]
     srcdir = "{git[protobuf]}"
     options = [
@@ -40,7 +40,8 @@ class ProtobufLib(Task):
 
     name = "protobuf/lib"
     version = Parameter("33.2", help="Protobuf version.")
-    extends = "protobuf:version={version}"
+    shared = BooleanParameter(False, help="Build shared libraries")
+    extends = "protobuf:version={version},shared={shared}"
 
     def publish(self, artifact, tools):
         artifact.cxxinfo.libraries.append("protobuf")
@@ -51,7 +52,8 @@ class ProtobufLite(Task):
 
     name = "protobuf/lib-lite"
     version = Parameter("33.2", help="Protobuf version.")
-    extends = "protobuf:version={version}"
+    shared = BooleanParameter(False, help="Build shared libraries")
+    extends = "protobuf:version={version},shared={shared}"
 
     def publish(self, artifact, tools):
         artifact.cxxinfo.libraries.append("protobuf-lite")
@@ -62,7 +64,8 @@ class ProtobufLibProtoc(Task):
 
     name = "protobuf/lib-compiler"
     version = Parameter("33.2", help="Protobuf version.")
-    extends = "protobuf:version={version}"
+    shared = BooleanParameter(False, help="Build shared libraries")
+    extends = "protobuf:version={version},shared={shared}"
 
     def publish(self, artifact, tools):
         artifact.cxxinfo.libraries.append("protoc")

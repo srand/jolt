@@ -1,4 +1,4 @@
-from jolt import attributes, Parameter, Task
+from jolt import attributes, BooleanParameter, Parameter, Task
 from jolt.pkgs import abseil, cares, cmake, nasm, openssl, protobuf, re2, zlib
 from jolt.plugins import git, cmake
 from jolt.tasks import TaskRegistry
@@ -18,17 +18,19 @@ from jolt.tasks import TaskRegistry
 class Grpc(cmake.CMake):
     name = "grpc"
     version = Parameter("1.76.0", help="Grpc version.")
+    shared = BooleanParameter(False, help="Build shared libraries.")
     generator = "Ninja"
-    requires_abseil = ["abseil"]
-    requires_cares = ["c-ares"]
+    requires_abseil = ["abseil:shared={shared}"]
+    requires_cares = ["c-ares:shared={shared}"]
     requires_git = ["git:url=https://github.com/grpc/grpc.git,path={buildroot}/git_grpc,rev=v{version},submodules=true"]
     requires_nasm_windows = ["nasm"]
-    requires_protobuf = ["protobuf"]
-    requires_re2 = ["re2"]
-    requires_ssl = ["virtual/ssl"]
+    requires_protobuf = ["protobuf:shared={shared}"]
+    requires_re2 = ["re2:shared={shared}"]
+    requires_ssl = ["virtual/ssl:shared={shared}"]
     requires_zlib = ["zlib"]
     srcdir = "{git[grpc]}"
     options = [
+        "BUILD_SHARED_LIBS={shared[ON,OFF]}",
         "CMAKE_CXX_STANDARD=17",
         "gRPC_ABSL_PROVIDER=package",
         "gRPC_BUILD_TESTS=OFF",

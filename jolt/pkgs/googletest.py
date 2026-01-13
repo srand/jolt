@@ -8,7 +8,7 @@ from jolt.tasks import TaskRegistry
 @cmake.requires()
 @cmake.use_ninja()
 class GoogleTest(cmake.CMake):
-    name = "googletest"
+    name = "google/test"
     version = Parameter("1.12.1", help="GoogleTest version.")
     requires_git = ["git:url=https://github.com/google/googletest.git,rev=release-{version}"]
     srcdir = "{git[googletest]}"
@@ -22,16 +22,16 @@ class GoogleTest(cmake.CMake):
 
 
 class GTestMain(Task):
-    name = "gtest/main"
-    extends = "googletest"
+    name = "google/test/main"
+    extends = "google/test"
 
     def publish(self, artifact, tools):
         artifact.cxxinfo.libraries.append("gtest_main")
 
 
 class GmockMain(Task):
-    name = "gmock/main"
-    extends = "googletest"
+    name = "google/mock/main"
+    extends = "google/test"
 
     def publish(self, artifact, tools):
         artifact.cxxinfo.libraries.append("gmock_main")

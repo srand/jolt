@@ -27,6 +27,8 @@ class Abseil(cmake.CMake):
         artifact.cxxinfo.crt = "Dynamic"
         artifact.cxxinfo.incpaths.append("include")
         artifact.cxxinfo.libpaths.append("lib")
+        if self.shared:
+            artifact.environ.LD_LIBRARY_PATH.append("lib")
 
         with tools.cwd(artifact.path, "lib"):
             for libfile in tools.glob("*.lib"):
