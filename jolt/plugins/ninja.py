@@ -778,7 +778,7 @@ class StdVariable(Variable):
         raise_task_error_if(
             value not in self._values,
             project,
-            f"Illegal {self._lang} language standard: '{value}'. Expected one of: {", ".join([str(v) for v in self._values])}"
+            f"Illegal {self._lang} language standard: '{value}'. Expected one of: {', '.join([str(v) for v in self._values])}"
         )
 
         if value not in self._supported:
