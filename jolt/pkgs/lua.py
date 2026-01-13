@@ -1,4 +1,4 @@
-from jolt import attributes, Parameter
+from jolt import attributes, BooleanParameter, Parameter
 from jolt.pkgs import ninja
 from jolt.plugins import git
 from jolt.plugins.ninja import CXXLibrary
@@ -10,6 +10,7 @@ from jolt.tasks import TaskRegistry
 class Lua(CXXLibrary):
     name = "lua"
     version = Parameter("5.4.8", help="Lua version.")
+    shared = BooleanParameter(False, help="Build shared libraries.")
 
     requires_git = ["git:url=https://github.com/lua/lua.git,rev=v{version},hash=true"]
     requires_ninja = ["ninja"]
@@ -25,6 +26,7 @@ class Lua(CXXLibrary):
         "{git[lua]}/ldo.c",
         "{git[lua]}/ldump.c",
         "{git[lua]}/lfunc.c",
+        "{git[lua]}/lgc.c",
         "{git[lua]}/linit.c",
         "{git[lua]}/liolib.c",
         "{git[lua]}/llex.c",
