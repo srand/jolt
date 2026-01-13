@@ -383,7 +383,7 @@ def progress(desc, count, unit, estimates=True, debug=False):
             def __init__(self, *args, **kwargs):
                 super(ProgressTqdm, self).__init__(*args, **kwargs)
 
-            def set_description(self, desc = None, refresh = True):
+            def set_description(self, desc=None, refresh=True):
                 return super().set_description("[   INFO] " + desc, refresh)
 
         p = ProgressTqdm(total=count, unit=unit, unit_scale=True, bar_format=bar_format, dynamic_ncols=True)
