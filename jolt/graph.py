@@ -674,9 +674,6 @@ class TaskProxy(object):
         The artifact is published to the cache even if the acquisition fails.
         """
 
-        if self.task.acquire.__func__ is Resource.acquire:
-            return
-
         try:
             if not self.is_workspace_resource():
                 ts = utils.duration()
@@ -706,10 +703,6 @@ class TaskProxy(object):
         """
         Releases a resource.
         """
-
-        if self.task.release.__func__ is Resource.release:
-            return
-
         try:
             if not self.is_workspace_resource():
                 ts = utils.duration()
