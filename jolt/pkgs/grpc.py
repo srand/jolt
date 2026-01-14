@@ -1,5 +1,5 @@
 from jolt import attributes, BooleanParameter, Parameter, Task
-from jolt.pkgs import abseil, cares, cmake, nasm, openssl, protobuf, re2, zlib
+from jolt.pkgs import abseil, cares, cmake, nasm, protobuf, re2, ssl, zlib
 from jolt.plugins import git, cmake
 from jolt.tasks import TaskRegistry
 
@@ -40,6 +40,7 @@ class Grpc(cmake.CMake):
         "gRPC_RE2_PROVIDER=package",
         "gRPC_SSL_PROVIDER=package",
         "gRPC_ZLIB_PROVIDER=package",
+        "gRPC_USE_SYSTEMD=OFF",
     ]
 
     def publish(self, artifact, tools):

@@ -16,7 +16,7 @@ class GoogleTest(cmake.CMake):
     options = [
         "BUILD_SHARED_LIBS={shared[ON,OFF]}",
     ]
-    
+
     def publish(self, artifact, tools):
         super().publish(artifact, tools)
         artifact.cxxinfo.incpaths.append("include")

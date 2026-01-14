@@ -14,8 +14,8 @@ class OpenCV(cmake.CMake):
     requires_git = ["git:url=https://github.com/opencv/opencv.git,rev={version}"]
     srcdir = "{git[opencv]}"
     options = [
-        "BUILD_EXAMPLES=OFF", 
-        "BUILD_TESTS=OFF", 
+        "BUILD_EXAMPLES=OFF",
+        "BUILD_TESTS=OFF",
         "BUILD_PERF_TESTS=OFF",
         "BUILD_SHARED_LIBS={shared[ON,OFF]}",
     ]
