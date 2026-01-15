@@ -11,7 +11,8 @@ class PythonFlake8(python.PythonEnv):
 
 @git.influence("..")
 class Flake8(Task):
-    requires = ["python-flake8"]
+    # Disabled until PythonEnv supports nested virtualenvs
+    # requires = ["python-flake8"]
 
     def run(self, deps, tools):
         with tools.cwd(".."):
