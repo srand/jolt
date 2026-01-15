@@ -3360,24 +3360,21 @@ class Test(Task):
         """
         raise_error_if(type(args) is not list, "Test.parameterized() expects a list as argument")
 
-        class partialmethod(functools.partialmethod):
-            def __init__(self, index, func, *args):
-                super().__init__(func, *args)
-                self.__index = index
-
-            def __get__(self, obj, cls=None):
-                retval = super().__get__(obj, cls)
-                retval.__name__ = f"{self.func.__name__}[{self.__index}]"
-                retval.__doc__ = self.func.__doc__
-                return retval
+        def make_method(index, func, *args):
+            def testmethod(self):
+                return func(self, *args)
+            testmethod.__name__ = f"{func.__name__}[{index}]"
+            testmethod.__doc__ = func.__doc__
+            return testmethod
 
         def decorate(method):
             frame = sys._getframe().f_back.f_locals
             for index, arg in enumerate(args):
-                testmethod = partialmethod(index, method, *utils.as_list(arg))
+                testmethod = make_method(index, method, *utils.as_list(arg))
                 name = f"{method.__name__}[{index}]"
                 frame[name] = testmethod
             return None
+
         return decorate
 
     def setup(self, deps, tools):
