@@ -2,7 +2,6 @@ package cache
 
 import (
 	"io"
-	"io/fs"
 	"path"
 	"path/filepath"
 	"sync"
@@ -237,33 +236,48 @@ func (c *lruCache) fileDiscarded(file *lruFile) error {
 }
 
 func (c *lruCache) load() error {
-	count := 0
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+	var walkDir func(dirPath string) error
+	var count int64
 
-	err := afero.Walk(c.fs, ".", func(path string, info fs.FileInfo, err error) error {
-		if path == "." {
-			return nil
-		}
-
+	walkDir = func(dirPath string) error {
+		entries, err := afero.ReadDir(c.fs, dirPath)
 		if err != nil {
 			return err
 		}
 
-		if info.IsDir() {
-			return nil
+		for _, entry := range entries {
+			fullPath := filepath.Join(dirPath, entry.Name())
+
+			if entry.IsDir() {
+				wg.Add(1)
+				go func(path string) {
+					defer wg.Done()
+					if err := walkDir(path); err != nil {
+						log.Warn("Error walking directory:", err)
+					}
+				}(fullPath)
+			} else {
+				mu.Lock()
+				c.lru.Add(&lruItem{
+					access: entry.ModTime(),
+					path:   fullPath,
+					size:   entry.Size(),
+				})
+				count++
+				mu.Unlock()
+			}
 		}
 
-		c.lru.Add(&lruItem{
-			access: info.ModTime(),
-			path:   path,
-			size:   info.Size(),
-		})
-
-		count++
 		return nil
-	})
-	if err != nil {
+	}
+
+	if err := walkDir("."); err != nil {
 		return err
 	}
+
+	wg.Wait()
 
 	log.Infof("Loaded %d items from storage into cache. Total size: %s", count, utils.HumanByteSize(c.lru.Size()))
 
