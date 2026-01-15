@@ -25,12 +25,30 @@ class Zlib(cmake.CMake):
         artifact.cxxinfo.incpaths.append("include")
         artifact.cxxinfo.libpaths.append("lib")
         if self.system == "windows":
+            self.publish_windows(artifact, tools)
+        else:
+            self.publish_unix(artifact, tools)
+
+    def publish_unix(self, artifact, tools):
+        artifact.cxxinfo.libraries.append("z")
+        with tools.cwd(artifact.path, "lib"):
+            if self.shared:
+                for lib in tools.glob("*.a"):
+                    tools.unlink(lib)
+            else:
+                for lib in tools.glob("*.so*") + tools.glob("*.dylib*"):
+                    tools.unlink(lib)
+
+    def publish_windows(self, artifact, tools):
+        with tools.cwd(artifact.path, "lib"):
             if self.shared:
                 artifact.cxxinfo.libraries.append("zlib")
+                for lib in tools.glob("zlibstatic.*"):
+                    tools.unlink(lib)
             else:
                 artifact.cxxinfo.libraries.append("zlibstatic")
-        else:
-            artifact.cxxinfo.libraries.append("z")
+                for lib in tools.glob("zlib.*"):
+                    tools.unlink(lib)
 
 
 @attributes.requires("requires_git")
