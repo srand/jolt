@@ -12,6 +12,7 @@ class CLI11(cmake.CMake):
     requires_src = ["fetch:alias=src,url=https://github.com/CLIUtils/CLI11/archive/refs/tags/v{version}.tar.gz"]
     srcdir = "{fetch[src]}/CLI11-{version}"
     options = [
+        "CLI11_BUILD_EXAMPLES=OFF",
         "CLI11_BUILD_TESTS=OFF",
     ]
 
