@@ -22,8 +22,8 @@ from jolt.error import raise_task_error_if
 from jolt.error import JoltError, JoltCommandError
 
 
-c_standard_default = 17
-cxx_standard_default = 17
+c_standard_default = None
+cxx_standard_default = None
 c_standards_list = [90, 99, 11, 17, 23]
 cxx_standards_list = [98, 11, 14, 17, 20, 23, 26]
 
@@ -2008,7 +2008,7 @@ class CXXProject(Task):
 
     cstd = None
     """
-    C language standard to use (int). Default: 17
+    C language standard to use (int). Default: Compiler default
 
     If the chosen standard is not supported, the nearest supported standard is selected.
     """
@@ -2018,7 +2018,7 @@ class CXXProject(Task):
 
     cxxstd = None
     """
-    C++ language standard to use (int). Default: 17
+    C++ language standard to use (int). Default: Compiler default
 
     If the chosen standard is not supported, the nearest supported standard is selected.
     """
