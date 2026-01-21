@@ -1838,13 +1838,13 @@ class MSVCCRT(Variable):
 
     def _select_dep_flags(self, project, dep):
         crt = self._select_flag(dep.cxxinfo.asflags.items())
-        if hasattr(dep.cxxinfo, "crt"):
-            crt = self._combine(project, crt, self._select_flag([str(dep.cxxinfo.crt)]))
+        if hasattr(dep.cxxinfo, "msvcrt"):
+            crt = self._combine(project, crt, self._select_flag([str(dep.cxxinfo.msvcrt)]))
         crt = self._combine(project, crt, self._select_flag(dep.cxxinfo.cflags.items()))
         return self._combine(project, crt, self._select_flag(dep.cxxinfo.cxxflags.items()))
 
     def create(self, project, writer, deps, tools):
-        crt = self._select_flag(getattr(project, "crt", None))
+        crt = self._select_flag(getattr(project, "msvcrt", None))
         crt = self._combine(project, crt, self._select_flag(project._asflags()))
         crt = self._combine(project, crt, self._select_flag(project._cflags()))
         crt = self._combine(project, crt, self._select_flag(project._cxxflags()))
@@ -1854,7 +1854,7 @@ class MSVCCRT(Variable):
 
     @utils.cached.instance
     def get_influence(self, task):
-        return "CRT"
+        return "MSVC-CRT"
 
 
 MSVCCompiler = GNUCompiler
