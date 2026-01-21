@@ -1704,6 +1704,9 @@ class TaskBase(object):
                 "Required parameter '{0}' has not been set", key)
 
     def _verify_influence(self, deps, artifact, tools, sources=None):
+        if "configurationrepository" in self.name:
+            breakpoint()
+
         # Verify that any transformed sources are influencing
         sources = set(map(tools.expand_path, sources or []))
 
@@ -1720,29 +1723,29 @@ class TaskBase(object):
                 return not fs.is_relative_to(fname, rootpath)
             return _filter
 
+        # Ignore any files in build directories
+        sources = filter(_subpath_filter(tools.expand_path(tools.buildroot)), sources)
+
         for _, dep in deps.items():
             deptask = dep.task
             if isinstance(deptask, FileInfluence):
                 # Resource dependencies may cover the influence implicitly
                 deppath = self.tools.expand_path(str(deptask.path))
-                sources = set(filter(lambda d: not deptask.is_influenced_by(self, d), sources))
+                sources = filter(lambda d, dt=deptask: not dt.is_influenced_by(self, d), sources)
             else:
                 # Ignore any files in artifacts
                 deppath = self.tools.expand_path(dep.path)
-                sources = set(filter(_subpath_filter(deppath), sources))
-
-        # Ignore any files in build directories
-        sources = filter(_subpath_filter(tools.expand_path(tools.buildroot)), sources)
-        sources = set(sources)
+                sources = filter(_subpath_filter(deppath), sources)
 
         for ip in self.influence:
             if not isinstance(ip, FileInfluence):
                 continue
-            ok = [source for source in sources if ip.is_influenced_by(self, source)]
-            sources.difference_update(ok)
+            sources = {source for source in sources if not ip.is_influenced_by(self, source)}
+
         for source in sources:
             log.warning("Missing influence: {} ({})", source, self.name)
-        raise_task_error_if(sources, self, "Task is missing source influence")
+
+        raise_task_error_if(set(sources), self, "Task is missing source influence")
 
     def _get_export_objects(self):
         return self._exports
