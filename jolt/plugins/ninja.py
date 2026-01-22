@@ -797,7 +797,9 @@ class OptimizationVariable(Variable):
         assert type(values) is dict, "Optimization values must be dict with compiler flag mapping"
 
     def create(self, project, writer, deps, tools):
-        value = str(getattr(project, "optimize", self._default))
+        value = getattr(project, "optimize", self._default)
+        if value is not None:
+            value = str(value)
         raise_task_error_if(
             value not in self._values,
             project,
@@ -1604,7 +1606,7 @@ class GNUToolchain(Toolchain):
         "debug": "-Og",
         "size": "-Os",
         "release": "-O2",
-        None: "-O0",
+        None: "",
     })
     asflags = EnvironmentVariable(default="")
     cflags = EnvironmentVariable(default="")
@@ -1885,7 +1887,7 @@ class MSVCToolchain(Toolchain):
         "debug": "/Od /Zi",
         "size": "/O1",
         "release": "/O2 /DNDEBUG",
-        None: "/0d",
+        None: "",
     })
     win32flags = Variable("/DWIN32 /D_WINDOWS /D_WIN32_WINNT=0x0601 /EHsc")
     asflags = EnvironmentVariable(default="")

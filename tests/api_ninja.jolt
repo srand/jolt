@@ -1063,12 +1063,22 @@ class NinjaApi(JoltTest):
         class LibIllegal(CXXLibrary):
             sources = ["test.c"]
             optimize = "illegal"
+
+        class LibDisable(CXXLibrary):
+            sources = ["test.c"]
+            optimize = None
         ---
         """
-        self.build("libnone")
-        self.build("libdebug")
-        self.build("libsize")
-        self.build("librelease")
+        r = self.build("libnone")
+        self.assertIn("-O0", r)
+        r = self.build("libdebug")
+        self.assertIn("-Og", r)
+        r = self.build("libsize")
+        self.assertIn("-Os", r)
+        r = self.build("librelease")
+        self.assertIn("-O2", r)
+        r = self.build("libdisable")
+        self.assertNotIn("-O", r)
         with self.assertRaises(Exception):
             self.build("libillegal")
 
