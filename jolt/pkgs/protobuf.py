@@ -6,6 +6,7 @@ from jolt.tasks import TaskRegistry
 
 @attributes.requires("requires_abseil")
 @attributes.requires("requires_git")
+@attributes.system
 @cmake.requires()
 @cmake.use_ninja()
 class Protobuf(cmake.CMake):
@@ -30,7 +31,8 @@ class Protobuf(cmake.CMake):
 
     def publish(self, artifact, tools):
         super().publish(artifact, tools)
-        artifact.cxxinfo.crt = "Dynamic"
+        if self.system == "windows":
+            artifact.cxxinfo.msvcrt = "Dynamic"
         artifact.cxxinfo.incpaths.append("include")
         artifact.cxxinfo.libpaths.append("lib")
 

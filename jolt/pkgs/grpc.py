@@ -45,7 +45,8 @@ class Grpc(cmake.CMake):
 
     def publish(self, artifact, tools):
         super().publish(artifact, tools)
-        artifact.cxxinfo.crt = "Dynamic"
+        if self.system == "windows":
+            artifact.cxxinfo.msvcrt = "Dynamic"
         artifact.cxxinfo.incpaths.append("include")
         artifact.cxxinfo.libpaths.append("lib")
 
@@ -55,7 +56,6 @@ class GrpcC(Task):
     extends = "grpc"
 
     def publish(self, artifact, tools):
-        artifact.cxxinfo.crt = "Dynamic"
         artifact.cxxinfo.libraries.append("grpc")
 
 
@@ -64,7 +64,6 @@ class GrpcCXX(Task):
     extends = "grpc"
 
     def publish(self, artifact, tools):
-        artifact.cxxinfo.crt = "Dynamic"
         artifact.cxxinfo.libraries.append("grpc++")
 
 
