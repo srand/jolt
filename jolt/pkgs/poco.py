@@ -23,7 +23,8 @@ class Poco(cmake.CMake):
 
     def publish(self, artifact, tools):
         super().publish(artifact, tools)
-        artifact.cxxinfo.crt = "Dynamic"
+        if self.system == "windows":
+            artifact.cxxinfo.msvcrt = "Dynamic"
         artifact.cxxinfo.incpaths.append("include")
         artifact.cxxinfo.libpaths.append("lib")
 
