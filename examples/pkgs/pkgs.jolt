@@ -5,6 +5,7 @@ from jolt.pkgs import abseil
 from jolt.pkgs import asio
 from jolt.pkgs import autoconf
 from jolt.pkgs import automake
+from jolt.pkgs import blake3
 from jolt.pkgs import boost
 from jolt.pkgs import boringssl
 from jolt.pkgs import busybox
@@ -112,9 +113,9 @@ from jolt.pkgs import zstd
 class Default(Alias):
     requires = [
         "abseil",
+        "blake3",
         "boost",
         "boringssl",
-        "libbzip2",
         "c-ares",
         "catch2",
         "cbindgen",
@@ -151,6 +152,7 @@ class Default(Alias):
         "inja",
         "jsoncpp",
         "libarchive",
+        "libbzip2",
         "libevent",
         "libexpat",
         "libmysqlclient",
