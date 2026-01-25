@@ -93,7 +93,7 @@ for i in range(1):
 
         @property
         def identity(self):
-            return utils.sha1(self.name)
+            return utils.hashstring(self.name)
 
     the_tasks.append(Task())
 

@@ -25,13 +25,13 @@ type DetailedError interface {
 func GrpcError(err error) error {
 	switch err {
 	case ErrNotFound:
-		return status.Errorf(codes.NotFound, err.Error())
+		return status.Errorf(codes.NotFound, "%s", err.Error())
 	case ErrNoEligibleWorker:
-		return status.Errorf(codes.Unavailable, err.Error())
+		return status.Errorf(codes.Unavailable, "%s", err.Error())
 	case ErrNoTask:
-		return status.Errorf(codes.Unavailable, err.Error())
+		return status.Errorf(codes.Unavailable, "%s", err.Error())
 	case ErrTerminalBuild:
-		return status.Errorf(codes.FailedPrecondition, err.Error())
+		return status.Errorf(codes.FailedPrecondition, "%s", err.Error())
 	}
 	return err
 }

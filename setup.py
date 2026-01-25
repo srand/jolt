@@ -70,6 +70,7 @@ setup(
     ],
     packages=find_packages(exclude=["contrib", "docs", "tests"]),
     install_requires=pinned_reqs or [
+        "blake3",
         "bz2file",
         "click>=8.1",
         "colorama",

@@ -7,6 +7,7 @@ import (
 )
 
 const (
+	Blake3Algorithm = HashAlgorithm("blake3")
 	Sha1Algorithm   = HashAlgorithm("sha1")
 	Sha256Algorithm = HashAlgorithm("sha256")
 )
@@ -31,6 +32,11 @@ func ParseDigest(digest string) (Digest, error) {
 	}
 
 	switch HashAlgorithm(alg) {
+	case Blake3Algorithm:
+		if len(bytes) != 32 {
+			return Digest{}, fmt.Errorf("invalid length of blake3 hex string: %d", len(bytes))
+		}
+		return NewDigest(Blake3Algorithm, data), nil
 	case Sha1Algorithm:
 		if len(bytes) != 20 {
 			return Digest{}, fmt.Errorf("invalid length of sha1 hex string: %d", len(bytes))
@@ -38,7 +44,7 @@ func ParseDigest(digest string) (Digest, error) {
 		return NewDigest(Sha1Algorithm, data), nil
 	case Sha256Algorithm:
 		if len(bytes) != 32 {
-			return Digest{}, fmt.Errorf("invalid length of sha1 hex string: %d", len(bytes))
+			return Digest{}, fmt.Errorf("invalid length of sha256 hex string: %d", len(bytes))
 		}
 		return NewDigest(Sha256Algorithm, data), nil
 	default:

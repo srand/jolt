@@ -1,6 +1,8 @@
+import blake3
 import contextlib
 import ctypes
 import fnmatch
+import mmap
 import re
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -515,18 +517,30 @@ def map_concurrent(method, iterable, *args, **kwargs):
     return [future.result() for future in futures]
 
 
-def sha1(string):
-    sha = hashlib.sha1()
-    sha.update(string.encode())
-    return sha.hexdigest()
+def hashstring(string, hashfn=blake3.blake3):
+    hash = hashfn()
+    hash.update(string.encode())
+    return hash.hexdigest()
 
 
-def filesha1(path):
-    sha = hashlib.sha1()
+def hashfile(path, hashfn=blake3.blake3):
+    hash = hashfn()
     with open(path, "rb") as f:
-        for data in iter(lambda: f.read(0x10000), b''):
-            sha.update(data)
-    return sha.hexdigest()
+        mm = None
+        try:
+            mm = mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ)
+            hash.update(mm)
+        except ValueError:
+            # File is empty
+            pass
+        finally:
+            if mm is not None:
+                mm.close()
+    return hash.hexdigest()
+
+
+def hashfn(hashfn=blake3.blake3):
+    return hashfn()
 
 
 def fromjson(filepath, ignore_errors=False):

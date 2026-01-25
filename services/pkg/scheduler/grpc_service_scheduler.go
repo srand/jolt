@@ -21,7 +21,7 @@ func NewSchedulerService(scheduler Scheduler) *schedulerService {
 func (s *schedulerService) ScheduleBuild(request *protocol.BuildRequest, stream protocol.Scheduler_ScheduleBuildServer) error {
 	var build Build
 
-	id, err := utils.Sha1String(request.String())
+	id, err := utils.Blake3String(request.String())
 	if err != nil {
 		return utils.GrpcError(err)
 	}

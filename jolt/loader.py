@@ -462,7 +462,7 @@ def export_workspace(tasks=None) -> common_pb.Workspace:
         with tools.cwd(loader.workspace_path):
             cwd = tools.getcwd()
             cachedir = config.get_cachedir()
-            indexhash = utils.sha1(cwd)
+            indexhash = utils.hashstring(cwd)
             indexfile = tools.expand_path(
                 "{cachedir}/indexes/{}/{}",
                 indexhash[:2], indexhash[2:],

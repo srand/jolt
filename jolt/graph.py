@@ -139,9 +139,9 @@ class TaskProxy(object):
             if c.is_workspace_resource():
                 c.task.acquire_ws()
 
-        sha = hashlib.sha1()
-        HashInfluenceRegistry.get().apply_all(self.task, sha)
-        self.task.identity = sha.hexdigest()
+        hash = utils.hashfn()
+        HashInfluenceRegistry.get().apply_all(self.task, hash)
+        self.task.identity = hash.hexdigest()
 
         return str(self.task.identity)
 

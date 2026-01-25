@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import blake3
 import errno
 import hashlib
 import os
@@ -336,7 +337,7 @@ class ToolsApi(JoltTest):
         """
         with self.tools.cwd(self.ws):
             shasum = self.tools.checksum_file("test1.txt")
-            self.assertEqual(hashlib.sha1(self.tools.read_file("test1.txt").encode()).hexdigest(), shasum)
+            self.assertEqual(blake3.blake3(self.tools.read_file("test1.txt").encode()).hexdigest(), shasum)
 
             md5sum = self.tools.checksum_file("test1.txt", hashfn=hashlib.md5)
             self.assertEqual(hashlib.md5(self.tools.read_file("test1.txt").encode()).hexdigest(), md5sum)
@@ -345,9 +346,6 @@ class ToolsApi(JoltTest):
             self.assertEqual(2, len(shalist))
             self.assertEqual(shasum, shalist[0])
             self.assertNotEqual(shalist[0], shalist[1])
-
-            shalist = self.tools.checksum_file(["test1.txt", "test2.txt"], filterfn=lambda data: filter(lambda n: n == " ", data))
-            self.assertEqual(shalist[0], shalist[1])
 
     def test_chroot(self):
         """

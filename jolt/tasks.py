@@ -1977,26 +1977,26 @@ class SubTask(object):
 
     @functools.cached_property
     def identity(self):
-        sha = hashlib.sha1()
+        hash = utils.hashfn()
         for ident in self._identity:
-            sha.update(ident.encode())
+            hash.update(ident.encode())
         for output in self._outputs:
-            sha.update(output.encode())
+            hash.update(output.encode())
         if self.message:
-            sha.update(self.message.encode())
-        return sha.hexdigest()
+            hash.update(self.message.encode())
+        return hash.hexdigest()
 
     @functools.cached_property
     def influence(self):
-        sha = hashlib.sha1()
+        hash = utils.hashfn()
         for infl in self._influence:
             if callable(infl):
-                sha.update(infl().encode())
+                hash.update(infl().encode())
             else:
-                sha.update(infl.encode())
+                hash.update(infl.encode())
         for dep in self._deps:
-            sha.update(dep.influence.encode())
-        return sha.hexdigest()
+            hash.update(dep.influence.encode())
+        return hash.hexdigest()
 
     @functools.cached_property
     def is_outdated(self):
@@ -2049,7 +2049,7 @@ class SubTask(object):
 
     def add_influence_file(self, path):
         path = self._tools.expand_path(path)
-        self.add_influence(utils.filesha1(path))
+        self.add_influence(utils.hashfile(path))
 
     def add_influence_depfile(self, path):
         def depfile():
@@ -2062,7 +2062,7 @@ class SubTask(object):
                 for output in self.outputs:
                     for input in deps.get(output, []):
                         input = self._tools.expand_path(input)
-                        result += utils.filesha1(input)
+                        result += utils.hashfile(input)
             return result
         self.add_influence(depfile)
 

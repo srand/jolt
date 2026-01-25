@@ -1,10 +1,12 @@
 import py7zr
+import blake3
 import bz2
 import copy
 import getpass
 import gzip
 import json
 import lzma
+import mmap
 import subprocess
 import os
 import platform
@@ -710,7 +712,7 @@ class Tools(object):
         from jolt.loader import JoltLoader
         return fs.path.normpath(JoltLoader.get().build_path)
 
-    def checksum_file(self, filelist, concat=False, hashfn=hashlib.sha1, filterfn=None):
+    def checksum_file(self, filelist, concat=False, hashfn=blake3.blake3):
         """ Calculate a checksum of one or multiple files.
 
         Args:
@@ -718,24 +720,27 @@ class Tools(object):
             concat (boolean): Concatenate files and return a single digest. If False,
                 a list with one digest for each file is returned. Default: False.
             hashfn: The hash algorithm used. Any type which provides an update() and
-                hexdigest() method is accepted. Default: hashlib.sha1
-            filterfn: An optional data filter function. It is called repeatedly
-                with each block of data read from files as its only argument.
-                It should return the data to be included in the checksum.
-                Default: None
+                hexdigest() method is accepted. Default: blake3
 
         Returns:
             A list of checksum digests, or a single digest if files where concatenated.
         """
         files = [self.expand_path(fname) for fname in utils.as_list(filelist)]
-        filterfn = filterfn or (lambda data: data)
         result = []
-        checksum = hashfn()
 
         for fname in files:
+            checksum = hashfn()
             with open(fname, "rb") as f:
-                for block in iter(lambda: f.read(0x10000), b''):
-                    checksum.update(bytes(filterfn(block)))
+                mm = None
+                try:
+                    mm = mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ)
+                    checksum.update(mm)
+                except ValueError:
+                    # File is empty
+                    pass
+                finally:
+                    if mm is not None:
+                        mm.close()
                 result.append(checksum.hexdigest())
             if not concat:
                 checksum = hashfn()

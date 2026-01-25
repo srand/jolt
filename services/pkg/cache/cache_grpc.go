@@ -66,7 +66,7 @@ func (svc *cacheService) checkTree(server CacheService_HasTreeServer, m *sync.Mu
 	}
 
 	for _, child := range tree.Children {
-		digest := utils.NewDigest(utils.Sha1Algorithm, child.Digest())
+		digest := utils.NewDigest(digest.Algorithm(), child.Digest())
 
 		switch child.Type() {
 		case fstree.InodeType_Directory:

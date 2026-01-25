@@ -1,5 +1,4 @@
 import datetime
-import hashlib
 import os
 from pathlib import Path, PurePath
 
@@ -158,17 +157,17 @@ class TaskSourceInfluence(HashInfluenceProvider):
         else:
             funcs = []
 
-        # Calculate sha1 sum for all functions
-        shasum = hashlib.sha1()
+        # Calculate hash sum for all functions
+        sum = ""
         for func in funcs:
             try:
                 func.__influence
             except AttributeError:
-                func.__influence = utils.sha1(inspection.getfuncsource(func))
+                func.__influence = utils.hashstring(inspection.getfuncsource(func))
             finally:
-                shasum.update(func.__influence.encode())
+                sum += func.__influence
 
-        return shasum.hexdigest() + ": " + funcname
+        return utils.hashstring(sum) + ": " + funcname
 
 
 def source(name, obj=None):
@@ -271,7 +270,7 @@ class TaskClassSourceInfluence(HashInfluenceProvider):
     name = "Source"
 
     def get_influence(self, task):
-        # Calculate sha1 sum for classes in hierarchy
+        # Calculate hash sum for classes in hierarchy
         result = ""
         for cls in reversed(task.__class__.mro()):
             if cls is object:
@@ -280,7 +279,7 @@ class TaskClassSourceInfluence(HashInfluenceProvider):
                 cls.__dict__["_TaskClassSourceInfluence__influence"]
             except KeyError:
                 try:
-                    cls.__influence = utils.sha1(inspection.getclasssource(cls))
+                    cls.__influence = utils.hashstring(inspection.getclasssource(cls))
                 except TypeError:
                     continue
             result += cls.__dict__["_TaskClassSourceInfluence__influence"] + \
@@ -529,7 +528,7 @@ class FileInfluence(HashInfluenceProvider):
         self._files = {}
 
     def get_file_influence(self, path):
-        return utils.filesha1(str(path))
+        return utils.hashfile(str(path))
 
     def get_filelist(self, task):
         try:

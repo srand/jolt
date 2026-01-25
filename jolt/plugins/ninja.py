@@ -1281,7 +1281,7 @@ class FileListWriter(Rule):
 
     def _data(self, project, files):
         data = "\n".join(files)
-        return data, utils.sha1(data)
+        return data, utils.hashstring(data)
 
     def build(self, project, writer, infiles, implicit=None, order_only=None):
         infiles = [fs.as_posix(infile) for infile in infiles] if self.posix else infiles
@@ -1320,7 +1320,7 @@ class GNUMRIWriter(FileListWriter):
             else:
                 data += "addmod {}\n".format(infile)
         data += "save\nend\n"
-        return data, utils.sha1(data)
+        return data, utils.hashstring(data)
 
     @utils.cached.instance
     def get_influence(self, task):

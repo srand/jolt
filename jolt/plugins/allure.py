@@ -40,7 +40,7 @@ class _ReporterTest(object):
 
     def attach(self, name, content, mime_type=None):
         with self._task.tools.cwd(self._outdirfull):
-            logpath = utils.sha1(content) + "-" + name
+            logpath = utils.hashstring(content) + "-" + name
             self._task.tools.write_file(logpath, content, expand=False)
             self._result.attachments.append(
                 Attachment(source=logpath, name=name, type=mime_type))
@@ -96,8 +96,8 @@ class Reporter(object):
             result.name = name
             result.start = time.time() * 1000
             result.fullName = self._task.__class__.__name__ + "." + name
-            result.testCaseId = utils.sha1(result.fullName)
-            result.historyId = utils.sha1(self._task.qualified_name + result.testCaseId)
+            result.testCaseId = utils.hashstring(result.fullName)
+            result.historyId = utils.hashstring(self._task.qualified_name + result.testCaseId)
             result.description = description
             result.labels.append(Label(name=LabelType.HOST, value=self._host))
             result.labels.append(Label(name=LabelType.THREAD, value=self._thread))
@@ -202,8 +202,8 @@ class AllureHooks(TaskHook):
             result.start = time.time() * 1000
             result.fullName = task.qualified_name
             result.description = task.task.__doc__
-            result.testCaseId = utils.sha1(result.fullName)
-            result.historyId = utils.sha1(task.qualified_name + result.testCaseId)
+            result.testCaseId = utils.hashstring(result.fullName)
+            result.historyId = utils.hashstring(task.qualified_name + result.testCaseId)
             result.labels.append(Label(name=LabelType.HOST, value=host_tag()))
             result.labels.append(Label(name=LabelType.THREAD, value=thread_tag()))
             result.labels.append(Label(name=LabelType.FRAMEWORK, value='jolt'))
@@ -217,7 +217,7 @@ class AllureHooks(TaskHook):
             with task.tools.cwd(self._logpath):
                 content = task.allure_logsink_buffer.getvalue()
                 if content:
-                    logpath = utils.sha1(content) + "-" + "log"
+                    logpath = utils.hashstring(content) + "-" + "log"
                     task.tools.write_file(logpath, content, expand=False)
                     result.attachments.append(
                         Attachment(source=logpath, name="log", type="text/plain"))

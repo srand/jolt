@@ -22,6 +22,8 @@ func newHashWriter(writer WriteCloseDiscarder, digest utils.Digest) (*hashWriter
 	var hash hash.Hash
 
 	switch digest.Algorithm() {
+	case utils.Blake3Algorithm:
+		hash = utils.NewBlake3()
 	case utils.Sha1Algorithm:
 		hash = sha1.New()
 	case utils.Sha256Algorithm:
