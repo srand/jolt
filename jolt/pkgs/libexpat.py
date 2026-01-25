@@ -1,11 +1,12 @@
 from jolt import attributes, BooleanParameter, Parameter
-from jolt.plugins import cmake, git
+from jolt.plugins import cmake, cxxinfo, git
 from jolt.tasks import TaskRegistry
 
 
 @attributes.requires("requires_src")
 @cmake.requires()
 @cmake.use_ninja()
+@cxxinfo.publish(libraries=["expat"])
 class Libexpat(cmake.CMake):
     name = "libexpat"
     version = Parameter("2.7.3", help="Expat version.")
@@ -16,12 +17,6 @@ class Libexpat(cmake.CMake):
     options = [
         "BUILD_SHARED_LIBS={shared[ON,OFF]}",
     ]
-
-    def publish(self, artifact, tools):
-        super().publish(artifact, tools)
-        artifact.cxxinfo.incpaths.append("include")
-        artifact.cxxinfo.libpaths.append("lib")
-        artifact.cxxinfo.libraries.append("expat")
 
 
 TaskRegistry.get().add_task_class(Libexpat)

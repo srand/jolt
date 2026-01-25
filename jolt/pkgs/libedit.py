@@ -1,6 +1,6 @@
 from jolt import attributes, BooleanParameter, Parameter
 from jolt.pkgs import ncurses
-from jolt.plugins import git, autotools, pkgconfig
+from jolt.plugins import cxxinfo, git, autotools, pkgconfig
 from jolt.tasks import TaskRegistry
 
 
@@ -8,6 +8,7 @@ from jolt.tasks import TaskRegistry
 @attributes.requires("requires_ncurses")
 @autotools.requires()
 @pkgconfig.requires()
+@cxxinfo.publish(libraries=["edit"])
 class Libedit(autotools.Autotools):
     name = "libedit"
     version = Parameter("20251016-3.1", help="Libedit version.")
@@ -31,9 +32,6 @@ class Libedit(autotools.Autotools):
 
     def publish(self, artifact, tools):
         super().publish(artifact, tools)
-        artifact.cxxinfo.incpaths.append("include")
-        artifact.cxxinfo.libpaths.append("lib")
-        artifact.cxxinfo.libraries.append("edit")
         artifact.environ.CMAKE_PREFIX_PATH.append(".")
         if self.shared:
             artifact.environ.LD_LIBRARY_PATH.append("lib")

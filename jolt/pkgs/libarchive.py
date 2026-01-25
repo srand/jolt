@@ -1,6 +1,6 @@
 from jolt import attributes, BooleanParameter, Parameter
 from jolt.tasks import TaskRegistry
-from jolt.plugins import cmake, git
+from jolt.plugins import cmake, cxxinfo, git
 from jolt.pkgs import bzip2, libexpat, lz4, openssl, xz, zlib, zstd
 
 
@@ -14,6 +14,7 @@ from jolt.pkgs import bzip2, libexpat, lz4, openssl, xz, zlib, zstd
 @attributes.requires("requires_git")
 @cmake.requires()
 @cmake.use_ninja()
+@cxxinfo.publish(libraries=["archive"])
 class Libarchive(cmake.CMake):
     name = "libarchive"
     version = Parameter("3.8.5", help="libarchive version.")
@@ -32,12 +33,6 @@ class Libarchive(cmake.CMake):
         "BUILD_SHARED_LIBS={shared[ON,OFF]}",
         "ENABLE_TEST=OFF",
     ]
-
-    def publish(self, artifact, tools):
-        super().publish(artifact, tools)
-        artifact.cxxinfo.incpaths.append("include")
-        artifact.cxxinfo.libpaths.append("lib")
-        artifact.cxxinfo.libraries.append("archive")
 
 
 TaskRegistry.get().add_task_class(Libarchive)

@@ -1,6 +1,6 @@
 from jolt import attributes, BooleanParameter, Parameter
 from jolt.pkgs import boost, cmake, mysql, sqlite
-from jolt.plugins import git, cmake
+from jolt.plugins import cxxinfo, git, cmake
 from jolt.tasks import TaskRegistry
 
 
@@ -10,6 +10,7 @@ from jolt.tasks import TaskRegistry
 @attributes.requires("requires_sqlite_{sqlite[on,off]}")
 @cmake.requires()
 @cmake.use_ninja()
+@cxxinfo.publish()
 class Soci(cmake.CMake):
     name = "soci"
     version = Parameter("4.1.2", help="Soci version")
@@ -33,8 +34,6 @@ class Soci(cmake.CMake):
 
     def publish(self, artifact, tools):
         super().publish(artifact, tools)
-        artifact.cxxinfo.incpaths.append("include")
-        artifact.cxxinfo.libpaths.append("lib")
         if self.sqlite:
             artifact.cxxinfo.libraries.append("soci_sqlite3")
         if self.mysql:

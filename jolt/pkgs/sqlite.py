@@ -1,10 +1,11 @@
 from jolt import BooleanParameter, attributes, Alias, Parameter, Task
-from jolt.plugins import git, autotools
+from jolt.plugins import cxxinfo, git, autotools
 from jolt.tasks import TaskRegistry
 
 
 @attributes.requires("requires_git")
 @autotools.requires()
+@cxxinfo.publish(libraries=["sqlite3"])
 class SQLitePosix(autotools.Autotools):
     name = "sqlite/posix"
     version = Parameter("3.51.1", help="sqlite version.")
@@ -15,16 +16,10 @@ class SQLitePosix(autotools.Autotools):
         "--{shared[enable,disable]}-shared",
     ]
 
-    def publish(self, artifact, tools):
-        super().publish(artifact, tools)
-        with tools.cwd(self.srcdir):
-            artifact.cxxinfo.incpaths.append("include")
-            artifact.cxxinfo.libpaths.append("lib")
-            artifact.cxxinfo.libraries.append("sqlite3")
-
 
 @attributes.common_metadata()
 @attributes.requires("requires_git")
+@cxxinfo.publish(libraries=["sqlite3"])
 class SQLiteWin32(Task):
     name = "sqlite/win32"
     version = Parameter("3.51.1", help="sqlite version.")
@@ -61,9 +56,6 @@ Cflags: -I${{includedir}}
             artifact.collect("sqlite3.exe", "bin/")
             artifact.collect("sqlite*.h", "include/")
             artifact.collect("sqlite3.pc", "lib/pkgconfig/")
-            artifact.cxxinfo.incpaths.append("include")
-            artifact.cxxinfo.libpaths.append("lib")
-            artifact.cxxinfo.libraries.append("sqlite3")
             artifact.environ.CMAKE_PREFIX_PATH.append(".")
 
 

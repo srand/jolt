@@ -1,6 +1,6 @@
 from jolt import attributes, BooleanParameter, Parameter, Task
 from jolt.pkgs import nasm, perl
-from jolt.plugins import git
+from jolt.plugins import cxxinfo, git
 from jolt.tasks import TaskRegistry
 
 
@@ -9,6 +9,7 @@ from jolt.tasks import TaskRegistry
 @attributes.requires("requires_{system}_nasm")
 @attributes.common_metadata()
 @attributes.system
+@cxxinfo.publish(libraries=["ssl", "crypto"])
 class OpenSSL(Task):
     name = "openssl"
     version = Parameter("3.6.0", help="openssl version.")
@@ -40,15 +41,17 @@ class OpenSSL(Task):
     def publish(self, artifact, tools):
         with tools.cwd(self.installdir):
             artifact.collect("*", symlinks=True)
-        artifact.cxxinfo.incpaths.append("include")
-        artifact.cxxinfo.libpaths.append("lib")
-        artifact.cxxinfo.libraries.append("ssl")
-        artifact.cxxinfo.libraries.append("crypto")
         artifact.strings.install_prefix = self.installdir
         if self.system == "windows":
             self.publish_pkgconfig(artifact, tools)
 
     def publish_pkgconfig(self, artifact, tools):
+        with tools.cwd(artifact.path):
+            for libdir in ["lib", "lib32", "lib64"]:
+                if tools.exist(libdir):
+                    self.libdir = libdir
+                    break
+
         with tools.tmpdir() as tmp, tools.cwd(tmp):
             tools.write_file(
                 "openssl.pc",
@@ -56,7 +59,7 @@ class OpenSSL(Task):
 # See: man pkg-config
 prefix=${{pcfiledir}}/../..
 exec_prefix=${{prefix}}/bin
-libdir=${{prefix}}/lib
+libdir=${{prefix}}/{libdir}
 includedir=${{prefix}}/include
 
 Name: OpenSSL
@@ -70,7 +73,7 @@ Requires: libssl libcrypto
 # See: man pkg-config
 prefix=${{pcfiledir}}/../..
 exec_prefix=${{prefix}}/bin
-libdir=${{prefix}}/lib
+libdir=${{prefix}}/{libdir}
 includedir=${{prefix}}/include
 enginesdir=${{libdir}}/engines-3
 
@@ -86,7 +89,7 @@ Cflags: -I${{includedir}}
 # See: man pkg-config
 prefix=${{pcfiledir}}/../..
 exec_prefix=${{prefix}}/bin
-libdir=${{prefix}}/lib
+libdir=${{prefix}}/{libdir}
 includedir=${{prefix}}/include
 
 Name: OpenSSL-libssl
@@ -95,9 +98,9 @@ Version: {version}-{identity}
 Libs: -L${{libdir}} -lssl
 Cflags: -I${{includedir}}
 """)
-            artifact.collect("openssl.pc", "lib/pkgconfig/")
-            artifact.collect("libcrypto.pc", "lib/pkgconfig/")
-            artifact.collect("libssl.pc", "lib/pkgconfig/")
+            artifact.collect("openssl.pc", "{libdir}/pkgconfig/")
+            artifact.collect("libcrypto.pc", "{libdir}/pkgconfig/")
+            artifact.collect("libssl.pc", "{libdir}/pkgconfig/")
 
 
 TaskRegistry.get().add_task_class(OpenSSL)

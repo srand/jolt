@@ -1,6 +1,6 @@
 from jolt import attributes, Alias, BooleanParameter, Parameter
 from jolt.pkgs import cmake
-from jolt.plugins import git, cmake
+from jolt.plugins import cxxinfo, git, cmake
 from jolt.tasks import TaskRegistry
 
 
@@ -8,6 +8,7 @@ from jolt.tasks import TaskRegistry
 @attributes.system
 @cmake.requires()
 @cmake.use_ninja()
+@cxxinfo.publish()
 class Zlib(cmake.CMake):
     name = "zlib"
     version = Parameter("1.3.1", help="Zlib version.")
@@ -22,8 +23,6 @@ class Zlib(cmake.CMake):
     def publish(self, artifact, tools):
         super().publish(artifact, tools)
         artifact.environ.CMAKE_PREFIX_PATH.append(".")
-        artifact.cxxinfo.incpaths.append("include")
-        artifact.cxxinfo.libpaths.append("lib")
         if self.system == "windows":
             self.publish_windows(artifact, tools)
         else:
@@ -31,23 +30,23 @@ class Zlib(cmake.CMake):
 
     def publish_unix(self, artifact, tools):
         artifact.cxxinfo.libraries.append("z")
-        with tools.cwd(artifact.path, "lib"):
+        with tools.cwd(artifact.path):
             if self.shared:
-                for lib in tools.glob("*.a"):
+                for lib in tools.glob("lib*/*.a"):
                     tools.unlink(lib)
             else:
-                for lib in tools.glob("*.so*") + tools.glob("*.dylib*"):
+                for lib in tools.glob("lib*/*.so*") + tools.glob("lib*/*.dylib*"):
                     tools.unlink(lib)
 
     def publish_windows(self, artifact, tools):
-        with tools.cwd(artifact.path, "lib"):
+        with tools.cwd(artifact.path):
             if self.shared:
                 artifact.cxxinfo.libraries.append("zlib")
-                for lib in tools.glob("zlibstatic.*"):
+                for lib in tools.glob("lib*/zlibstatic.*"):
                     tools.unlink(lib)
             else:
                 artifact.cxxinfo.libraries.append("zlibstatic")
-                for lib in tools.glob("zlib.*"):
+                for lib in tools.glob("lib*/zlib.*"):
                     tools.unlink(lib)
 
 
@@ -55,6 +54,7 @@ class Zlib(cmake.CMake):
 @attributes.system
 @cmake.requires()
 @cmake.use_ninja()
+@cxxinfo.publish()
 class ZlibNg(cmake.CMake):
     name = "zlib-ng"
     version = Parameter("2.3.2", help="Zlib version.")
@@ -69,8 +69,6 @@ class ZlibNg(cmake.CMake):
     def publish(self, artifact, tools):
         super().publish(artifact, tools)
         artifact.environ.CMAKE_PREFIX_PATH.append(".")
-        artifact.cxxinfo.incpaths.append("include")
-        artifact.cxxinfo.libpaths.append("lib")
         if self.system == "windows":
             artifact.cxxinfo.libraries.append("zlibstatic-ng")
         else:

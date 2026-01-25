@@ -1,6 +1,6 @@
 from jolt import attributes, BooleanParameter, Parameter
 from jolt.pkgs import cmake
-from jolt.plugins import git, cmake, pkgconfig
+from jolt.plugins import cxxinfo, git, cmake, pkgconfig
 from jolt.tasks import TaskRegistry
 
 
@@ -8,6 +8,7 @@ from jolt.tasks import TaskRegistry
 @attributes.system
 @cmake.requires()
 @cmake.use_ninja()
+@cxxinfo.publish(libraries=["yaml-cpp"])
 class YamlCPP(cmake.CMake):
     name = "yaml-cpp"
     version = Parameter("bbf8bdb", help="yaml-cpp version.")
@@ -19,12 +20,6 @@ class YamlCPP(cmake.CMake):
         "YAML_BUILD_SHARED_LIBS={shared[ON,OFF]}",
         "YAML_BUILD_TOOLS=OFF",
     ]
-
-    def publish(self, artifact, tools):
-        super().publish(artifact, tools)
-        artifact.cxxinfo.incpaths.append("include")
-        artifact.cxxinfo.libpaths.append("lib")
-        artifact.cxxinfo.libraries.append("yaml-cpp")
 
 
 TaskRegistry.get().add_task_class(YamlCPP)

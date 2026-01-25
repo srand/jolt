@@ -1,6 +1,6 @@
 from jolt import attributes, BooleanParameter, Parameter, Task
 from jolt.pkgs import abseil, cares, cmake, nasm, protobuf, re2, ssl, zlib
-from jolt.plugins import git, cmake
+from jolt.plugins import cxxinfo, git, cmake
 from jolt.tasks import TaskRegistry
 
 
@@ -15,6 +15,7 @@ from jolt.tasks import TaskRegistry
 @attributes.system
 @cmake.requires()
 @cmake.use_ninja()
+@cxxinfo.publish()
 class Grpc(cmake.CMake):
     name = "grpc"
     version = Parameter("1.76.0", help="Grpc version.")
@@ -47,8 +48,6 @@ class Grpc(cmake.CMake):
         super().publish(artifact, tools)
         if self.system == "windows":
             artifact.cxxinfo.msvcrt = "Dynamic"
-        artifact.cxxinfo.incpaths.append("include")
-        artifact.cxxinfo.libpaths.append("lib")
 
 
 class GrpcC(Task):

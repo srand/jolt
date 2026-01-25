@@ -1,6 +1,6 @@
 from jolt import attributes, BooleanParameter, Parameter
 from jolt.pkgs import cmake
-from jolt.plugins import git, cmake
+from jolt.plugins import cxxinfo, git, cmake
 from jolt.tasks import TaskRegistry
 
 
@@ -8,6 +8,7 @@ from jolt.tasks import TaskRegistry
 @attributes.system
 @cmake.requires()
 @cmake.use_ninja()
+@cxxinfo.publish()
 class Libxml2(cmake.CMake):
     name = "libxml2"
     version = Parameter("2.15.1", help="Libxml2 version.")
@@ -22,8 +23,6 @@ class Libxml2(cmake.CMake):
 
     def publish(self, artifact, tools):
         super().publish(artifact, tools)
-        artifact.cxxinfo.incpaths.append("include")
-        artifact.cxxinfo.libpaths.append("lib")
         if self.system == "windows":
             artifact.cxxinfo.libraries.append("libxml2{shared[,s]}")
         else:

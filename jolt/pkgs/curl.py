@@ -1,6 +1,6 @@
 from jolt import attributes, BooleanParameter, Parameter
 from jolt.pkgs import brotli, ssl, zlib, zstd
-from jolt.plugins import git, cmake
+from jolt.plugins import cxxinfo, git, cmake
 from jolt.tasks import TaskRegistry
 
 
@@ -12,6 +12,7 @@ from jolt.tasks import TaskRegistry
 @attributes.system
 @cmake.requires()
 @cmake.use_ninja()
+@cxxinfo.publish()
 class Curl(cmake.CMake):
     name = "curl"
     version = Parameter("8.17.0", help="Curl version.")
@@ -34,8 +35,6 @@ class Curl(cmake.CMake):
 
     def publish(self, artifact, tools):
         super().publish(artifact, tools)
-        artifact.cxxinfo.incpaths.append("include")
-        artifact.cxxinfo.libpaths.append("lib")
         if self.system == "windows":
             artifact.cxxinfo.libraries.append("libcurl_imp")
         else:

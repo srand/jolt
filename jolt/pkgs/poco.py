@@ -1,6 +1,6 @@
 from jolt import attributes, BooleanParameter, Parameter
 from jolt.pkgs import cmake, ssl
-from jolt.plugins import git, cmake
+from jolt.plugins import cxxinfo, git, cmake
 from jolt.tasks import TaskRegistry
 import os
 
@@ -10,6 +10,7 @@ import os
 @attributes.system
 @cmake.requires()
 @cmake.use_ninja()
+@cxxinfo.publish()
 class Poco(cmake.CMake):
     name = "poco"
     version = Parameter("1.14.2", help="Poco version")
@@ -26,16 +27,18 @@ class Poco(cmake.CMake):
         super().publish(artifact, tools)
         if self.system == "windows":
             artifact.cxxinfo.msvcrt = "Dynamic"
-        artifact.cxxinfo.incpaths.append("include")
-        artifact.cxxinfo.libpaths.append("lib")
 
-        with tools.cwd(artifact.path, "lib"):
-            for libfile in tools.glob("*.lib"):
-                libname, _ = os.path.splitext(libfile)
-                artifact.cxxinfo.libraries.append(libname)
-            for libfile in tools.glob("lib*.a"):
-                libname, _ = os.path.splitext(libfile)
-                artifact.cxxinfo.libraries.append(libname[3:])
+        for libdir in ["lib", "lib32", "lib64"]:
+            full_libdir = os.path.join(artifact.path, libdir)
+            if not os.path.isdir(full_libdir):
+                continue
+            with tools.cwd(artifact.path, libdir):
+                for libfile in tools.glob("*.lib"):
+                    libname, _ = os.path.splitext(libfile)
+                    artifact.cxxinfo.libraries.append(libname)
+                for libfile in tools.glob("lib*.a"):
+                    libname, _ = os.path.splitext(libfile)
+                    artifact.cxxinfo.libraries.append(libname[3:])
 
 
 TaskRegistry.get().add_task_class(Poco)

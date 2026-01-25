@@ -1,6 +1,7 @@
+import os
 from jolt import attributes, Parameter
 from jolt.pkgs import cmake, openssl
-from jolt.plugins import git, cmake, pkgconfig
+from jolt.plugins import cxxinfo, git, cmake, pkgconfig
 from jolt.tasks import TaskRegistry
 
 
@@ -9,6 +10,7 @@ from jolt.tasks import TaskRegistry
 @cmake.requires()
 @cmake.use_ninja()
 @pkgconfig.requires()
+@cxxinfo.publish(libraries=["event"])
 class LibEvent(cmake.CMake):
     name = "libevent"
     version = Parameter("2.1.12", help="libevent version.")
@@ -19,7 +21,13 @@ class LibEvent(cmake.CMake):
 
     def publish(self, artifact, tools):
         super().publish(artifact, tools)
-        with tools.cwd(artifact.path, "lib/cmake/libevent"):
+
+        for libdir in ["lib", "lib32", "lib64"]:
+            if os.path.isdir(os.path.join(artifact.path, libdir)):
+                self.libdir = libdir
+                break
+
+        with tools.cwd(artifact.path, "{libdir}/cmake/libevent"):
             for file in tools.glob("*.cmake"):
                 tools.replace_in_file(
                     file,

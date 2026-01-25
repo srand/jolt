@@ -1,6 +1,6 @@
 from jolt import BooleanParameter, Parameter, attributes
 from jolt.pkgs import cmake
-from jolt.plugins import cmake, git
+from jolt.plugins import cmake, cxxinfo, git
 from jolt.tasks import TaskRegistry
 
 
@@ -8,6 +8,7 @@ from jolt.tasks import TaskRegistry
 @attributes.system
 @cmake.requires()
 @cmake.use_ninja()
+@cxxinfo.publish()
 class SDL(cmake.CMake):
     name = "sdl"
     version = Parameter("3.2.28", help="SDL version.")
@@ -17,8 +18,6 @@ class SDL(cmake.CMake):
 
     def publish(self, artifact, tools):
         super().publish(artifact, tools)
-        artifact.cxxinfo.incpaths.append("include")
-        artifact.cxxinfo.libpaths.append("lib")
         if self.system == "windows":
             artifact.cxxinfo.libraries.append("SDL2{shared[,-static]}")
         else:

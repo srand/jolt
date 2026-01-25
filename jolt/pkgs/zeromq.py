@@ -1,12 +1,13 @@
 from jolt import attributes, BooleanParameter, Parameter
 from jolt.pkgs import openssl
-from jolt.plugins import cmake, git
+from jolt.plugins import cmake, cxxinfo, git
 from jolt.tasks import TaskRegistry
 
 
 @attributes.requires("requires_git")
 @cmake.requires()
 @cmake.use_ninja()
+@cxxinfo.publish(libraries=["zmq"])
 class Libzmq(cmake.CMake):
     name = "libzmq"
     version = Parameter("4.3.5", help="ZeroMQ version.")
@@ -19,17 +20,12 @@ class Libzmq(cmake.CMake):
         "CMAKE_POLICY_VERSION_MINIMUM=3.5",
     ]
 
-    def publish(self, artifact, tools):
-        super().publish(artifact, tools)
-        artifact.cxxinfo.incpaths.append("include")
-        artifact.cxxinfo.libpaths.append("lib")
-        artifact.cxxinfo.libraries.append("zmq")
-
 
 @attributes.requires("requires_git")
 @attributes.requires("requires_libzmq")
 @cmake.requires()
 @cmake.use_ninja()
+@cxxinfo.publish()
 class Cppzmq(cmake.CMake):
     name = "cppzmq"
     version = Parameter("4.11.0", help="cppzmq version.")
@@ -37,10 +33,6 @@ class Cppzmq(cmake.CMake):
     requires_libzmq = ["libzmq"]
     srcdir = "{git[cppzmq]}"
     options = ["CPPZMQ_BUILD_TESTS=OFF"]
-
-    def publish(self, artifact, tools):
-        super().publish(artifact, tools)
-        artifact.cxxinfo.incpaths.append("include")
 
 
 TaskRegistry.get().add_task_class(Libzmq)

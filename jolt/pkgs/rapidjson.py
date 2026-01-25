@@ -1,12 +1,13 @@
 from jolt import attributes, Parameter
 from jolt.pkgs import cmake
-from jolt.plugins import git, cmake
+from jolt.plugins import cxxinfo, git, cmake
 from jolt.tasks import TaskRegistry
 
 
 @attributes.requires("requires_git")
 @cmake.requires()
 @cmake.use_ninja()
+@cxxinfo.publish()
 class RapidJSON(cmake.CMake):
     name = "rapidjson"
     version = Parameter("24b5e7a", help="rapidjson version.")
@@ -17,10 +18,6 @@ class RapidJSON(cmake.CMake):
         "RAPIDJSON_BUILD_EXAMPLES=OFF",
         "RAPIDJSON_BUILD_TESTS=OFF",
     ]
-
-    def publish(self, artifact, tools):
-        super().publish(artifact, tools)
-        artifact.cxxinfo.incpaths.append("include")
 
 
 TaskRegistry.get().add_task_class(RapidJSON)

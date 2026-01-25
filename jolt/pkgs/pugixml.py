@@ -1,12 +1,13 @@
 from jolt import attributes, BooleanParameter, Parameter
 from jolt.pkgs import cmake
-from jolt.plugins import git, cmake
+from jolt.plugins import cxxinfo, git, cmake
 from jolt.tasks import TaskRegistry
 
 
 @attributes.requires("requires_git")
 @cmake.requires()
 @cmake.use_ninja()
+@cxxinfo.publish(libraries=["pugixml"])
 class PugiXML(cmake.CMake):
     name = "pugixml"
     version = Parameter("1.15", help="PugiXML version.")
@@ -16,12 +17,6 @@ class PugiXML(cmake.CMake):
     options = [
         "BUILD_SHARED_LIBS={shared[ON,OFF]}",
     ]
-
-    def publish(self, artifact, tools):
-        super().publish(artifact, tools)
-        artifact.cxxinfo.incpaths.append("include")
-        artifact.cxxinfo.libpaths.append("lib")
-        artifact.cxxinfo.libraries.append("pugixml")
 
 
 TaskRegistry.get().add_task_class(PugiXML)

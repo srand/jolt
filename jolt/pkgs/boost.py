@@ -95,17 +95,21 @@ class Boost(Task):
         with tools.cwd(self.installdir):
             artifact.collect("*", symlinks=True)
         artifact.cxxinfo.incpaths.append("include")
-        artifact.cxxinfo.libpaths.append("lib")
 
-        with tools.cwd(self.installdir, "lib"):
-            for lib in tools.glob("libboost_*.a"):
-                name, _ = os.path.splitext(os.path.basename(lib))
-                artifact.cxxinfo.libraries.append(name[3:])
+        for libdir in ["lib", "lib32", "lib64"]:
+            if not os.path.isdir(os.path.join(artifact.path, libdir)):
+                continue
+            artifact.cxxinfo.libpaths.append(libdir)
 
-            arch = tools.getenv("VSCMD_ARG_TGT_ARCH", "x64")
-            for lib in tools.glob(f"lib*-mt-{arch}-*.lib"):
-                name, _ = os.path.splitext(lib)
-                artifact.cxxinfo.libraries.append(name)
+            with tools.cwd(self.installdir, libdir):
+                for lib in tools.glob("libboost_*.a"):
+                    name, _ = os.path.splitext(os.path.basename(lib))
+                    artifact.cxxinfo.libraries.append(name[3:])
+
+                arch = tools.getenv("VSCMD_ARG_TGT_ARCH", "x64")
+                for lib in tools.glob(f"lib*-mt-{arch}-*.lib"):
+                    name, _ = os.path.splitext(lib)
+                    artifact.cxxinfo.libraries.append(name)
 
 
 TaskRegistry.get().add_task_class(Boost)

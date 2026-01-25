@@ -1,6 +1,6 @@
 from jolt import attributes, BooleanParameter, Parameter
 from jolt.pkgs import boost, curl, libedit, libtirpc, lz4, openssl, rapidjson, zlib, zstd
-from jolt.plugins import cmake, git, pkgconfig
+from jolt.plugins import cmake, cxxinfo, git, pkgconfig
 from jolt.tasks import TaskRegistry
 
 
@@ -34,6 +34,7 @@ class MySQLBase(cmake.CMake):
     srcdir = "{git[mysql-server]}"
 
 
+@cxxinfo.publish(libraries=["mysqlclient"])
 class LibMySQLClient(MySQLBase):
     name = "libmysqlclient"
     shared = BooleanParameter(False, help="Build shared libraries")
@@ -49,12 +50,6 @@ class LibMySQLClient(MySQLBase):
         "WITH_ZSTD=system",
         "WITHOUT_SERVER=ON",
     ]
-
-    def publish(self, artifact, tools):
-        super().publish(artifact, tools)
-        artifact.cxxinfo.incpaths.append("include")
-        artifact.cxxinfo.libpaths.append("lib")
-        artifact.cxxinfo.libraries.append("mysqlclient")
 
 
 TaskRegistry.get().add_task_class(LibMySQLClient)

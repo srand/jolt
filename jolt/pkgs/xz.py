@@ -1,5 +1,5 @@
 from jolt import attributes, BooleanParameter, Parameter
-from jolt.plugins import git, cmake
+from jolt.plugins import cxxinfo, git, cmake
 from jolt.tasks import TaskRegistry
 
 
@@ -7,6 +7,7 @@ from jolt.tasks import TaskRegistry
 @cmake.requires()
 @cmake.use_ninja()
 @cmake.options("options_pic_{pic[on,off]}")
+@cxxinfo.publish(libraries=["lzma"])
 class Xz(cmake.CMake):
     name = "xz"
     version = Parameter("5.8.2", help="xz version.")
@@ -18,12 +19,6 @@ class Xz(cmake.CMake):
         "BUILD_SHARED_LIBS={shared[ON,OFF]}",
         "CMAKE_POSITION_INDEPENDENT_CODE=ON",
     ]
-
-    def publish(self, artifact, tools):
-        super().publish(artifact, tools)
-        artifact.cxxinfo.incpaths.append("include")
-        artifact.cxxinfo.libpaths.append("lib")
-        artifact.cxxinfo.libraries.append("lzma")
 
 
 TaskRegistry.get().add_task_class(Xz)

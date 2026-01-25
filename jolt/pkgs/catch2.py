@@ -1,12 +1,13 @@
 from jolt import attributes, BooleanParameter, Parameter, Task
 from jolt.pkgs import cmake
-from jolt.plugins import git, cmake
+from jolt.plugins import cxxinfo, git, cmake
 from jolt.tasks import TaskRegistry
 
 
 @attributes.requires("requires_git")
 @cmake.requires()
 @cmake.use_ninja()
+@cxxinfo.publish(libraries=["Catch2"])
 class Catch2(cmake.CMake):
     name = "catch2"
     version = Parameter("3.11.0", help="catch2 version.")
@@ -16,12 +17,6 @@ class Catch2(cmake.CMake):
     options = [
         "BUILD_SHARED_LIBS={shared[ON,OFF]}",
     ]
-
-    def publish(self, artifact, tools):
-        super().publish(artifact, tools)
-        artifact.cxxinfo.incpaths.append("include")
-        artifact.cxxinfo.libpaths.append("lib")
-        artifact.cxxinfo.libraries.append("Catch2")
 
 
 class Catch2Main(Task):

@@ -27,17 +27,21 @@ class Abseil(cmake.CMake):
         if self.system == "windows":
             artifact.cxxinfo.msvcrt = "Dynamic"
         artifact.cxxinfo.incpaths.append("include")
-        artifact.cxxinfo.libpaths.append("lib")
-        if self.shared:
-            artifact.environ.LD_LIBRARY_PATH.append("lib")
 
-        with tools.cwd(artifact.path, "lib"):
-            for libfile in tools.glob("*.lib"):
-                libname, _ = os.path.splitext(libfile)
-                artifact.cxxinfo.libraries.append(libname)
-            for libfile in tools.glob("lib*.a"):
-                libname, _ = os.path.splitext(libfile)
-                artifact.cxxinfo.libraries.append(libname[3:])
+        with tools.cwd(artifact.path):
+            for libdir in ["lib", "lib32", "lib64"]:
+                if not tools.exists(libdir):
+                    continue
+                with tools.cwd(libdir):
+                    artifact.cxxinfo.libpaths.append(libdir)
+                    if self.shared:
+                        artifact.environ.LD_LIBRARY_PATH.append(libdir)
+                    for libfile in tools.glob("*.lib"):
+                        libname, _ = os.path.splitext(libfile)
+                        artifact.cxxinfo.libraries.append(libname)
+                    for libfile in tools.glob("lib*.a"):
+                        libname, _ = os.path.splitext(libfile)
+                        artifact.cxxinfo.libraries.append(libname[3:])
 
 
 TaskRegistry.get().add_task_class(Abseil)

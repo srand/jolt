@@ -1,11 +1,12 @@
 from jolt import attributes, BooleanParameter, Parameter
-from jolt.plugins import cmake, git
+from jolt.plugins import cmake, cxxinfo, git
 from jolt.tasks import TaskRegistry
 
 
 @attributes.requires("requires_git")
 @cmake.requires()
 @cmake.use_ninja()
+@cxxinfo.publish(libraries=["lz4"])
 class Lz4(cmake.CMake):
     name = "lz4"
     version = Parameter("1.10.0", help="LZ4 version.")
@@ -15,12 +16,6 @@ class Lz4(cmake.CMake):
     options = [
         "BUILD_SHARED_LIBS={shared[ON,OFF]}",
     ]
-
-    def publish(self, artifact, tools):
-        super().publish(artifact, tools)
-        artifact.cxxinfo.incpaths.append("include")
-        artifact.cxxinfo.libpaths.append("lib")
-        artifact.cxxinfo.libraries.append("lz4")
 
 
 TaskRegistry.get().add_task_class(Lz4)

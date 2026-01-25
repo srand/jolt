@@ -1,6 +1,6 @@
 from jolt import attributes, BooleanParameter, Parameter
 from jolt.pkgs import cmake
-from jolt.plugins import git, cmake, pkgconfig
+from jolt.plugins import cxxinfo, git, cmake, pkgconfig
 from jolt.tasks import TaskRegistry
 
 
@@ -8,6 +8,7 @@ from jolt.tasks import TaskRegistry
 @attributes.system
 @cmake.requires()
 @cmake.use_ninja()
+@cxxinfo.publish()
 class JsonCPP(cmake.CMake):
     name = "jsoncpp"
     version = Parameter("1.9.6", help="JsonCPP version.")
@@ -20,8 +21,6 @@ class JsonCPP(cmake.CMake):
 
     def publish(self, artifact, tools):
         super().publish(artifact, tools)
-        artifact.cxxinfo.incpaths.append("include")
-        artifact.cxxinfo.libpaths.append("lib")
         if self.system == "windows":
             artifact.cxxinfo.libraries.append("jsoncpp_static")
         else:

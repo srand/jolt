@@ -1,6 +1,6 @@
 from jolt import attributes, BooleanParameter, Parameter
 from jolt.tasks import TaskRegistry
-from jolt.plugins import fetch, ninja
+from jolt.plugins import cxxinfo, fetch, ninja
 
 
 @attributes.requires("requires_src")
@@ -32,8 +32,6 @@ class LibBzip2(ninja.CXXLibrary):
     def publish(self, artifact, tools):
         super().publish(artifact, tools)
         artifact.cxxinfo.incpaths.append("include")
-        artifact.cxxinfo.libpaths.append("lib")
-        artifact.cxxinfo.libraries.append("bz2")
         artifact.environ.CMAKE_PREFIX_PATH.append(".")
 
         with tools.cwd("{fetch[src]}/bzip2-{version}"):

@@ -72,3 +72,35 @@ class CppInfoProvider(ArtifactAttributeSetProvider):
 
     def unapply(self, task, artifact):
         pass
+
+
+def publish(incpaths=["include"], libpaths=["lib", "lib32", "lib64"], libraries=[]):
+    """
+    Decorator to add C++ build information to a CMake task artifact.
+    """
+
+    import functools
+    import os
+
+    def decorate(cls):
+        old_publish = cls.publish
+
+        @functools.wraps(old_publish)
+        def new_publish(self, artifact, tools):
+            old_publish(self, artifact, tools)
+
+            for incpath in incpaths:
+                if os.path.isdir(os.path.join(artifact.path, incpath)):
+                    artifact.cxxinfo.incpaths.append(incpath)
+
+            for libpath in libpaths:
+                if os.path.isdir(os.path.join(artifact.path, libpath)):
+                    artifact.cxxinfo.libpaths.append(libpath)
+
+            for lib in libraries:
+                artifact.cxxinfo.libraries.append(lib)
+
+        cls.publish = new_publish
+        return cls
+
+    return decorate
