@@ -1,9 +1,11 @@
+blake3
 bz2file
 colorama
 fasteners
 ninja
 protobuf
 psutil
+py7zr
 pygit2
 sphinx<7.0
 sphinx_click

@@ -97,7 +97,7 @@ Git
 .. reference-git-start
 
 .. autoclass:: jolt.plugins.git.Git
-   :members: hash, path, rev, url, depth, submodules
+   :members: hash, path, rev, url, submodules
 
 .. reference-git-end
 
@@ -534,7 +534,7 @@ PkgConfig
 .. reference-pkgconfig-start
 
 .. automodule:: jolt.plugins.pkgconfig
-   :members: cxxinfo
+   :members: from_cxxinfo, to_cxxinfo
 
 .. reference-pkgconfig-end
 
