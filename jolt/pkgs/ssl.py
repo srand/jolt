@@ -5,7 +5,7 @@ from jolt.tasks import TaskRegistry
 
 class VirtualSsl(Alias):
     name = "virtual/ssl"
-    shared = BooleanParameter(True, help="Use shared libraries.")
+    shared = BooleanParameter(False, help="Use shared libraries.")
     requires = ["openssl:shared={shared}"]
 
 
