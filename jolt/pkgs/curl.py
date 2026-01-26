@@ -19,7 +19,7 @@ class Curl(cmake.CMake):
     shared = BooleanParameter(False, help="Build shared libraries.")
     requires_brotli = ["brotli"]
     requires_git = ["git:url=https://github.com/curl/curl.git,rev=curl-{_version_tag},submodules=true"]
-    requires_ssl = ["virtual/ssl"]
+    requires_ssl = ["virtual/ssl:shared={shared}"]
     requires_zlib = ["virtual/zlib"]
     requires_zstd = ["zstd"]
     srcdir = "{git[curl]}"
@@ -27,6 +27,7 @@ class Curl(cmake.CMake):
         "BUILD_SHARED_LIBS={shared[ON,OFF]}",
         "CURL_USE_LIBPSL=OFF",
         "USE_LIBIDN2=OFF",
+        "OPENSSL_USE_STATIC_LIBS={shared[OFF,ON]}",
     ]
 
     @property
