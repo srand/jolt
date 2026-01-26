@@ -286,12 +286,14 @@ class _CMake(object):
 
     def build(self, *args, config="Release", **kwargs):
         threading_args = ' -j {}'.format(kwargs.get("threads", self.tools.thread_count()))
+        verbose_args = ' --verbose' if log.is_verbose() else ''
         with self.tools.cwd(self.builddir):
-            self.tools.run("cmake --build . --config {0} {1}", config, threading_args, output=True)
+            self.tools.run("cmake --build . --config {0} {1}{2}", config, threading_args, verbose_args, output=True)
 
     def install(self, target="install", config="Release", **kwargs):
+        verbose_args = ' --verbose' if log.is_verbose() else ''
         with self.tools.cwd(self.builddir), self.tools.environ(DESTDIR=self.installdir):
-            self.tools.run("cmake --build . --config {0} --target {1}", config, target, output=True)
+            self.tools.run("cmake --build . --config {0} --target {1}{2}", config, target, verbose_args, output=True)
 
     def publish(self, artifact, files='*', symlinks=True, *args, **kwargs):
         with self.tools.cwd(self.installdir, "jolt-prefix"):
