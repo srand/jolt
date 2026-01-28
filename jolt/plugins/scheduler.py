@@ -402,8 +402,27 @@ class RemoteSession(object):
         self.http_uri = config.get(NAME, "http_uri", f"http://{self.address.netloc}")
 
         # GRPC channel.
+        # Enable client-side keep-alives to prevent idle L4/L7 devices from
+        # silently dropping long-lived connections.
+        # Values can be overridden via config keys:
+        #   [scheduler]
+        #   grpc_keepalive_time_ms
+        #   grpc_keepalive_timeout_ms
+        #   grpc_keepalive_permit_without_calls
+        #   grpc_http2_max_pings_without_data
+        #   grpc_http2_min_time_between_pings_ms
+        #   grpc_http2_min_ping_interval_without_data_ms
+        keepalive_opts = [
+            ("grpc.keepalive_time_ms", config.getint(NAME, "grpc_keepalive_time_ms", 10_000)),
+            ("grpc.keepalive_timeout_ms", config.getint(NAME, "grpc_keepalive_timeout_ms", 20_000)),
+            ("grpc.keepalive_permit_without_calls", config.getint(NAME, "grpc_keepalive_permit_without_calls", 1)),
+            ("grpc.http2.max_pings_without_data", config.getint(NAME, "grpc_http2_max_pings_without_data", 0)),
+            ("grpc.http2.min_time_between_pings_ms", config.getint(NAME, "grpc_http2_min_time_between_pings_ms", 10_000)),
+            ("grpc.http2.min_ping_interval_without_data_ms", config.getint(NAME, "grpc_http2_min_ping_interval_without_data_ms", 10_000)),
+        ]
         self.channel = grpc.insecure_channel(
             target=self.address.netloc,
+            options=keepalive_opts,
         )
 
         # GRPC stub for the scheduler service.
@@ -563,7 +582,15 @@ def executor(ctx, worker, build, request):
     raise_error_if(address.scheme not in ["tcp"], "Invalid scheme in scheduler URI config: {}", address.scheme)
     raise_error_if(not address.netloc, "Invalid network address in scheduler URI config: {}", address.netloc)
 
-    channel = grpc.insecure_channel(address.netloc)
+    keepalive_opts = [
+        ("grpc.keepalive_time_ms", config.getint(NAME, "grpc_keepalive_time_ms", 10_000)),
+        ("grpc.keepalive_timeout_ms", config.getint(NAME, "grpc_keepalive_timeout_ms", 20_000)),
+        ("grpc.keepalive_permit_without_calls", config.getint(NAME, "grpc_keepalive_permit_without_calls", 1)),
+        ("grpc.http2.max_pings_without_data", config.getint(NAME, "grpc_http2_max_pings_without_data", 0)),
+        ("grpc.http2.min_time_between_pings_ms", config.getint(NAME, "grpc_http2_min_time_between_pings_ms", 10_000)),
+        ("grpc.http2.min_ping_interval_without_data_ms", config.getint(NAME, "grpc_http2_min_ping_interval_without_data_ms", 10_000)),
+    ]
+    channel = grpc.insecure_channel(address.netloc, options=keepalive_opts)
     log.verbose("Waiting for GRPC channel to connect")
     grpc.channel_ready_future(channel).result()
     log.verbose("GRPC channel established: {}", address.netloc)
