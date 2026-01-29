@@ -48,8 +48,10 @@ func serveGrpc(sched scheduler.Scheduler, stash logstash.LogStash, address strin
 		log.Info("Listening on", uri.Scheme, socket.Addr())
 	}
 
+	// Setup gRPC options
+	opts := config.GRPCOptions.ToServerOptions()
+
 	// Setup gRPC server
-	opts := []grpc.ServerOption{}
 	server := grpc.NewServer(opts...)
 	protocol.RegisterSchedulerServer(server, scheduler.NewSchedulerService(sched))
 	protocol.RegisterWorkerServer(server, scheduler.NewWorkerService(stash, sched))

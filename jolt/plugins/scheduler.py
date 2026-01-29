@@ -33,6 +33,18 @@ NAME = "scheduler"
 TYPE = "Remote execution"
 
 
+grpc_keepalive_opts = []
+grpc_keepalive_time = config.getduration(NAME, "grpc_keepalive_time")
+grpc_keepalive_timeout = config.getduration(NAME, "grpc_keepalive_timeout")
+grpc_keepalive_without_calls = config.getboolean(NAME, "grpc_keepalive_without_calls", False)
+if grpc_keepalive_time is not None:
+    grpc_keepalive_opts.append(("grpc.keepalive_time_ms", int(grpc_keepalive_time.total_seconds() * 1000)))
+if grpc_keepalive_timeout is not None:
+    grpc_keepalive_opts.append(("grpc.keepalive_timeout_ms", int(grpc_keepalive_timeout.total_seconds() * 1000)))
+if grpc_keepalive_without_calls:
+    grpc_keepalive_opts.append(("grpc.keepalive_permit_without_calls", 1))
+
+
 def locked(func):
     """ Decorator to lock a method. """
     def _f(self, *args, **kwargs):
@@ -394,7 +406,7 @@ class RemoteSession(object):
         self.factory = factory
 
         # Address of the scheduler.
-        self.address = config.geturi(NAME, "uri", "tcp://scheduler.:9090")
+        self.address = config.geturi(NAME, "grpc_uri", "tcp://scheduler.:9090")
         raise_error_if(self.address.scheme not in ["tcp"], "Invalid scheme in scheduler URI config: {}", self.address.scheme)
         raise_error_if(not self.address.netloc, "Invalid network address in scheduler URI config: {}", self.address.netloc)
 
@@ -404,6 +416,7 @@ class RemoteSession(object):
         # GRPC channel.
         self.channel = grpc.insecure_channel(
             target=self.address.netloc,
+            options=grpc_keepalive_opts,
         )
 
         # GRPC stub for the scheduler service.
@@ -559,11 +572,11 @@ log.verbose("[Remote] Loaded")
 @click.argument("request", required=True)
 @click.pass_context
 def executor(ctx, worker, build, request):
-    address = config.geturi(NAME, "uri", "tcp://scheduler.:9090")
+    address = config.geturi(NAME, "grpc_uri", "tcp://scheduler.:9090")
     raise_error_if(address.scheme not in ["tcp"], "Invalid scheme in scheduler URI config: {}", address.scheme)
     raise_error_if(not address.netloc, "Invalid network address in scheduler URI config: {}", address.netloc)
 
-    channel = grpc.insecure_channel(address.netloc)
+    channel = grpc.insecure_channel(address.netloc, options=grpc_keepalive_opts)
     log.verbose("Waiting for GRPC channel to connect")
     grpc.channel_ready_future(channel).result()
     log.verbose("GRPC channel established: {}", address.netloc)

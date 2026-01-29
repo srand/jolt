@@ -489,15 +489,9 @@ func (s *priorityScheduler) NewWorker(platform, taskPlatform *Platform) (Worker,
 
 	// FIXME: Log as single record to avoid interleaving
 	log.Info("new - worker", worker.Id())
-	log.Info("      properties:")
-	for prop := range *worker.Platform() {
-		log.Infof("      * %s", prop)
-	}
+	worker.Platform().Log("Platform", 2)
 	if len(*worker.TaskPlatform()) > 0 {
-		log.Info("      task properties:")
-		for prop := range *worker.TaskPlatform() {
-			log.Infof("      * %s", prop)
-		}
+		worker.TaskPlatform().Log("Task Platform", 2)
 	}
 
 	s.Reschedule()

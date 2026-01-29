@@ -278,11 +278,18 @@ Available configuration keys:
       - Type
       - Description
 
-    * - ``uri``
+    * - ``grpc_uri``
       - String
-      - | The URI of the remote artifact cache. The targeted service is expected
+      - | The gRPC URI of the remote artifact cache. The targeted service is expected
+          to implement the default Jolt cache gRPC service. The service is used to
+          synchronize workspaces between workers in distributed execution.
+        | Default: ``tcp://cache:9090``
+
+    * - ``http_uri``
+      - String
+      - | The HTTP URI of the remote artifact cache. The targeted service is expected
           to implement the default Jolt cache REST API.
-        | Default: ``http://cache``
+        | Default: ``http://cache:8080``
 
 
 Configuration variables for the cache service itself can be found here:
@@ -621,10 +628,32 @@ Available configuration keys:
       - Type
       - Description
 
-    * - ``uri``
+    * - ``grpc_uri``
       - String
-      - | The URI of the scheduler service.
+      - | The gRPC URI of the scheduler service.
         | Default: ``tcp://scheduler:9090``
+
+    * - ``grpc_keepalive_time``
+      -  Duration
+      - | The time after which a keepalive ping is sent on the gRPC channel.
+        | Default: ``2h``
+
+    * - ``grpc_keepalive_timeout``
+      - Duration
+      - | The time to wait for an acknowledgment to the keepalive ping.
+          If the acknowledgment is not received within this time, the
+          connection is closed.
+        | Default: ``20s``
+
+    * - ``grpc_keepalive_without_calls``
+      - Boolean
+      - | Whether to allow keepalive pings when there are no calls.
+        | Default: ``false``
+
+    * - ``http_uri``
+      - String
+      - | The HTTP URI of the scheduler service.
+        | Default: ``http://scheduler:8080``
 
 Configuration variables for the scheduler service itself can be found here:
 :ref:`Scheduler <configuration-services-scheduler>`
@@ -873,10 +902,16 @@ The cache service can be configured using environment variables and/or a configu
           and key are provided.
         | Default: ``false``
 
+    * - ``JOLT_CACHE_LISTEN_GRPC``
+      - ``listen_grpc``
+      - String
+      - | The address and port on which the cache will listen for gRPC requests.
+        | The default is ``:9090``.
+
     * - ``JOLT_CACHE_LISTEN_HTTP``
       - ``listen_http``
       - String
-      - | The address and port on which the cache will listen for HTTP(S) requests.
+      - | The address and port on which the cache will listen for HTTP(S) Cacherequests.
         | The default is ``:8080`` for HTTP and ``:8443`` for HTTPS.
 
     * - ``JOLT_CACHE_MAX_SIZE``
@@ -893,11 +928,45 @@ The cache service can be configured using environment variables and/or a configu
       - | The path to the cache directory.
         | Default: ``/data``
 
-    * - ``JOLT_CACHE_VERBOSITY``
-      - ``verbosity``
-      - Integer
-      - | The verbosity level of the cache. Higher value enables more detailed logs.
-        | Default: ``0``
+    * - ``-``
+      - ``grpc.keepalive_time``
+      - Duration
+      - | The time after which a keepalive ping is sent on the gRPC channel.
+        | Default: ``2h``.
+
+    * - ``-``
+      - ``grpc.keepalive_timeout``
+      - Duration
+      - | The time to wait for an acknowledgment to the keepalive ping.
+          If the acknowledgment is not received within this time, the
+          connection is closed.
+        | Default: ``20s``.
+
+    * - ``-``
+      - ``grpc.permit_keepalive_without_calls``
+      - Boolean
+      - | Whether to allow keepalive pings when there are no calls.
+        | Default: ``false``.
+
+    * - ``-``
+      - ``grpc.permit_keep_alive_time``
+      - Duration
+      - | The time after which a new keepalive ping is permitted to be sent
+          on the gRPC channel from client to scheduler.
+        | Default: ``5m``.
+
+Example:
+
+  .. code:: yaml
+
+    # /etc/jolt/cache.yaml
+    listen_http: "http://:8080"
+    listen_grpc: "tcp://:9090"
+    max_size: "2TiB"
+    grpc:
+      keepalive_time: "2h"
+      keepalive_timeout: "20s"
+
 
 Dashboard
 ^^^^^^^^^
@@ -927,33 +996,76 @@ The scheduler can be configured using environment variables and/or a configurati
       - Config File Key
       - Description
 
-    * - ``JOLT_CACHE_URI``
-      - ``cache_uri``
-      - | The URI of the HTTP cache service from which the scheduler may fetch Jolt clients.
-          Normally, this is not used and the scheduler instead installs the same version of
-          the client from the public Python package index. However, for development
-          purposes it is possible to deploy the source of the running client to the cache
-          and have the scheduler fetch it from there.
+    * - ``JOLT_SCHEDULER_LISTEN_GRPC``
+      - ``listen_grpc``
+      - | The address and port on which the scheduler will listen for gRPC requests.
+          The gRPC endpoint is used by clients and workers to communicate with the scheduler
+          and exchange task data.
+        | The default is ``:9090``.
 
-        | The format is ``<scheme>://<host>:<port>`` where accepted schemes are:
+    * - ``JOLT_SCHEDULER_LISTEN_HTTP``
+      - ``listen_http``
+      - | The address and port on which the scheduler will listen for HTTP requests.
+          The HTTP endpoint is used for metrics and task log stashing.
+        | The default is ``:8080``.
 
-        - ``tcp`` for both IPv4 and IPv6 connections
-        - ``tcp4`` for only IPv4 connections
-        - ``tcp6`` for only IPv6 connections
+    * - ``-``
+      - ``public_http``
+      - | The public HTTP URI of the scheduler. This is used by clients and the
+          Jolt dashboard to download task logs and metrics.
+        | Example: ``http://scheduler.jolt.domain``.
 
-        | The default is ``tcp://cache.``.
+    * - ``-``
+      - ``logstash.size``
+      - | The maximum size in bytes the logstash service is allowed to use
+          for storing task logs. When the size is exceeded, the oldest logs are evicted.
+        | Default: ``0 (unlimited)``.
 
-    * - ``JOLT_CACHE_SIZE``
-      - ``cache_size``
-      - | The maximum size of the local cache in bytes.
+    * - ``-``
+      - ``logstash.storage``
+      - | The storage backend to use for the logstash service.
+          Accepted values are ``disk`` and ``memory``.
+        | Default: ``memory``.
 
-        | The default is ``1000000000`` (1 GB).
+    * - ``-``
+      - ``logstash.path``
+      - | The path where task logs are stored by the logstash service when using
+          the ``disk`` storage backend.
 
-    * - ``JOLT_CACHE_PATH``
-      - ``cache_path``
-      - | The path to the local cache directory.
+    * - ``-``
+      - ``grpc.keepalive_time``
+      - | The time after which a keepalive ping is sent on the gRPC channel.
+        | Default: ``2h``.
 
-        | The default is ``/var/cache/jolt``.
+    * - ``-``
+      - ``grpc.keepalive_timeout``
+      - | The time to wait for an acknowledgment to the keepalive ping.
+          If the acknowledgment is not received within this time, the
+          connection is closed.
+        | Default: ``20s``.
+
+    * - ``-``
+      - ``grpc.permit_keepalive_without_calls``
+      - | Whether to allow keepalive pings when there are no calls.
+        | Default: ``false``.
+
+    * - ``-``
+      - ``grpc.permit_keep_alive_time``
+      - | The time after which a new keepalive ping is permitted to be sent
+          on the gRPC channel from client to scheduler.
+        | Default: ``5m``.
+
+Example:
+
+  .. code:: yaml
+
+    # /etc/jolt/cache.yaml
+    listen_http: "http://:8080"
+    listen_grpc: "tcp://:9090"
+    public_http: "http://scheduler.jolt.domain"
+    grpc:
+      keepalive_time: "2h"
+      keepalive_timeout: "20s"
 
 
 Worker
@@ -1011,8 +1123,8 @@ The worker can be configured using environment variables and/or a configuration 
       - Config File Key
       - Description
 
-    * - ``JOLT_CACHE_URI``
-      - ``cache_uri``
+    * - ``JOLT_CACHE_HTTP_URI``
+      - ``cache_http_uri``
       - | The URI of the HTTP cache service from which the worker may fetch Jolt clients.
           Normally, this is not used and the worker instead installs the same version of
           the client from the public Python package index. However, for development
@@ -1021,11 +1133,23 @@ The worker can be configured using environment variables and/or a configuration 
 
         | The format is ``<scheme>://<host>:<port>`` where accepted schemes are:
 
-        - ``tcp`` for both IPv4 and IPv6 connections
-        - ``tcp4`` for only IPv4 connections
-        - ``tcp6`` for only IPv6 connections
+        - ``http`` for plain-text connections
+        - ``https`` for secure connections
 
-        | The default is ``tcp://cache.``.
+        | The default is ``http://cache:8080.``.
+
+    * - ``JOLT_CACHE_GRPC_URI``
+      - ``cache_grpc_uri``
+      - | The URI of the gRPC cache service from which the worker may fetch workspace
+          dependencies and artifacts required to execute tasks.
+
+        | The format is ``<scheme>://<host>:<port>`` where accepted schemes are:
+
+        - ``tcp`` for either IPv4 or IPv6 connections
+        - ``tcp4`` for IPv4 connections
+        - ``tcp6`` for IPv6 connections
+
+        | The default is ``tcp://cache:9090.``.
 
     * - ``JOLT_PLATFORM``
       - ``platform``
@@ -1080,11 +1204,11 @@ The worker can be configured using environment variables and/or a configuration 
 
         | The recommandation is to use ``label`` for functional properties.
 
-    * - ``JOLT_SCHEDULER_URI``
-      - ``scheduler_uri``
-      - | The URIs of the scheduler to which the worker will connect and enlist.
+    * - ``JOLT_SCHEDULER_GRPC_URI``
+      - ``scheduler_grpc_uri``
+      - | The URI of the scheduler gRPC service to which the worker will connect and enlist.
 
-        | See ``JOLT_CACHE_URI`` for format. The default is ``tcp://scheduler.:9090``.
+        | See ``JOLT_CACHE_GRPC_URI`` for format. The default is ``tcp://scheduler:9090``.
 
     * - ``JOLT_NIX``
       - ``nix``
@@ -1120,8 +1244,10 @@ Example configuration:
   .. code:: yaml
 
     # /etc/jolt/worker.yaml
-    cache_uri: "tcp://cache:80"
+    cache_http_uri: "http://cache:80"
+    cache_grpc_uri: "tcp://cache:80"
     platform:
       - "label=compilation"
       - "label=testing"
-    scheduler_uri: "tcp://scheduler:9090"
+    scheduler_grpc_uri: "tcp://scheduler:9090"
+    scheduler_http_uri: "http://scheduler:8080"

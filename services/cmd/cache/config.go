@@ -1,13 +1,15 @@
 package main
 
 import (
-	"log"
 	"time"
 
+	"github.com/srand/jolt/scheduler/pkg/log"
 	"github.com/srand/jolt/scheduler/pkg/utils"
 )
 
 type Config struct {
+	utils.GRPCOptions `mapstructure:"grpc"`
+
 	// Path to server certificate
 	Certificate string `mapstructure:"cert"`
 	// Path to service certificate private key
@@ -15,7 +17,7 @@ type Config struct {
 
 	// Time duration from access to an artifact until the artifact
 	// expires and may be evicted.
-	ExpirationTime_ int64 `mapstructure:"expiration"`
+	ExpirationTime_ time.Duration `mapstructure:"expiration"`
 
 	// Don't use TLS / HTTPS
 	Insecure bool `mapstructure:"insecure"`
@@ -53,5 +55,18 @@ func (c *Config) MaxSize() int64 {
 }
 
 func (c *Config) ExpirationTime() time.Duration {
-	return time.Second * time.Duration(c.ExpirationTime_)
+	return c.ExpirationTime_
+}
+
+func (c *Config) Log() {
+	log.Info("Cache configuration:")
+	log.Infof("  cert = %s", c.Certificate)
+	log.Infof("  cert_key = %s", c.PrivateKey)
+	log.Infof("  expiration = %s", c.ExpirationTime())
+	log.Infof("  insecure = %v", c.Insecure)
+	log.Infof("  listen_http = %v", c.Listen)
+	log.Infof("  listen_grpc = %v", c.ListenGrpc)
+	log.Infof("  max_size = %d", c.MaxSize())
+	log.Infof("  path = %s", c.Path)
+	c.GRPCOptions.Log()
 }

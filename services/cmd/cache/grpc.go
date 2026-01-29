@@ -47,8 +47,10 @@ func serveGrpc(theCache cache.Cache, address string) {
 		log.Info("Listening on", uri.Scheme, socket.Addr())
 	}
 
+	// Setup gRPC options
+	opts := config.GRPCOptions.ToServerOptions()
+
 	// Setup gRPC server
-	opts := []grpc.ServerOption{}
 	server := grpc.NewServer(opts...)
 	cache.RegisterCacheServiceServer(server, cache.NewCacheService(theCache))
 	if err := server.Serve(socket); err != nil {

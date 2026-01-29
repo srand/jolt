@@ -3,13 +3,14 @@ package scheduler
 import (
 	"bytes"
 	"fmt"
-	"log"
 	"os"
 	"runtime"
+	"slices"
 	"strings"
 
 	"github.com/denisbrodbeck/machineid"
 	"github.com/spf13/viper"
+	"github.com/srand/jolt/scheduler/pkg/log"
 	"github.com/srand/jolt/scheduler/pkg/protocol"
 )
 
@@ -146,4 +147,22 @@ func (p *Platform) GetPropertiesForKey(key string) ([]string, bool) {
 	}
 
 	return nil, false
+}
+
+func (p *Platform) Log(title string, indent int) {
+	indentStr := strings.Repeat(" ", indent)
+
+	log.Infof("%s%s:", indentStr, title)
+
+	// Sort properties for consistent logging
+	propList := []string{}
+	for prop := range *p {
+		propList = append(propList, prop)
+	}
+	slices.Sort(propList)
+
+	for _, prop := range propList {
+		key, value, _ := strings.Cut(prop, "=")
+		log.Infof("%s  %s = %s", indentStr, key, value)
+	}
 }

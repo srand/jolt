@@ -354,11 +354,11 @@ func (w *worker) deployClient(client *protocol.Client, workspace *protocol.Works
 		return "", err
 	}
 
-	if (client.Identity != "" && w.config.CacheUri != "") || client.Url != "" {
+	if (client.Identity != "" && w.config.CacheHttpUri != "") || client.Url != "" {
 		var url string = client.Url
 
 		if url == "" {
-			url = fmt.Sprintf("%s/jolt/main@%s.tar.gz", w.config.CacheUri, client.Identity)
+			url = fmt.Sprintf("%s/jolt/main@%s.tar.gz", w.config.CacheHttpUri, client.Identity)
 		}
 
 		log.Info("Deploying client from URL:", url)

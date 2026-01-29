@@ -7,7 +7,7 @@ services:
       - JOLT_CACHE_MAX_SIZE=100GB
       - JOLT_CACHE_VERBOSITY=2
     ports:
-      - "8080:8080"
+      - "8081:8080"
       - "9091:9090"
     volumes:
       - cache-http:/data
@@ -18,11 +18,12 @@ services:
   scheduler:
     image: robrt/jolt-scheduler:latest
     ports:
+      - "8080:8080"
       - "9090:9090"
   worker:
     environment:
-      - "JOLT_CACHE_URI=http://cache"
       - "JOLT_CACHE_GRPC_URI=tcp://cache:9090"
+      - "JOLT_CACHE_HTTP_URI=http://cache:8080"
     image: robrt/jolt-worker:latest
     deploy:
       replicas: 2

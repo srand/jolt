@@ -8,14 +8,18 @@ import (
 )
 
 func NewWorkerClient(workerConfig *WorkerConfig) (protocol.WorkerClient, error) {
-	dialOptions := grpc.WithTransportCredentials(insecure.NewCredentials())
+	dialOptions := []grpc.DialOption{
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+	}
 
-	grpcUri, err := utils.ParseGrpcUrl(workerConfig.SchedulerUri)
+	dialOptions = append(dialOptions, workerConfig.Grpc.ToDialOptions()...)
+
+	grpcUri, err := utils.ParseGrpcUrl(workerConfig.SchedulerGrpcUri)
 	if err != nil {
 		return nil, err
 	}
 
-	conn, err := grpc.Dial(grpcUri, dialOptions)
+	conn, err := grpc.Dial(grpcUri, dialOptions...)
 	if err != nil {
 		return nil, err
 	}

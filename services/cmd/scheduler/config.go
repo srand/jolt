@@ -1,11 +1,23 @@
 package main
 
+import (
+	"github.com/srand/jolt/scheduler/pkg/log"
+	"github.com/srand/jolt/scheduler/pkg/utils"
+)
+
 type Config struct {
-	ListenGrpc []string         `mapstructure:"listen_grpc"`
-	ListenHttp []string         `mapstructure:"listen_http"`
-	PublicHttp []string         `mapstructure:"public_http"`
-	LogStash   LogStashConfig   `mapstructure:"logstash"`
-	Dashboard  *DashboardConfig `mapstructure:"dashboard"`
+	utils.GRPCOptions `mapstructure:"grpc"`
+
+	// Addresses to listen on for gRPC.
+	ListenGrpc []string `mapstructure:"listen_grpc"`
+	// Addresses to listen on for HTTP.
+	ListenHttp []string `mapstructure:"listen_http"`
+	// Public HTTP addresses.
+	PublicHttp []string `mapstructure:"public_http"`
+	// LogStash configuration.
+	LogStash LogStashConfig `mapstructure:"logstash"`
+	// Dashboard configuration.
+	Dashboard *DashboardConfig `mapstructure:"dashboard"`
 }
 
 func (c *Config) GetDashboardUri() string {
@@ -21,4 +33,13 @@ func (c *Config) GetLogstashUri() string {
 	}
 
 	return ""
+}
+
+func (c *Config) Log() {
+	log.Info("Scheduler configuration:")
+	log.Infof("  gRPC listen addresses: %v", config.ListenGrpc)
+	log.Infof("  HTTP listen addresses: %v", config.ListenHttp)
+	log.Infof("  Public HTTP addresses: %v", config.PublicHttp)
+	config.LogStash.LogValues()
+	config.GRPCOptions.Log()
 }

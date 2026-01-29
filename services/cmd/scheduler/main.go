@@ -23,9 +23,6 @@ var rootCmd = &cobra.Command{
 	Use:   "scheduler",
 	Short: "Jolt remote task execution scheduler service",
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
-		viper.BindPFlag("grpc_listen", cmd.Flags().Lookup("listen-grpc"))
-		viper.BindPFlag("http_listen", cmd.Flags().Lookup("listen-http"))
-
 		viper.SetEnvPrefix("jolt")
 		viper.AutomaticEnv()
 
@@ -37,9 +34,12 @@ var rootCmd = &cobra.Command{
 
 		viper.ReadInConfig()
 
-		if err := viper.Unmarshal(&config); err != nil {
+		if err := utils.UnmarshalConfig(*viper.GetViper(), &config); err != nil {
 			log.Fatal(err)
 		}
+
+		config.LogStash.SetDefaults()
+		config.Log()
 
 		verbosity, err := cmd.Flags().GetCount("verbose")
 		if err != nil {
@@ -73,13 +73,13 @@ var rootCmd = &cobra.Command{
 		stash := logstash.NewLogStash(&config.LogStash, stashFs)
 
 		// Start listening for Grpc connections on all configured addresses
-		schedulerUris := viper.GetStringSlice("grpc_listen")
+		schedulerUris := viper.GetStringSlice("listen_grpc")
 		for _, uri := range schedulerUris {
 			go serveGrpc(sched, stash, uri)
 		}
 
 		// Start listening for logstash HTTP connections on all configured addresses
-		logstashUris := viper.GetStringSlice("http_listen")
+		logstashUris := viper.GetStringSlice("listen_http")
 		for _, uri := range logstashUris {
 			host, err := utils.ParseHttpUrl(uri)
 			if err != nil {
@@ -108,6 +108,9 @@ func init() {
 	rootCmd.Flags().StringSliceP("listen-http", "l", []string{"tcp://:8080"}, "Addresses to listen on for HTTP connections")
 	rootCmd.Flags().StringSliceP("listen-grpc", "g", []string{"tcp://:9090"}, "Addresses to listen on for GRPC connections")
 	rootCmd.Flags().CountP("verbose", "v", "Verbosity (repeatable)")
+
+	viper.BindPFlag("listen_grpc", rootCmd.Flags().Lookup("listen-grpc"))
+	viper.BindPFlag("listen_http", rootCmd.Flags().Lookup("listen-http"))
 }
 
 func main() {

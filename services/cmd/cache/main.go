@@ -30,14 +30,20 @@ var rootCmd = &cobra.Command{
 			log.Warn(err)
 		}
 
-		if err := viper.Unmarshal(&config); err != nil {
+		if err := utils.UnmarshalConfig(*viper.GetViper(), &config); err != nil {
 			log.Fatal(err)
+		}
+		config.Log()
+
+		verbosity, err := cmd.Flags().GetCount("verbose")
+		if err != nil {
+			panic(err)
 		}
 
 		switch {
-		case config.Verbosity >= 2:
+		case verbosity >= 2:
 			log.SetLevel(log.TraceLevel)
-		case config.Verbosity >= 1:
+		case verbosity >= 1:
 			log.SetLevel(log.DebugLevel)
 		}
 		log.Info("Log verbosity:", log.GetLevel())
@@ -115,7 +121,7 @@ var rootCmd = &cobra.Command{
 func init() {
 	rootCmd.Flags().StringP("cert", "c", "", "TLS server certificate file")
 	rootCmd.Flags().StringP("cert-key", "k", "", "TLS private key file")
-	rootCmd.Flags().StringP("expiration", "e", "", "Artifact expiration timeout in seconds.")
+	rootCmd.Flags().StringP("expiration", "e", "0", "Artifact expiration timeout (e.g., 72h, 30m)")
 	rootCmd.Flags().BoolP("insecure", "i", false, "Don't use TLS")
 	rootCmd.Flags().StringSliceP("listen-http", "l", []string{"tcp://:8080"}, "Addresses to listen on for HTTP connections")
 	rootCmd.Flags().StringSliceP("listen-grpc", "g", []string{"tcp://:9090"}, "Addresses to listen on for GRPC connections")
@@ -131,7 +137,6 @@ func init() {
 	viper.BindPFlag("listen_http", rootCmd.Flags().Lookup("listen-http"))
 	viper.BindPFlag("max_size", rootCmd.Flags().Lookup("max-size"))
 	viper.BindPFlag("path", rootCmd.Flags().Lookup("path"))
-	viper.BindPFlag("verbosity", rootCmd.Flags().Lookup("verbose"))
 }
 
 func main() {

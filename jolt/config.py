@@ -1,4 +1,5 @@
 from configparser import ConfigParser, NoOptionError, NoSectionError
+from datetime import timedelta
 from urllib.parse import urlparse
 import os
 import re
@@ -150,6 +151,18 @@ _config.load()
 def get(section, key, default=None, expand=True, alias=None):
     val = _config.get(section, key, default, alias)
     return utils.expand(val) if expand and val is not None else val
+
+
+def getduration(section, key, default=None, alias=None):
+    value = get(section, key, default=None, alias=alias)
+    if value is None:
+        if type(default) is timedelta:
+            return default
+        elif default is not None:
+            value = str(default)
+        else:
+            return None
+    return utils.parse_duration(value)
 
 
 def getint(section, key, default=None, alias=None):

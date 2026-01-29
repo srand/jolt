@@ -9,9 +9,14 @@ import (
 )
 
 type LogStashConfig struct {
-	MaxSize_    string `mapstructure:"size"`
+	// Maximum size of the logstash.
+	// When the size is exceeded, oldest entries will be removed.
+	// Supported suffixes:
+	MaxSize_ string `mapstructure:"size"`
+	// Storage type: "memory" or "disk"
 	StorageType string `mapstructure:"storage"`
-	Path        string `mapstructure:"path"`
+	// Path to store logstash files (for disk storage)
+	Path string `mapstructure:"path"`
 }
 
 func (c *LogStashConfig) MaxSize() int64 {
@@ -42,5 +47,20 @@ func (c *LogStashConfig) CreateFs() (utils.Fs, error) {
 
 	default:
 		return nil, fmt.Errorf("invalid logstash storage type configured: %s", c.StorageType)
+	}
+}
+
+func (c *LogStashConfig) SetDefaults() {
+	if c.StorageType == "" {
+		c.StorageType = "memory"
+	}
+}
+
+func (c *LogStashConfig) LogValues() {
+	log.Infof("  Logstash configuration:")
+	log.Infof("    storage = %s", c.StorageType)
+	log.Infof("    size = %d", c.MaxSize())
+	if c.StorageType == "disk" {
+		log.Infof("    path = %s", c.Path)
 	}
 }

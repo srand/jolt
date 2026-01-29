@@ -1,3 +1,4 @@
+from datetime import timedelta
 import blake3
 import contextlib
 import ctypes
@@ -725,3 +726,40 @@ def platform_os_arch():
             f"Unsupported platform: {uname.system} {uname.machine}"
         ) from None
     return system, architecture
+
+
+def parse_duration(value: str) -> timedelta:
+    """ Parses a duration string into a timedelta object.
+
+    Supported formats are:
+    - Nms (milliseconds)
+    - Ns (seconds)
+    - Nm (minutes)
+    - Nh (hours)
+    - Nd (days)
+    - Nw (weeks)
+
+    Where N is an integer.
+    """
+    pattern = r"^(?P<value>\d+)(?P<unit>s|m|h|d|w)$"
+    match = re.match(pattern, value)
+    if not match:
+        raise ValueError(f"Invalid duration format: {value}")
+
+    value = int(match.group("value"))
+    unit = match.group("unit")
+
+    if unit == "ms":
+        return timedelta(milliseconds=value)
+    elif unit == "s":
+        return timedelta(seconds=value)
+    elif unit == "m":
+        return timedelta(minutes=value)
+    elif unit == "h":
+        return timedelta(hours=value)
+    elif unit == "d":
+        return timedelta(days=value)
+    elif unit == "w":
+        return timedelta(weeks=value)
+
+    raise ValueError(f"Unsupported duration unit: {unit}")

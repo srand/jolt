@@ -35,19 +35,9 @@ var rootCmd = &cobra.Command{
 			log.Fatal(err)
 		}
 
-		log.Info("Worker configuration:")
-		log.Infof("  Cache directory: %s", workerConfig.CacheDir)
-		log.Infof("  Cache URI: %s", workerConfig.CacheUri)
-		log.Infof("  Cache gRPC URI: %s", workerConfig.CacheGrpcUri)
-		log.Infof("  Scheduler URI: %s", workerConfig.SchedulerUri)
-		log.Infof("  Thread count: %d", workerConfig.ThreadCount)
-
 		platform := scheduler.NewPlatformWithDefaults()
 		platform.LoadConfig()
-		log.Info("Properties:")
-		for prop := range *platform {
-			log.Infof("  %s", prop)
-		}
+		platform.Log("Platform", 0)
 
 		taskPlatform := scheduler.NewPlatform()
 		for _, prop := range viper.GetStringSlice("task_platform") {
@@ -58,16 +48,14 @@ var rootCmd = &cobra.Command{
 			taskPlatform.AddProperty(parts[0], parts[1])
 		}
 		if len(*taskPlatform) > 0 {
-			log.Info("Task properties:")
-			for prop := range *taskPlatform {
-				log.Infof("  %s", prop)
-			}
+			taskPlatform.Log("Task Platform", 0)
 		}
 
 		// Validate the worker configuration.
 		if err := workerConfig.Validate(); err != nil {
 			log.Fatal(err)
 		}
+		workerConfig.Log()
 
 		workerClient, err := worker.NewWorkerClient(workerConfig)
 		if err != nil {
@@ -81,24 +69,24 @@ var rootCmd = &cobra.Command{
 
 func main() {
 	rootCmd.Flags().StringP("cache-dir", "d", "", "Cache directory")
-	rootCmd.Flags().StringP("cache-uri", "u", "http://cache", "Cache service URI")
 	rootCmd.Flags().StringP("cache-grpc-uri", "g", "tcp://cache:9090", "Cache service gRPC URI")
+	rootCmd.Flags().StringP("cache-http-uri", "u", "http://cache:8080", "Cache service HTTP URI")
 	rootCmd.Flags().Bool("nix", false, "Use Nix environments")
 	rootCmd.Flags().StringSlice("nix-keep", []string{}, "Host environment variables to copy into Nix (repeatable)")
 	rootCmd.Flags().StringSliceP("platform", "p", []string{}, "Platform property (repeatable)")
 	rootCmd.Flags().StringSliceP("task-platform", "t", []string{}, "Task platform property (repeatable)")
-	rootCmd.Flags().StringP("scheduler-uri", "s", "tcp://scheduler:9090", "Scheduler service URI")
-	rootCmd.Flags().StringP("threads", "j", fmt.Sprint(runtime.NumCPU()), "Maximum thread count")
+	rootCmd.Flags().StringP("scheduler-grpc-uri", "s", "tcp://scheduler:9090", "Scheduler service URI")
+	rootCmd.Flags().IntP("threads", "j", runtime.NumCPU(), "Maximum thread count")
 	rootCmd.Flags().CountP("verbose", "v", "Verbosity (repeatable)")
 
 	viper.BindPFlag("cache_dir", rootCmd.Flags().Lookup("cache-dir"))
-	viper.BindPFlag("cache_uri", rootCmd.Flags().Lookup("cache-uri"))
 	viper.BindPFlag("cache_grpc_uri", rootCmd.Flags().Lookup("cache-grpc-uri"))
+	viper.BindPFlag("cache_http_uri", rootCmd.Flags().Lookup("cache-http-uri"))
 	viper.BindPFlag("nix", rootCmd.Flags().Lookup("nix"))
 	viper.BindPFlag("nix_keep", rootCmd.Flags().Lookup("nix-keep"))
 	viper.BindPFlag("platform", rootCmd.Flags().Lookup("platform"))
 	viper.BindPFlag("task_platform", rootCmd.Flags().Lookup("task-platform"))
-	viper.BindPFlag("scheduler_uri", rootCmd.Flags().Lookup("scheduler-uri"))
+	viper.BindPFlag("scheduler_grpc_uri", rootCmd.Flags().Lookup("scheduler-grpc-uri"))
 	viper.BindPFlag("threads", rootCmd.Flags().Lookup("threads"))
 	viper.SetEnvPrefix("jolt")
 	viper.AutomaticEnv()
