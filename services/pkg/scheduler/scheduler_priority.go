@@ -574,6 +574,9 @@ func (s *priorityScheduler) TaskStatusChanged(task *Task, status protocol.TaskSt
 	case protocol.TaskStatus_TASK_PASSED, protocol.TaskStatus_TASK_SKIPPED, protocol.TaskStatus_TASK_UPLOADED, protocol.TaskStatus_TASK_DOWNLOADED:
 		atomic.AddInt64(&s.numSuccessfulTasks, 1)
 		atomic.AddInt64(&s.numCompletedTasks, 1)
+	case protocol.TaskStatus_TASK_QUEUED:
+		// Executor likely closed and task returned to queue
+		s.Reschedule()
 	}
 
 	// Post scheduling telemetry to observers
