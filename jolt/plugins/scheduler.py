@@ -406,7 +406,7 @@ class RemoteSession(object):
         self.factory = factory
 
         # Address of the scheduler.
-        self.address = config.geturi(NAME, "grpc_uri", "tcp://scheduler.:9090")
+        self.address = config.geturi(NAME, "grpc_uri", config.geturi(NAME, "uri", "tcp://scheduler.:9090"))
         raise_error_if(self.address.scheme not in ["tcp"], "Invalid scheme in scheduler URI config: {}", self.address.scheme)
         raise_error_if(not self.address.netloc, "Invalid network address in scheduler URI config: {}", self.address.netloc)
 

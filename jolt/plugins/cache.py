@@ -20,7 +20,7 @@ class Cache(cache.StorageProvider):
     def __init__(self, cache):
         super().__init__()
         self._cache = cache
-        self._uri = config.get(NAME, "http_uri", "http://cache")
+        self._uri = config.get(NAME, "http_uri", config.get(NAME, "uri", "http://cache"))
         self._uri = self._uri.rstrip("/")
         raise_error_if(not self._uri, "Cache Service URI not configured")
         self._file_uri = self._uri + "/files"
