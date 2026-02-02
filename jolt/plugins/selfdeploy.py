@@ -159,7 +159,7 @@ def publish_artifact():
         executor.run(env)
     jolt_url = acache.location(task.artifacts[0])
     raise_error_if(not jolt_url, "Failed to deploy jolt to a remote cache")
-    cacheUrl = config.get("http", "uri", config.get("cache", "http_uri", config.get("cache", "uri", ""))) + "/files"
+    cacheUrl = config.get("http", "uri", config.get("cache", "http_uri", config.get("cache", "uri", "")) + "/files")
     substituteUrl = config.get("selfdeploy", "baseUri")
     if cacheUrl and substituteUrl:
         return task.identity, jolt_url.replace(cacheUrl, substituteUrl)
