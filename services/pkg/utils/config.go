@@ -3,6 +3,7 @@ package utils
 import (
 	"fmt"
 	"reflect"
+	"strings"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/spf13/viper"
@@ -50,12 +51,32 @@ func StringToIntHookFunc() mapstructure.DecodeHookFunc {
 	}
 }
 
+func StringToStringSliceHookFunc() mapstructure.DecodeHookFunc {
+	return func(
+		f reflect.Type,
+		t reflect.Type,
+		data interface{},
+	) (interface{}, error) {
+		if f.Kind() != reflect.String || t.Kind() != reflect.Slice || t.Elem().Kind() != reflect.String {
+			return data, nil
+		}
+
+		str := data.(string)
+		slice := []string{}
+		for _, s := range strings.Split(str, ",") {
+			slice = append(slice, strings.TrimSpace(s))
+		}
+		return slice, nil
+	}
+}
+
 // Custom unmarshal function to handle time.Duration and bool properly.
 func UnmarshalConfig(v viper.Viper, cfg interface{}) error {
 	hook := mapstructure.ComposeDecodeHookFunc(
 		mapstructure.StringToTimeDurationHookFunc(),
 		StringToBoolHookFunc(),
 		StringToIntHookFunc(),
+		StringToStringSliceHookFunc(),
 	)
 
 	decoderConfig := &mapstructure.DecoderConfig{
