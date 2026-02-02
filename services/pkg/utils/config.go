@@ -30,11 +30,32 @@ func StringToBoolHookFunc() mapstructure.DecodeHookFunc {
 	}
 }
 
+func StringToIntHookFunc() mapstructure.DecodeHookFunc {
+	return func(
+		f reflect.Type,
+		t reflect.Type,
+		data interface{},
+	) (interface{}, error) {
+		if f.Kind() != reflect.String || t.Kind() != reflect.Int {
+			return data, nil
+		}
+
+		str := data.(string)
+		var i int
+		_, err := fmt.Sscanf(str, "%d", &i)
+		if err != nil {
+			return nil, fmt.Errorf("cannot convert %q to int: %v", str, err)
+		}
+		return i, nil
+	}
+}
+
 // Custom unmarshal function to handle time.Duration and bool properly.
 func UnmarshalConfig(v viper.Viper, cfg interface{}) error {
 	hook := mapstructure.ComposeDecodeHookFunc(
 		mapstructure.StringToTimeDurationHookFunc(),
 		StringToBoolHookFunc(),
+		StringToIntHookFunc(),
 	)
 
 	decoderConfig := &mapstructure.DecoderConfig{

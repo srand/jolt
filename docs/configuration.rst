@@ -911,7 +911,7 @@ The cache service can be configured using environment variables and/or a configu
     * - ``JOLT_CACHE_LISTEN_HTTP``
       - ``listen_http``
       - String
-      - | The address and port on which the cache will listen for HTTP(S) Cacherequests.
+      - | The address and port on which the cache will listen for HTTP(S) requests.
         | The default is ``:8080`` for HTTP and ``:8443`` for HTTPS.
 
     * - ``JOLT_CACHE_MAX_SIZE``
@@ -927,6 +927,12 @@ The cache service can be configured using environment variables and/or a configu
       - String
       - | The path to the cache directory.
         | Default: ``/data``
+
+    * - ``JOLT_CACHE_VERBOSITY``
+      - ``verbosity``
+      - Integer
+      - | The verbosity level of the cache. Higher value enables more detailed logs.
+        | Default: ``0``
 
     * - ``-``
       - ``grpc.keepalive_time``
