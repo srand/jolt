@@ -16,18 +16,20 @@ from jolt.tasks import TaskRegistry
 class Curl(cmake.CMake):
     name = "curl"
     version = Parameter("8.17.0", help="Curl version.")
+    pic = BooleanParameter(False, help="Build with position independent code.")
     shared = BooleanParameter(False, help="Build shared libraries.")
-    requires_brotli = ["brotli"]
+    requires_brotli = ["brotli:pic={pic},shared={shared}"]
     requires_git = ["git:url=https://github.com/curl/curl.git,rev=curl-{_version_tag},submodules=true"]
-    requires_ssl = ["virtual/ssl:shared={shared}"]
-    requires_zlib = ["virtual/zlib"]
-    requires_zstd = ["zstd"]
+    requires_ssl = ["virtual/ssl:pic={pic},shared={shared}"]
+    requires_zlib = ["virtual/zlib:pic={pic},shared={shared}"]
+    requires_zstd = ["zstd:pic={pic},shared={shared}"]
     srcdir = "{git[curl]}"
     options = [
         "BUILD_SHARED_LIBS={shared[ON,OFF]}",
         "CURL_USE_LIBPSL=OFF",
         "USE_LIBIDN2=OFF",
         "OPENSSL_USE_STATIC_LIBS={shared[OFF,ON]}",
+        "CMAKE_POSITION_INDEPENDENT_CODE={pic[ON,OFF]}",
     ]
 
     @property

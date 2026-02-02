@@ -11,6 +11,7 @@ from jolt.tasks import TaskRegistry
 class CAres(cmake.CMake):
     name = "c-ares"
     version = Parameter("1.34.6", help="c-ares version.")
+    pic = BooleanParameter(False, help="Build with position independent code.")
     shared = BooleanParameter(False, help="Build shared libraries.")
     requires_git = ["git:url=https://github.com/c-ares/c-ares.git,rev=v{version}"]
     srcdir = "{git[c-ares]}"
@@ -18,6 +19,7 @@ class CAres(cmake.CMake):
         "CARES_SHARED={shared[ON,OFF]}",
         "CARES_STATIC={shared[OFF,ON]}",
         "CARES_BUILD_TESTS=OFF",
+        "CMAKE_POSITION_INDEPENDENT_CODE={pic[ON,OFF]}",
     ]
 
 

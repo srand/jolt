@@ -19,13 +19,15 @@ class Protobuf(cmake.CMake):
 
     name = "protobuf"
     version = Parameter("33.2", help="Protobuf version.")
+    pic = BooleanParameter(False, help="Build with position independent code.")
     shared = BooleanParameter(False, help="Build shared libraries")
-    requires_abseil = ["abseil:shared={shared}"]
+    requires_abseil = ["abseil:pic={pic},shared={shared}"]
     requires_git = ["git:url=https://github.com/protocolbuffers/protobuf.git,rev=v{version}"]
     srcdir = "{git[protobuf]}"
     options = [
         "BUILD_SHARED_LIBS={shared[ON,OFF]}",
         "CMAKE_CXX_STANDARD=17",
+        "CMAKE_POSITION_INDEPENDENT_CODE={pic[ON,OFF]}",
         "protobuf_BUILD_TESTS=OFF",
         "protobuf_MSVC_STATIC_RUNTIME=OFF",
     ]

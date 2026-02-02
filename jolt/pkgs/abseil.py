@@ -13,6 +13,7 @@ class Abseil(cmake.CMake):
 
     name = "abseil"
     version = Parameter("20250814.1")
+    pic = BooleanParameter(False, help="Build with position independent code.")
     shared = BooleanParameter(False, help="Build shared libraries")
     requires_git = ["git:url=https://github.com/abseil/abseil-cpp.git,rev={version}"]
     srcdir = "{git[abseil-cpp]}"
@@ -20,6 +21,7 @@ class Abseil(cmake.CMake):
         "ABSL_MSVC_STATIC_RUNTIME=OFF",
         "BUILD_SHARED_LIBS={shared[ON,OFF]}",
         "CMAKE_CXX_STANDARD=17",
+        "CMAKE_POSITION_INDEPENDENT_CODE={pic[ON,OFF]}",
     ]
 
     def publish(self, artifact, tools):

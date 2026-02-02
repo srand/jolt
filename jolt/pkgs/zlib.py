@@ -12,11 +12,13 @@ from jolt.tasks import TaskRegistry
 class Zlib(cmake.CMake):
     name = "zlib"
     version = Parameter("1.3.1", help="Zlib version.")
+    pic = BooleanParameter(False, "Build with position independent code.")
     shared = BooleanParameter(False, "Enable shared libraries.")
     requires_git = ["git:clean=true,url=https://github.com/madler/zlib.git,rev=v{version}"]
     srcdir = "{git[zlib]}"
     options = [
         "BUILD_SHARED_LIBS={shared[ON,OFF]}",
+        "CMAKE_POSITION_INDEPENDENT_CODE={pic[ON,OFF]}",
         "ZLIB_BUILD_EXAMPLES=OFF",
     ]
 
@@ -58,12 +60,14 @@ class Zlib(cmake.CMake):
 class ZlibNg(cmake.CMake):
     name = "zlib-ng"
     version = Parameter("2.3.2", help="Zlib version.")
+    pic = BooleanParameter(False, "Build with position independent code.")
     shared = BooleanParameter(False, "Enable shared libraries.")
     requires_git = ["git:url=https://github.com/zlib-ng/zlib-ng.git,rev={version}"]
     srcdir = "{git[zlib-ng]}"
     options = [
         "BUILD_SHARED_LIBS={shared[ON,OFF]}",
         "BUILD_TESTING=OFF",
+        "CMAKE_POSITION_INDEPENDENT_CODE={pic[ON,OFF]}",
     ]
 
     def publish(self, artifact, tools):
@@ -77,7 +81,9 @@ class ZlibNg(cmake.CMake):
 
 class VirtualZlib(Alias):
     name = "virtual/zlib"
-    requires = ["zlib"]
+    pic = BooleanParameter(False, "Build with position independent code.")
+    shared = BooleanParameter(False, "Enable shared libraries.")
+    requires = ["zlib:pic={pic},shared={shared}"]
 
 
 TaskRegistry.get().add_task_class(Zlib)

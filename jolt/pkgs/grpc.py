@@ -19,19 +19,21 @@ from jolt.tasks import TaskRegistry
 class Grpc(cmake.CMake):
     name = "grpc"
     version = Parameter("1.76.0", help="Grpc version.")
+    pic = BooleanParameter(False, help="Build with position independent code.")
     shared = BooleanParameter(False, help="Build shared libraries.")
     generator = "Ninja"
-    requires_abseil = ["abseil:shared={shared}"]
-    requires_cares = ["c-ares:shared={shared}"]
+    requires_abseil = ["abseil:pic={pic},shared={shared}"]
+    requires_cares = ["c-ares:pic={pic},shared={shared}"]
     requires_git = ["git:url=https://github.com/grpc/grpc.git,path={buildroot}/git_grpc,rev=v{version},submodules=true"]
     requires_nasm_windows = ["nasm"]
-    requires_protobuf = ["protobuf:shared={shared}"]
-    requires_re2 = ["re2:shared={shared}"]
-    requires_ssl = ["virtual/ssl:shared={shared}"]
-    requires_zlib = ["zlib"]
+    requires_protobuf = ["protobuf:pic={pic},shared={shared}"]
+    requires_re2 = ["re2:pic={pic},shared={shared}"]
+    requires_ssl = ["virtual/ssl:pic={pic},shared={shared}"]
+    requires_zlib = ["virtual/zlib:pic={pic},shared={shared}"]
     srcdir = "{git[grpc]}"
     options = [
         "BUILD_SHARED_LIBS={shared[ON,OFF]}",
+        "CMAKE_POSITION_INDEPENDENT_CODE={pic[ON,OFF]}",
         "CMAKE_CXX_STANDARD=17",
         "gRPC_ABSL_PROVIDER=package",
         "gRPC_BUILD_TESTS=OFF",
