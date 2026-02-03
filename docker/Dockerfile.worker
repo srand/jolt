@@ -18,11 +18,8 @@ RUN mkdir -p /blake3/build && cd /blake3/build && git checkout ${BLAKE3_VERSION}
 FROM docker.io/debian:bookworm-slim as base
 ARG DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    bubblewrap \
     build-essential \
     git \
-    libxml2-dev \
-    libxslt-dev \
     ninja-build \
     procps \
     python-is-python3 \
