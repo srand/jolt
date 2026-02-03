@@ -406,7 +406,7 @@ class RemoteSession(object):
         self.factory = factory
 
         # Address of the scheduler.
-        self.address = config.geturi(NAME, "grpc_uri", config.geturi(NAME, "uri", "tcp://scheduler.:9090"))
+        self.address = config.geturi(NAME, "grpc_uri", None) or config.geturi(NAME, "uri", "tcp://scheduler.:9090")
         raise_error_if(self.address.scheme not in ["tcp"], "Invalid scheme in scheduler URI config: {}", self.address.scheme)
         raise_error_if(not self.address.netloc, "Invalid network address in scheduler URI config: {}", self.address.netloc)
 
@@ -572,7 +572,7 @@ log.verbose("[Remote] Loaded")
 @click.argument("request", required=True)
 @click.pass_context
 def executor(ctx, worker, build, request):
-    address = config.geturi(NAME, "grpc_uri", "tcp://scheduler.:9090")
+    address = config.geturi(NAME, "grpc_uri", None) or config.geturi(NAME, "uri", "tcp://scheduler.:9090")
     raise_error_if(address.scheme not in ["tcp"], "Invalid scheme in scheduler URI config: {}", address.scheme)
     raise_error_if(not address.netloc, "Invalid network address in scheduler URI config: {}", address.netloc)
 
