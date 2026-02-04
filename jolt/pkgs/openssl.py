@@ -48,7 +48,7 @@ class OpenSSL(Task):
     def publish_pkgconfig(self, artifact, tools):
         with tools.cwd(artifact.path):
             for libdir in ["lib", "lib32", "lib64"]:
-                if tools.exist(libdir):
+                if tools.exists(libdir):
                     self.libdir = libdir
                     break
 
