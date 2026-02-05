@@ -181,7 +181,10 @@ class JoltDebianPackage(docker.DockerImage):
 
 class ProtobufTools(docker.DockerImage):
     name = "jolt/protobuf-tools"
-    dockerfile = "FROM alpine:3.18\nRUN apk add protobuf-dev protoc py3-pip && pip install grpcio-tools"
+    dockerfile = """
+    FROM debian:trixie-slim
+    RUN apt-get update && apt-get install -y protobuf-compiler protobuf-compiler-grpc  python3-pip python3-grpcio && apt-get clean
+    """
     extract = True
     imagefile = None
 
