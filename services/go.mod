@@ -1,8 +1,6 @@
 module github.com/srand/jolt/scheduler
 
-go 1.24.0
-
-toolchain go1.24.1
+go 1.25.0
 
 require (
 	github.com/denisbrodbeck/machineid v1.0.1
