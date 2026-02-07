@@ -236,10 +236,13 @@ func (c *lruCache) fileDiscarded(file *lruFile) error {
 }
 
 func (c *lruCache) load() error {
-	var wg sync.WaitGroup
 	var mu sync.Mutex
 	var walkDir func(dirPath string) error
 	var count int64
+
+	pool := utils.NewWorkerPool()
+	pool.Start()
+	defer pool.Stop()
 
 	walkDir = func(dirPath string) error {
 		entries, err := afero.ReadDir(c.fs, dirPath)
@@ -251,13 +254,11 @@ func (c *lruCache) load() error {
 			fullPath := filepath.Join(dirPath, entry.Name())
 
 			if entry.IsDir() {
-				wg.Add(1)
-				go func(path string) {
-					defer wg.Done()
-					if err := walkDir(path); err != nil {
+				pool.SubmitOrRun(func() {
+					if err := walkDir(fullPath); err != nil {
 						log.Warn("Error walking directory:", err)
 					}
-				}(fullPath)
+				})
 			} else {
 				mu.Lock()
 				c.lru.Add(&lruItem{
@@ -269,16 +270,16 @@ func (c *lruCache) load() error {
 				mu.Unlock()
 			}
 		}
-
 		return nil
 	}
 
-	if err := walkDir("."); err != nil {
-		return err
-	}
+	pool.SubmitOrRun(func() {
+		if err := walkDir("."); err != nil {
+			log.Warn("Error walking directory:", err)
+		}
+	})
 
-	wg.Wait()
-
+	pool.Wait()
 	log.Infof("Loaded %d items from storage into cache. Total size: %s", count, utils.HumanByteSize(c.lru.Size()))
 
 	return nil
