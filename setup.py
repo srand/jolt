@@ -15,9 +15,30 @@ with open(path.join(here, "README.rst"), encoding="utf-8") as f:
 
 try:
     with open(path.join(here, "requirements.txt"), encoding="utf-8") as f:
-        pinned_reqs = f.readlines()
+        install_requires = f.readlines()
 except FileNotFoundError:
-    pinned_reqs = []
+    install_requires=[
+        "blake3",
+        "bz2file",
+        "click>=8.1",
+        "colorama",
+        "fasteners",
+        "grpcio>=1.62.2",
+        "jinja2",
+        "keyring",
+        "keyrings.alt",
+        "importlib_metadata",
+        "lxml",
+        "multi_key_dict",
+        "ninja",
+        "protobuf",
+        "psutil",
+        "pygit2",
+        "py7zr",
+        "requests",
+        "zstandard; python_version < '3.14'",
+        "tqdm",
+    ]
 
 
 class BuildCommand(build_py):
@@ -35,7 +56,7 @@ setup(
     name=name,
     cmdclass={"build_py": BuildCommand},
     version=__version__,
-    python_requires=">=3.8",
+    python_requires=">=3.9",
     description="A task executor",
     long_description=long_description,
     url="https://github.com/srand/jolt",
@@ -69,29 +90,7 @@ setup(
         "xcode",
     ],
     packages=find_packages(exclude=["contrib", "docs", "tests"]),
-    install_requires=pinned_reqs or [
-        "blake3",
-        "bz2file",
-        "click>=8.1",
-        "colorama",
-        "fasteners",
-        "grpcio>=1.62.2",
-        "jinja2",
-        "keyring",
-        "keyrings.alt",
-        "importlib_metadata",
-        "lxml",
-        "multi_key_dict",
-        "ninja",
-        "protobuf",
-        "psutil",
-        "pygit2",
-        "py7zr",
-        "requests",
-        "zstandard",
-        "tqdm",
-    ],
-    dependency_links=[],
+    install_requires=install_requires,
     extras_require={
         "allure": ["allure-python-commons"],
         "conan": ["conan>=2.0"],

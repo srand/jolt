@@ -2,6 +2,7 @@ package main
 
 import (
 	"net/http"
+	"runtime"
 
 	"github.com/srand/jolt/scheduler/pkg/cache"
 	"github.com/srand/jolt/scheduler/pkg/log"
@@ -136,6 +137,8 @@ func init() {
 }
 
 func main() {
+	log.Info("GOMAXPROCS:", runtime.GOMAXPROCS(0))
+
 	if err := rootCmd.Execute(); err != nil {
 		log.Fatal(err)
 	}
