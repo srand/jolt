@@ -23,7 +23,10 @@ import tarfile
 import zipfile
 import bz2file
 import hashlib
-import zstandard
+try:
+    from compression import zstd as zstandard
+except ImportError:
+    import zstandard
 from contextlib import contextmanager
 from psutil import NoSuchProcess, Process
 from jinja2 import Environment, FileSystemLoader
