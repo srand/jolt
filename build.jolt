@@ -29,14 +29,15 @@ class CacheImage(docker.DockerImage):
 
 class Jolt(selfdeploy.Jolt):
     version = Parameter(__version__, influence=False)
+    fstree = Parameter(fstree_version, influence=False)
 
     def publish(self, artifact, tools):
         super().publish(artifact, tools)
         with tools.cwd(tools.builddir()):
             tools.mkdir("jolt/bin")
-            tools.download(f"https://github.com/srand/fstree/releases/download/{fstree_version}/fstree-darwin-x86_64", "jolt/bin/fstree-darwin-x86_64")
-            tools.download(f"https://github.com/srand/fstree/releases/download/{fstree_version}/fstree-linux-x86_64", "jolt/bin/fstree-linux-x86_64")
-            tools.download(f"https://github.com/srand/fstree/releases/download/{fstree_version}/fstree-windows-x86_64.exe", "jolt/bin/fstree-windows-x86_64.exe")
+            tools.download("https://github.com/srand/fstree/releases/download/{fstree}/fstree-darwin-x86_64", "jolt/bin/fstree-darwin-x86_64")
+            tools.download("https://github.com/srand/fstree/releases/download/{fstree}/fstree-linux-x86_64", "jolt/bin/fstree-linux-x86_64")
+            tools.download("https://github.com/srand/fstree/releases/download/{fstree}/fstree-windows-x86_64.exe", "jolt/bin/fstree-windows-x86_64.exe")
             tools.chmod("jolt/bin/fstree-darwin-x86_64", 0o755)
             tools.chmod("jolt/bin/fstree-linux-x86_64", 0o755)
             tools.chmod("jolt/bin/fstree-windows-x86_64.exe", 0o755)
