@@ -2540,6 +2540,9 @@ if __name__ == "__main__":
 
     def _report_errors(self, logbuffer):
         """ Parses the build log and reports errors. """
+
+        logbuffer = utils.strip_ansi_escape_sequences(logbuffer)
+
         with self.report() as report, utils.ignore_exception():
             # GCC style errors
             report.add_regex_errors_with_file(

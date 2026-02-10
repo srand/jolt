@@ -763,3 +763,9 @@ def parse_duration(value: str) -> timedelta:
         return timedelta(weeks=value)
 
     raise ValueError(f"Unsupported duration unit: {unit}")
+
+
+def strip_ansi_escape_sequences(s):
+    """ Removes ANSI escape sequences from a string. """
+    ansi_escape = re.compile(r'\x1B[@-_][0-?]*[ -/]*[@-~]')
+    return ansi_escape.sub('', s)
