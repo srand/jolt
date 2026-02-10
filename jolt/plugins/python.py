@@ -1,3 +1,4 @@
+import os
 import sys
 
 from jolt import Task
@@ -139,6 +140,8 @@ class PythonEnv(Task):
             for script in tools.glob("*"):
                 if script.startswith("python"):
                     continue
+                if os.path.isdir(tools.expand_path(script)):
+                    continue
                 tools.replace_in_file(script, frompath, topath)
 
         with tools.cwd(artifact.path):
@@ -186,6 +189,8 @@ class PythonEnv(Task):
             with tools.cwd(artifact.path, "bin"):
                 tools.symlink("python3", "python")
                 tools.symlink("python3", "python{version_major}")
+            with tools.cwd(artifact.path, "lib", "python{version_major}"):
+                tools.unlink("sitecustomize.py", ignore_errors=True)
 
         # Install required packages into the artifact using pip
         with tools.environ(PYTHONHOME=artifact.path):
@@ -205,6 +210,7 @@ class PythonEnv(Task):
                     "install",
                     "-r",
                     "requirements.txt",
+                    "--prefix", artifact.path,
                     "--break-system-packages",
                 ]
                 tools.run(pip_cmd, shell=False)
