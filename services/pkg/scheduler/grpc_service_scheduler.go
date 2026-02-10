@@ -39,6 +39,10 @@ func (s *schedulerService) ScheduleBuild(request *protocol.BuildRequest, stream 
 	for {
 		select {
 		case update := <-observer.Updates():
+			if update == nil {
+				return nil
+			}
+
 			if err := stream.Send(update); err != nil {
 				return utils.GrpcError(err)
 			}
