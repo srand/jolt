@@ -66,10 +66,14 @@ func (svc *cacheService) checkTree(server CacheService_HasTreeServer, m *sync.Mu
 	}
 
 	for _, child := range tree.Children {
-		digest := utils.NewDigest(digest.Algorithm(), child.Digest())
+		digest, err := utils.ParseDigest(child.Digest())
 
 		switch child.Type() {
 		case fstree.InodeType_Directory:
+			if err != nil {
+				return status.Errorf(codes.InvalidArgument, "invalid digest: %v", err)
+			}
+
 			eg.Go(func() error {
 				return svc.checkTree(server, m, eg, digest)
 			})
@@ -78,6 +82,10 @@ func (svc *cacheService) checkTree(server CacheService_HasTreeServer, m *sync.Mu
 			// Skip symlinks.
 
 		default:
+			if err != nil {
+				return status.Errorf(codes.InvalidArgument, "invalid digest: %v", err)
+			}
+
 			if info := svc.cache.HasObject(digest); info == nil {
 				response.MissingObjects = append(response.MissingObjects, child.Digest())
 			}
