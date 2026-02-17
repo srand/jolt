@@ -39,7 +39,10 @@ class Curl(cmake.CMake):
     def publish(self, artifact, tools):
         super().publish(artifact, tools)
         if self.system == "windows":
-            artifact.cxxinfo.libraries.append("libcurl_imp")
+            if self.shared:
+                artifact.cxxinfo.libraries.append("libcurl_imp")
+            else:
+                artifact.cxxinfo.libraries.append("libcurl")
         else:
             artifact.cxxinfo.libraries.append("curl")
 
