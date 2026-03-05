@@ -894,6 +894,27 @@ class TaskApi(JoltTest):
         r = self.build("a")
         self.assertNoBuild(r, "a")
 
+    def test_source_influence_object(self):
+        """
+        --- tasks:
+        class Helper(object):
+            def func(self):
+                self.info("value1")
+
+        @influence.source("func", Helper)
+        class A(Task):
+            pass
+        ---
+        """
+        r = self.build("a")
+        self.assertBuild(r, "a")
+        r = self.build("a")
+        self.assertNoBuild(r, "a")
+        with self.tools.cwd(self.ws):
+            self.tools.replace_in_file("test.jolt", "value1", "value2")
+        r = self.build("a")
+        self.assertBuild(r, "a")
+
     def test_unpack(self):
         """
         --- tasks:
