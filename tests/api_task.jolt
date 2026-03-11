@@ -671,6 +671,32 @@ class TaskApi(JoltTest):
         with self.assertRaises(Exception, msg="illegal value 'd' assigned to parameter 'arg'"):
             self.build("a:arg=a+b+d")
 
+
+    def test_param_list_nested(self):
+        """
+        Regression test:
+        When a task instance requires another task instance and forwards a ListParameter
+        as a real Python list (not the CLI string form), the required task name must be
+        encoded using '+' separators (a+b) rather than Python list repr ([...]).
+
+        --- tasks:
+        from jolt import utils
+
+        class A(Task):
+            arg = ListParameter()
+            def run(self, deps, tools):
+                reqname = utils.format_task_name("a", {"arg": self.arg.get_list_value()})
+                assert reqname == "a:arg=a+b", reqname
+
+        class B(Task):
+            # Use a template for requires, but build the instance parameter dict with a
+            requires = ["a:arg={{arg}}"]
+            arg = ListParameter()
+
+        ---
+        """
+        self.build("b:arg=a+b")
+
     def test_param_substitution(self):
         """
         --- tasks:

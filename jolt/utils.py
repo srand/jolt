@@ -170,7 +170,16 @@ def format_task_name(name, params, artifact=None):
     if not params:
         return name
 
+    def _encode_param_value(value):
+        # ListParameter values may arrive here as an actual Python list
+        # (e.g. when propagating parameters to required tasks).
+        # Qualified task names use '+' as list separator.
+        if type(value) is list:
+            return "+".join(map(str, value))
+        return value
+
     def _param(key, value):
+        value = _encode_param_value(value)
         return "{0}={1}".format(key, value) if value is not None else key
 
     params = sorted([(key, value) for key, value in params.items()], key=lambda x: x[0])
@@ -219,6 +228,7 @@ class _SafeDict(object):
         return None
 
     def __getitem__(self, key):
+        from jolt.tasks import ListParameter
         value = self.values.get(key)
         if value is None:
             value = call_and_catch(getattr, self.values.get("_instance", object()), key)
@@ -228,7 +238,9 @@ class _SafeDict(object):
                 value = tools.buildroot
         if value is None:
             value = self._envget(key)
-        if type(value) is list:
+        if type(value) is ListParameter:
+            value = value.get_value()
+        elif type(value) is list:
             value = " ".join(value)
         if value is not None:
             return value
