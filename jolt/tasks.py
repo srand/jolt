@@ -720,6 +720,10 @@ class ListParameter(Parameter):
     def __len__(self):
         """ Returns the length of the list. """
         return len(self._value)
+    
+    def __str__(self):
+        """ Returns the list parameter value as a string. """
+        return self.get_value()
 
     def __getitem__(self, key):
         """
