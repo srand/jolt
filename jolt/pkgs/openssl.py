@@ -19,8 +19,11 @@ class OpenSSL(Task):
     requires_perl = ["virtual/perl"]
     requires_windows_nasm = ["nasm"]
 
-    def clean(self):
-        pass
+    def clean(self, tools):
+        self.builddir = tools.builddir(incremental=True)
+        self.installdir = tools.builddir("install")
+        tools.rmtree(self.builddir)
+        tools.rmtree(self.installdir)
 
     def run(self, deps, tools):
         self.builddir = tools.builddir(incremental=True)
