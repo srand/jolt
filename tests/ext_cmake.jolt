@@ -55,10 +55,48 @@ class CMakeExtension(JoltTest):
         int main() {{return 0;}}
 
         --- tasks:
-        from jolt.plugins.cmake import _CMakeCXXLibrary
+        from jolt.plugins.cmake import CXXLibrary
 
-        class A(_CMakeCXXLibrary):
+        class A(CXXLibrary):
             sources = ["main.cpp"]
         ---
         """
         self.build("a")
+
+    def test_cmake_artifact_option(self):
+        """
+        --- file: main.cpp
+        #ifdef JOLTERROR
+        #error "JOLTERROR is defined"
+        #endif
+        int main() {{return 0;}}
+
+        --- file: CMakeLists.txt
+        project(test)
+        cmake_minimum_required(VERSION 2.8)
+        option(ERROR "Compiler error")
+        if (ERROR)
+            add_definitions("-DJOLTERROR")
+        endif (ERROR)
+        add_executable(test main.cpp)
+        install(TARGETS test)
+
+        --- tasks:
+        from jolt.plugins.cmake import CMake
+
+        class Dep(Task):
+            on = BooleanParameter(False)
+
+            def publish(self, artifact, tools):
+                artifact.cmake.options.append("ERROR={{on[ON,OFF]}}")
+
+        class A(CMake):
+            requires = ["dep"]
+
+        ---
+        """
+        r = self.build("a")
+        self.assertBuild(r, "a")
+
+        with self.assertRaises(Exception):
+            self.build("a -d dep:on=true")

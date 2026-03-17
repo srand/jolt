@@ -22,6 +22,7 @@ class All(Alias):
         "cli/report",
         "ext/alias",
         "ext/autoweight",
+        "ext/cmake",
         "ext/conan",
         # "ext/docker",  -- cannot run inside CI container
         "ext/googletest",

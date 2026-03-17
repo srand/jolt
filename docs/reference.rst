@@ -26,7 +26,7 @@ Artifact
 .. reference-artifact-start
 
 .. autoclass:: jolt.Artifact
-   :members: collect, copy, cxxinfo, environ, path, paths, python, final_path, strings
+   :members: cmake, collect, copy, cxxinfo, environ, path, paths, python, final_path, strings
 
 .. reference-artifact-end
 

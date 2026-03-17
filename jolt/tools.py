@@ -273,7 +273,15 @@ class _CMake(object):
     def configure(self, sourcedir, *args, generator=None, **kwargs):
         sourcedir = self.tools.expand_path(sourcedir)
 
-        extra_args = list(args)
+        extra_args = []
+
+        # Collect any extra options from dep artifacts
+        for _, artifact in self.deps.items():
+            if hasattr(artifact, "cmake"):
+                for option in artifact.cmake.options.items():
+                    extra_args.append("-D" + self.tools.expand(option))
+
+        extra_args += list(args)
         extra_args += ["-D{0}={1}".format(key, self.tools.expand(val))
                        for key, val in kwargs.items()]
         extra_args = " ".join(extra_args)

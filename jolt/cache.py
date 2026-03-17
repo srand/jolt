@@ -414,6 +414,26 @@ class Artifact(object):
 
     """
 
+    cmake = {}
+    """ Artifact CMake configuration.
+
+    A task can add CMake configuration to an artifact. Such configuration
+    will automatically be applied when consumer CMake tasks are executed.
+    A common use-case is to add CMake options that control the build of
+    consumer tasks.
+
+    These fields are supported:
+
+    - ``options`` - List of options, passed to CMake as '-D<option>'.
+        Use the append() method to add options.
+
+    Example:
+        .. code-block:: python
+
+            def publish(self, artifact, tools):
+                artifact.cmake.options.append("ANDROID_PLATFORM=android-30")
+    """
+
     cxxinfo = {}
     """ Artifact C/C++ build metadata.
 

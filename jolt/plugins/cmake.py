@@ -3,9 +3,12 @@ from jolt import attributes, include
 from jolt import influence
 from jolt import Task
 from jolt import utils
+from jolt.cache import ArtifactAttributeSet, ArtifactAttributeSetProvider, ArtifactListAttribute
 from jolt.error import raise_task_error_if
 
 import os
+
+from jolt.plugins.cxxinfo import CppInfo
 
 
 def options(attrib):
@@ -160,3 +163,42 @@ class CXXExecutable(_CMakeCXX):
 
     def publish(self, artifact, tools):
         super().publish(artifact, tools)
+
+
+class CMakeListVariable(ArtifactListAttribute):
+    pass
+
+
+class CMakeInfo(ArtifactAttributeSet):
+    def __init__(self, artifact):
+        super(CMakeInfo, self).__init__()
+        super(ArtifactAttributeSet, self).__setattr__("_artifact", artifact)
+
+    def create(self, name):
+        if name == "options":
+            return CMakeListVariable(self._artifact, "options")
+        assert False, "No such CMake attribute: {0}".format(name)
+
+
+@ArtifactAttributeSetProvider.Register
+class CMakeInfoProvider(ArtifactAttributeSetProvider):
+    def create(self, artifact):
+        setattr(artifact, "cmake", CMakeInfo(artifact))
+
+    def parse(self, artifact, content):
+        if "cmake" not in content:
+            return
+        for key, value in content["cmake"].items():
+            getattr(artifact.cmake, key).set_value(value, expand=False)
+
+    def format(self, artifact, content):
+        if "cmake" not in content:
+            content["cmake"] = {}
+        for key, attrib in artifact.cmake.items():
+            content["cmake"][key] = attrib.get_value()
+
+    def apply(self, task, artifact):
+        pass
+
+    def unapply(self, task, artifact):
+        pass
