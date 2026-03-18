@@ -40,11 +40,25 @@ class CMakeExtension(JoltTest):
             e = BooleanParameter()
             options_false = []
             options_true = ["ERROR:BOOLEAN=ON"]
+
+        class B(Task):
+            def run(self, deps, tools):
+                cmake = tools.cmake()
+                cmake.configure("{{joltdir}}")
+                cmake.build()
+                cmake.install()
+
+            def publish(self, artifact, tools):
+                cmake = tools.cmake()
+                cmake.publish(artifact)
         ---
         """
 
         r = self.build("a:e=false")
         self.assertBuild(r, "a:e=false")
+
+        r = self.build("b")
+        self.assertBuild(r, "b")
 
         with self.assertRaises(Exception, msg="JOLTERROR is defined"):
             self.build("a:e=true")

@@ -276,7 +276,7 @@ class _CMake(object):
         extra_args = []
 
         # Collect any extra options from dep artifacts
-        for _, artifact in self.deps.items():
+        for _, artifact in (self.deps or {}).items():
             if hasattr(artifact, "cmake"):
                 for option in artifact.cmake.options.items():
                     extra_args.append("-D" + self.tools.expand(option))
