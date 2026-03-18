@@ -90,7 +90,6 @@ Libs: {% for flag in ldflags %}{{ flag }} {% endfor %}{% for libpath in libpaths
                 libpaths=list(self.artifact.cxxinfo.libpaths),
                 libraries=list(self.artifact.cxxinfo.libraries),
             )
-            print(content)
             self.tools.write_file(f"{package}.pc", content, expand=False)
             self.artifact.collect(f"{package}.pc", "lib/pkgconfig/")
 
