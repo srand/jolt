@@ -19,7 +19,7 @@ class CacheImage(docker.DockerImage):
     push = BooleanParameter(False)
     requires = ["docker/cli"]
     requires_push_true = ["docker/login"]
-    version = Parameter(__version__, influence=False)
+    version = Parameter(__version__)
     tags = [
         "robrt/jolt-cache:{identity}",
         "robrt/jolt-cache:latest",
@@ -28,8 +28,8 @@ class CacheImage(docker.DockerImage):
 
 
 class Jolt(selfdeploy.Jolt):
-    version = Parameter(__version__, influence=False)
-    fstree = Parameter(fstree_version, influence=False)
+    version = Parameter(__version__)
+    fstree = Parameter(fstree_version)
 
     def publish(self, artifact, tools):
         super().publish(artifact, tools)
@@ -55,7 +55,7 @@ class JoltImage(docker.DockerImage):
     requires = ["jolt:version={version}", "docker/cli"]
     requires_push_true = ["docker/login"]
     tags = ["robrt/jolt:latest", "robrt/jolt:{version}", "robrt/jolt:{minor_version}"]
-    version = Parameter(__version__, influence=False)
+    version = Parameter(__version__)
 
     @property
     def minor_version(self):
@@ -78,7 +78,7 @@ class SchedulerImage(docker.DockerImage):
     push = BooleanParameter(False)
     requires = ["docker/cli"]
     requires_push_true = ["docker/login"]
-    version = Parameter(__version__, influence=False)
+    version = Parameter(__version__)
     tags = [
         "robrt/jolt-scheduler:{identity}",
         "robrt/jolt-scheduler:latest",
@@ -121,7 +121,7 @@ class JoltWheel(Task):
 
     release = BooleanParameter(False)
     requires = ["jolt:version={version}"]
-    version = Parameter(__version__, influence=False)
+    version = Parameter(__version__)
 
     def run(self, deps, tools):
         tools.run("python3 -m pip install --upgrade setuptools wheel")
@@ -145,7 +145,7 @@ class JoltWrapperWheel(Task):
     name = "jolt/docker/pypi"
 
     release = BooleanParameter(False)
-    version = Parameter(__version__, influence=False)
+    version = Parameter(__version__)
 
     def run(self, deps, tools):
         tools.run("python3 -m pip install --upgrade setuptools wheel")
@@ -168,7 +168,7 @@ class JoltDebianPackage(docker.DockerImage):
     extract = True
     imagefile = None
     requires = ["jolt:version={version}"]
-    version = Parameter(__version__, influence=False)
+    version = Parameter(__version__)
 
     def run(self, deps, tools):
         self.context = tools.builddir()
