@@ -76,47 +76,44 @@ class GitRepository(object):
     def is_indexed(self):
         return self.is_cloned() and fs.path.exists(self._git_index())
 
+    def _get_reference_path(self):
+        """ Return the configured reference repository root path, or None. """
+        refroot = config.get("git", "reference", None)
+        if not refroot:
+            return None
+        url = urllib.parse.urlparse(str(self.url))
+        refpath = fs.path.join(refroot, url.hostname, url.path.lstrip("/"))
+        return fs.path.abspath(refpath)
+
+    def _configure_alternates(self, refpath):
+        """ Point the local repo at a reference repository via git alternates. """
+        objpath = os.path.join(refpath, ".git", "objects")
+        objpath_bare = os.path.join(refpath, "objects")
+        if os.path.isdir(objpath):
+            objects_path = objpath
+        elif os.path.isdir(objpath_bare):
+            objects_path = objpath_bare
+        else:
+            return
+        self.tools.mkdir(".git/objects/info")
+        self.tools.write_file(".git/objects/info/alternates", objects_path)
+
     def clone(self, submodules=False):
         log.info("Cloning into {0}", self.path)
+        refpath = self._get_reference_path()
 
-        # Get reference repository path
-        refroot = config.get("git", "reference", None)
-        refpath = None
-        if refroot:
-            # Append <host>/<path> to the reference root
-            url = urllib.parse.urlparse(str(self.url))
-            refpath = fs.path.join(refroot, url.hostname, url.path.lstrip("/"))
-            refpath = fs.path.abspath(refpath)
-
-        # If the directory exists, initialize the repository instead of cloning
         if fs.path.exists(self.path):
+            # Directory already exists: initialise and fetch instead of cloning
             with self.tools.cwd(self.path):
                 self.tools.run("git init", output_on_error=True)
-
-                # Set the reference repository if available
                 if refpath:
-                    # Check if the reference repository is a git repository
-                    objpath = os.path.join(refpath, ".git", "objects")
-                    objpath_bare = os.path.join(refpath, "objects")
-                    if os.path.isdir(objpath):
-                        refpath = objpath
-                    elif os.path.isdir(objpath_bare):
-                        refpath = objpath_bare
-                    else:
-                        refpath = None
-
-                if refpath:
-                    self.tools.mkdir(".git/objects/info")
-                    self.tools.write_file(".git/objects/info/alternates", refpath)
-
+                    self._configure_alternates(refpath)
                 utils.call_and_catch(self.tools.run, "git remote remove origin", output=False)
                 self.tools.run("git remote add origin {}", self.url, output_on_error=True)
-                self._fetch_origin(submodules=submodules)
+                self._fetch_origin()
                 self.tools.run("git checkout -f FETCH_HEAD", output_on_error=True)
         else:
-            # Get configurable extra clone options
             extra_clone_options = config.get("git", "clone_options", "")
-
             if refpath and os.path.isdir(refpath):
                 self.tools.run("git clone --reference-if-able {0} {1} {2} {3}", refpath, extra_clone_options, self.url, self.path, output_on_error=True)
             else:
@@ -130,7 +127,7 @@ class GitRepository(object):
             self._update_submodules()
 
     @utils.retried.on_exception(JoltCommandError, pattern="Command failed: git fetch", count=6, backoff=[2, 5, 10, 15, 20, 30])
-    def _fetch_origin(self, submodules=False):
+    def _fetch_origin(self):
         extra_fetch_options = config.get("git", "fetch_options", "")
 
         with self.tools.cwd(self.path):
