@@ -554,3 +554,31 @@ class GitApi(testsupport.JoltTest):
         ---
         """
         self.build("b")
+
+    def test_submodule(self):
+        """
+        --- tasks:
+        class With_Submodules(Task):
+            requires = ["git:url={ws}/parent.git,path=with_submodules,submodules=true"]
+
+        class Without_Submodules(Task):
+            requires = ["git:url={ws}/parent.git,path=without_submodules"]
+        ---
+        """
+        if self.network:
+            self.skipTest("network build not supported")
+
+        with self.tools.cwd(self.ws):
+            # Create a parent repo with a submodule, then bare-clone it
+            self.tools.run("git init parent_work")
+            with self.tools.cwd("parent_work"):
+                self.tools.run("git -c user.email='e@mail' -c user.name='Name' submodule add https://github.com/gideont/hello_world.git sub".format(ws=self.ws))
+                self.tools.run("git -c user.email='e@mail' -c user.name='Name' add .")
+                self.tools.run("git -c user.email='e@mail' -c user.name='Name' commit -m 'Add submodule'")
+            self.tools.run("git clone --bare parent_work parent.git")
+
+        self.build("with_submodules")
+        self.assertExists("with_submodules/sub/README.md")
+
+        self.build("without_submodules")
+        self.assertNotExists("without_submodules/sub/README.md")
