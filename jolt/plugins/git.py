@@ -118,7 +118,7 @@ class GitRepository(object):
             extra_clone_options = config.get("git", "clone_options", "")
 
             if refpath and os.path.isdir(refpath):
-                self.tools.run("git clone --reference-if-able  {0} {1} {2} {3}", refpath, extra_clone_options, self.url, self.path, output_on_error=True)
+                self.tools.run("git clone --reference-if-able {0} {1} {2} {3}", refpath, extra_clone_options, self.url, self.path, output_on_error=True)
             else:
                 self.tools.run("git clone {0} {1} {2}", extra_clone_options, self.url, self.path, output_on_error=True)
 
@@ -126,14 +126,15 @@ class GitRepository(object):
         raise_error_if(
             self.repository is None,
             "Failed to clone repository '{0}'", self.relpath)
+        if submodules:
+            self._update_submodules()
 
     @utils.retried.on_exception(JoltCommandError, pattern="Command failed: git fetch", count=6, backoff=[2, 5, 10, 15, 20, 30])
     def _fetch_origin(self, submodules=False):
-        # Get configurable extra clone options
         extra_fetch_options = config.get("git", "fetch_options", "")
 
         with self.tools.cwd(self.path):
-            self.tools.run("git fetch {0} {1} origin", "", extra_fetch_options, output_on_error=True)
+            self.tools.run("git fetch {extra_fetch_options} origin", extra_fetch_options=extra_fetch_options, output_on_error=True)
 
     @utils.cached.instance
     def diff_unchecked(self):
@@ -279,6 +280,8 @@ class GitRepository(object):
     def checkout(self, rev, commit=None, submodules=False):
         if rev == self._last_rev:
             log.debug("Checkout skipped, already @ {}", rev)
+            if submodules:
+                self._update_submodules()
             return False
         log.verbose("Checking out {0} in {1}", rev, self.path)
         with self.tools.cwd(self.path):
@@ -312,7 +315,7 @@ def new_git(url, path, relpath, refspecs=None):
         git = _gits[path]
         raise_error_if(git.url != url, "Multiple git repositories required at {}", relpath)
         raise_error_if(git.refspecs != refspecs,
-                       "Conflicting refspecs detected for git repository at  {}", relpath)
+                       "Conflicting refspecs detected for git repository at {}", relpath)
         return git
     except Exception:
         git = _gits[path] = GitRepository(url, path, relpath, refspecs)
@@ -504,19 +507,10 @@ class Git(WorkspaceResource, FileInfluence):
         if not hasattr(task, "git"):
             task.git = ErrorDict(self)
         if none:
-            # None means the git repo is not cloned or checked out
-            # and should not be included in the git dictionary
-            # of the consuming task yet. If the consuming task
-            # requires the git repo for its influence collection,
-            # the dict will raise an error. The solution is to
-            # assign hash=true to the git requirement which
-            # will cause the git repo to be cloned and checked out
-            # before the influence collection is performed.
+            # Placeholder; the dict raises an error if accessed before the repo is cloned.
+            # Set hash=true on the requirement to force cloning before influence collection.
             task.git[self._get_name()] = None
         else:
-            # Assign the git repo to the consuming task.
-            # The git repo is cloned and checked out before
-            # any influence collection is performed.
             task.git[self._get_name()] = fs.path.relpath(self.abspath, task.joltdir)
 
     def acquire(self, artifact, deps, tools, owner):
@@ -535,13 +529,9 @@ class Git(WorkspaceResource, FileInfluence):
         :param task: The task to prepare the workspace for.
         """
         if not self._must_influence():
-            # The content of the git repo is not required to influence the hash of the
-            # consumer task. The repo is therefore not cloned or checked out
-            # until the consumer is executed. Raise an error if the git repo
-            # is required for the influence collection of the consumer task.
+            # Repo is not cloned until the consumer executes.
             self._assign_git(task, none=True)
             return
-        # The content of the git repo is required to influence the hash of the consumer task.
         self._assign_git(task)
 
     def acquire_ws(self, force=False):
@@ -572,18 +562,10 @@ class Git(WorkspaceResource, FileInfluence):
 
     def _must_influence(self):
         """ Check if the git repo must influence the hash of the consumer task."""
-
-        # If the hash parameter is set, honor it
         if self.hash.is_set():
             return self.hash
-
-        # If the revision parameter is not set, the git repo must influence the hash
-        if self.rev.is_unset():
-            return True
-
-        # If the revision parameter is set, no influence is needed since the
-        # revision is fixed and repository content will not change.
-        return False
+        # A fixed revision doesn't need content-based influence.
+        return self.rev.is_unset()
 
     def is_influenced_by(self, task, path):
         influencing = self._must_influence() or self.rev.is_set()
