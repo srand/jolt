@@ -108,9 +108,7 @@ class GitRepository(object):
                 self.tools.run("git init", output_on_error=True)
                 if refpath:
                     self._configure_alternates(refpath)
-                utils.call_and_catch(self.tools.run, "git remote remove origin", output=False)
-                self.tools.run("git remote add origin {}", self.url, output_on_error=True)
-                self._fetch_origin()
+                self.fetch()
                 self.tools.run("git checkout -f FETCH_HEAD", output_on_error=True)
         else:
             extra_clone_options = config.get("git", "clone_options", "")
@@ -125,13 +123,6 @@ class GitRepository(object):
             "Failed to clone repository '{0}'", self.relpath)
         if submodules:
             self._update_submodules()
-
-    @utils.retried.on_exception(JoltCommandError, pattern="Command failed: git fetch", count=6, backoff=[2, 5, 10, 15, 20, 30])
-    def _fetch_origin(self):
-        extra_fetch_options = config.get("git", "fetch_options", "")
-
-        with self.tools.cwd(self.path):
-            self.tools.run("git fetch {extra_fetch_options} origin", extra_fetch_options=extra_fetch_options, output_on_error=True)
 
     @utils.cached.instance
     def diff_unchecked(self):
