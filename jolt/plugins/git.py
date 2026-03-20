@@ -201,28 +201,22 @@ class GitRepository(object):
         return tree
 
     def tree_hash(self, rev=None, path="/"):
-        # When rev is None, the caller want the tree hash of the repository's
-        # current workspace state. If no checkout has been made, that would be the
-        # tree that was written upon initialization of the repository as it
-        # includes any uncommitted changes. If a checkout has been made since
-        # the repo was initialized, make this an explicit request for the current
-        # head - there can be no local changes.
-        if rev is None:
-            if self.is_original_head():
-                tree = self.repository.get(self.write_tree())
-            else:
-                rev = self.head()
-
         path = fs.path.normpath(path)
         full_path = fs.path.join(self.path, path) if path != "/" else self.path
 
-        # Lookup tree hash value in cache
+        # When a checkout has been made, there can be no local changes, so treat
+        # an unspecified rev as an explicit request for the current head commit.
+        if rev is None and not self.is_original_head():
+            rev = self.head()
+
         value = self._tree_hash.get((full_path, rev))
         if value is not None:
             return value
 
-        # Translate explicit rev to tree
-        if rev is not None:
+        if rev is None:
+            # Original head: capture current workspace state including uncommitted changes.
+            tree = self.repository.get(self.write_tree())
+        else:
             commit = self.rev_parse(rev)
             obj = self.repository.get(commit)
             try:
@@ -252,7 +246,6 @@ class GitRepository(object):
         if commit and not self.is_valid_sha(commit):
             commit = None
 
-        # Get configurable extra clone options
         extra_fetch_options = config.get("git", "fetch_options", "")
 
         refspec = " ".join(self.default_refspecs + self.refspecs)
