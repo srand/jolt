@@ -2121,8 +2121,6 @@ class ArtifactCache(StorageProvider):
             with self._cache_lock():
                 with self._db() as db:
                     self._db_delete_lock(db, artifact.identity)
-                lock.release()
-                with self._db() as db:
                     if self._db_select_lock_count(db, artifact.identity) == 0:
                         fs.unlink(lock_path, ignore_errors=True)
 
