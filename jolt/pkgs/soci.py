@@ -7,6 +7,7 @@ from jolt.tasks import TaskRegistry
 @attributes.requires("requires_boost_{boost[on,off]}")
 @attributes.requires("requires_git")
 @attributes.requires("requires_mysql_{mysql[on,off]}")
+@attributes.requires("requires_odbc_{odbc[on,off]}")
 @attributes.requires("requires_sqlite_{sqlite[on,off]}")
 @cmake.requires()
 @cmake.use_ninja()
@@ -18,17 +19,20 @@ class Soci(cmake.CMake):
     boost = BooleanParameter(False, help="Enable boost support")
     mysql = BooleanParameter(True, help="Enable MySQL support")
     sqlite = BooleanParameter(True, help="Enable sqlite support")
+    odbc = BooleanParameter(False, help="Enable ODBC support")
 
     requires_boost_on = ["boost"]
     requires_git = ["git:url=https://github.com/SOCI/soci.git,rev=v{version}"]
     requires_mysql_on = ["libmysqlclient"]
     requires_sqlite_on = ["sqlite"]
+    requires_odbc_on = ["odbc"]
     srcdir = "{git[soci]}"
     options = [
         "SOCI_TESTS=OFF",
         "SOCI_SHARED={shared[ON,OFF]}",
         "SOCI_SQLITE3={sqlite[ON,OFF]}",
         "SOCI_MYSQL={mysql[ON,OFF]}",
+        "SOCI_ODBC={odbc[ON,OFF]}",
         "WITH_BOOST={boost[ON,OFF]}",
     ]
 
@@ -38,7 +42,8 @@ class Soci(cmake.CMake):
             artifact.cxxinfo.libraries.append("soci_sqlite3")
         if self.mysql:
             artifact.cxxinfo.libraries.append("soci_mysql")
-        artifact.cxxinfo.libraries.append("soci_odbc")
+        if self.odbc:
+            artifact.cxxinfo.libraries.append("soci_odbc")
         artifact.cxxinfo.libraries.append("soci_core")
 
 
