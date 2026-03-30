@@ -409,20 +409,6 @@ class SignalHandler(object):
         return finalizer
 
 
-sigint_handler = SignalHandler(signal.SIGINT)
-
-
-@contextlib.contextmanager
-def delayed_signal(signum):
-    """ A context manager that delays signals until after the code block. """
-
-    finalize = sigint_handler.new_monitor()
-    try:
-        yield
-    finally:
-        finalize()
-
-
 @contextlib.contextmanager
 def delayed_interrupt():
     if hasattr(signal, 'pthread_sigmask'):
