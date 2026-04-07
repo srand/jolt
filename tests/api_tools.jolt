@@ -748,6 +748,16 @@ class ToolsApi(JoltTest):
         end = datetime.now()
         self.assertLessEqual((end-start).seconds, 3)
 
+    def test_run_new_session(self):
+        # Without new_session, subprocess runs in the same session as the parent
+        parent_sid = os.getsid(os.getpid())
+        child_sid = int(self.tools.run("python3 -c 'import os; print(os.getsid(os.getpid()))'"))
+        self.assertEqual(child_sid, parent_sid)
+
+        # With new_session=True, subprocess runs in a new independent session
+        child_sid = int(self.tools.run("python3 -c 'import os; print(os.getsid(os.getpid()))'", new_session=True))
+        self.assertNotEqual(child_sid, parent_sid)
+
     def test_rsync(self):
         """
         --- file: a/new/file

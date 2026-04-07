@@ -105,6 +105,7 @@ def _run(cmd, cwd, env, *args, **kwargs):
     shell = kwargs.get("shell", True)
     timeout = kwargs.get("timeout", config.getint("jolt", "command_timeout", 0))
     timeout = timeout if type(timeout) is int and timeout > 0 else None
+    new_session = kwargs.get("new_session", False)
 
     log.debug("Running: '{0}' (CWD: {1})", cmd, cwd)
 
@@ -139,6 +140,7 @@ def _run(cmd, cwd, env, *args, **kwargs):
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 shell=shell,
+                start_new_session=new_session,
                 cwd=cwd,
                 env=env,
             )
@@ -1602,6 +1604,8 @@ class Tools(object):
                 first be terminated if the timeout expires. If the command
                 refuses to terminate, it will be killed after an additional
                 10 seconds have passed. Default: None.
+            new_session (boolean, optional): If ``True``, the command will be
+                run in a new session. Default: False.
 
         Returns:
            str: stdout from command unless output=False
