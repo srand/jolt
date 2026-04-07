@@ -113,9 +113,9 @@ class GitRepository(object):
         else:
             extra_clone_options = config.get("git", "clone_options", "")
             if refpath and os.path.isdir(refpath):
-                self.tools.run("git clone --reference-if-able {0} {1} {2} {3}", refpath, extra_clone_options, self.url, self.path, output_on_error=True)
+                self.tools.run("git clone --reference-if-able {0} {1} {2} {3}", refpath, extra_clone_options, self.url, self.path, output_on_error=True, new_session=True)
             else:
-                self.tools.run("git clone {0} {1} {2}", extra_clone_options, self.url, self.path, output_on_error=True)
+                self.tools.run("git clone {0} {1} {2}", extra_clone_options, self.url, self.path, output_on_error=True, new_session=True)
 
         self._init_repo()
         raise_error_if(
@@ -256,7 +256,8 @@ class GitRepository(object):
                 extra_fetch_options=extra_fetch_options,
                 url=self.url,
                 what=commit or refspec or '',
-                output_on_error=True)
+                output_on_error=True,
+                new_session=True)
 
     def checkout(self, rev, commit=None, submodules=False):
         if rev == self._last_rev:
@@ -284,7 +285,7 @@ class GitRepository(object):
 
     def _update_submodules(self):
         with self.tools.cwd(self.path):
-            self.tools.run("git submodule update --init --recursive", output_on_error=True)
+            self.tools.run("git submodule update --init --recursive", output_on_error=True, new_session=True)
 
 
 _gits = {}
