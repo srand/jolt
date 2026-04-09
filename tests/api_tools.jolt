@@ -758,6 +758,21 @@ class ToolsApi(JoltTest):
         child_sid = int(self.tools.run("python3 -c 'import os; print(os.getsid(os.getpid()))'", new_session=True))
         self.assertNotEqual(child_sid, parent_sid)
 
+    def test_popen_read(self):
+        with self.tools.popen("python3 -c 'print(\"Hello world\")'") as f:
+            self.assertEqual(f.read(), "Hello world\n")
+
+    def test_popen_write(self):
+        with self.tools.popen("python3 -c 'import sys; sys.stdout.write(sys.stdin.read().upper())'") as f:
+            f.write("hello world")
+            f.close()
+            self.assertEqual(f.read(), "HELLO WORLD")
+
+    def test_popen_failure(self):
+        with self.assertRaises(Exception):
+            with self.tools.popen("python3 -c 'import sys; print(\"stdout\"); print(\"stderr\", file=sys.stderr); sys.exit(3)'") as f:
+                self.assertEqual(f.read(), "stdout\n")
+
     def test_rsync(self):
         """
         --- file: a/new/file

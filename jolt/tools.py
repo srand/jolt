@@ -94,20 +94,193 @@ class Reader(threading.Thread):
             self.logbuf.append((self, line))
 
 
-def _run(cmd, cwd, env, *args, **kwargs):
+def _normalize_run_kwargs(kwargs):
     output = kwargs.get("output")
     output_on_error = kwargs.get("output_on_error")
-    output_rstrip = kwargs.get("output_rstrip", True)
-    output_stdio = kwargs.get("output_stdio", False)
-    output_stderr = kwargs.get("output_stderr", True)
-    output_stdout = kwargs.get("output_stdout", True)
-    return_stderr = kwargs.get("return_stderr", False)
     output = output if output is not None else True
     output = False if output_on_error else output
-    shell = kwargs.get("shell", True)
+
     timeout = kwargs.get("timeout", config.getint("jolt", "command_timeout", 0))
-    timeout = timeout if type(timeout) is int and timeout > 0 else None
-    new_session = kwargs.get("new_session", False)
+
+    return {
+        "output": output,
+        "output_on_error": output_on_error,
+        "output_rstrip": kwargs.get("output_rstrip", True),
+        "output_stdio": kwargs.get("output_stdio", False),
+        "output_stdout": kwargs.get("output_stdout", True),
+        "output_stderr": kwargs.get("output_stderr", True),
+        "return_stderr": kwargs.get("return_stderr", False),
+        "shell": kwargs.get("shell", True),
+        "timeout": timeout if type(timeout) is int and timeout > 0 else None,
+        "new_session": kwargs.get("new_session", False),
+    }
+
+
+def _terminate_process(process):
+    try:
+        proc = Process(process.pid)
+        for child in proc.children(recursive=True):
+            child.terminate()
+        proc.terminate()
+    except NoSuchProcess:
+        pass
+
+
+def _kill_process(process):
+    try:
+        proc = Process(process.pid)
+        for child in proc.children(recursive=True):
+            child.kill()
+        proc.kill()
+    except NoSuchProcess:
+        pass
+
+
+def _format_command(process):
+    return process.args if type(process.args) is str else " ".join(process.args)
+
+
+def _wait_for_process(process, timeout):
+    timedout = False
+
+    try:
+        process.wait(timeout=timeout)
+    except KeyboardInterrupt:
+        _terminate_process(process)
+        try:
+            process.wait(10)
+        except subprocess.TimeoutExpired:
+            _kill_process(process)
+            utils.call_and_catch(process.wait, 10)
+        raise
+    except (subprocess.TimeoutExpired, JoltTimeoutError):
+        timedout = True
+        _terminate_process(process)
+        try:
+            process.wait(10)
+        except subprocess.TimeoutExpired:
+            _kill_process(process)
+            utils.call_and_catch(process.wait, 10)
+
+    return timedout
+
+
+def _raise_process_error(process, stdoutbuf, stderrbuf, timedout):
+    command = _format_command(process)
+    if timedout:
+        raise JoltTimeoutError("Command timeout: " + command)
+    raise JoltCommandError(
+        "Command failed: " + command,
+        stdoutbuf,
+        stderrbuf,
+        process.returncode)
+
+
+class _PopenFile(object):
+    def __init__(self, process, **options):
+        self._process = process
+        self._timeout = options["timeout"]
+        self._output = options["output"]
+        self._output_on_error = options["output_on_error"]
+        self._output_rstrip = options["output_rstrip"]
+        self._stdoutbuf = []
+        self._stderrbuf = []
+        self._stdin_closed = False
+        self._finalized = False
+
+        if options["output_stderr"]:
+            stderr_func = log.stderr if not options["output_stdio"] else stderr_write
+        else:
+            stderr_func = None
+
+        self._stderrlog = []
+        self._stderr = Reader(
+            threading.current_thread(),
+            process.stderr,
+            output=stderr_func if options["output"] else None,
+            logbuf=self._stderrlog,
+            output_rstrip=options["output_rstrip"])
+
+    def _emit_stdout(self, data):
+        if not self._output:
+            return
+        if self._output_rstrip:
+            for line in data.splitlines():
+                log.stdout(line)
+        elif data:
+            log.stdout(data)
+
+    def _record_stdout(self, data):
+        if not data:
+            return ""
+        if isinstance(data, bytes):
+            data = data.decode(errors='ignore')
+        self._stdoutbuf.append(data)
+        self._emit_stdout(data)
+        return data
+
+    def _close_stdin(self):
+        if not self._stdin_closed and self._process.stdin:
+            self._process.stdin.close()
+            self._stdin_closed = True
+
+    def read(self, size=-1):
+        return self._record_stdout(self._process.stdout.read(size))
+
+    def readline(self, size=-1):
+        return self._record_stdout(self._process.stdout.readline(size))
+
+    def readlines(self, hint=-1):
+        return [self._record_stdout(line) for line in self._process.stdout.readlines(hint)]
+
+    def write(self, data):
+        if isinstance(data, str):
+            data = data.encode()
+        return self._process.stdin.write(data)
+
+    def flush(self):
+        return self._process.stdin.flush()
+
+    def close(self):
+        self._close_stdin()
+
+    def finalize(self, raise_on_error=True):
+        if self._finalized:
+            return
+
+        self._finalized = True
+
+        try:
+            self._close_stdin()
+            timedout = _wait_for_process(self._process, self._timeout)
+        finally:
+            remaining = self._process.stdout.read()
+            self._record_stdout(remaining)
+            self._stderr.join()
+            self._stderrbuf = [line for _, line in self._stderrlog]
+            utils.call_and_catch(self._process.stdout.close)
+            utils.call_and_catch(self._process.stderr.close)
+            if self._process.stdin:
+                utils.call_and_catch(self._process.stdin.close)
+
+        if self._process.returncode != 0 and self._output_on_error:
+            for data in self._stdoutbuf:
+                if self._output_rstrip:
+                    for line in data.splitlines():
+                        log.stdout(line.rstrip())
+                elif data:
+                    log.stdout(data)
+            for line in self._stderrbuf:
+                log.stderr(line)
+
+        if not raise_on_error or self._process.returncode == 0:
+            return
+
+        _raise_process_error(self._process, self._stdoutbuf, self._stderrbuf, timedout)
+
+
+def _run(cmd, cwd, env, *args, **kwargs):
+    options = _normalize_run_kwargs(kwargs)
 
     log.debug("Running: '{0}' (CWD: {1})", cmd, cwd)
 
@@ -116,24 +289,6 @@ def _run(cmd, cwd, env, *args, **kwargs):
     stderr = None
     timedout = False
 
-    def terminate(pid):
-        try:
-            process = Process(pid)
-            for chld in process.children(recursive=True):
-                chld.terminate()
-            process.terminate()
-        except NoSuchProcess:
-            pass
-
-    def kill(pid):
-        try:
-            process = Process(pid)
-            for chld in process.children(recursive=True):
-                chld.kill()
-            process.kill()
-        except NoSuchProcess:
-            pass
-
     try:
         with utils.delayed_interrupt():
             p = subprocess.Popen(
@@ -141,19 +296,19 @@ def _run(cmd, cwd, env, *args, **kwargs):
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                shell=shell,
-                start_new_session=new_session,
+                shell=options["shell"],
+                start_new_session=options["new_session"],
                 cwd=cwd,
                 env=env,
             )
 
-            if output_stdout:
-                stdout_func = log.stdout if not output_stdio else stdout_write
+            if options["output_stdout"]:
+                stdout_func = log.stdout if not options["output_stdio"] else stdout_write
             else:
                 stdout_func = None
 
-            if output_stderr:
-                stderr_func = log.stderr if not output_stdio else stderr_write
+            if options["output_stderr"]:
+                stderr_func = log.stderr if not options["output_stdio"] else stderr_write
             else:
                 stderr_func = None
 
@@ -161,37 +316,17 @@ def _run(cmd, cwd, env, *args, **kwargs):
             stdout = Reader(
                 threading.current_thread(),
                 p.stdout,
-                output=stdout_func if output else None,
+                output=stdout_func if options["output"] else None,
                 logbuf=logbuf,
-                output_rstrip=output_rstrip)
+                output_rstrip=options["output_rstrip"])
             stderr = Reader(
                 threading.current_thread(),
                 p.stderr,
-                output=stderr_func if output else None,
+                output=stderr_func if options["output"] else None,
                 logbuf=logbuf,
-                output_rstrip=output_rstrip)
+                output_rstrip=options["output_rstrip"])
 
-        p.wait(timeout=timeout)
-
-    except KeyboardInterrupt:
-        if not p:
-            raise
-        try:
-            terminate(p.pid)
-            p.wait(10)
-        except subprocess.TimeoutExpired:
-            kill(p.pid)
-            utils.call_and_catch(p.wait, 10)
-        raise
-
-    except (subprocess.TimeoutExpired, JoltTimeoutError):
-        timedout = True
-        try:
-            terminate(p.pid)
-            p.wait(10)
-        except subprocess.TimeoutExpired:
-            kill(p.pid)
-            utils.call_and_catch(p.wait, 10)
+        timedout = _wait_for_process(p, options["timeout"])
 
     finally:
         if stdout:
@@ -203,7 +338,7 @@ def _run(cmd, cwd, env, *args, **kwargs):
             p.stdout.close()
             p.stderr.close()
 
-    if p.returncode != 0 and output_on_error:
+    if p.returncode != 0 and options["output_on_error"]:
         for reader, line in logbuf:
             if reader is stdout:
                 log.stdout(line)
@@ -220,17 +355,11 @@ def _run(cmd, cwd, env, *args, **kwargs):
 
     if p.returncode != 0:
         stderrbuf = [line for reader, line in logbuf if reader is stderr]
-        if timedout:
-            raise JoltTimeoutError(
-                "Command timeout: " + (" ".join(cmd) if type(cmd) is list else cmd))
-        else:
-            raise JoltCommandError(
-                "Command failed: " + (" ".join(cmd) if type(cmd) is list else cmd),
-                stdoutbuf, stderrbuf, p.returncode)
-    if return_stderr:
-        return "\n".join(stdoutbuf) if output_rstrip else "".join(stdoutbuf), \
-            "\n".join(stderrbuf) if output_rstrip else "".join(stderrbuf)
-    return "\n".join(stdoutbuf) if output_rstrip else "".join(stdoutbuf)
+        _raise_process_error(p, stdoutbuf, stderrbuf, timedout)
+    if options["return_stderr"]:
+        return "\n".join(stdoutbuf) if options["output_rstrip"] else "".join(stdoutbuf), \
+            "\n".join(stderrbuf) if options["output_rstrip"] else "".join(stderrbuf)
+    return "\n".join(stdoutbuf) if options["output_rstrip"] else "".join(stdoutbuf)
 
 
 class _String(object):
@@ -534,6 +663,43 @@ class Tools(object):
         for dir in self._builddir.values():
             fs.rmtree(dir, ignore_errors=True)
         return False
+
+    def _prepare_run_command(self, cmd, args, kwargs):
+        kwargs.setdefault("shell", True)
+
+        if self._chroot_prefix or self._run_prefix:
+            if type(cmd) is list:
+                cmd = self._chroot_prefix + self._run_prefix + cmd
+            else:
+                cmd = " ".join(self._chroot_prefix + self._run_prefix) + " " + cmd
+
+        if self._deadline is not None:
+            remaining = int(self._deadline - time.time() + 0.5)
+            timeout = kwargs.get("timeout", remaining)
+            kwargs["timeout"] = min(remaining, timeout)
+
+        return self.expand(cmd, *args, **kwargs)
+
+    def _capture_termios(self):
+        states = [None, None, None]
+        try:
+            states[0] = termios.tcgetattr(sys.stdin.fileno())
+            states[1] = termios.tcgetattr(sys.stdout.fileno())
+            states[2] = termios.tcgetattr(sys.stderr.fileno())
+        except KeyboardInterrupt as e:
+            raise e
+        except Exception:
+            pass
+        return states
+
+    def _restore_termios(self, states):
+        stdin_state, stdout_state, stderr_state = states
+        if stdin_state:
+            termios.tcsetattr(sys.stdin.fileno(), termios.TCSANOW, stdin_state)
+        if stdout_state:
+            termios.tcsetattr(sys.stdout.fileno(), termios.TCSANOW, stdout_state)
+        if stderr_state:
+            termios.tcsetattr(sys.stderr.fileno(), termios.TCSANOW, stderr_state)
 
     def append_file(self, pathname, content, expand=True):
         """ Appends data at the end of a file.
@@ -1603,6 +1769,94 @@ class Tools(object):
             elif kind == "symlink" and os.readlink(src) != os.readlink(dst):
                 fs.copy(src, dst, symlinks=True, metadata=False)
 
+    @contextmanager
+    def popen(self, cmd, *args, **kwargs):
+        """
+        Runs a command in a shell interpreter and returns a file-like object
+        for reading the command's output. The object provides these functions:
+
+            - ``read()``: Reads the command's output until EOF and returns it as a string.
+            - ``readline()``: Reads a single line of output from the command and returns it as a string.
+            - ``readlines()``: Reads all lines of output from the command and returns them as a list of strings.
+            - ``write()``: Writes a string to the command's standard input.
+            - ``flush()``: Flushes the command's standard input stream.
+            - ``close()``: Closes the command's standard input stream.
+
+        These additional environment variables will be set when the command is run:
+
+            - ``JOLTDIR`` - Set to :attr:`Task.joltdir <jolt.tasks.Task.joltdir>`
+            - ``JOLTCACHEDIR`` - Set to the location of the Jolt cache
+
+        A JoltCommandError exception is raised on failure.
+
+        Args:
+            cmd (str): Command format string.
+            args: Positional arguments for the command format string.
+            kwargs: Keyword arguments for the command format string.
+            output (boolean, optional): By default, the executed command's
+                output will be written to the console. Set to ``False`` to
+                disable all output.
+            output_on_error (boolean, optional): If ``True``, no output is
+                written to the console unless the command fails.
+                The default is ``False``.
+            output_rstrip (boolean, optional): By default, output written
+                to stdout is stripped from whitespace at the end of the
+                string. This can be disabled by setting this argument to False.
+            shell (boolean, optional): Use a shell to run the command.
+                Default: True.
+            timeout (int, optional): Timeout in seconds. The command will
+                first be terminated if the timeout expires. If the command
+                refuses to terminate, it will be killed after an additional
+                10 seconds have passed. Default: None.
+            new_session (boolean, optional): If ``True``, the command will be
+                run in a new session. Default: False.
+
+        Example:
+
+            .. code-block:: python
+
+                with tools.popen("echo Hello, World!") as f:
+                    print(f.read())
+
+        """
+        cmd = self._prepare_run_command(cmd, args, kwargs)
+        options = _normalize_run_kwargs(kwargs)
+
+        log.debug("Running: '{0}' (CWD: {1})", cmd, self._cwd)
+
+        termios_state = [None, None, None]
+        procfile = None
+        body_failed = False
+        try:
+            termios_state = self._capture_termios()
+
+            with utils.delayed_interrupt():
+                process = subprocess.Popen(
+                    cmd,
+                    stdin=subprocess.PIPE,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    shell=options["shell"],
+                    start_new_session=options["new_session"],
+                    cwd=self._cwd,
+                    env=self._env,
+                )
+
+            procfile = _PopenFile(
+                process,
+                **options)
+
+            yield procfile
+        except Exception:
+            body_failed = True
+            raise
+        finally:
+            try:
+                if procfile is not None:
+                    procfile.finalize(raise_on_error=not body_failed)
+            finally:
+                self._restore_termios(termios_state)
+
     def run(self, cmd, *args, **kwargs):
         """
         Runs a command in a shell interpreter.
@@ -1650,43 +1904,15 @@ class Tools(object):
                     tools.run("make {target} VERBOSE={verbose} JOBS={0}", tools.cpu_count())
 
         """
-        kwargs.setdefault("shell", True)
-
-        # Append command prefix before expanding string
-        if self._chroot_prefix or self._run_prefix:
-            if type(cmd) is list:
-                cmd = self._chroot_prefix + self._run_prefix + cmd
-            else:
-                cmd = " ".join(self._chroot_prefix + self._run_prefix) + " " + cmd
-
-        if self._deadline is not None:
-            remaining = int(self._deadline - time.time() + 0.5)
-            timeout = kwargs.get("timeout", remaining)
-            kwargs["timeout"] = min(remaining, timeout)
-
-        cmd = self.expand(cmd, *args, **kwargs)
-
-        stdi, stdo, stde = None, None, None
+        cmd = self._prepare_run_command(cmd, args, kwargs)
+        termios_state = [None, None, None]
         try:
-            stdi, stdo, stde = None, None, None
-            try:
-                stdi = termios.tcgetattr(sys.stdin.fileno())
-                stdo = termios.tcgetattr(sys.stdout.fileno())
-                stde = termios.tcgetattr(sys.stderr.fileno())
-            except KeyboardInterrupt as e:
-                raise e
-            except Exception:
-                pass
+            termios_state = self._capture_termios()
 
             return _run(cmd, self._cwd, self._env, *args, **kwargs)
 
         finally:
-            if stdi:
-                termios.tcsetattr(sys.stdin.fileno(), termios.TCSANOW, stdi)
-            if stdo:
-                termios.tcsetattr(sys.stdout.fileno(), termios.TCSANOW, stdo)
-            if stde:
-                termios.tcsetattr(sys.stderr.fileno(), termios.TCSANOW, stde)
+            self._restore_termios(termios_state)
 
     @contextmanager
     def runprefix(self, cmdprefix, *args, **kwargs):
