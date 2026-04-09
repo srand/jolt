@@ -208,6 +208,9 @@ class ArtifactListAttribute(ArtifactAttribute):
             "Illegal type passed to {}.extend() - list expected".format(self._name))
         self._value.extend(self._artifact.tools.expand(value))
 
+    def remove(self, value):
+        self._value.remove(value)
+
     def items(self):
         return list(self._value)
 
