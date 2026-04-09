@@ -181,6 +181,9 @@ class ArtifactListAttribute(ArtifactAttribute):
     def __getslice__(self, i, j):
         return self._value[i:j]
 
+    def __iter__(self):
+        return iter(self._value)
+
     def __len__(self):
         return len(self._value)
 
