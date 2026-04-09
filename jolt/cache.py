@@ -202,6 +202,9 @@ class ArtifactListAttribute(ArtifactAttribute):
         else:
             self._value.append(self._artifact.tools.expand(value))
 
+    def clear(self):
+        self._value.clear()
+
     def extend(self, value):
         raise_error_if(
             type(value) is not list,
