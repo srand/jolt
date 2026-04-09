@@ -809,6 +809,55 @@ class ToolsApi(JoltTest):
             self.assertGreater(mtime_btest2, mtime_atest2+1)
             self.assertEqual(mtime_btest3_1, mtime_btest3_2)
 
+    def test_rsync_missing_source_preserves_destination(self):
+        """
+        --- file: b/existing.txt
+        keep
+        ---
+        """
+        with self.tools.cwd(self.ws):
+            with self.assertRaisesRegex(Exception, "source directory does not exist"):
+                self.tools.rsync("missing", "b")
+
+            self.assertExists("b/existing.txt")
+            self.assertEqual(self.tools.read_file("b/existing.txt"), "keep\n")
+
+    def test_rsync_ignores_hidden_directories(self):
+        """
+        --- file: a/visible.txt
+        visible
+        --- file: a/.hidden/source.txt
+        source
+        --- file: b/.hidden/destination.txt
+        destination
+        ---
+        """
+        with self.tools.cwd(self.ws):
+            self.tools.rsync("a", "b")
+
+            self.assertExists("b/visible.txt")
+            self.assertExists("b/.hidden/destination.txt")
+            self.assertNotExists("b/.hidden/source.txt")
+
+    def test_rsync_preserves_symlinks(self):
+        """
+        --- file: a/target.txt
+        source
+        --- file: b/old-target.txt
+        destination
+        ---
+        """
+        with self.tools.cwd(self.ws):
+            os.symlink("target.txt", self.tools.expand_path("a/link.txt"))
+            os.symlink("old-target.txt", self.tools.expand_path("b/link.txt"))
+
+            self.tools.rsync("a", "b")
+
+            dst = self.tools.expand_path("b/link.txt")
+            self.assertTrue(os.path.islink(dst))
+            self.assertEqual(os.readlink(dst), "target.txt")
+            self.assertEqual(self.tools.read_file("b/target.txt"), "source\n")
+
     def test_sandbox(self):
         """
         --- file: test.txt

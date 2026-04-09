@@ -1529,23 +1529,48 @@ class Tools(object):
         """
 
         def _scandir(scanpath, filterfn=lambda path: path[0] != "."):
-            def relresult(path, fp):
-                return os.path.relpath(os.path.join(path, fp), scanpath)
-            resfn = relresult
             result = []
+            pending = [scanpath]
 
-            for path, dirs, files in os.walk(scanpath):
-                for d in dirs:
-                    if filterfn(d):
-                        result.append((True, resfn(path, d)))
-                for f in files:
-                    if filterfn(f):
-                        result.append((False, resfn(path, f)))
+            while pending:
+                path = pending.pop()
+                child_dirs = []
+
+                with os.scandir(path) as entries:
+                    for entry in sorted(entries, key=lambda item: item.name):
+                        if not filterfn(entry.name):
+                            continue
+
+                        relpath = os.path.relpath(entry.path, scanpath)
+                        if entry.is_symlink():
+                            result.append(("symlink", relpath))
+                        elif entry.is_dir(follow_symlinks=False):
+                            result.append(("dir", relpath))
+                            child_dirs.append(entry.path)
+                        else:
+                            result.append(("file", relpath))
+
+                pending.extend(reversed(child_dirs))
 
             return result
 
         srcpath = self.expand_path(srcpath, *args, **kwargs)
         dstpath = self.expand_path(dstpath, *args, **kwargs)
+        raise_task_error_if(
+            not fs.path.exists(srcpath) or not fs.path.isdir(srcpath),
+            self._task,
+            "source directory does not exist '{0}'",
+            srcpath)
+
+        if fs.path.exists(dstpath):
+            raise_task_error_if(
+                not fs.path.isdir(dstpath),
+                self._task,
+                "destination path is not a directory '{0}'",
+                dstpath)
+        else:
+            fs.makedirs(dstpath)
+
         srcfiles = set(_scandir(srcpath))
         dstfiles = set(_scandir(dstpath))
         added_files = list(srcfiles - dstfiles)
@@ -1553,28 +1578,30 @@ class Tools(object):
         common_files = srcfiles.intersection(dstfiles)
 
         # Remove files first, then directories
-        for dir, fp in sorted(deleted_files, key=lambda n: (n[0], -len(n[1]))):
+        for kind, fp in sorted(deleted_files, key=lambda n: (n[0] == "dir", -len(n[1]))):
             dst = fs.path.join(dstpath, fp)
-            if dir:
+            if kind == "dir":
                 fs.rmtree(dst)
             else:
                 fs.unlink(dst)
 
         # Add new directories, then files
-        for dir, fp in sorted(added_files, key=lambda n: (not n[0], n[1])):
+        for kind, fp in sorted(added_files, key=lambda n: (n[0] != "dir", n[1])):
             src = fs.path.join(srcpath, fp)
             dst = fs.path.join(dstpath, fp)
-            if dir:
+            if kind == "dir":
                 fs.makedirs(dst)
             else:
-                fs.copy(src, dst, metadata=False)
+                fs.copy(src, dst, symlinks=True, metadata=False)
 
         # Refresh existing files
-        for dir, fp in filter(lambda n: not n[0], common_files):
+        for kind, fp in common_files:
             src = fs.path.join(srcpath, fp)
             dst = fs.path.join(dstpath, fp)
-            if not fs.identical_files(src, dst):
-                fs.copy(src, dst, metadata=False)
+            if kind == "file" and not fs.identical_files(src, dst):
+                fs.copy(src, dst, symlinks=True, metadata=False)
+            elif kind == "symlink" and os.readlink(src) != os.readlink(dst):
+                fs.copy(src, dst, symlinks=True, metadata=False)
 
     def run(self, cmd, *args, **kwargs):
         """
