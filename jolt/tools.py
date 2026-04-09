@@ -2,6 +2,7 @@ import py7zr
 import blake3
 import bz2
 import copy
+import fstree
 import getpass
 import gzip
 import json
@@ -13,6 +14,7 @@ import platform
 import sys
 import threading
 import time
+
 if os.name != "nt":
     import termios
 import glob
@@ -1749,11 +1751,9 @@ class Tools(object):
         return meta if not fs.path.exists(meta) or self.read_file(meta) != artifact.path else None
 
     def _sandbox_rsync(self, artifact, path):
-        meta = self._sandbox_validate(artifact, path)
-        if meta:
-            fs.unlink(meta, ignore_errors=True)
-            self.rsync(artifact.path, path)
-            self.write_file(meta, artifact.path)
+        s = fstree.Simple()
+        s.write_tree(artifact.path)
+        s.checkout(path)
         return path
 
     def _sandbox_reflect(self, artifact, path):
