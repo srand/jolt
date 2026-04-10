@@ -2,9 +2,15 @@
 import os
 import sys
 
+from setproctitle import setproctitle
+
 from jolt import cli
 from jolt import error
 from jolt import log
+
+
+def _build_process_title(name):
+    return " ".join([name] + sys.argv[1:])
 
 
 def start_pdb(sig, frame):
@@ -25,6 +31,8 @@ def dump_threads(sig, frame):
 
 
 def main():
+    setproctitle(_build_process_title("jolt"))
+
     if os.name == "posix":
         import signal
         signal.signal(signal.SIGUSR1, start_pdb)

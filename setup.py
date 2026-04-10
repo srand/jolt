@@ -37,6 +37,7 @@ except FileNotFoundError:
         "pygit2",
         "py7zr",
         "requests",
+        "setproctitle",
         "zstandard; python_version < '3.14'",
         "tqdm",
     ]
