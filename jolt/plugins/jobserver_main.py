@@ -10,6 +10,12 @@ import tempfile
 import threading
 import time
 
+from setproctitle import setproctitle
+
+
+def _build_process_title(name):
+    return " ".join([name] + sys.argv[1:])
+
 
 class Jobserver:
     def __init__(self, path=None, slots=1):
@@ -311,6 +317,8 @@ def _parse_args(argv=None):
 
 
 def main(argv=None):
+    setproctitle(_build_process_title("jolt-jobserver"))
+
     args = _parse_args(argv)
     return _serve_jobserver(
         args.path,
