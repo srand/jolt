@@ -26,6 +26,7 @@ class All(Alias):
         "ext/conan",
         # "ext/docker",  -- cannot run inside CI container
         "ext/googletest",
+        "ext/jobserver",
         "ext/ninja-compdb",
         # "ext/podman",  -- cannot run inside CI container
         "ext/symlinks",

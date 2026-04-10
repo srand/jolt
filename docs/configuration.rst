@@ -489,6 +489,54 @@ These configuration keys exist:
         for the password when needed and stores it in a keyring for future use.
 
 
+Jobserver
+^^^^^^^^^
+
+The jobserver plugin enables support for the GNU Make Jobserver protocol.
+
+When enabled, Jolt launches a background helper process that implements
+the Jobserver protocol. It also sets the ``MAKEFLAGS`` environment
+variable so GNU Make, Ninja and other compatible build tools can use it.
+This lets Jolt limit how many parallel jobs those tools start, which can
+improve execution time and reduce resource contention, for example when
+Jolt runs with the ``--jobs`` option.
+
+The plugin also enables a hidden ``jobserver`` command which can be used to
+manually launch a persistent jobserver.
+
+The plugin is enabled by adding a ``[jobserver]`` section in the Jolt configuration.
+
+These configuration keys exist:
+
+  .. list-table::
+    :widths: 20 10 70
+    :header-rows: 1
+    :class: tight-table
+
+    * - Config Key
+      - Type
+      - Description
+
+    * - ``launch``
+      - Boolean
+      - | Whether Jolt should launch a jobserver helper process or not. The process
+          is launched when Jolt starts and is automatically terminated when Jolt exits.
+        | Default: ``false``
+
+    * - ``slots``
+      - Integer
+      - | The number of slots to use when launching the jobserver helper process.
+        | This is used to limit the number of parallel jobs launched by compatible build tools.
+        | Default: the number of CPUs available, or ``jolt.threads`` / ``JOLT_THREADS`` if set.
+
+    * - ``path``
+      - String
+      - | The path to the jobserver FIFO that is used to communicate with the jobserver helper process.
+        | By default, a temporary path is used.
+        | If set when ``launch`` is ``false``, Jolt will attempt to connect to an already running
+          jobserver helper process at the specified path.
+
+
 Logstash (HTTP)
 ^^^^^^^^^^^^^^^
 
