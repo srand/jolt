@@ -123,30 +123,32 @@ func (b *priorityBuild) Cancel() {
 
 // Close the build and all its tasks.
 func (b *priorityBuild) Close() {
-	b.RLock()
-	defer b.RUnlock()
+	b.Lock()
 
 	if b.queue == nil {
+		b.Unlock()
 		return
 	}
 
 	b.ctxCancel()
 	b.buildObservers.Close()
 
-	tasks := []*Task{}
-	b.WalkTasks(func(b *priorityBuild, t *Task) bool {
-		tasks = append(tasks, t)
-		return true
-	})
+	tasks := make([]*Task, 0, len(b.tasks))
+	for _, task := range b.tasks {
+		tasks = append(tasks, task)
+	}
+
+	queue := b.queue
+	b.queue = nil
+	b.environment = nil
+	b.tasks = nil
+	b.Unlock()
 
 	for _, task := range tasks {
 		task.Close()
 	}
 
-	b.queue.Close()
-	b.queue = nil
-	b.environment = nil
-	b.tasks = nil
+	queue.Close()
 }
 
 // Returns a channel that is closed when the build is cancelled.
@@ -156,6 +158,8 @@ func (b *priorityBuild) Done() <-chan struct{} {
 
 // Returns true if the build is cancelled.
 func (b *priorityBuild) IsCancelled() bool {
+	b.RLock()
+	defer b.RUnlock()
 	return b.isCancelled()
 }
 
@@ -165,6 +169,8 @@ func (b *priorityBuild) isCancelled() bool {
 
 // Returns true if the build is in a terminal state, but may have outstanding work to complete.
 func (b *priorityBuild) IsDone() bool {
+	b.RLock()
+	defer b.RUnlock()
 	return b.status != protocol.BuildStatus_BUILD_ACCEPTED
 }
 
@@ -192,13 +198,14 @@ func (b *priorityBuild) IsTerminal() bool {
 // Returns true if the build or one of its tasks has an observer.
 func (b *priorityBuild) HasObserver() bool {
 	b.RLock()
-	defer b.RUnlock()
+	observers := b.buildObservers
+	b.RUnlock()
 
-	if b.buildObservers == nil {
+	if observers == nil {
 		return false
 	}
 
-	if b.buildObservers.HasObserver() {
+	if observers.HasObserver() {
 		return true
 	}
 
@@ -323,10 +330,14 @@ func (b *priorityBuild) WalkQueuedTasks(walkFn TaskWalkFunc) bool {
 
 // Creates a new task executor for the build.
 func (b *priorityBuild) NewExecutor(scheduler Scheduler, worker Worker) (Executor, error) {
-	if b.IsCancelled() || b.queue == nil {
+	b.RLock()
+	cancelled := b.isCancelled()
+	queue := b.queue
+	b.RUnlock()
+	if cancelled || queue == nil {
 		return nil, errors.New("Build is cancelled")
 	}
-	consumer, err := b.queue.NewConsumerWithItem(worker)
+	consumer, err := queue.NewConsumerWithItem(worker)
 	if err != nil {
 		return nil, err
 	}

@@ -2,6 +2,7 @@ package scheduler
 
 import (
 	"context"
+	"sync"
 
 	"github.com/google/uuid"
 	"github.com/srand/jolt/scheduler/pkg/log"
@@ -29,6 +30,10 @@ type priorityWorker struct {
 
 	// The channel that receives builds to be executed by the worker.
 	builds chan Build
+
+	// Protects closing of the builds channel.
+	mu     sync.Mutex
+	closed bool
 }
 
 // Acknowledge that the worker has received and handled the task.
@@ -45,7 +50,12 @@ func (w *priorityWorker) Cancel() {
 // Unregisters the worker from the scheduler.
 func (w *priorityWorker) Close() {
 	w.cancel()
-	close(w.builds)
+	w.mu.Lock()
+	if !w.closed {
+		w.closed = true
+		close(w.builds)
+	}
+	w.mu.Unlock()
 	w.scheduler.removeWorker(w)
 }
 
@@ -88,11 +98,15 @@ func (w *priorityWorker) Builds() chan Build {
 
 // Post a task to the worker.
 func (w *priorityWorker) Post(build Build) {
-	defer func() {
-		if r := recover(); r != nil {
-			log.Errorf("build could not be delivered: %v", r)
-		}
-	}()
-
-	w.builds <- build
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if w.closed {
+		log.Errorf("build could not be delivered: worker closed")
+		return
+	}
+	select {
+	case w.builds <- build:
+	default:
+		log.Errorf("build could not be delivered: channel full")
+	}
 }
