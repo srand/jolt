@@ -969,6 +969,11 @@ class ToolsApi(JoltTest):
         self.assertEqual(requirement("<=1.0").required(), version("1.0"))
 
     def test_unshare(self):
+        try:
+            self.tools.run("unshare -rm uname")
+        except Exception:
+            self.skip("required privileges not held")
+
         uid = os.getuid()
         gid = os.getgid()
 

@@ -1,4 +1,5 @@
 import argparse
+import atexit
 import ctypes
 import os
 import re
@@ -280,21 +281,32 @@ def launch_jobserver(slots, path=None, python_executable=None, new_session=True)
 
 
 def _serve_jobserver(path, slots, parent_sentinel_fd=None, parent_pid=None):
-    jobserver = Jobserver(path=path, slots=slots)
-    shutdown_event = _start_parent_liveness_monitor(
-        parent_sentinel_fd=parent_sentinel_fd,
-        parent_pid=parent_pid,
-    )
-
     def _shutdown(*_args):
         raise SystemExit(0)
 
+    # Install signal handlers BEFORE creating the FIFO. PR_SET_PDEATHSIG is
+    # armed by the launcher's preexec_fn, so a SIGTERM can in theory arrive
+    # the moment this process starts running. If the default disposition
+    # were still in effect when the signal hits, the helper would terminate
+    # without running cleanup and leave the FIFO behind.
     handled_signals = [signal.SIGTERM, signal.SIGINT]
     if hasattr(signal, "SIGHUP"):
         handled_signals.append(signal.SIGHUP)
 
     for signum in handled_signals:
         signal.signal(signum, _shutdown)
+
+    jobserver = Jobserver(path=path, slots=slots)
+
+    # Belt-and-braces: ensure the FIFO and directory are removed even if the
+    # helper exits via an unexpected path (e.g. an uncaught exception before
+    # the finally below runs).
+    atexit.register(jobserver.cleanup)
+
+    shutdown_event = _start_parent_liveness_monitor(
+        parent_sentinel_fd=parent_sentinel_fd,
+        parent_pid=parent_pid,
+    )
 
     try:
         print("READY {}".format(jobserver.fifo_path), flush=True)

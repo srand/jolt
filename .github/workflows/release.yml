@@ -1,0 +1,79 @@
+name: Release
+
+on: [workflow_dispatch]
+
+env:
+  JOLT_VERSION: 0.10.${{ github.run_number }}
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Update version
+        run: echo "__version__ = \"$JOLT_VERSION\"" > jolt/version.py
+
+      - name: Install build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential \
+            cmake \
+            git \
+            make \
+            ninja-build
+
+      - name: Set up virtualenv
+        run: |
+          rm -rf venv
+          pip install --upgrade virtualenv
+          virtualenv venv
+          . venv/bin/activate
+          pip install --upgrade -e .[amqp,allure,conan]
+          pip install --upgrade flake8
+
+      - name: Configure conan
+        run: |
+          . ${{ github.workspace }}/venv/bin/activate
+          conan profile detect --force
+
+      - name: Enable Docker swarm
+        run: |
+          docker swarm init
+
+      - name: Run tests
+        working-directory: tests
+        run: |
+          . ${{ github.workspace }}/venv/bin/activate
+          jolt -c jolt.cachedir=${{ github.workspace }}/cache build all
+
+      - name: Release
+        env:
+          DOCKER_USER: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKER_PASSWD: ${{ secrets.DOCKERHUB_TOKEN }}
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
+        run: |
+          . ${{ github.workspace }}/venv/bin/activate
+          jolt -c jolt.cachedir=${{ github.workspace }}/cache build default:push=true
+
+      - name: Push version update
+        run: |
+          git config user.name "Robert Andersson"
+          git config user.email "rbrtandersson@gmail.com"
+          git commit -asm "bump version to $JOLT_VERSION [no ci]"
+          git push origin HEAD:master
+          git tag v$JOLT_VERSION
+          git push origin v$JOLT_VERSION

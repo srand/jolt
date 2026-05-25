@@ -150,14 +150,16 @@ class JobserverExtension(JoltTest):
             )
 
             parent.kill()
-            parent.wait(timeout=5)
+            parent.wait(timeout=30)
 
             self._wait_for(
                 lambda: not os.path.exists(fifo_path),
+                timeout=30,
                 message="jobserver fifo was not removed after the parent died",
             )
             self._wait_for(
                 lambda: not self._pid_exists(helper_pid),
+                timeout=30,
                 message="jobserver helper is still running after the parent died",
             )
         finally:

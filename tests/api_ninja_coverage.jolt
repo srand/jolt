@@ -138,6 +138,9 @@ class NinjaCoverageApi(JoltTest):
             selfsustained = True
         ---
         """
+        # Skip if lcov is not available
+        if not self.tools.which("lcov"):
+            self.skipTest("lcov is not available")
 
         def assertLcov(self, artifact):
             """ Artifact should contain coverage.info and html report """
