@@ -75,6 +75,19 @@ func (p *Platform) Fulfills(requirement *Platform) bool {
 	return true
 }
 
+// Equals returns true if two platforms have the same set of properties.
+func (p *Platform) Equals(other *Platform) bool {
+	if len(*p) != len(*other) {
+		return false
+	}
+	for property := range *p {
+		if _, ok := (*other)[property]; !ok {
+			return false
+		}
+	}
+	return true
+}
+
 // Get hostname from platform properties.
 func (p *Platform) GetHostname() string {
 	hostname, _ := p.GetPropertiesForKey("worker.hostname")

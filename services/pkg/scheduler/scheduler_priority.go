@@ -349,6 +349,10 @@ func (s *priorityScheduler) selectTaskAndWorker() {
 	for _, worker := range s.availWorkers {
 		// Select tasks for worker
 		for _, build := range s.readyBuilds.Items() {
+			if !build.HasCompatibleTask(worker) {
+				continue
+			}
+
 			executor, err := build.NewExecutor(s, worker)
 			if err != nil {
 				continue
@@ -565,9 +569,15 @@ func (s *priorityScheduler) TaskStatusChanged(task *Task, status protocol.TaskSt
 	case protocol.TaskStatus_TASK_FAILED, protocol.TaskStatus_TASK_ERROR, protocol.TaskStatus_TASK_UNSTABLE:
 		atomic.AddInt64(&s.numFailedTasks, 1)
 		atomic.AddInt64(&s.numCompletedTasks, 1)
+		if build, ok := task.Build().(*priorityBuild); ok {
+			build.removeTaskPlatform(task.Platform())
+		}
 	case protocol.TaskStatus_TASK_PASSED, protocol.TaskStatus_TASK_SKIPPED, protocol.TaskStatus_TASK_UPLOADED, protocol.TaskStatus_TASK_DOWNLOADED:
 		atomic.AddInt64(&s.numSuccessfulTasks, 1)
 		atomic.AddInt64(&s.numCompletedTasks, 1)
+		if build, ok := task.Build().(*priorityBuild); ok {
+			build.removeTaskPlatform(task.Platform())
+		}
 	case protocol.TaskStatus_TASK_QUEUED:
 		// Executor likely closed and task returned to queue
 		s.Reschedule()

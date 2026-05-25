@@ -3,6 +3,7 @@ package scheduler
 import (
 	"context"
 	"errors"
+	"sync"
 	"time"
 
 	"github.com/srand/jolt/scheduler/pkg/protocol"
@@ -48,6 +49,14 @@ type priorityBuild struct {
 	// queued until a worker becomes available. Meanwhile, other tasks may
 	// jump ahead in the queue.
 	queue *utils.Unicast[*Task]
+
+	// Distinct platform requirements across all queued tasks.
+	// Used for quick pre-filtering of incompatible workers without
+	// walking the full task queue.
+	// Protected by its own lock to avoid lock-ordering issues
+	// between build and task mutexes.
+	taskPlatformsMu sync.RWMutex
+	taskPlatforms   []platformRef
 
 	// Build update observers
 	buildObservers BuildUpdateObservers
@@ -258,6 +267,9 @@ func (b *priorityBuild) ScheduleTask(identity string) (*Task, TaskUpdateObserver
 	// Duplicate tasks are not added to the queue.
 	b.queue.Send(task)
 
+	// Cache the task's platform requirement for quick pre-filtering
+	b.addTaskPlatform(task.Platform())
+
 	return task, observer, nil
 }
 
@@ -330,4 +342,55 @@ func (b *priorityBuild) NewUpdateObserver() BuildUpdateObserver {
 // Returns true if the build should stream logs back to the client.
 func (b *priorityBuild) LogStreamEnabled() bool {
 	return b.logstream
+}
+
+// platformRef tracks a distinct platform requirement and the number of
+// queued tasks that use it.
+type platformRef struct {
+	platform *Platform
+	count    int
+}
+
+// Adds a task's platform to the cached set of distinct platform requirements.
+// Increments the reference count if the platform is already present.
+func (b *priorityBuild) addTaskPlatform(platform *Platform) {
+	b.taskPlatformsMu.Lock()
+	defer b.taskPlatformsMu.Unlock()
+	for i := range b.taskPlatforms {
+		if b.taskPlatforms[i].platform.Equals(platform) {
+			b.taskPlatforms[i].count++
+			return
+		}
+	}
+	b.taskPlatforms = append(b.taskPlatforms, platformRef{platform: platform, count: 1})
+}
+
+// Decrements the reference count for a task's platform.
+// Removes the entry when the count reaches zero.
+func (b *priorityBuild) removeTaskPlatform(platform *Platform) {
+	b.taskPlatformsMu.Lock()
+	defer b.taskPlatformsMu.Unlock()
+	for i := range b.taskPlatforms {
+		if b.taskPlatforms[i].platform.Equals(platform) {
+			b.taskPlatforms[i].count--
+			if b.taskPlatforms[i].count <= 0 {
+				b.taskPlatforms = append(b.taskPlatforms[:i], b.taskPlatforms[i+1:]...)
+			}
+			return
+		}
+	}
+}
+
+// Returns true if the worker could potentially execute at least one task in this build,
+// based on cached platform requirements. This is a cheap pre-check to avoid walking
+// the full task queue for incompatible workers.
+func (b *priorityBuild) HasCompatibleTask(worker Worker) bool {
+	b.taskPlatformsMu.RLock()
+	defer b.taskPlatformsMu.RUnlock()
+	for _, ref := range b.taskPlatforms {
+		if worker.Platform().Fulfills(ref.platform) && ref.platform.Fulfills(worker.TaskPlatform()) {
+			return true
+		}
+	}
+	return false
 }
