@@ -61,19 +61,19 @@ func TestUnicast(t *testing.T) {
 	c3 := bc.NewConsumer(nil)
 	assert.True(t, bc.HasUnackedData())
 
-	expectedOrder := []string{
-		unicastTestData[0],
-		unicastTestData[1],
-		unicastTestData[2],
-	}
-
-	for i := range expectedOrder {
+	// The order of test1 and test2 in the requeue is non-deterministic
+	// because map iteration in send() decides which consumer received which
+	// item, and Close()'s PushFront order depends on that.
+	// test3 must always come last because it was never dispatched.
+	received := make([]string, 0, 3)
+	for i := 0; i < 3; i++ {
 		msg := <-c3.Chan
 		t.Log(msg)
-		assert.NotNil(t, msg)
-		assert.Equal(t, expectedOrder[i], msg)
+		received = append(received, msg)
 		c3.Acknowledge()
 	}
+	assert.ElementsMatch(t, unicastTestData[:2], received[:2])
+	assert.Equal(t, unicastTestData[2], received[2])
 	assert.False(t, bc.HasUnackedData())
 }
 
