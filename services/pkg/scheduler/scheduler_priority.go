@@ -60,6 +60,9 @@ type priorityScheduler struct {
 	// These builds are eligible for scheduling.
 	readyBuilds *utils.PriorityQueue[*priorityBuild]
 
+	// O(1) membership test for readyBuilds
+	readyBuildSet map[string]struct{}
+
 	// Map of worker id to worker
 	workers map[string]Worker
 
@@ -86,6 +89,7 @@ func NewPriorityScheduler() *priorityScheduler {
 		rescheduleChan:  make(chan bool, 1),
 		builds:          map[string]*priorityBuild{},
 		readyBuilds:     utils.NewPriorityQueue[*priorityBuild](buildPriorityFunc, buildEqualityFunc),
+		readyBuildSet:   map[string]struct{}{},
 		workers:         map[string]Worker{},
 		availWorkers:    map[string]Worker{},
 		workerExecutors: map[Worker]Executor{},
@@ -388,12 +392,23 @@ func (s *priorityScheduler) selectTaskAndWorker() {
 func (s *priorityScheduler) dequeueBuildNoLock(build *priorityBuild) {
 	log.Trace("Removing build from ready queue:", build.id)
 	s.readyBuilds.Remove(build)
+	delete(s.readyBuildSet, build.Id())
 }
 
 // Add a build to the ready queue.
 func (s *priorityScheduler) enqueueBuildNoLock(build *priorityBuild) {
+	if _, ok := s.readyBuildSet[build.Id()]; ok {
+		return
+	}
 	log.Trace("Moving build to ready queue:", build.id)
 	s.readyBuilds.Push(build)
+	s.readyBuildSet[build.Id()] = struct{}{}
+}
+
+// Returns true if the build is in the ready queue.
+func (s *priorityScheduler) isReadyBuildNoLock(build *priorityBuild) bool {
+	_, ok := s.readyBuildSet[build.Id()]
+	return ok
 }
 
 // Remove a worker from the available worker list.
@@ -452,7 +467,7 @@ func (s *priorityScheduler) removeStaleBuilds() {
 func (s *priorityScheduler) requeueReadyBuilds() {
 	s.Lock()
 	for _, build := range s.builds {
-		if build.HasQueuedTask() && !s.readyBuilds.Contains(build) {
+		if build.HasQueuedTask() && !s.isReadyBuildNoLock(build) {
 			s.enqueueBuildNoLock(build)
 		}
 	}
@@ -635,7 +650,7 @@ func (s *priorityScheduler) ListBuilds(tasks bool) *protocol.ListBuildsResponse 
 			HasObserver:    build.HasObserver(),
 			HasRunningTask: build.HasRunningTask(),
 			HasQueuedTask:  build.HasQueuedTask(),
-			Ready:          s.readyBuilds.Contains(build),
+			Ready:          s.isReadyBuildNoLock(build),
 		})
 
 		if !tasks {
