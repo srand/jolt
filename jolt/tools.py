@@ -27,8 +27,31 @@ import bz2file
 import hashlib
 try:
     from compression import zstd as zstandard
+
+    class _CompressionZstdCompressor:
+        def __init__(self, threads=1):
+            self._options = {
+                zstandard.CompressionParameter.nb_workers: threads,
+            }
+
+        def stream_writer(self, stream):
+            return zstandard.ZstdFile(stream, mode='w', options=self._options)
+
+    def ZstdCompressor(threads=1):
+        return _CompressionZstdCompressor(threads=threads)
+
+    def ZstdFile(stream):
+        return zstandard.ZstdFile(stream)
+
 except ImportError:
     import zstandard
+
+    def ZstdCompressor(threads=1):
+        return zstandard.ZstdCompressor(threads=threads)
+
+    def ZstdFile(stream):
+        return zstandard.ZstdDecompressor().stream_reader(stream)
+
 from contextlib import contextmanager
 from psutil import NoSuchProcess, Process
 from jinja2 import Environment, FileSystemLoader
@@ -747,7 +770,7 @@ class Tools(object):
     def _make_tarzstd(self, filename, rootdir):
         self.mkdirname(filename)
         with open(filename, 'wb') as zstd_file:
-            compressor = zstandard.ZstdCompressor(threads=self.thread_count())
+            compressor = ZstdCompressor(threads=self.thread_count())
             with compressor.stream_writer(zstd_file) as stream:
                 with tarfile.open(mode="w|", fileobj=stream) as tar:
                     tar.add(rootdir, ".")
@@ -755,8 +778,7 @@ class Tools(object):
 
     def _extract_tarzstd(self, filename, pathname, files=None):
         with open(filename, 'rb') as zstd_file:
-            decompressor = zstandard.ZstdDecompressor()
-            with decompressor.stream_reader(zstd_file) as stream:
+            with ZstdFile(zstd_file) as stream:
                 with tarfile.open(mode="r|", fileobj=stream) as tar:
                     if files:
                         for file in files:
@@ -984,7 +1006,7 @@ class Tools(object):
         elif ext == "zst":
             with open(src, 'rb') as infp:
                 with open(dst, 'wb') as outfp:
-                    compressor = zstandard.ZstdCompressor(threads=self.thread_count())
+                    compressor = ZstdCompressor(threads=self.thread_count())
                     with compressor.stream_writer(outfp) as stream:
                         for block in iter(lambda: infp.read(0x10000), b''):
                             stream.write(block)

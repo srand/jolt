@@ -1,5 +1,5 @@
 project({{ task.canonical_name }})
-cmake_minimum_required(VERSION 3.0)
+cmake_minimum_required(VERSION 3.5)
 
 {% if task.asflags %}
 set(CMAKE_ASM_FLAGS "${CMAKE_ASM_FLAGS}{% for flags in task.asflags %} {{ flags }}{% endfor %}")

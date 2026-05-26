@@ -25,15 +25,11 @@ class GoogleTestApi(JoltTest):
             EXPECT_EQ(1, 1);
         }}
         --- tasks:
-        from jolt.plugins.conan import Conan2
         from jolt.plugins import googletest, ninja
-
-        class GTest(Conan2):
-            packages = ["gtest/1.11.0"]
-            settings = ["compiler.libcxx=libstdc++11"]
+        from jolt.pkgs import googletest as gtest_pkg
 
         class Test(ninja.CXXExecutable):
-            requires = ["gtest"]
+            requires = ["google/test/main"]
             sources = ["test.cpp"]
 
         @googletest.break_on_failure(default=True)
@@ -85,15 +81,12 @@ class GoogleTestApi(JoltTest):
         }}
 
         --- tasks:
-        from jolt.plugins.conan import Conan2
         from jolt.plugins import googletest, ninja
+        from jolt.pkgs import googletest as gtest_pkg
 
-        class GTest(Conan2):
-            packages = ["gtest/1.11.0"]
-            settings = ["compiler.libcxx=libstdc++11"]
 
         class Test(ninja.CXXExecutable):
-            requires = ["gtest"]
+            requires = ["google/test/main"]
             sources = ["test.cpp"]
 
         @googletest.brief(default=True)
@@ -184,15 +177,11 @@ class GoogleTestApi(JoltTest):
 
         --- tasks:
         from contextlib import contextmanager
-        from jolt.plugins.conan import Conan2
         from jolt.plugins import googletest, ninja
-
-        class GTest(Conan2):
-            packages = ["gtest/1.10.0"]
-            settings = ["compiler.libcxx=libstdc++11"]
+        from jolt.pkgs import googletest as gtest_pkg
 
         class Test(ninja.CXXExecutable):
-            requires = ["gtest"]
+            requires = ["google/test/main"]
             sources = ["test.cpp"]
 
         @googletest.filter()
@@ -233,15 +222,11 @@ class GoogleTestApi(JoltTest):
 
         --- tasks:
         from contextlib import contextmanager
-        from jolt.plugins.conan import Conan2
         from jolt.plugins import googletest, ninja
-
-        class GTest(Conan2):
-            packages = ["gtest/1.10.0"]
-            settings = ["compiler.libcxx=libstdc++11"]
+        from jolt.pkgs import googletest as gtest_pkg
 
         class Test(ninja.CXXExecutable):
-            requires = ["gtest"]
+            requires = ["google/test/main"]
             sources = ["test.cpp"]
 
         @googletest.filter()
@@ -280,15 +265,11 @@ class GoogleTestApi(JoltTest):
             EXPECT_EQ(1, 1);
         }}
         --- tasks:
-        from jolt.plugins.conan import Conan2
         from jolt.plugins import googletest, ninja
-
-        class GTest(Conan2):
-            packages = ["gtest/1.11.0"]
-            settings = ["compiler.libcxx=libstdc++11"]
+        from jolt.pkgs import googletest as gtest_pkg
 
         class Test(ninja.CXXExecutable):
-            requires = ["gtest"]
+            requires = ["google/test/main"]
             sources = ["test.cpp"]
 
         @googletest.fail_fast(default=True)
@@ -336,15 +317,11 @@ class GoogleTestApi(JoltTest):
         }}
 
         --- tasks:
-        from jolt.plugins.conan import Conan2
         from jolt.plugins import googletest, ninja
-
-        class GTest(Conan2):
-            packages = ["gtest/1.11.0"]
-            settings = ["compiler.libcxx=libstdc++11"]
+        from jolt.pkgs import googletest as gtest_pkg
 
         class Test(ninja.CXXExecutable):
-            requires = ["gtest"]
+            requires = ["google/test/main"]
             sources = ["test.cpp"]
 
         @googletest.repeat()
