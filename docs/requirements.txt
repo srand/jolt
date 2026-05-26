@@ -6,6 +6,7 @@ ninja
 protobuf
 psutil
 py7zr
+pyfstree
 pygit2
 sphinx<7.0
 sphinx_click
