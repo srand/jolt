@@ -61,10 +61,10 @@ jobs:
 
       - name: Release
         env:
-          DOCKER_USER: ${{ secrets.DOCKERHUB_USERNAME }}
-          DOCKER_PASSWD: ${{ secrets.DOCKERHUB_TOKEN }}
-          TWINE_USERNAME: __token__
-          TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
+          DOCKER_USER: ${{ secrets.DOCKER_USER }}
+          DOCKER_PASSWD: ${{ secrets.DOCKER_PASSWD }}
+          TWINE_USERNAME: ${{ secrets.TWINE_USERNAME }}
+          TWINE_PASSWORD: ${{ secrets.TWINE_PASSWORD }}
         run: |
           . ${{ github.workspace }}/venv/bin/activate
           jolt -c jolt.cachedir=${{ github.workspace }}/cache build default:push=true
