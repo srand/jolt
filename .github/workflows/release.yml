@@ -77,3 +77,12 @@ jobs:
           git push origin HEAD:master
           git tag v$JOLT_VERSION
           git push origin v$JOLT_VERSION
+
+      - name: Make release on GitHub
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ env.JOLT_VERSION }}
+          name: Jolt ${{ env.JOLT_VERSION }}
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
