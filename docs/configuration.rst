@@ -1033,6 +1033,65 @@ No configuration is currently possible.
 
  .. _configuration-services-scheduler:
 
+
+Jobserver
+^^^^^^^^^
+The jobserver service implements the GNU Make Jobserver protocol.
+It is used to limit the number of parallel jobs launched by compatible build
+tools such as GNU Make and Ninja.
+
+It is especially useful in environments, such as a Kubernetes cluster, where
+multiple worker pods are running on the same node. By using a shared jobserver,
+the workers can coordinate the number of parallel jobs they launch, which can
+improve execution time and reduce resource contention.
+
+The server is a FUSE filesystem implementation that exposes a character device file.
+It automatically reclaims tokens if a client worker process dies while holding them,
+ensuring that the number of available tokens is always accurate.
+
+Requirements:
+
+ - The container must be run with access to the host's ``/dev/cuse`` device.
+   If Docker is used, this can be achieved using the ``--device=/dev/cuse`` option.
+
+ - The container must share PID namespace with the host so that it can monitor
+   client processes and reclaim tokens when they die. If Docker is used,
+   this can be achieved using the ``--pid=host`` option.
+
+The container image is available at
+`robrt/jolt-jobserver <https://hub.docker.com/r/robrt/jolt-jobserver>`_.
+
+The following configuration environment variables are available:
+
+  .. list-table::
+    :widths: 20 10 70
+    :header-rows: 1
+    :class: tight-table
+
+    * - Environment Variable
+      - Type
+      - Description
+
+    * - ``JOLT_JOBSERVER_DEVNAME``
+      - String
+      - | The name of the character device file exposed by the jobserver.
+        | Default: ``jobserver``
+
+    * - ``JOLT_JOBSERVER_TOKEN_COUNT``
+      - Integer
+      - | The number of slots to use when launching the jobserver helper process.
+        | This is used to limit the number of parallel jobs launched by compatible build tools.
+        | Default: the number of CPUs available.
+
+To use the jobserver when running tasks, configure the Jolt client as described in
+the :ref:`Jobserver <configuration-plugins-jobserver>` plugin section:
+
+  .. code:: text
+
+    [jobserver]
+    path = /dev/jobserver
+
+
 Scheduler
 ^^^^^^^^^
 

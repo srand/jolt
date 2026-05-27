@@ -71,6 +71,23 @@ class JoltImage(docker.DockerImage):
 
 @influence.files("{dockerfile}")
 @attributes.requires("requires_push_{push}")
+@git.influence("jolt/plugins/jobserver_cuse.py")
+class JobServerImage(docker.DockerImage):
+    name = "jolt/jobserver"
+    dockerfile = "docker/Dockerfile.jobserver"
+    push = BooleanParameter(False)
+    requires = ["docker/cli"]
+    requires_push_true = ["docker/login"]
+    version = Parameter(__version__)
+    tags = [
+        "robrt/jolt-jobserver:{identity}",
+        "robrt/jolt-jobserver:latest",
+        "robrt/jolt-jobserver:{version}",
+    ]
+
+
+@influence.files("{dockerfile}")
+@attributes.requires("requires_push_{push}")
 @git.influence("services")
 class SchedulerImage(docker.DockerImage):
     name = "jolt/scheduler"
@@ -220,6 +237,7 @@ class Default(Alias):
         "jolt/cache:push={push}",
         "jolt/docker/pypi:release={push}",
         "jolt/image:push={push}",
+        "jolt/jobserver:push={push}",
         "jolt/pypi:release={push}",
         "jolt/scheduler:push={push}",
         "jolt/worker:push={push}",

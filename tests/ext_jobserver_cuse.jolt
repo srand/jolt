@@ -1,0 +1,42 @@
+#!/usr/bin/env python3
+
+import os
+import subprocess
+import sys
+import textwrap
+import time
+
+from jolt.utils import timeout
+from tests.testsupport import JoltTest
+sys.path.append(".")
+
+import jolt
+from jolt.plugins import docker
+
+
+class JobserverResource(docker.DockerContainer):
+    name = "jolt/jobserver/container"
+    image = "jolt/jobserver"
+    tokens = jolt.IntParameter(3, help="Number of jobserver tokens to provide")
+    environment = ["JOLT_JOBSERVER_TOKEN_COUNT={tokens}"]
+    pid = "host"
+    privileged = True
+    user = "root"
+    volumes = ["/dev:/dev"]
+
+
+class JobserverCuse(JoltTest):
+    name = "ext/jobserver/cuse"
+
+    requires = ["jolt/jobserver/container"]
+
+    def setup(self, deps, tools):
+        super().setup(deps, tools)
+        self.device = "/dev/jobserver"
+        tools.setenv("MAKEFLAGS", "--jobserver-auth=fifo:{device}")
+
+    def test_reclaim(self):
+        """ Test that tokens are reclaimed when a jobserver client process exits. """
+        with self.tools.runprefix("docker run --privileged --device {device} alpine:latest "):
+            for i in range(5):
+                 self.tools.run("dd if={device} bs=1 count=1", timeout=1)

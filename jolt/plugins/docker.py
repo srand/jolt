@@ -146,6 +146,12 @@ class DockerContainer(Resource):
     labels = []
     """ A list of container metadata labels """
 
+    pid = None
+    """ PID namespace to use. By default, the container is started with its own PID namespace.
+
+    Set to "host" to use the host PID namespace.
+    """
+
     privileged = False
     """
     Start container with elevated privileges.
@@ -270,6 +276,10 @@ class DockerContainer(Resource):
         return " ".join([utils.option("-l ", self.tools.expand(label)) for label in self.labels])
 
     @property
+    def _pid(self):
+        return f"--pid={self.pid}" if self.pid else ""
+
+    @property
     def _privileged(self):
         return "--privileged" if self.privileged else ""
 
@@ -319,7 +329,7 @@ class DockerContainer(Resource):
         self._info(f"Creating container from image '{image}'")
         with utils.delayed_interrupt():
             self.container = tools.run(
-                "docker run -i -d {_cap_adds} {_cap_drops} {_entrypoint} {_labels} {_ports} {_privileged} {_security_opts} {_user} {_environment} {_volumes} {_workdir} {image} {_arguments}",
+                "docker run -i -d {_cap_adds} {_cap_drops} {_entrypoint} {_labels} {_ports} {_privileged} {_security_opts} {_user} {_environment} {_volumes} {_workdir} {_pid} {image} {_arguments}",
                 image=image, output_on_error=True)
 
         self._info("Created container '{container}'")

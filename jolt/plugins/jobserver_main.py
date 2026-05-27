@@ -130,7 +130,9 @@ def _resolve_fifo_path(path=None, env=None):
         return None
 
     fifo_path = os.path.abspath(fifo_path)
-    if not os.path.exists(fifo_path) or not stat_is_fifo(fifo_path):
+    if not os.path.exists(fifo_path):
+        return None
+    if not stat_is_fifo(fifo_path) and not stat_is_chardev(fifo_path):
         return None
 
     return fifo_path
@@ -146,6 +148,10 @@ def find_jobserver(path=None, env=None):
 
 def stat_is_fifo(path):
     return os.path.exists(path) and stat.S_ISFIFO(os.stat(path).st_mode)
+
+
+def stat_is_chardev(path):
+    return os.path.exists(path) and stat.S_ISCHR(os.stat(path).st_mode)
 
 
 def _create_parent_death_preexec():
