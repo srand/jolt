@@ -1,0 +1,8 @@
+FROM alpine:latest
+RUN apk add --no-cache \
+    python3 \
+    py3-pip \
+    fuse3
+
+COPY jolt/plugins/jobserver_cuse.py /opt/jolt/jobserver.py
+ENTRYPOINT ["python3", "/opt/jolt/jobserver.py"]
