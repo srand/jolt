@@ -1368,6 +1368,8 @@ class ArtifactCache(StorageProvider):
     def _db(self):
         db = sqlite3.connect(self._db_path, detect_types=sqlite3.PARSE_DECLTYPES)
         try:
+            db.execute("PRAGMA busy_timeout = 5000")
+            db.execute("PRAGMA journal_mode = WAL")
             yield db
         finally:
             db.close()
