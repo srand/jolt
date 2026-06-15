@@ -7,7 +7,7 @@ from jolt.plugins import cxx, docker, git, selfdeploy
 from os import getenv
 
 
-fstree_version = "26.06.188"
+fstree_version = "26.06.190"
 
 
 @influence.files("{dockerfile}")
