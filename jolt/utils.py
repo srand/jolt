@@ -756,16 +756,3 @@ def strip_ansi_escape_sequences(s):
     """ Removes ANSI escape sequences from a string. """
     ansi_escape = re.compile(r'\x1B[@-_][0-?]*[ -/]*[@-~]')
     return ansi_escape.sub('', s)
-
-
-def fstree_simple():
-    """ A simple implementation of a file system tree for copying files.
-
-    This is used as a fallback for the sandbox rsync implementation when the
-    rsync binary is not available.
-    """
-    import fstree
-    from jolt import config
-
-    cachedir = config.get_cachedir()
-    return fstree.Simple(cachedir)

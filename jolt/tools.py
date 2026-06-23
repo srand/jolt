@@ -2026,7 +2026,7 @@ class Tools(object):
         return meta if not fs.path.exists(meta) or self.read_file(meta) != artifact.path else None
 
     def _sandbox_rsync(self, artifact, path):
-        s = utils.fstree_simple()
+        s = fstree.Simple()
         s.write_tree(artifact.path)
         s.checkout(path)
         return path
