@@ -479,11 +479,11 @@ class TaskProxy(object):
         # If this is an alias, taint all children
         if self.is_alias():
             for child in self.children:
-                child.taint()
+                child.taint(salt=salt)
 
         # Taint all extensions
         for extension in self.extensions:
-            extension.taint()
+            extension.taint(salt=salt)
 
     def queued(self, remote=True):
         self.task.verbose("Task queued " + self.log_name)
