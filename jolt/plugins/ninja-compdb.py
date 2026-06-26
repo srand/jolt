@@ -102,7 +102,11 @@ def get_compdb_artifacts(task):
 
     for dep in task.children:
         artifacts.extend(dep.artifacts)
-    return select_compdb(task.artifacts)[0], select_compdb(artifacts)
+
+    task_compdb = select_compdb(task.artifacts) or [None]
+    task_compdb = task_compdb[0]
+
+    return task_compdb, select_compdb(artifacts)
 
 
 def get_task_artifacts(task):
@@ -128,11 +132,23 @@ class CompDBHooks(TaskHook):
     def task_created(self, task):
         task.task.influence.append(StringInfluence("NinjaCompDB: v3"))
         if isinstance(task.task, ninja.CXXProject):
+            # Get the compdb artifact for the task
             compdb_artifact = task.cache.get_artifact(task, "compdb")
-            task.add_artifact(compdb_artifact)
+
+            # Patch the _artifacts method of the task to include the compdb artifact
+            _old_artifacts = getattr(task.task, "_artifacts", None)
+
+            def _artifacts(self, cache, node):
+                return [compdb_artifact] + list(_old_artifacts(cache, node))
+
+            task.task._artifacts = _artifacts.__get__(task.task, task.task.__class__)
+
+            # Add the publish_compdb hook to the task if it doesn't already exist
             publish_compdb = getattr(task.task, "publish_compdb", None)
             if not publish_compdb:
                 setattr(task.task, "publish_compdb", CompDBHooks.publish_compdb.__get__(task.task, task.task.__class__))
+
+            # Add the publish_depfiles hook to the task if it doesn't already exist
             if self._depfiles:
                 depfile_artifact = task.cache.get_artifact(task, "depfiles")
                 task.add_artifact(depfile_artifact)
