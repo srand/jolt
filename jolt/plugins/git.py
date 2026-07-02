@@ -98,11 +98,37 @@ class GitRepository(object):
         self.tools.mkdir(".git/objects/info")
         self.tools.write_file(".git/objects/info/alternates", objects_path)
 
-    def clone(self, submodules=False):
-        log.info("Cloning into {0}", self.path)
+    def clone(self, submodules=False, rev=None, shallow=False):
+        """ Clone the repository.
+
+        :param submodules: Initialize and update submodules after cloning.
+        :param rev: Revision (tag or commit) to fetch and check out. Only used
+            when ``shallow`` is False, in which case it is required.
+        :param shallow: Clone the repository without its full history.
+            When True, only ``rev`` is fetched (shallow, depth 1) and checked
+            out, avoiding the cost of a full clone.
+        """
         refpath = self._get_reference_path()
 
-        if fs.path.exists(self.path):
+        if shallow:
+            raise_error_if(
+                not rev,
+                "A revision is required to fetch repository '{0}' when shallow cloning is enabled", self.relpath)
+            log.info("Fetching {0} into {1}", rev, self.path)
+            self.tools.mkdir(self.path)
+            with self.tools.cwd(self.path):
+                self.tools.run("git init", output_on_error=True)
+                if refpath:
+                    self._configure_alternates(refpath)
+                self._fetch_revision(rev)
+                self.tools.run("git checkout -f FETCH_HEAD", output_on_error=True)
+                if not self.is_valid_sha(rev):
+                    # Create a local tag so that the revision can later be
+                    # resolved (e.g. by rev_parse) without re-contacting the
+                    # remote.
+                    self.tools.run("git tag -f {rev} FETCH_HEAD", rev=rev, output_on_error=True)
+        elif fs.path.exists(self.path):
+            log.info("Cloning into {0}", self.path)
             # Directory already exists: initialise and fetch instead of cloning
             with self.tools.cwd(self.path):
                 self.tools.run("git init", output_on_error=True)
@@ -111,6 +137,7 @@ class GitRepository(object):
                 self.fetch()
                 self.tools.run("git checkout -f FETCH_HEAD", output_on_error=True)
         else:
+            log.info("Cloning into {0}", self.path)
             extra_clone_options = config.get("git", "clone_options", "")
             if refpath and os.path.isdir(refpath):
                 self.tools.run("git clone --reference-if-able {0} {1} {2} {3}", refpath, extra_clone_options, self.url, self.path, output_on_error=True, new_session=True)
@@ -256,6 +283,21 @@ class GitRepository(object):
                 extra_fetch_options=extra_fetch_options,
                 url=self.url,
                 what=commit or refspec or '',
+                output_on_error=True,
+                new_session=True)
+
+    @utils.retried.on_exception(JoltCommandError, pattern="Command failed: git fetch", count=6, backoff=[2, 5, 10, 15, 20, 30])
+    def _fetch_revision(self, rev, depth=1):
+        """ Fetch a single revision (tag or commit) without its history. """
+        extra_fetch_options = config.get("git", "fetch_options", "")
+        with self.tools.cwd(self.path):
+            log.info("Fetching {0} from {1}", rev, self.url)
+            self.tools.run(
+                "git fetch --force --depth={depth} {extra_fetch_options} {url} {rev}",
+                depth=depth,
+                extra_fetch_options=extra_fetch_options,
+                url=self.url,
+                rev=rev,
                 output_on_error=True,
                 new_session=True)
 
@@ -428,14 +470,20 @@ class Git(WorkspaceResource, FileInfluence):
     url = Parameter(help="URL to the git repo to be cloned. Required.")
     """ URL to the git repo to be cloned. Required. """
 
-    rev = Parameter(required=False, help="Specific commit or tag to be checked out. Optional.")
-    """ Specific commit or tag to be checked out. Optional. """
+    rev = Parameter(required=False, help="Specific commit or tag to be checked out.")
+    """ Specific commit or tag to be checked out.
+
+    Required when ``shallow`` is True and the repository has not already
+    been cloned. Optional otherwise. """
 
     hash = BooleanParameter(required=False, help="Let repo content influence the hash of consuming tasks.")
     """ Let repo content influence the hash of consuming tasks. Default ``True``. Optional. """
 
     path = Parameter(required=False, help="Local path where the repository should be cloned.")
     """ Alternative path where the repository should be cloned. Relative to ``joltdir``. Optional. """
+
+    shallow = BooleanParameter(default=False, help="Clone the repository without its full history.")
+    """ Clone the repository without its full history. Default ``False``. Optional. """
 
     submodules = BooleanParameter(default=False, help="Initialize and update git submodules after cloning.")
     """ Initialize and update git submodules after cloning. Default ``False``. Optional. """
@@ -468,6 +516,11 @@ class Git(WorkspaceResource, FileInfluence):
         # Create the git repository
         self.refspecs = kwargs.get("refspecs", [])
         self.git = new_git(self.url, self.abspath, self.relpath, self.refspecs)
+
+        raise_error_if(
+            not self.shallow and self.rev.is_unset() and not self.git.is_cloned(),
+            "Git repository '{0}' requires a revision (rev) when shallow=true and the repository has not already been cloned",
+            self.relpath)
 
     @utils.cached.instance
     def _get_name(self):
@@ -525,7 +578,7 @@ class Git(WorkspaceResource, FileInfluence):
     def _acquire_ws(self):
         commit = None
         if not self.git.is_cloned():
-            self.git.clone(submodules=bool(self.submodules))
+            self.git.clone(submodules=bool(self.submodules), rev=self._get_revision(), shallow=bool(self.shallow))
         if not self._revision.is_imported:
             self.git.diff_unchecked()
         else:
@@ -561,7 +614,7 @@ class Git(WorkspaceResource, FileInfluence):
     @utils.cached.instance
     def get_influence(self, task):
         if not self.git.is_cloned():
-            self.git.clone(submodules=bool(self.submodules))
+            self.git.clone(submodules=bool(self.submodules), rev=self._get_revision(), shallow=bool(self.shallow))
         if not self._revision.is_imported:
             self.git.diff_unchecked()
         rev = self._get_revision()

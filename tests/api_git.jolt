@@ -582,3 +582,70 @@ class GitApi(testsupport.JoltTest):
 
         self.build("without_submodules")
         self.assertNotExists("without_submodules/sub/README.md")
+
+    def test_shallow_true(self):
+        """
+        --- tasks:
+        class A(Task):
+            requires = ["git:url=https://github.com/gideont/hello_world.git,path=a,shallow=true,rev=74cf3e97a31007f9c1e28852de3e17b69a728bcd"]
+
+            def run(self, deps, tools):
+                with tools.cwd("a"):
+                    assert tools.run("git rev-parse HEAD") == "74cf3e97a31007f9c1e28852de3e17b69a728bcd"
+                    try:
+                        tools.run("git rev-parse master")
+                        assert False, "master should not exist"
+                    except Exception:
+                        pass
+        ---
+        """
+        self.build("a")
+
+    def test_shallow_true_precloned(self):
+        """
+        --- tasks:
+        class A(Task):
+            requires = ["git:url=https://github.com/gideont/hello_world.git,path=a,shallow=true"]
+        ---
+        """
+        with self.tools.cwd(self.ws):
+            self.tools.run("git clone https://github.com/gideont/hello_world.git a")
+
+        self.build("a")
+
+    def test_shallow_false_precloned(self):
+        """
+        --- tasks:
+        class A(Task):
+            requires = ["git:url=https://github.com/gideont/hello_world.git,path=a,shallow=false"]
+        ---
+        """
+        with self.tools.cwd(self.ws):
+            self.tools.run("git clone https://github.com/gideont/hello_world.git a")
+
+        self.build("a")
+
+    @testsupport.skip_if_local
+    def test_shallow_true_with_submodules(self):
+        """
+        --- tasks:
+        class A(Task):
+            requires = ["git:url=https://github.com/gideont/hello_world.git,path=a,shallow=true,submodules=true,rev=74cf3e97a31007f9c1e28852de3e17b69a728bcd"]
+        ---
+        """
+
+        self.build("a")
+
+    def test_shallow_true(self):
+        """
+        --- tasks:
+        class A(Task):
+            requires = ["git:url=https://github.com/gideont/hello_world.git,path=a,shallow=true,rev=74cf3e97a31007f9c1e28852de3e17b69a728bcd"]
+
+            def run(self, deps, tools):
+                with tools.cwd("a"):
+                    assert tools.run("git rev-parse HEAD") == "74cf3e97a31007f9c1e28852de3e17b69a728bcd"
+                    assert tools.run("git rev-parse master")
+        ---
+        """
+        self.build("a")
