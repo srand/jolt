@@ -115,17 +115,6 @@ def get_dependencies(packages=None):
             skip.add(req)
             continue
 
-        for dep in dist.requires or []:
-            dep = dep.split(" ", 1)[0].strip()
-            dep = dep.split("[", 1)[0].strip()
-            dep = dep.split(";", 1)[0].strip()
-            dep = dep.split(">", 1)[0].strip()
-            dep = dep.split("=", 1)[0].strip()
-            dep = dep.split("<", 1)[0].strip()
-            dep = dep.split("!", 1)[0].strip()
-            if dep not in pkgs and dep not in skip:
-                reqs.append(dep)
-
         pkgs[req] = f"{dist.name}=={dist.version}"
 
     try:
