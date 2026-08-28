@@ -1,8 +1,6 @@
 package utils
 
 import (
-	"time"
-
 	"github.com/google/uuid"
 	"github.com/srand/jolt/scheduler/pkg/log"
 )
@@ -11,11 +9,13 @@ type BroadcastConsumer[E any] struct {
 	Chan      chan E
 	ID        string
 	Broadcast *Broadcast[E]
+	err       error
 }
 
 type Broadcast[E any] struct {
 	mu        RWMutex
 	consumers map[string]*BroadcastConsumer[E]
+	closed    bool
 }
 
 func NewBroadcast[E any]() *Broadcast[E] {
@@ -50,19 +50,27 @@ func (bc *Broadcast[E]) NewConsumer() *BroadcastConsumer[E] {
 	}
 	bc.Lock()
 	defer bc.Unlock()
+	if bc.closed {
+		close(consumer.Chan)
+		return consumer
+	}
 	bc.consumers[consumer.ID] = consumer
 	return consumer
 }
 
 func (bc *Broadcast[E]) HasConsumer() bool {
-	bc.Lock()
-	defer bc.Unlock()
+	bc.RLock()
+	defer bc.RUnlock()
 	return len(bc.consumers) > 0
 }
 
 func (bc *Broadcast[E]) Close() {
 	bc.Lock()
 	defer bc.Unlock()
+	if bc.closed {
+		return
+	}
+	bc.closed = true
 
 	for _, consumer := range bc.consumers {
 		close(consumer.Chan)
@@ -74,36 +82,60 @@ func (bc *Broadcast[E]) Close() {
 func (bc *Broadcast[E]) Remove(bcc *BroadcastConsumer[E]) bool {
 	bc.Lock()
 	defer bc.Unlock()
-	_, ok := bc.consumers[bcc.ID]
+	consumer, ok := bc.consumers[bcc.ID]
+	if !ok || consumer != bcc {
+		return false
+	}
 	delete(bc.consumers, bcc.ID)
-	return ok
+	return true
 }
 
 func (bcc *BroadcastConsumer[E]) Close() {
-	if bcc.Broadcast.Remove(bcc) {
-		close(bcc.Chan)
-	}
+	bc := bcc.Broadcast
+	bc.Lock()
+	defer bc.Unlock()
+	bc.closeConsumer(bcc, nil)
 }
 
-func (bcc *BroadcastConsumer[E]) send(data E) error {
-	select {
-	case bcc.Chan <- data:
-		return nil
-	case <-time.After(30 * time.Second):
-		log.Debugf("unable to send event to %s, channel full", bcc.ID)
-	}
+// Err reports why the consumer was disconnected. A normal close has no error.
+func (bcc *BroadcastConsumer[E]) Err() error {
+	bcc.Broadcast.RLock()
+	defer bcc.Broadcast.RUnlock()
+	return bcc.err
+}
 
-	bcc.Chan <- data
-	return nil
+// closeConsumer removes and closes a consumer. The caller must hold bc's write lock.
+func (bc *Broadcast[E]) closeConsumer(bcc *BroadcastConsumer[E], err error) bool {
+	consumer, ok := bc.consumers[bcc.ID]
+	if !ok || consumer != bcc {
+		return false
+	}
+	delete(bc.consumers, bcc.ID)
+	bcc.err = err
+	close(bcc.Chan)
+	return true
 }
 
 func (bc *Broadcast[E]) Send(data E) {
-	bc.RLock()
-	defer bc.RUnlock()
+	var overflowed []string
+
+	bc.Lock()
+	if bc.closed {
+		bc.Unlock()
+		return
+	}
 	for _, c := range bc.consumers {
-		err := c.send(data)
-		if err != nil {
-			log.Debug(err.Error())
+		select {
+		case c.Chan <- data:
+		default:
+			if bc.closeConsumer(c, ErrBroadcastConsumerOverflow) {
+				overflowed = append(overflowed, c.ID)
+			}
 		}
+	}
+	bc.Unlock()
+
+	for _, id := range overflowed {
+		log.Debugf("disconnecting broadcast consumer %s: channel full", id)
 	}
 }

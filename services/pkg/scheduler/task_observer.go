@@ -73,6 +73,11 @@ func (o *taskUpdateObserver) Close() {
 	o.consumer.Close()
 }
 
+// Err reports why the observer was disconnected.
+func (o *taskUpdateObserver) Err() error {
+	return o.consumer.Err()
+}
+
 // Returns a channel of task updates.
 func (o *taskUpdateObserver) Updates() chan *protocol.TaskUpdate {
 	return o.consumer.Chan

@@ -8,12 +8,13 @@ import (
 )
 
 var (
-	ErrBadRequest       = fmt.Errorf("Bad request")
-	ErrNoEligibleWorker = fmt.Errorf("No eligible worker available")
-	ErrNoTask           = fmt.Errorf("No tasks available")
-	ErrNotFound         = fmt.Errorf("Not found")
-	ErrParse            = fmt.Errorf("Parse error")
-	ErrTerminalBuild    = fmt.Errorf("Build is terminal")
+	ErrBadRequest                = fmt.Errorf("Bad request")
+	ErrBroadcastConsumerOverflow = fmt.Errorf("Broadcast consumer overflow")
+	ErrNoEligibleWorker          = fmt.Errorf("No eligible worker available")
+	ErrNoTask                    = fmt.Errorf("No tasks available")
+	ErrNotFound                  = fmt.Errorf("Not found")
+	ErrParse                     = fmt.Errorf("Parse error")
+	ErrTerminalBuild             = fmt.Errorf("Build is terminal")
 )
 
 type DetailedError interface {
@@ -32,6 +33,8 @@ func GrpcError(err error) error {
 		return status.Errorf(codes.Unavailable, "%s", err.Error())
 	case ErrTerminalBuild:
 		return status.Errorf(codes.FailedPrecondition, "%s", err.Error())
+	case ErrBroadcastConsumerOverflow:
+		return status.Errorf(codes.Unavailable, "%s", err.Error())
 	}
 	return err
 }

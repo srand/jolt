@@ -12,6 +12,17 @@ type schedulerService struct {
 	scheduler Scheduler
 }
 
+type observerWithError interface {
+	Err() error
+}
+
+func observerError(observer any) error {
+	if observer, ok := observer.(observerWithError); ok {
+		return observer.Err()
+	}
+	return nil
+}
+
 func NewSchedulerService(scheduler Scheduler) *schedulerService {
 	return &schedulerService{
 		scheduler: scheduler,
@@ -38,7 +49,13 @@ func (s *schedulerService) ScheduleBuild(request *protocol.BuildRequest, stream 
 
 	for {
 		select {
-		case update := <-observer.Updates():
+		case update, ok := <-observer.Updates():
+			if err := observerError(observer); err != nil {
+				return utils.GrpcError(err)
+			}
+			if !ok {
+				return nil
+			}
 			if update == nil {
 				return nil
 			}
@@ -76,7 +93,13 @@ func (s *schedulerService) ScheduleTask(request *protocol.TaskRequest, stream pr
 
 	for {
 		select {
-		case update := <-observer.Updates():
+		case update, ok := <-observer.Updates():
+			if err := observerError(observer); err != nil {
+				return utils.GrpcError(err)
+			}
+			if !ok {
+				return nil
+			}
 			if update == nil {
 				return nil
 			}

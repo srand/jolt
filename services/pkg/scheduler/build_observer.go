@@ -73,6 +73,11 @@ func (o *buildUpdateObserver) Close() {
 	o.consumer.Close()
 }
 
+// Err reports why the observer was disconnected.
+func (o *buildUpdateObserver) Err() error {
+	return o.consumer.Err()
+}
+
 // Returns a channel of task updates.
 func (o *buildUpdateObserver) Updates() chan *protocol.BuildUpdate {
 	return o.consumer.Chan
