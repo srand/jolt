@@ -98,6 +98,20 @@ class GitRepository(object):
         self.tools.mkdir(".git/objects/info")
         self.tools.write_file(".git/objects/info/alternates", objects_path)
 
+    def _dissociate_alternates(self):
+        """Copy borrowed reference objects locally and remove git alternates."""
+        alternates = ".git/objects/info/alternates"
+        if not self.tools.exists(alternates):
+            return
+
+        # ``git clone --dissociate`` is unavailable for the manual init/fetch
+        # paths below.  Repacking before removing the alternates file copies the
+        # reachable borrowed objects into the local repository, so persistent CI
+        # workspaces no longer depend on the shared reference cache remaining
+        # unchanged after checkout.
+        self.tools.run("git repack -a -d", output_on_error=True)
+        self.tools.unlink(alternates, ignore_errors=True)
+
     def clone(self, submodules=False, rev=None, shallow=False):
         """ Clone the repository.
 
@@ -121,6 +135,7 @@ class GitRepository(object):
                 if refpath:
                     self._configure_alternates(refpath)
                 self._fetch_revision(rev)
+                self._dissociate_alternates()
                 self.tools.run("git checkout -f FETCH_HEAD", output_on_error=True)
                 if not self.is_valid_sha(rev):
                     # Create a local tag so that the revision can later be
@@ -135,12 +150,13 @@ class GitRepository(object):
                 if refpath:
                     self._configure_alternates(refpath)
                 self.fetch()
+                self._dissociate_alternates()
                 self.tools.run("git checkout -f FETCH_HEAD", output_on_error=True)
         else:
             log.info("Cloning into {0}", self.path)
             extra_clone_options = config.get("git", "clone_options", "")
             if refpath and os.path.isdir(refpath):
-                self.tools.run("git clone --reference-if-able {0} {1} {2} {3}", refpath, extra_clone_options, self.url, self.path, output_on_error=True, new_session=True)
+                self.tools.run("git clone --reference-if-able {0} --dissociate {1} {2} {3}", refpath, extra_clone_options, self.url, self.path, output_on_error=True, new_session=True)
             else:
                 self.tools.run("git clone {0} {1} {2}", extra_clone_options, self.url, self.path, output_on_error=True, new_session=True)
 

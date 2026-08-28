@@ -516,14 +516,19 @@ class GitApi(testsupport.JoltTest):
 
         self.build("a")
         with self.tools.cwd(self.ws):
-            self.assertExists("hello_world/.git/objects/info/alternates")
-            self.assertEqual("4", self.tools.run("find hello_world/.git/objects | wc -l"))
+            self.assertNotExists("hello_world/.git/objects/info/alternates")
+            self.tools.run("git -C hello_world fsck --connectivity-only", output_on_error=True)
+            self.tools.rmtree("reference")
+            self.tools.run("git -C hello_world rev-parse HEAD", output_on_error=True)
             self.tools.rmtree("hello_world/.git")
+
+        with self.tools.cwd(self.ws):
+            self.tools.run("git clone --bare https://github.com/gideont/hello_world.git reference/github.com/gideont/hello_world.git")
 
         self.build("a")
         with self.tools.cwd(self.ws):
-            self.assertExists("hello_world/.git/objects/info/alternates")
-            self.assertEqual("4", self.tools.run("find hello_world/.git/objects | wc -l"))
+            self.assertNotExists("hello_world/.git/objects/info/alternates")
+            self.tools.run("git -C hello_world fsck --connectivity-only", output_on_error=True)
 
     @testsupport.skip_if_local
     def test_parallel_clone(self):
