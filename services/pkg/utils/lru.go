@@ -108,6 +108,24 @@ func (lru *LRU[E]) Get(path string) (item E, ok bool) {
 	return
 }
 
+// Update gets an item from the cache, moves it to the front, and applies fn
+// while holding the LRU lock. This is useful for mutating item metadata that is
+// protected by the LRU lock.
+func (lru *LRU[E]) Update(path string, fn func(E)) (item E, ok bool) {
+	lru.mu.Lock()
+	defer lru.mu.Unlock()
+
+	if ele, hit := lru.cacheMap[path]; hit {
+		lru.cacheList.MoveToFront(ele)
+		item = ele.Value.(E)
+		if fn != nil {
+			fn(item)
+		}
+		return item, true
+	}
+	return
+}
+
 func (lru *LRU[E]) Count() int {
 	lru.mu.Lock()
 	defer lru.mu.Unlock()

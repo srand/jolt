@@ -73,7 +73,7 @@ func NewLRUCache(fs utils.Fs, config CacheConfig) (*lruCache, error) {
 			return false
 		}
 
-		cache.stats.Evictions++
+		cache.recordEviction()
 
 		log.Tracef("Evicting %s (%s)", item.path, utils.HumanByteSize(item.size))
 		fs.Remove(item.path)
@@ -92,58 +92,71 @@ func (c *lruCache) pathFromDigest(digest utils.Digest) string {
 	return path.Join("objects", hex[:2], hex[2:6], hex[6:])
 }
 
-func (c *lruCache) hasFile(path string) CacheItem {
+func (c *lruCache) recordHit() {
 	c.Lock()
 	defer c.Unlock()
+	c.stats.Hits++
+}
 
-	// Check if the file is in the cache
-	item, found := c.lru.Get(path)
+func (c *lruCache) recordMiss() {
+	c.Lock()
+	defer c.Unlock()
+	c.stats.Misses++
+}
+
+func (c *lruCache) recordEviction() {
+	c.Lock()
+	defer c.Unlock()
+	c.stats.Evictions++
+}
+
+func (c *lruCache) hasFile(path string) CacheItem {
+	// Check cache metadata without holding c.Lock across filesystem I/O.
+	item, found := c.lru.Update(path, func(item *lruItem) {
+		item.access = time.Now()
+	})
 	if !found {
-		c.stats.Misses++
+		c.recordMiss()
 		return nil
 	}
 
-	// Check if the file still exists on disk
+	// Check if the file still exists on disk. This can block on storage, so it
+	// must not serialize all other cache operations behind c.Lock.
 	if _, err := c.fs.Stat(path); err != nil {
 		log.Warn("inconsistent cache: file not found on disk:", path)
 		c.lru.Remove(path)
-		c.stats.Misses++
+		c.recordMiss()
 		return nil
 	}
 
-	item.access = time.Now()
-	c.stats.Hits++
+	c.recordHit()
 	return item
 }
 
 func (c *lruCache) readFile(path string) (io.ReadCloser, error) {
-	c.Lock()
-	defer c.Unlock()
-
-	// Check if the file is in the cache
-	item, ok := c.lru.Get(path)
+	// Check cache metadata without holding c.Lock across filesystem I/O.
+	_, ok := c.lru.Update(path, func(item *lruItem) {
+		item.access = time.Now()
+	})
 	if !ok {
-		c.stats.Misses++
+		c.recordMiss()
 		return nil, utils.ErrNotFound
 	}
 
+	// Opening a file can block on storage, so do not hold c.Lock here.
 	file, err := c.fs.Open(path)
 	if err != nil {
 		log.Warn("inconsistent cache: file not found on disk:", path)
 		c.lru.Remove(path)
-		c.stats.Misses++
+		c.recordMiss()
 		return nil, err
 	}
 
-	item.access = time.Now()
-	c.stats.Hits++
+	c.recordHit()
 	return file, nil
 }
 
 func (c *lruCache) writeFile(path string) (WriteCloseDiscarder, error) {
-	c.Lock()
-	defer c.Unlock()
-
 	dirpath := filepath.Dir(path)
 	err := c.fs.MkdirAll(dirpath, 0777)
 	if err != nil {
@@ -191,18 +204,19 @@ func (c *lruCache) WriteObject(digest utils.Digest) (WriteCloseDiscarder, error)
 }
 
 func (c *lruCache) Statistics() CacheStats {
+	artifacts := int64(c.lru.Count())
+	size := c.lru.Size()
+
 	c.Lock()
 	defer c.Unlock()
 
-	c.stats.Artifacts = int64(c.lru.Count())
-	c.stats.Size = c.lru.Size()
-	return c.stats
+	stats := c.stats
+	stats.Artifacts = artifacts
+	stats.Size = size
+	return stats
 }
 
 func (c *lruCache) fileClosed(file *lruFile, err error) error {
-	c.Lock()
-	defer c.Unlock()
-
 	if err != nil {
 		c.fs.Remove(file.file.Name())
 		return err
@@ -230,8 +244,6 @@ func (c *lruCache) fileClosed(file *lruFile, err error) error {
 }
 
 func (c *lruCache) fileDiscarded(file *lruFile) error {
-	c.Lock()
-	defer c.Unlock()
 	return c.fs.Remove(file.file.Name())
 }
 
