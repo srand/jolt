@@ -1,0 +1,154 @@
+import contextlib
+import subprocess
+import sys
+import threading
+sys.path.append(".")
+
+from unittest.mock import MagicMock, patch
+
+from testsupport import JoltTest
+from jolt import tools
+
+
+class ToolsInternal(JoltTest):
+    name = "int/tools"
+
+    def process(self):
+        process = MagicMock()
+        process.pid = 123
+        process.args = "command"
+        process.returncode = 0
+        process.stdin = MagicMock()
+        process.stdout = MagicMock()
+        process.stderr = MagicMock()
+        return process
+
+    def test_reader_is_daemon(self):
+        stream = MagicMock()
+        stream.readline.side_effect = [b"output\n", b""]
+        logbuf = []
+
+        reader = tools.Reader(threading.current_thread(), stream, logbuf=logbuf)
+        reader.join()
+
+        self.assertTrue(reader.daemon)
+        self.assertEqual(logbuf, [(reader, "output")])
+
+    def test_close_process_streams_skips_active_reader(self):
+        process = self.process()
+        reader = MagicMock()
+        reader.stream = process.stdout
+        reader.is_alive.return_value = True
+
+        tools._close_process_streams(process, ((process.stdout, reader),))
+
+        process.stdin.close.assert_called_once_with()
+        process.stdout.close.assert_not_called()
+        process.stderr.close.assert_called_once_with()
+
+    @patch("jolt.tools.utils.delayed_interrupt", return_value=contextlib.nullcontext())
+    @patch("jolt.tools._close_process_streams")
+    @patch("jolt.tools._stop_process")
+    def test_cleanup_interrupted_process_is_bounded(
+            self, stop_process, close_streams, delayed_interrupt):
+        process = self.process()
+        stdout = MagicMock()
+        stdout.stream = process.stdout
+        stderr = MagicMock()
+        stderr.stream = process.stderr
+
+        tools._cleanup_interrupted_process(process, (stdout, stderr))
+
+        stop_process.assert_called_once_with(process)
+        stdout.join.assert_called_once_with(tools.READER_JOIN_TIMEOUT)
+        stderr.join.assert_called_once_with(tools.READER_JOIN_TIMEOUT)
+        close_streams.assert_called_once()
+        delayed_interrupt.assert_called_once_with()
+
+    @patch("jolt.tools.utils.delayed_interrupt", return_value=contextlib.nullcontext())
+    @patch("jolt.tools._stop_process", side_effect=KeyboardInterrupt)
+    def test_cleanup_interrupted_process_suppresses_second_interrupt(
+            self, stop_process, delayed_interrupt):
+        process = self.process()
+        tools._cleanup_interrupted_process(process)
+
+        stop_process.assert_called_once_with(process)
+
+    @patch("jolt.tools._cleanup_interrupted_process")
+    def test_wait_for_process_preserves_keyboard_interrupt(self, cleanup):
+        process = self.process()
+        process.wait.side_effect = KeyboardInterrupt
+
+        with self.assertRaises(KeyboardInterrupt):
+            tools._wait_for_process(process, 7)
+
+        process.wait.assert_called_once_with(timeout=7)
+        cleanup.assert_called_once_with(process)
+
+    @patch("jolt.tools.utils.call_and_catch")
+    @patch("jolt.tools._kill_process")
+    @patch("jolt.tools._terminate_process")
+    def test_stop_process_escalates_to_kill(
+            self, terminate_process, kill_process, call_and_catch):
+        process = self.process()
+        process.wait.side_effect = subprocess.TimeoutExpired("command", 10)
+
+        tools._stop_process(process)
+
+        terminate_process.assert_called_once_with(process)
+        process.wait.assert_called_once_with(10)
+        kill_process.assert_called_once_with(process)
+        call_and_catch.assert_called_once_with(process.wait, 10)
+
+    @patch("jolt.tools._close_process_streams")
+    @patch("jolt.tools._cleanup_interrupted_process")
+    @patch("jolt.tools._wait_for_process", return_value=False)
+    @patch("jolt.tools.Reader")
+    @patch("jolt.tools.subprocess.Popen")
+    def test_run_cleans_up_interrupt_during_reader_join(
+            self, popen, reader_type, wait_for_process,
+            cleanup, close_streams):
+        process = self.process()
+        popen.return_value = process
+        stdout = MagicMock()
+        stdout.stream = process.stdout
+        stdout.join.side_effect = KeyboardInterrupt
+        stderr = MagicMock()
+        stderr.stream = process.stderr
+        reader_type.side_effect = [stdout, stderr]
+
+        with self.assertRaises(KeyboardInterrupt):
+            tools._run("command", None, None)
+
+        wait_for_process.assert_called_once_with(process, None)
+        cleanup.assert_called_once_with(process, (stdout, stderr))
+        close_streams.assert_called_once()
+        stderr.join.assert_not_called()
+
+    @patch("jolt.tools._close_process_streams")
+    @patch("jolt.tools._cleanup_interrupted_process")
+    @patch("jolt.tools._wait_for_process", return_value=False)
+    def test_popen_file_cleans_up_interrupt_during_reader_join(
+            self, wait_for_process, cleanup, close_streams):
+        process = self.process()
+        options = {
+            "timeout": None,
+            "output": False,
+            "output_on_error": False,
+            "output_rstrip": True,
+            "output_stderr": False,
+            "output_stdio": False,
+        }
+
+        with patch("jolt.tools.Reader") as reader_type:
+            reader = reader_type.return_value
+            reader.stream = process.stderr
+            reader.join.side_effect = KeyboardInterrupt
+            process.stdout.read.return_value = b""
+            popen_file = tools._PopenFile(process, **options)
+
+        with self.assertRaises(KeyboardInterrupt):
+            popen_file.finalize()
+
+        cleanup.assert_called_once_with(process, (reader,))
+        close_streams.assert_called_once()

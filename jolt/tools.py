@@ -72,6 +72,7 @@ from jolt.error import raise_task_error, raise_task_error_if
 
 
 SUPPORTED_ARCHIVE_TYPES = [".tar", ".tar.bz2", ".tar.gz", ".tgz", ".tar.xz", ".tar.zst", ".zip"]
+READER_JOIN_TIMEOUT = 1
 
 
 http_session = Session()
@@ -90,6 +91,7 @@ def stderr_write(line):
 class Reader(threading.Thread):
     def __init__(self, parent, stream, output=None, logbuf=None, output_rstrip=True):
         super(Reader, self).__init__()
+        self.daemon = True
         self.output = output
         self.output_rstrip = output_rstrip
         self.parent = parent
@@ -157,6 +159,40 @@ def _kill_process(process):
         pass
 
 
+def _stop_process(process):
+    _terminate_process(process)
+    try:
+        process.wait(10)
+    except subprocess.TimeoutExpired:
+        _kill_process(process)
+        utils.call_and_catch(process.wait, 10)
+
+
+def _close_process_streams(process, readers=()):
+    readers = dict(readers)
+    for stream in (process.stdin, process.stdout, process.stderr):
+        reader = readers.get(stream)
+        if stream and (reader is None or not reader.is_alive()):
+            utils.call_and_catch(stream.close)
+
+
+def _cleanup_interrupted_process(process, readers=()):
+    try:
+        with utils.delayed_interrupt():
+            _stop_process(process)
+            for reader in readers:
+                if reader:
+                    reader.join(READER_JOIN_TIMEOUT)
+            _close_process_streams(
+                process,
+                ((reader.stream, reader) for reader in readers if reader))
+    except KeyboardInterrupt:
+        # Preserve the interrupt that initiated cleanup. Reader threads are
+        # daemons, so a pipe retained by an orphaned descendant cannot block
+        # interpreter shutdown indefinitely.
+        pass
+
+
 def _format_command(process):
     return process.args if type(process.args) is str else " ".join(process.args)
 
@@ -167,21 +203,11 @@ def _wait_for_process(process, timeout):
     try:
         process.wait(timeout=timeout)
     except KeyboardInterrupt:
-        _terminate_process(process)
-        try:
-            process.wait(10)
-        except subprocess.TimeoutExpired:
-            _kill_process(process)
-            utils.call_and_catch(process.wait, 10)
+        _cleanup_interrupted_process(process)
         raise
     except (subprocess.TimeoutExpired, JoltTimeoutError):
         timedout = True
-        _terminate_process(process)
-        try:
-            process.wait(10)
-        except subprocess.TimeoutExpired:
-            _kill_process(process)
-            utils.call_and_catch(process.wait, 10)
+        _stop_process(process)
 
     return timedout
 
@@ -274,15 +300,17 @@ class _PopenFile(object):
         try:
             self._close_stdin()
             timedout = _wait_for_process(self._process, self._timeout)
-        finally:
             remaining = self._process.stdout.read()
             self._record_stdout(remaining)
             self._stderr.join()
+        except KeyboardInterrupt:
+            _cleanup_interrupted_process(self._process, (self._stderr,))
+            raise
+        finally:
             self._stderrbuf = [line for _, line in self._stderrlog]
-            utils.call_and_catch(self._process.stdout.close)
-            utils.call_and_catch(self._process.stderr.close)
-            if self._process.stdin:
-                utils.call_and_catch(self._process.stdin.close)
+            _close_process_streams(
+                self._process,
+                ((self._stderr.stream, self._stderr),))
 
         if self._process.returncode != 0 and self._output_on_error:
             for data in self._stdoutbuf:
@@ -348,16 +376,18 @@ def _run(cmd, cwd, env, *args, **kwargs):
                 output_rstrip=options["output_rstrip"])
 
         timedout = _wait_for_process(p, options["timeout"])
+        stdout.join()
+        stderr.join()
 
-    finally:
-        if stdout:
-            stdout.join()
-        if stderr:
-            stderr.join()
+    except KeyboardInterrupt:
         if p:
-            p.stdin.close()
-            p.stdout.close()
-            p.stderr.close()
+            _cleanup_interrupted_process(p, (stdout, stderr))
+        raise
+    finally:
+        if p:
+            _close_process_streams(
+                p,
+                ((reader.stream, reader) for reader in (stdout, stderr) if reader))
 
     if p.returncode != 0 and options["output_on_error"]:
         for reader, line in logbuf:

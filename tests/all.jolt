@@ -31,6 +31,7 @@ class All(Alias):
         # "ext/podman",  -- cannot run inside CI container
         "ext/symlinks",
         "flake8",
+        "int/tools",
         "int/utils",
         "nfr",
     ]

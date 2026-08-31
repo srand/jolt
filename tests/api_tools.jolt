@@ -1118,7 +1118,7 @@ class ToolsApi(JoltTest):
 
         class A(Task):
             def run(self, d, t):
-                t.run("timeout 3 yes & (sleep 1 && kill -INT {{}})", os.getpid(), shell=True)
+                t.run("timeout 3 sleep 30 & (sleep 1 && kill -INT {{}})", os.getpid(), shell=True)
         ---
         """
         with self.assertRaises(Exception):
