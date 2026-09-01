@@ -13,7 +13,7 @@ import (
 )
 
 // Sets up a gRPC server on a specific listening address and starts it.
-func serveGrpc(sched scheduler.Scheduler, stash logstash.LogStash, address string) {
+func serveGrpc(sched scheduler.Scheduler, events *scheduler.EventHub, stash logstash.LogStash, address string) {
 	// Parse URI
 	uri, err := url.Parse(address)
 	if err != nil {
@@ -55,7 +55,7 @@ func serveGrpc(sched scheduler.Scheduler, stash logstash.LogStash, address strin
 	server := grpc.NewServer(opts...)
 	protocol.RegisterSchedulerServer(server, scheduler.NewSchedulerService(sched))
 	protocol.RegisterWorkerServer(server, scheduler.NewWorkerService(stash, sched))
-	protocol.RegisterAdministrationServer(server, scheduler.NewAdminService(sched))
+	protocol.RegisterAdministrationServer(server, scheduler.NewAdminService(sched, events))
 	protocol.RegisterLogStashServer(server, logstash.NewLogStashService(stash))
 	if err := server.Serve(socket); err != nil {
 		log.Fatal(err)

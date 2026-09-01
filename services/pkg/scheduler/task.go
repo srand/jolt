@@ -233,3 +233,10 @@ func (t *Task) IsAssigned() bool {
 	defer t.RUnlock()
 	return t.worker != nil
 }
+
+// Returns the worker that the task is assigned to, if any.
+func (t *Task) Worker() Worker {
+	t.RLock()
+	defer t.RUnlock()
+	return t.worker
+}

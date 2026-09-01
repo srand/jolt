@@ -197,21 +197,10 @@ class JoltDebianPackage(docker.DockerImage):
         super().run(deps, tools)
 
 
-class ProtobufTools(docker.DockerImage):
-    name = "jolt/protobuf-tools"
-    dockerfile = """
-    FROM debian:trixie-slim
-    RUN apt-get update && apt-get install -y protobuf-compiler protobuf-compiler-grpc  python3-pip python3-grpcio && apt-get clean
-    """
-    extract = True
-    imagefile = None
-
-
 @git.influence("protocol")
 class GenerateProtobufs(cxx.Compilation):
     name = "jolt/protobufs"
     incpaths = ["."]
-    requires = ["tools=jolt/protobuf-tools"]
     sources = [
         "jolt/common.proto",
         "jolt/plugins/remote_execution/administration.proto",

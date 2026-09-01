@@ -13,6 +13,8 @@ services:
       - cache-http:/data
   dashboard:
     image: robrt/jolt-dashboard:latest
+    environment:
+      - JOLT_SCHEDULER_URI=tcp://scheduler:9090
     ports:
       - "80:80"
   scheduler:

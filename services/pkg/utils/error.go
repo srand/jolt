@@ -15,6 +15,7 @@ var (
 	ErrNotFound                  = fmt.Errorf("Not found")
 	ErrParse                     = fmt.Errorf("Parse error")
 	ErrTerminalBuild             = fmt.Errorf("Build is terminal")
+	ErrTerminated                = fmt.Errorf("Terminated")
 )
 
 type DetailedError interface {
@@ -34,6 +35,8 @@ func GrpcError(err error) error {
 	case ErrTerminalBuild:
 		return status.Errorf(codes.FailedPrecondition, "%s", err.Error())
 	case ErrBroadcastConsumerOverflow:
+		return status.Errorf(codes.Unavailable, "%s", err.Error())
+	case ErrTerminated:
 		return status.Errorf(codes.Unavailable, "%s", err.Error())
 	}
 	return err

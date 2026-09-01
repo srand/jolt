@@ -87,10 +87,132 @@ message ListWorkersResponse {
     repeated Worker workers = 1;
 }
 
+// Full state of a task as known by the scheduler.
+message TaskInfo {
+    // Identifier of the build that the task belongs to
+    string build_id = 1;
+
+    // Influence identity of the task. Not unique; the same identity may be
+    // executed by several concurrent builds.
+    string identity = 2;
+
+    // Unique identifier of this particular task execution
+    string instance = 3;
+
+    // Name of the task
+    string name = 4;
+
+    // Current status of the task
+    TaskStatus status = 5;
+
+    // Values of the task's required "label" platform properties
+    repeated string labels = 6;
+
+    // Identifier of the worker executing the task, if assigned
+    string worker_id = 7;
+
+    // Hostname of the worker executing the task, if assigned
+    string worker_hostname = 8;
+
+    // Time when the task entered the build queue
+    google.protobuf.Timestamp queued_at = 9;
+
+    // Time when the task started executing, if it has
+    google.protobuf.Timestamp started_at = 10;
+
+    // Time when the task reached a terminal status, if it has
+    google.protobuf.Timestamp ended_at = 11;
+
+    // URL from which the task log can be downloaded
+    string log = 12;
+}
+
+// Full state of a worker as known by the scheduler.
+message WorkerInfo {
+    // Unique identifier of the worker
+    string id = 1;
+
+    // Hostname of the worker, from its platform properties
+    string hostname = 2;
+
+    // The worker platform
+    Platform platform = 3;
+
+    // Task platform requirements
+    Platform task_platform = 4;
+
+    // Time when the worker enlisted with the scheduler
+    google.protobuf.Timestamp enlisted_at = 5;
+
+    // Task currently assigned to the worker, if any
+    TaskInfo task = 6;
+}
+
+// A worker has disconnected from the scheduler.
+message WorkerRemoved {
+    string id = 1;
+}
+
+// Complete state of the scheduler at a point in time.
+// Only tasks that have not yet reached a terminal status are included.
+message Snapshot {
+    repeated TaskInfo tasks = 1;
+    repeated WorkerInfo workers = 2;
+    google.protobuf.Timestamp timestamp = 3;
+}
+
+message StreamEventsRequest {
+    // Only stream events for tasks and workers, respectively.
+    // If neither is set, both are streamed.
+    bool tasks = 1;
+    bool workers = 2;
+
+    // Only stream events for tasks belonging to this build
+    string build_id = 3;
+
+    // Only stream events for tasks with these statuses
+    repeated TaskStatus task_status = 4;
+
+    // Only stream events for tasks and workers with all of these labels
+    repeated string labels = 5;
+
+    // Only stream events for tasks and workers on this worker hostname
+    string hostname = 6;
+
+    // Do not send the initial snapshot
+    bool no_snapshot = 7;
+}
+
+// An incremental update of the scheduler's state.
+// The first event of a stream is always a snapshot, unless suppressed.
+message SchedulerEvent {
+    oneof event {
+        // Complete state of the scheduler
+        Snapshot snapshot = 1;
+
+        // A task was scheduled or changed status
+        TaskInfo task = 2;
+
+        // A worker enlisted or changed its assigned task
+        WorkerInfo worker = 3;
+
+        // A worker delisted
+        WorkerRemoved worker_removed = 4;
+
+        // Keepalive, sent when the stream is otherwise idle
+        google.protobuf.Timestamp heartbeat = 5;
+    }
+}
+
 // This service is not yet implemented.
 service Administration {
     rpc CancelBuild(CancelBuildRequest) returns (CancelBuildResponse);
     rpc ListBuilds(ListBuildsRequest) returns (ListBuildsResponse);
     rpc ListWorkers(ListWorkersRequest) returns (ListWorkersResponse);
     rpc Reschedule(google.protobuf.Empty) returns (google.protobuf.Empty);
+
+    // Subscribe to scheduler state changes. The first event is a snapshot of
+    // all queued and running tasks and all connected workers, followed by
+    // incremental updates.
+    rpc StreamEvents(StreamEventsRequest) returns (stream SchedulerEvent);
 }

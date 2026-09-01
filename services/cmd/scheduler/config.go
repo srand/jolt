@@ -16,15 +16,6 @@ type Config struct {
 	PublicHttp []string `mapstructure:"public_http"`
 	// LogStash configuration.
 	LogStash LogStashConfig `mapstructure:"logstash"`
-	// Dashboard configuration.
-	Dashboard *DashboardConfig `mapstructure:"dashboard"`
-}
-
-func (c *Config) GetDashboardUri() string {
-	if c.Dashboard != nil {
-		return c.Dashboard.GetDashboardUri()
-	}
-	return ""
 }
 
 func (c *Config) GetLogstashUri() string {

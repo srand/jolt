@@ -146,9 +146,12 @@ configurable size, allowing them to be accessed for a certain period
 of time after a task finishes. Clients can download the logs through
 the HTTP `/logs/<id>` endpoint.
 
-If configured, the scheduler can forward task telemetry to the Jolt
-Dashboard web service. This enables users to monitor the status and
-logs of all tasks in the system. The Dashboard fetches the logs
+The Jolt Dashboard web service subscribes to the scheduler's administration
+event stream. On connection it receives a snapshot of all queued and running
+tasks and all connected workers, followed by incremental updates. This enables
+users to monitor the status and logs of all tasks in the system. Because the
+Dashboard pulls its state from the scheduler and resynchronizes on every
+reconnect, it cannot drift out of sync. The Dashboard fetches the logs
 using the scheduler's HTTP REST API.
 
 Clients have the ability to cancel a build. Tasks that have not

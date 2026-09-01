@@ -37,6 +37,11 @@ class AdministrationStub(object):
                 request_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
                 response_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
                 )
+        self.StreamEvents = channel.unary_stream(
+                '/Administration/StreamEvents',
+                request_serializer=jolt_dot_plugins_dot_remote__execution_dot_administration__pb2.StreamEventsRequest.SerializeToString,
+                response_deserializer=jolt_dot_plugins_dot_remote__execution_dot_administration__pb2.SchedulerEvent.FromString,
+                )
 
 
 class AdministrationServicer(object):
@@ -67,6 +72,15 @@ class AdministrationServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def StreamEvents(self, request, context):
+        """Subscribe to scheduler state changes. The first event is a snapshot of
+        all queued and running tasks and all connected workers, followed by
+        incremental updates.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_AdministrationServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -89,6 +103,11 @@ def add_AdministrationServicer_to_server(servicer, server):
                     servicer.Reschedule,
                     request_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
                     response_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
+            ),
+            'StreamEvents': grpc.unary_stream_rpc_method_handler(
+                    servicer.StreamEvents,
+                    request_deserializer=jolt_dot_plugins_dot_remote__execution_dot_administration__pb2.StreamEventsRequest.FromString,
+                    response_serializer=jolt_dot_plugins_dot_remote__execution_dot_administration__pb2.SchedulerEvent.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -166,5 +185,22 @@ class Administration(object):
         return grpc.experimental.unary_unary(request, target, '/Administration/Reschedule',
             google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
             google_dot_protobuf_dot_empty__pb2.Empty.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def StreamEvents(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_stream(request, target, '/Administration/StreamEvents',
+            jolt_dot_plugins_dot_remote__execution_dot_administration__pb2.StreamEventsRequest.SerializeToString,
+            jolt_dot_plugins_dot_remote__execution_dot_administration__pb2.SchedulerEvent.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)

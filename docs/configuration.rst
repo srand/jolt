@@ -296,31 +296,6 @@ Configuration variables for the cache service itself can be found here:
 :ref:`Cache <configuration-services-cache>`
 
 
-Dashboard
-^^^^^^^^^
-
-The dashboard plugin automatically submits required telemetry to
-the Jolt Dashboard. It should be enabled on both clients and workers.
-
-The plugin is enabled by adding a ``[dashboard]`` section in
-the Jolt configuration.
-
-These configuration keys exist:
-
-
-  .. list-table::
-    :widths: 30 70
-    :header-rows: 1
-    :class: tight-table
-
-    * - Config Key
-      - Description
-
-    * - ``uri``
-      - | Base URI of the Jolt Dashboard.
-        | Default: http://dashboard
-
-
 Email
 ^^^^^
 
@@ -1025,11 +1000,30 @@ Example:
 Dashboard
 ^^^^^^^^^
 
-The dashboard service is used to collect and display task telemetry data
-from the Jolt scheduler.
+The dashboard service displays the tasks and workers of a Jolt scheduler.
+It subscribes to the scheduler's administration event stream, receiving a
+snapshot of all queued and running tasks and all connected workers when the
+connection is established, followed by incremental updates. The dashboard
+resynchronizes automatically if the connection is lost, so its view cannot
+drift away from the scheduler's.
 
 Its container image is available at `robrt/jolt-dashboard <https://hub.docker.com/r/robrt/jolt-dashboard>`_.
-No configuration is currently possible.
+
+  .. list-table::
+    :widths: 30 70
+    :header-rows: 1
+    :class: tight-table
+
+    * - Environment Variable
+      - Description
+
+    * - ``JOLT_SCHEDULER_URI``
+      - | gRPC URI of the scheduler to subscribe to.
+        | Default: tcp://jolt-scheduler:9090
+
+    * - ``PORT``
+      - | Port to serve the web application on.
+        | Default: 8080
 
  .. _configuration-services-scheduler:
 

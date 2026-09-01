@@ -513,6 +513,7 @@ func (s *priorityScheduler) NewWorker(platform, taskPlatform *Platform) (Worker,
 		worker.TaskPlatform().Log("Task Platform", 2)
 	}
 
+	s.WorkerEnlisted(worker)
 	s.Reschedule()
 
 	return worker, nil
@@ -541,6 +542,7 @@ func (s *priorityScheduler) removeWorker(worker Worker) error {
 	delete(s.workers, worker.Id())
 	s.Unlock()
 
+	s.WorkerDelisted(worker)
 	s.Reschedule()
 	return nil
 }
@@ -575,6 +577,20 @@ func (s *priorityScheduler) AddObserver(receiver SchedulerObserver) {
 func (s *priorityScheduler) TaskScheduled(task *Task) {
 	for _, receiver := range s.observers {
 		receiver.TaskScheduled(task)
+	}
+}
+
+// Implementation of SchedulerObserver interface
+func (s *priorityScheduler) WorkerEnlisted(worker Worker) {
+	for _, receiver := range s.observers {
+		receiver.WorkerEnlisted(worker)
+	}
+}
+
+// Implementation of SchedulerObserver interface
+func (s *priorityScheduler) WorkerDelisted(worker Worker) {
+	for _, receiver := range s.observers {
+		receiver.WorkerDelisted(worker)
 	}
 }
 

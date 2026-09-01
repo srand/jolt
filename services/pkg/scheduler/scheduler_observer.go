@@ -8,4 +8,10 @@ type SchedulerObserver interface {
 
 	// When the task's status has changed
 	TaskStatusChanged(*Task, protocol.TaskStatus)
+
+	// When a worker has connected and registered with the scheduler
+	WorkerEnlisted(Worker)
+
+	// When a worker has disconnected and been unregistered
+	WorkerDelisted(Worker)
 }

@@ -7,7 +7,6 @@ import (
 	"os"
 
 	"github.com/labstack/echo/v4"
-	"github.com/srand/jolt/scheduler/pkg/dashboard"
 	"github.com/srand/jolt/scheduler/pkg/log"
 	"github.com/srand/jolt/scheduler/pkg/logstash"
 	"github.com/srand/jolt/scheduler/pkg/scheduler"
@@ -54,14 +53,16 @@ var rootCmd = &cobra.Command{
 		}
 	},
 	Run: func(cmd *cobra.Command, args []string) {
+		ctx := context.Background()
+
 		// Create scheduler.
 		sched := scheduler.NewPriorityScheduler()
 
-		// Create dashboard telemetry provider if configured
-		if config.Dashboard != nil {
-			hooks := dashboard.NewDashboardTelemetryHook(config)
-			sched.AddObserver(hooks)
-		}
+		// Mirror scheduler state for subscribers of the administration event stream.
+		// Must be registered before any listener accepts connections.
+		events := scheduler.NewEventHub(config.GetLogstashUri())
+		sched.AddObserver(events)
+		go events.Run(ctx)
 
 		// Create filesystem storage for the logstash
 		stashFs, err := config.LogStash.CreateFs()
@@ -75,7 +76,7 @@ var rootCmd = &cobra.Command{
 		// Start listening for Grpc connections on all configured addresses
 		schedulerUris := viper.GetStringSlice("listen_grpc")
 		for _, uri := range schedulerUris {
-			go serveGrpc(sched, stash, uri)
+			go serveGrpc(sched, events, stash, uri)
 		}
 
 		// Start listening for logstash HTTP connections on all configured addresses
@@ -100,7 +101,7 @@ var rootCmd = &cobra.Command{
 		}
 
 		// Ready to run the scheduler
-		sched.Run(context.Background())
+		sched.Run(ctx)
 	},
 }
 

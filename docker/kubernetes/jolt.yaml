@@ -15,8 +15,6 @@ data:
         size: 10GB
         storage: disk
         path: /root/logstash
-      dashboard:
-        uri: "http://jolt-dashboard"
   worker.conf:
     |-
       # This configuration is used by the Jolt application
@@ -102,6 +100,10 @@ spec:
       containers:
         - name: jolt-dashboard
           image: robrt/jolt-dashboard:latest
+          env:
+            # The dashboard subscribes to the scheduler's event stream.
+            - name: JOLT_SCHEDULER_URI
+              value: tcp://jolt-scheduler:9090
           ports:
             - containerPort: 8080
 ---
