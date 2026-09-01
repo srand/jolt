@@ -24,6 +24,7 @@ services:
       - "9090:9090"
   worker:
     environment:
+      - "JOLT_CACHE_DIR=/data/cache"
       - "JOLT_CACHE_GRPC_URI=tcp://cache:9090"
       - "JOLT_CACHE_HTTP_URI=http://cache:8080"
     image: robrt/jolt-worker:latest
@@ -33,7 +34,7 @@ services:
       - source: worker.conf
         target: /root/.config/jolt/config
     volumes:
-      - cache-node:/root/.cache/jolt
+      - cache-node:/data/cache
       - /etc/machine-id:/etc/machine-id
 configs:
   worker.conf:

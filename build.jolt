@@ -1,5 +1,5 @@
-from jolt import Alias, BooleanParameter, Parameter, Task, TaskGenerator, Tools
-from jolt import attributes, influence
+from jolt import Alias, BooleanParameter, IntParameter, Parameter, Task, TaskGenerator, Tools
+from jolt import attributes, influence, utils
 from jolt import __version__
 from jolt.pkgs import fstree
 from jolt.plugins import cxx, docker, git, selfdeploy
@@ -115,6 +115,73 @@ class WorkerImage(SchedulerImage):
         "robrt/jolt-worker:latest",
         "robrt/jolt-worker:{version}",
     ]
+
+
+@git.influence("docker/swarm")
+class Deployment(Task):
+    """
+    Deploys a scheduler, a cache and a number of workers locally.
+
+    The deployment is the docker/swarm stack, overridden to use the
+    freshly built images. It runs in the foreground until interrupted
+    with Ctrl-C, at which point containers and volumes are removed again.
+
+    Configure a Jolt client to use the deployment with docker/swarm/client.conf.
+    """
+
+    name = "jolt/run"
+
+    cacheable = False
+    local = True
+
+    project = Parameter("jolt", help="Name of the Docker Compose project.")
+    version = Parameter(__version__)
+    workers = IntParameter(2, help="Number of workers to deploy.")
+
+    requires = [
+        "jolt/cache:version={version}",
+        "jolt/scheduler:version={version}",
+        "jolt/worker:version={version}",
+    ]
+
+    override = """
+services:
+  cache:
+    image: {{ cache }}
+  scheduler:
+    image: {{ scheduler }}
+  worker:
+    image: {{ worker }}
+    deploy:
+      replicas: {{ workers }}
+"""
+
+    def run(self, deps, tools):
+        override = tools.render(
+            self.override,
+            cache=str(deps["jolt/cache:version={version}"].strings.tag),
+            scheduler=str(deps["jolt/scheduler:version={version}"].strings.tag),
+            worker=str(deps["jolt/worker:version={version}"].strings.tag),
+            workers=int(self.workers),
+        )
+
+        with tools.cwd(tools.builddir()):
+            tools.write_file("override.yaml", override, expand=False)
+            self.override_file = tools.expand_path("override.yaml")
+
+        # Relative paths in the stack file are resolved from its own directory.
+        with tools.cwd("docker/swarm"):
+            self.info("Scheduler listening on tcp://localhost:9090 and http://localhost:8080")
+            self.info("Cache listening on tcp://localhost:9091 and http://localhost:8081")
+            self.info("Press Ctrl-C to stop the deployment")
+
+            try:
+                tools.run("docker compose -p {project} -f jolt.yaml -f {override_file}"
+                          " up --remove-orphans cache scheduler worker")
+            finally:
+                with utils.delayed_interrupt():
+                    tools.run("docker compose -p {project} -f jolt.yaml -f {override_file}"
+                              " down --volumes", output_on_error=True)
 
 
 @influence.files("**/*.py")
