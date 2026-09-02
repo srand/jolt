@@ -173,6 +173,8 @@ func (t *Task) setStatus(status protocol.TaskStatus) bool {
 		fallthrough
 	case protocol.TaskStatus_TASK_QUEUED:
 		fallthrough
+	case protocol.TaskStatus_TASK_ASSIGNED:
+		fallthrough
 	case protocol.TaskStatus_TASK_RUNNING:
 		if t.status != status {
 			t.status = status

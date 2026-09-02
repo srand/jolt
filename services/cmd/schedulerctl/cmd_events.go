@@ -123,10 +123,10 @@ func printEvent(event *protocol.SchedulerEvent) {
 			len(snapshot.GetWorkers()),
 		)
 		for _, task := range snapshot.GetTasks() {
-			printTask("  task    ", task)
+			printTask("task      ", task)
 		}
 		for _, worker := range snapshot.GetWorkers() {
-			printWorker("  worker  ", worker)
+			printWorker("worker    ", worker)
 		}
 
 	case *protocol.SchedulerEvent_Task:
@@ -160,16 +160,22 @@ func printTask(prefix string, task *protocol.TaskInfo) {
 	fmt.Println()
 }
 
+// Worker events are upserts, so report the worker's state rather than an event name.
 func printWorker(prefix string, worker *protocol.WorkerInfo) {
-	fmt.Printf("%s %-14s %s", prefix, "ENLISTED", worker.GetId())
+	task := worker.GetTask()
+
+	state := "IDLE"
+	if task != nil {
+		state = strings.TrimPrefix(task.GetStatus().String(), "TASK_")
+	}
+
+	fmt.Printf("%s %-14s %s", prefix, state, worker.GetId())
 
 	if hostname := worker.GetHostname(); hostname != "" {
 		fmt.Printf(" @%s", hostname)
 	}
-	if task := worker.GetTask(); task != nil {
-		fmt.Printf(" running %s", task.GetName())
-	} else {
-		fmt.Printf(" idle")
+	if task != nil {
+		fmt.Printf(" %s", task.GetName())
 	}
 	fmt.Println()
 }

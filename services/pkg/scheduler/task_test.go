@@ -71,6 +71,7 @@ func (s *TaskTest) TestIsComplete() {
 	}{
 		{protocol.TaskStatus_TASK_CANCELLED, true},
 		{protocol.TaskStatus_TASK_CREATED, false},
+		{protocol.TaskStatus_TASK_ASSIGNED, false},
 		{protocol.TaskStatus_TASK_DOWNLOADED, true},
 		{protocol.TaskStatus_TASK_FAILED, true},
 		{protocol.TaskStatus_TASK_PASSED, true},
@@ -88,6 +89,27 @@ func (s *TaskTest) TestIsComplete() {
 		task.PostUpdate(&protocol.TaskUpdate{Status: data.status})
 		assert.Equal(s.T(), data.complete, task.IsCompleted(), data.status)
 	}
+}
+
+func (s *TaskTest) TestAssignedStatusTransitions() {
+	build := s.newBuild()
+
+	task := addTask(build, "assigned-to-running", "label=test")
+	task.PostStatusUpdate(protocol.TaskStatus_TASK_QUEUED)
+	assert.True(s.T(), task.PostUpdate(&protocol.TaskUpdate{Status: protocol.TaskStatus_TASK_ASSIGNED}))
+	assert.True(s.T(), task.PostUpdate(&protocol.TaskUpdate{Status: protocol.TaskStatus_TASK_RUNNING}))
+	assert.Equal(s.T(), protocol.TaskStatus_TASK_RUNNING, task.Status())
+
+	// A task returned to the queue must be able to leave the assigned state.
+	requeued := addTask(build, "assigned-to-queued", "label=test")
+	assert.True(s.T(), requeued.PostUpdate(&protocol.TaskUpdate{Status: protocol.TaskStatus_TASK_ASSIGNED}))
+	assert.True(s.T(), requeued.PostUpdate(&protocol.TaskUpdate{Status: protocol.TaskStatus_TASK_QUEUED}))
+	assert.Equal(s.T(), protocol.TaskStatus_TASK_QUEUED, requeued.Status())
+
+	failed := addTask(build, "assigned-to-failed", "label=test")
+	assert.True(s.T(), failed.PostUpdate(&protocol.TaskUpdate{Status: protocol.TaskStatus_TASK_ASSIGNED}))
+	assert.True(s.T(), failed.PostUpdate(&protocol.TaskUpdate{Status: protocol.TaskStatus_TASK_FAILED}))
+	assert.Equal(s.T(), protocol.TaskStatus_TASK_FAILED, failed.Status())
 }
 
 func (s *TaskTest) TestObserver() {

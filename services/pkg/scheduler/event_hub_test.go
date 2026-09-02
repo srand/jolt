@@ -249,6 +249,47 @@ func TestEventHubFilters(t *testing.T) {
 	assert.Empty(t, snapshot.Tasks)
 }
 
+func TestEventHubReportsAssignmentBeforeExecution(t *testing.T) {
+	hub, _ := newTestHub(t)
+
+	platform := NewPlatform()
+	platform.AddProperty("worker.hostname", "builder1")
+	id, _ := uuid.NewRandom()
+	worker := &priorityWorker{id: id, platform: platform, taskPlatform: NewPlatform()}
+
+	task := newTestTask(t, "task")
+
+	postSync(t, hub, func() {
+		hub.WorkerEnlisted(worker)
+		hub.TaskScheduled(task)
+	})
+
+	consumer, err := hub.Subscribe(context.Background(), nil)
+	require.NoError(t, err)
+	require.NotNil(t, recv(t, consumer).GetSnapshot())
+
+	// The matched platform is not known until the executor connects.
+	task.AssignToWorker(worker)
+	hub.TaskStatusChanged(task, protocol.TaskStatus_TASK_ASSIGNED)
+
+	assignment := recv(t, consumer).GetTask()
+	require.NotNil(t, assignment)
+	assert.Equal(t, protocol.TaskStatus_TASK_ASSIGNED, assignment.Status)
+	assert.Equal(t, worker.Id(), assignment.WorkerId)
+	assert.Equal(t, "builder1", assignment.WorkerHostname)
+	assert.Nil(t, assignment.StartedAt)
+	assert.Empty(t, assignment.Log)
+
+	assigned := recv(t, consumer).GetWorker()
+	require.NotNil(t, assigned)
+	assert.Equal(t, task.Instance(), assigned.Task.GetInstance())
+
+	hub.TaskStatusChanged(task, protocol.TaskStatus_TASK_RUNNING)
+	running := recv(t, consumer).GetTask()
+	require.NotNil(t, running)
+	assert.NotNil(t, running.StartedAt)
+}
+
 func TestEventHubReleasesWorkerOnRequeue(t *testing.T) {
 	hub, _ := newTestHub(t)
 

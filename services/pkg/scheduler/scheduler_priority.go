@@ -33,12 +33,16 @@ func (c *priorityUnicastCallbacks) Select(item *Task, consumer interface{}) bool
 func (c *priorityUnicastCallbacks) Selected(item *Task, consumer interface{}) bool {
 	worker := consumer.(Worker)
 	item.AssignToWorker(worker)
+	if !item.build.IsCancelled() {
+		item.PostStatusUpdate(protocol.TaskStatus_TASK_ASSIGNED)
+	}
 	return true
 }
 
 func (c *priorityUnicastCallbacks) NotSelected(item *Task, consumer interface{}) bool {
 	item.AssignToWorker(nil)
-	if !item.build.IsCancelled() {
+	// A task that already reached a terminal status must not reappear as queued.
+	if !item.build.IsCancelled() && !item.IsCompleted() {
 		item.PostStatusUpdate(protocol.TaskStatus_TASK_QUEUED)
 	}
 	return true

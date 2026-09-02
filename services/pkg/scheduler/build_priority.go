@@ -258,7 +258,7 @@ func (b *priorityBuild) ScheduleTask(identity string) (*Task, TaskUpdateObserver
 	}
 
 	switch task.Status() {
-	case protocol.TaskStatus_TASK_QUEUED, protocol.TaskStatus_TASK_RUNNING:
+	case protocol.TaskStatus_TASK_QUEUED, protocol.TaskStatus_TASK_ASSIGNED, protocol.TaskStatus_TASK_RUNNING:
 		// Task is already queued or running.
 	default:
 		// The task has completed or is cancelled.

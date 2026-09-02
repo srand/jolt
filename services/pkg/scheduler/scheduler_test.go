@@ -255,6 +255,43 @@ func (suite *SchedulerTest) TestScheduleTaskWithRestartDueToWorkerFailure() {
 	worker.Close()
 }
 
+// The worker failure path closes the executor without acknowledging the task,
+// which must not resurrect a task that already reached a terminal status.
+func (suite *SchedulerTest) TestCompletedTaskIsNotRequeuedWhenExecutorClosed() {
+	build := suite.newBuild(0)
+	task1 := addTask(build, "task13")
+
+	worker, err := suite.newWorker()
+	assert.NoError(suite.T(), err)
+
+	buildObserver, err := suite.scheduler.ScheduleBuild(build)
+	assert.NoError(suite.T(), err)
+	defer buildObserver.Close()
+
+	observer, err := suite.scheduler.ScheduleTask(build.Id(), task1.task.Identity)
+	assert.NoError(suite.T(), err)
+	defer observer.Close()
+
+	scheduledBuild := <-worker.Builds()
+	assert.NotNil(suite.T(), scheduledBuild)
+
+	executor, err := suite.scheduler.NewExecutor(worker.Id(), scheduledBuild.Id())
+	assert.NoError(suite.T(), err)
+
+	scheduledTask := <-executor.Tasks()
+	assert.Equal(suite.T(), task1, scheduledTask)
+
+	scheduledTask.PostStatusUpdate(protocol.TaskStatus_TASK_ERROR)
+	executor.Close()
+
+	// The item is pushed back onto the queue, but Select() rejects completed
+	// tasks so it is never handed out again.
+	assert.Equal(suite.T(), protocol.TaskStatus_TASK_ERROR, task1.Status())
+	assert.False(suite.T(), build.HasRunningTask())
+
+	worker.Close()
+}
+
 func (suite *SchedulerTest) TestScheduleTaskWithInvalidIdentifiers() {
 	build := suite.newBuild(0)
 	task := addTask(build, "task")
@@ -512,6 +549,14 @@ func (suite *SchedulerTest) TestCancelBuildWithObservers() {
 	select {
 	case update := <-taskObserver1.Updates():
 		assert.NotNil(suite.T(), update)
+		assert.Equal(suite.T(), protocol.TaskStatus_TASK_ASSIGNED, update.Status)
+	case <-time.After(1 * time.Second):
+		assert.Fail(suite.T(), "Task1 should have been assigned")
+	}
+
+	select {
+	case update := <-taskObserver1.Updates():
+		assert.NotNil(suite.T(), update)
 		assert.Equal(suite.T(), protocol.TaskStatus_TASK_PASSED, update.Status)
 	case <-time.After(1 * time.Second):
 		assert.Fail(suite.T(), "Task1 should have been completed")
@@ -581,6 +626,14 @@ func (suite *SchedulerTest) TestDeploymentError() {
 	case <-worker.Builds():
 		assert.Fail(suite.T(), "No more tasks should be scheduled to the worker")
 	default:
+	}
+
+	select {
+	case update := <-taskObserver1.Updates():
+		assert.NotNil(suite.T(), update)
+		assert.Equal(suite.T(), protocol.TaskStatus_TASK_ASSIGNED, update.Status)
+	case <-time.After(1 * time.Second):
+		assert.Fail(suite.T(), "Task1 should have been assigned")
 	}
 
 	select {

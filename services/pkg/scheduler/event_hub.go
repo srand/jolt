@@ -296,10 +296,16 @@ func (h *EventHub) newTaskInfo(task *Task, status protocol.TaskStatus, worker Wo
 
 	if worker != nil {
 		info.WorkerId = worker.Id()
+
+		// The matched platform is only recorded once the executor connects,
+		// which is after the task has been assigned.
+		if info.WorkerHostname == "" {
+			info.WorkerHostname = worker.Platform().GetHostname()
+		}
 	}
 
 	switch status {
-	case protocol.TaskStatus_TASK_QUEUED, protocol.TaskStatus_TASK_CANCELLED:
+	case protocol.TaskStatus_TASK_QUEUED, protocol.TaskStatus_TASK_ASSIGNED, protocol.TaskStatus_TASK_CANCELLED:
 		info.Log = ""
 	}
 

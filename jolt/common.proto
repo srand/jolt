@@ -287,4 +287,8 @@ enum TaskStatus {
 
     // Initial task state
     TASK_CREATED = 10;
+
+    // The task has been assigned to a worker which is preparing to
+    // execute it. Execution has not started yet.
+    TASK_ASSIGNED = 11;
 }
