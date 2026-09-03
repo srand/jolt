@@ -24,7 +24,7 @@ WORKDIR /usr/src/services
 RUN go generate ./...
 RUN go build -ldflags '-s -w' ${BUILD_ARGS} ./cmd/scheduler
 
-FROM docker.io/debian:trixie-slim
+FROM docker.io/debian:stable-slim
 COPY --from=build /usr/src/services/scheduler /opt/jolt/scheduler
 RUN mkdir /data
 WORKDIR /data
