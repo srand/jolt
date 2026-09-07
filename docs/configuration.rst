@@ -1331,6 +1331,15 @@ The worker can be configured using environment variables and/or a configuration 
 
         | The default is ``false``.
 
+    * - ``JOLT_JOBSERVER_PATH``
+      - N/A
+      - | The path to a jobserver character device used to limit the number of
+          parallel jobs performed by the worker when deploying workspace trees.
+
+        | See the Jobserver service section for details on how to deploy a jobserver.
+
+        | If unset, no jobserver is used.
+
     * - ``JOLT_NIX_KEEP``
       - ``nix_keep``
       - | A list of worker host environment variables to keep when entering

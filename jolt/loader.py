@@ -469,12 +469,15 @@ def export_workspace(tasks=None) -> common_pb.Workspace:
                 cwd=fs.posixpath.abspath(cwd),
                 cachedir=cachedir)
 
+            jobserver_path = os.getenv("JOLT_JOBSERVER_PATH")
+            jobserver_args = ["--jobserver-path", jobserver_path] if jobserver_path else []
+
             if not os.path.exists(indexfile):
                 process = None
                 try:
                     with log.progress("Indexing workspace for the first time", count=None, unit="objects", estimates=False) as progress:
                         process = subprocess.Popen(
-                            [fstree, "write-tree", "--json", "--cache", cachedir, "--ignore", ".joltignore", "--index", indexfile, "--remote", cache_grpc_uri.geturl(), "--threads", str(tools.thread_count())],
+                            [fstree, "write-tree", "--json", "--cache", cachedir, "--ignore", ".joltignore", "--index", indexfile, "--remote", cache_grpc_uri.geturl(), "--threads", str(tools.thread_count())] + jobserver_args,
                             stdout=subprocess.DEVNULL,
                             stderr=subprocess.PIPE,
                             cwd=tools.getcwd())
@@ -503,7 +506,7 @@ def export_workspace(tasks=None) -> common_pb.Workspace:
             try:
                 with log.progress("Pushing workspace to remote cache", count=None, unit="objects", estimates=False) as progress:
                     process = subprocess.Popen(
-                        [fstree, "write-tree-push", "--json", "--cache", cachedir, "--ignore", ".joltignore", "--index", indexfile, "--remote", cache_grpc_uri.geturl(), "--threads", str(tools.thread_count())],
+                        [fstree, "write-tree-push", "--json", "--cache", cachedir, "--ignore", ".joltignore", "--index", indexfile, "--remote", cache_grpc_uri.geturl(), "--threads", str(tools.thread_count())] + jobserver_args,
                         stdout=subprocess.DEVNULL,
                         stderr=subprocess.PIPE,
                         cwd=tools.getcwd())

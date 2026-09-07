@@ -180,8 +180,7 @@ func (w *worker) run() error {
 				if request.Build.Environment.Workspace.Tree != "" {
 					log.Info("Deploying workspace tree", request.Build.Environment.Workspace.Tree, "for", request.Build.Environment.Workspace.Name)
 					pathHash, _ := utils.Sha1String(filepath.Join(w.cachePath(), "indexes", request.Build.Environment.Workspace.Name))
-					err = w.runCmd(
-						w.cwd,
+					fstreeArgs := []string{
 						"fstree",
 						"pull-checkout",
 						"--cache",
@@ -194,9 +193,16 @@ func (w *worker) run() error {
 						w.config.CacheGrpcUri,
 						"--threads",
 						fmt.Sprint(w.config.ThreadCount),
+					}
+					if jobserverPath := os.Getenv("JOLT_JOBSERVER_PATH"); jobserverPath != "" {
+						fstreeArgs = append(fstreeArgs, "--jobserver-path", jobserverPath)
+					}
+					fstreeArgs = append(
+						fstreeArgs,
 						request.Build.Environment.Workspace.Tree,
 						request.Build.Environment.Workspace.Name,
 					)
+					err = w.runCmd(w.cwd, fstreeArgs...)
 					if err != nil {
 						log.Error("Failed to deploy workspace tree:", err)
 						reply(protocol.WorkerUpdate_DEPLOY_FAILED, err)
