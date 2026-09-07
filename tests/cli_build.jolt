@@ -729,7 +729,7 @@ class BuildCli(testsupport.JoltTest):
         ---
         """
         self.build("a")
-        self.tools.run("docker exec $(docker inspect $(docker service ps jolt_test_worker --format {{{{.ID}}}}) --format {{{{.Status.ContainerStatus.ContainerID}}}}) find /data/cache/ -delete")
+        self.tools.run("docker exec $(docker inspect $(docker service ps jolt_test_worker --format {{{{.ID}}}}) --format {{{{.Status.ContainerStatus.ContainerID}}}}) find /data/cache/ -mindepth 1 -delete")
         r = self.build("b")
         self.assertIn("Failed to download session artifact: result", r)
 
