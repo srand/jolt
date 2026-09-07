@@ -33,7 +33,7 @@ func (c *priorityUnicastCallbacks) Select(item *Task, consumer interface{}) bool
 func (c *priorityUnicastCallbacks) Selected(item *Task, consumer interface{}) bool {
 	worker := consumer.(Worker)
 	item.AssignToWorker(worker)
-	if !item.build.IsCancelled() {
+	if !buildIsCancelled(item.build) {
 		item.PostStatusUpdate(protocol.TaskStatus_TASK_ASSIGNED)
 	}
 	return true
@@ -42,10 +42,26 @@ func (c *priorityUnicastCallbacks) Selected(item *Task, consumer interface{}) bo
 func (c *priorityUnicastCallbacks) NotSelected(item *Task, consumer interface{}) bool {
 	item.AssignToWorker(nil)
 	// A task that already reached a terminal status must not reappear as queued.
-	if !item.build.IsCancelled() && !item.IsCompleted() {
+	if !buildIsCancelled(item.build) && !item.IsCompleted() {
 		item.PostStatusUpdate(protocol.TaskStatus_TASK_QUEUED)
 	}
 	return true
+}
+
+// Returns true if the build has been cancelled or closed.
+//
+// These callbacks run with the unicast queue lock held, and priorityBuild.ScheduleTask
+// sends to the queue while holding the build's write lock. Calling Build.IsCancelled()
+// here would therefore take the build lock a second time on the same goroutine and
+// deadlock the scheduler. Done() only reads the build's immutable context and is safe
+// to call from any lock context.
+func buildIsCancelled(build Build) bool {
+	select {
+	case <-build.Done():
+		return true
+	default:
+		return false
+	}
 }
 
 // A priority scheduler.
