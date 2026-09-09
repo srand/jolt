@@ -516,6 +516,33 @@ class GitApi(testsupport.JoltTest):
 
         self.build("a")
         with self.tools.cwd(self.ws):
+            self.assertExists("hello_world/.git/objects/info/alternates")
+            self.tools.run("git -C hello_world fsck --connectivity-only", output_on_error=True)
+            self.tools.rmtree("hello_world/.git")
+
+        # The directory already exists, so the repo is initialized and fetched
+        self.build("a")
+        with self.tools.cwd(self.ws):
+            self.assertExists("hello_world/.git/objects/info/alternates")
+            self.tools.run("git -C hello_world fsck --connectivity-only", output_on_error=True)
+
+    def test_reference_repo_dissociate(self):
+        """
+        --- config:
+        [git]
+        reference = reference
+        dissociate = true
+
+        --- tasks:
+        class A(Task):
+            requires = ["git:url=https://github.com/gideont/hello_world.git,path=hello_world"]
+        ---
+        """
+        with self.tools.cwd(self.ws):
+            self.tools.run("git clone --bare https://github.com/gideont/hello_world.git reference/github.com/gideont/hello_world.git")
+
+        self.build("a")
+        with self.tools.cwd(self.ws):
             self.assertNotExists("hello_world/.git/objects/info/alternates")
             self.tools.run("git -C hello_world fsck --connectivity-only", output_on_error=True)
             self.tools.rmtree("reference")

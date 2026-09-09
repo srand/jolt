@@ -100,6 +100,9 @@ class GitRepository(object):
 
     def _dissociate_alternates(self):
         """Copy borrowed reference objects locally and remove git alternates."""
+        if not config.getboolean("git", "dissociate", False):
+            return
+
         alternates = ".git/objects/info/alternates"
         if not self.tools.exists(alternates):
             return
@@ -156,7 +159,8 @@ class GitRepository(object):
             log.info("Cloning into {0}", self.path)
             extra_clone_options = config.get("git", "clone_options", "")
             if refpath and os.path.isdir(refpath):
-                self.tools.run("git clone --reference-if-able {0} --dissociate {1} {2} {3}", refpath, extra_clone_options, self.url, self.path, output_on_error=True, new_session=True)
+                dissociate = "--dissociate" if config.getboolean("git", "dissociate", False) else ""
+                self.tools.run("git clone --reference-if-able {0} {1} {2} {3} {4}", refpath, dissociate, extra_clone_options, self.url, self.path, output_on_error=True, new_session=True)
             else:
                 self.tools.run("git clone {0} {1} {2}", extra_clone_options, self.url, self.path, output_on_error=True, new_session=True)
 

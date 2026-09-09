@@ -397,6 +397,16 @@ the Jolt configuration. These configuration keys exist:
           the repository ``git://example.com/repo.git`` should be stored in
           ``reference/example.com/repo.git``.
 
+    * - ``dissociate``
+      - Boolean
+      - | Copy objects borrowed from the ``reference`` repository into the
+          cloned repository and stop borrowing from the reference. This makes
+          the clone self-contained at the expense of extra disk space and
+          clone time, which is useful when the reference repository may be
+          pruned or removed while the clone remains in use. Has no effect
+          unless ``reference`` is configured.
+        | Default: ``false``
+
 
 HTTP
 ^^^^
