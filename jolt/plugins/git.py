@@ -109,7 +109,7 @@ class GitRepository(object):
         # reachable borrowed objects into the local repository, so persistent CI
         # workspaces no longer depend on the shared reference cache remaining
         # unchanged after checkout.
-        self.tools.run("git repack -a -d", output_on_error=True)
+        self.tools.run("git repack -a -d -k", output_on_error=True)
         self.tools.unlink(alternates, ignore_errors=True)
 
     def clone(self, submodules=False, rev=None, shallow=False):
