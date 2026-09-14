@@ -168,6 +168,7 @@ func (h *EventHub) applyTask(info *protocol.TaskInfo, now time.Time) {
 	if previous, ok := h.tasks[info.Instance]; ok {
 		previousWorkerId = previous.WorkerId
 		info.QueuedAt = previous.QueuedAt
+		info.AssignedAt = previous.AssignedAt
 		info.StartedAt = previous.StartedAt
 
 		// Status updates posted by the worker carry no assignment.
@@ -186,6 +187,8 @@ func (h *EventHub) applyTask(info *protocol.TaskInfo, now time.Time) {
 		info.EndedAt = nil
 		info.WorkerId = ""
 		info.WorkerHostname = ""
+	case info.Status == protocol.TaskStatus_TASK_ASSIGNED && info.AssignedAt == nil:
+		info.AssignedAt = timestamp
 	case info.Status == protocol.TaskStatus_TASK_RUNNING && info.StartedAt == nil:
 		info.StartedAt = timestamp
 	case info.Status.IsCompleted():

@@ -277,6 +277,7 @@ func TestEventHubReportsAssignmentBeforeExecution(t *testing.T) {
 	assert.Equal(t, protocol.TaskStatus_TASK_ASSIGNED, assignment.Status)
 	assert.Equal(t, worker.Id(), assignment.WorkerId)
 	assert.Equal(t, "builder1", assignment.WorkerHostname)
+	assert.NotNil(t, assignment.AssignedAt)
 	assert.Nil(t, assignment.StartedAt)
 	assert.Empty(t, assignment.Log)
 
@@ -284,9 +285,15 @@ func TestEventHubReportsAssignmentBeforeExecution(t *testing.T) {
 	require.NotNil(t, assigned)
 	assert.Equal(t, task.Instance(), assigned.Task.GetInstance())
 
+	hub.TaskStatusChanged(task, protocol.TaskStatus_TASK_ASSIGNED)
+	repeatedAssignment := recv(t, consumer).GetTask()
+	require.NotNil(t, repeatedAssignment)
+	assert.Equal(t, assignment.AssignedAt.AsTime(), repeatedAssignment.AssignedAt.AsTime())
+
 	hub.TaskStatusChanged(task, protocol.TaskStatus_TASK_RUNNING)
 	running := recv(t, consumer).GetTask()
 	require.NotNil(t, running)
+	assert.Equal(t, assignment.AssignedAt.AsTime(), running.AssignedAt.AsTime())
 	assert.NotNil(t, running.StartedAt)
 }
 

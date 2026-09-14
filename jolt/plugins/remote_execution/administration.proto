@@ -125,6 +125,9 @@ message TaskInfo {
 
     // URL from which the task log can be downloaded
     string log = 12;
+
+    // Time when the task was first assigned to a worker, if it has
+    google.protobuf.Timestamp assigned_at = 13;
 }
 
 // Full state of a worker as known by the scheduler.
