@@ -1223,6 +1223,8 @@ class TaskApi(JoltTest):
     def test_multiple_resource_artifacts(self):
         """
         --- tasks:
+        released = []
+
         @attributes.artifact("extra")
         class R1(Resource):
             def acquire(self, artifact, deps, tools, owner):
@@ -1232,6 +1234,8 @@ class TaskApi(JoltTest):
                     artifact.collect("r1.lock")
 
             def release(self, artifact, deps, tools, owner):
+                assert artifact.name not in released, "released more than once"
+                released.append(artifact.name)
                 assert not artifact.is_temporary()
                 with tools.cwd(artifact.path):
                     assert tools.read_file("r1.lock") == "locked"
@@ -1243,6 +1247,8 @@ class TaskApi(JoltTest):
                     artifact.collect("r1.extra")
 
             def release_extra(self, artifact, deps, tools, owner):
+                assert artifact.name not in released, "released more than once"
+                released.append(artifact.name)
                 assert not artifact.is_temporary()
                 with tools.cwd(artifact.path):
                     assert tools.read_file("r1.extra") == "extra_locked"
@@ -1262,6 +1268,135 @@ class TaskApi(JoltTest):
         ---
         """
         self.build("a")
+
+    def test_resource_nested(self):
+        """
+        --- tasks:
+        class R1(Resource):
+            def acquire(self, artifact, deps, tools, owner):
+                assert owner.name == "a", "Incorrect owner: " + owner.name
+                with tools.cwd(tools.builddir()):
+                    tools.write_file("r1.lock", "locked")
+                    artifact.collect("r1.lock")
+
+            def release(self, artifact, deps, tools, owner):
+                assert owner.name == "a", "Incorrect owner: " + owner.name
+
+        class R2(Resource):
+            requires = ["r1"]
+
+            def acquire(self, artifact, deps, tools, owner):
+                assert owner.name == "a", "Incorrect owner: " + owner.name
+                with tools.cwd(deps["r1"].path):
+                    assert tools.read_file("r1.lock") == "locked"
+                with tools.cwd(tools.builddir()):
+                    tools.write_file("r2.lock", "locked")
+                    artifact.collect("r2.lock")
+
+            def release(self, artifact, deps, tools, owner):
+                assert owner.name == "a", "Incorrect owner: " + owner.name
+
+        class A(Task):
+            requires = ["r2"]
+
+            def run(self, deps, tools):
+                with tools.cwd(deps["r2"].path):
+                    assert tools.read_file("r2.lock") == "locked"
+        ---
+        """
+        r = self.build("a")
+        self.assertLess(
+            r.index("Resource acquisition started (r1 for a)"),
+            r.index("Resource acquisition started (r2 for a)"))
+        self.assertLess(
+            r.index("Resource release started (r2 for a)"),
+            r.index("Resource release started (r1 for a)"))
+
+    def test_resource_nested_and_direct(self):
+        """
+        --- tasks:
+        class R2(Resource):
+            def acquire(self, artifact, deps, tools, owner):
+                assert owner.name == "a", "Incorrect owner: " + owner.name
+                with tools.cwd(tools.builddir()):
+                    tools.write_file("r2.lock", "locked")
+                    artifact.collect("r2.lock")
+
+        class R1(Resource):
+            requires = ["r2"]
+
+            def acquire(self, artifact, deps, tools, owner):
+                assert owner.name == "a", "Incorrect owner: " + owner.name
+                with tools.cwd(deps["r2"].path):
+                    assert tools.read_file("r2.lock") == "locked"
+
+        class A(Task):
+            requires = ["r1", "r2"]
+
+            def run(self, deps, tools):
+                with tools.cwd(deps["r2"].path):
+                    assert tools.read_file("r2.lock") == "locked"
+        ---
+        """
+        r = self.build("a")
+        self.assertEqual(1, r.count("Resource acquisition started (r2 for a)"))
+        self.assertEqual(1, r.count("Resource release started (r2 for a)"))
+        self.assertLess(
+            r.index("Resource acquisition started (r2 for a)"),
+            r.index("Resource acquisition started (r1 for a)"))
+        self.assertLess(
+            r.index("Resource release started (r1 for a)"),
+            r.index("Resource release started (r2 for a)"))
+
+    def test_resource_nested_acquire_failure(self):
+        """
+        --- tasks:
+        class R1(Resource):
+            def acquire(self, artifact, deps, tools, owner):
+                assert False, "Acquisition Error"
+
+        class R2(Resource):
+            requires = ["r1"]
+
+            def acquire(self, artifact, deps, tools, owner):
+                assert False, "Unexpected R2 acquisition"
+
+        class A(Task):
+            requires = ["r2"]
+        ---
+        """
+        with self.assertRaises(Exception, msg="Acquisition Error"):
+            self.build("a")
+        self.assertNotIn("Resource acquisition started (r2 for a)", self.lastLog())
+
+    def test_resource_nested_parent_failure(self):
+        """
+        --- tasks:
+        class R1(Resource):
+            def acquire(self, artifact, deps, tools, owner):
+                print("Acquire R1")
+
+            def release(self, artifact, deps, tools, owner):
+                print("Release R1")
+
+        class R2(Resource):
+            requires = ["r1"]
+
+            def acquire(self, artifact, deps, tools, owner):
+                assert False, "Acquisition Error"
+
+            def release(self, artifact, deps, tools, owner):
+                assert False, "Unexpected R2 release"
+
+        class A(Task):
+            requires = ["r2"]
+        ---
+        """
+        with self.assertRaises(Exception, msg="Acquisition Error"):
+            self.build("a")
+        r = self.lastLog()
+        self.assertIn("Acquire R1", r)
+        self.assertIn("Release R1", r)
 
     def test_resource_recursive(self):
         """
@@ -1299,8 +1434,8 @@ class TaskApi(JoltTest):
         ---
         """
         r = self.build("a")
-        # Workspace resources are allowed as dependencies of other resources
-        # and should have been acquired and released in the correct order
+        # Workspace resources required by a resource are acquired while the graph is built,
+        # before any other resource acquisition, and in requirement order
         import re
         assert re.search(r".*Acquire R0.*\n.*Acquire R1.*", r, re.MULTILINE)
 

@@ -441,11 +441,25 @@ class TaskProxy(object):
                 self.children.extend(n.children)
             n.ancestors.add(self)
 
-        # Exclude transitive alias and resources dependencies.
-        # Workspace resources are included as they may be required by its dependencies.
+        # Exclude transitive alias and resource dependencies. Directly required resources
+        # are retained, including those required by a resource.
         self.children = list(
             filter(lambda n: dag.are_neighbors(self, n) or (not n.is_alias() and not n.is_resource()),
                    utils.unique_list(self.children)))
+
+        # A resource and the resources it requires are acquired on the same host
+        if self.options.network and self.is_resource() and not self.is_workspace_resource():
+            for child in self.children:
+                if not child.is_resource() or child.is_workspace_resource():
+                    continue
+                raise_task_error_if(
+                    self.is_local() and not child.is_local(), self,
+                    "Local resource cannot require a non-local resource '{}'",
+                    child.short_qualified_name)
+                raise_task_error_if(
+                    not self.is_local() and child.is_local(), child,
+                    "Local resource cannot be required by non-local resource '{}'",
+                    self.short_qualified_name)
 
         # Prepare workspace resources for this task so that influence can be calculated
         for child in self.children:
@@ -618,23 +632,36 @@ class TaskProxy(object):
                 else:
                     log.debug(" Retained: {} ({})", self.short_qualified_name, artifact.identity)
 
+    def _acquires_resource(self, resource):
+        """
+        Returns True if this task is responsible for acquiring the resource.
+
+        In a network build, non-local resources are acquired by the remote worker while
+        local resources are acquired by the client.
+        """
+        if self.options.worker:
+            return not resource.is_local()
+        if self.options.network and not self.is_local():
+            return resource.is_local()
+        return True
+
     def _run_download_dependencies(self, resource_only=False):
         for child in self.children:
             if not child.has_artifact():
                 continue
 
-            if child.is_resource() and child.is_local():
-                if child.options.worker:
+            if child.is_resource():
+                if self._acquires_resource(child):
+                    # Resource about to be acquired here, make its dependencies available
+                    child._run_download_dependencies()
+                elif self.options.worker:
                     # Resource already acquired by the client when running as worker
                     raise_task_error_if(
                         not child.download(force=True),
                         child, "Failed to download task artifact")
-                else:
-                    # Resource about to be acquired by the client
-                    child._run_download_dependencies()
                 continue
 
-            if resource_only and not child.is_resource():
+            if resource_only:
                 continue
 
             raise_task_error_if(
@@ -730,6 +757,9 @@ class TaskProxy(object):
         already acquired resources are released in reverse order and the exception is propagated
         to the caller.
 
+        A resource may itself require other resources. Such nested resources are acquired
+        before, and released after, the resource that requires them.
+
         Resource artifacts are always published and uploaded if the acquisition has been started,
         even if the acquisition fails. That way, a failed acquisition can be debugged.
         """
@@ -741,25 +771,44 @@ class TaskProxy(object):
     @contextmanager
     def _run_resources_no_dep_download(self):
         # Log messages are prefixed with task identity if resources are acquired in parallel
-        log_prefix = False
+        log_prefix = self.options.network and not self.options.worker and not self.is_local()
 
-        # Collect list of resource dependencies
-        resource_deps = [child for child in self.children if child.is_resource()]
+        # Collect list of resource dependencies acquired by this task
+        resource_deps = [
+            child for child in self.children
+            if child.is_resource() and self._acquires_resource(child)
+        ]
 
-        if self.options.worker:
-            # Exclude local resources when running as worker. They are already acquired by the client.
-            resource_deps = [child for child in resource_deps if not child.is_local()]
-        elif self.options.network and not self.is_local():
-            # Exclude non-local resources in the client when running a network build.
-            # They are acquired by the remote worker.
-            resource_deps = [child for child in resource_deps if child.is_local()]
-            log_prefix = True
-
-        exitstack = ExitStack()
-        acquired = []
-        try:
+        with ExitStack() as exitstack:
             # Acquire resource dependencies in reverse order.
+            acquired = set()
             for resource in reversed(resource_deps):
+                exitstack.enter_context(self._acquire_resource(resource, log_prefix, acquired))
+
+            yield
+
+    @contextmanager
+    def _acquire_resource(self, resource, log_prefix, acquired):
+        """
+        Acquires a resource dependency of this task and releases it on exit.
+
+        Resources required by the resource are acquired first and released last.
+        The owner passed to the resource is always this task, never an intermediate resource.
+        """
+        # A resource required both directly and by another resource is acquired once
+        if resource in acquired:
+            yield resource
+            return
+        acquired.add(resource)
+
+        with ExitStack() as exitstack:
+            nested_deps = [child for child in resource.children if child.is_resource()]
+            for nested in reversed(nested_deps):
+                exitstack.enter_context(self._acquire_resource(nested, log_prefix, acquired))
+
+            acquired = []
+
+            try:
                 # Always discard resource artifacts before acquiring the resource.
                 # They should not exist in the cache when the resource is acquired,
                 # but may exist if the resource was previously acquired by an interrupted build.
@@ -771,19 +820,17 @@ class TaskProxy(object):
                     for artifact in resource.artifacts:
                         try:
                             resource.run_acquire(artifact, self, log_prefix=log_prefix)
-                            acquired.append(resource)
+                            acquired.append(artifact)
                         finally:
                             # Always upload the artifact session artifact to the cache, even if the acquisition failed.
                             if not resource.is_workspace_resource():
                                 resource.upload(locked=False, session_only=True, artifacts=[artifact])
 
-            yield
+                yield resource
 
-        finally:
-            for resource in reversed(acquired):
-                for artifact in resource.artifacts:
+            finally:
+                for artifact in reversed(acquired):
                     resource.run_release(artifact, self, log_prefix=log_prefix)
-            exitstack.close()
 
     def run(self, env, force_upload=False, force_build=False):
         # Download dependency artifacts if not already done
@@ -1108,25 +1155,37 @@ class GraphBuilder(object):
         self.cache = cache
         self.graph = Graph()
         self.nodes = {}
+        self.resources = {}
         self.registry = registry
         self.buildenv = buildenv
         self.progress = progress
         self.options = options or JoltOptions()
 
+    def _get_owner(self, node):
+        """ Returns the task consuming a resource required by node. """
+        while node is not None and node.is_resource() and node._owner is not None:
+            node = node._owner
+        return node
+
     def _get_node(self, progress, name, parent=None):
         name = utils.stable_task_name(name)
-        node = self.nodes.get(name)
+        owner = self._get_owner(parent)
+        node = self.nodes.get(name) or self.resources.get((owner, name))
         if not node:
             task = self.registry.get_task(name, buildenv=self.buildenv)
-            node = self.nodes.get(task.qualified_name, None)
+            node = self.nodes.get(task.qualified_name) or \
+                self.resources.get((owner, task.qualified_name))
             if node is not None:
                 return node
             node = TaskProxy(task, self.graph, self.cache, self.options)
             if not node.is_resource() or node.is_workspace_resource():
                 self.nodes[node.short_qualified_name] = node
                 self.nodes[node.qualified_name] = node
-            elif parent:
-                node.set_owner(parent)
+            elif owner:
+                node.set_owner(owner)
+                # A resource required more than once by a task is a single instance
+                self.resources[(owner, node.short_qualified_name)] = node
+                self.resources[(owner, node.qualified_name)] = node
                 if self.buildenv:
                     task._apply_protobuf(self.buildenv)
             if self.options.salt:

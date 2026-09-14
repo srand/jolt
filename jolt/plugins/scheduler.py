@@ -201,11 +201,10 @@ class RemoteExecutor(NetworkExecutor):
             return
         if not task.download(session_only=True):
             task.warning("Failed to download session artifact")
-        if not task.is_resource():
-            # Tasks also download session artifacts of consumed resources
-            for resource in filter(lambda task: task.is_resource() and not task.is_workspace_resource(), task.children):
-                if not resource.is_available_locally(persistent_only=False):
-                    self.download_session_artifacts(resource)
+        # Tasks and resources also download session artifacts of consumed resources
+        for resource in filter(lambda task: task.is_resource() and not task.is_workspace_resource(), task.children):
+            if not resource.is_available_locally(persistent_only=False):
+                self.download_session_artifacts(resource)
 
     def download_log(self, task):
         """ Download log and transfer lines into local logging system. """
@@ -631,7 +630,11 @@ def executor(ctx, worker, build, request):
 
     # Build the graph of tasks
     gb = GraphBuilder(registry, acache, options=options, progress=True, buildenv=request.environment)
-    task_names = [task.name for task in request.environment.tasks.values()]
+    # Resources are not goals, they are rebuilt as dependencies of their consuming task
+    task_names = [
+        task.name for name, task in request.environment.tasks.items()
+        if "@@" not in name
+    ]
     dag = gb.build(task_names)
 
     # Enlist to execute build tasks from the scheduler

@@ -972,6 +972,99 @@ class BuildCli(testsupport.JoltTest):
         self.assertIn("Resource release finished after 00s (r for b)", r)
 
     @testsupport.skip_if_local
+    def test_nested_resources(self):
+        """
+        --- tasks:
+        class R1(Resource):
+            def acquire(self, artifact, deps, tools, owner):
+                assert owner.name == "a", "Incorrect owner: " + owner.name
+
+        class R2(Resource):
+            requires = ["r1"]
+
+            def acquire(self, artifact, deps, tools, owner):
+                assert owner.name == "a", "Incorrect owner: " + owner.name
+                assert not deps["r1"].is_temporary()
+
+        class A(Task):
+            requires = ["r2"]
+        ---
+        """
+        r = self.build("a")
+        self.assertRemoteBuild(r, "a")
+        self.assertLess(
+            r.index("Resource acquisition started (r1 for a)"),
+            r.index("Resource acquisition started (r2 for a)"))
+        self.assertLess(
+            r.index("Resource release started (r2 for a)"),
+            r.index("Resource release started (r1 for a)"))
+
+    @testsupport.skip_if_local
+    def test_nested_local_resources(self):
+        """
+        --- tasks:
+        class R1(Resource):
+            local = True
+
+        class R2(Resource):
+            local = True
+            requires = ["r1"]
+
+            def acquire(self, artifact, deps, tools, owner):
+                assert owner.name == "a", "Incorrect owner: " + owner.name
+                assert not deps["r1"].is_temporary()
+
+        class A(Task):
+            requires = ["r2"]
+        ---
+        """
+        r = self.build("a")
+        self.assertRemoteBuild(r, "a")
+        self.assertLess(
+            r.index("Resource acquisition started (r1 for a)"),
+            r.index("Resource acquisition started (r2 for a)"))
+        self.assertLess(
+            r.index("Resource release started (r2 for a)"),
+            r.index("Resource release started (r1 for a)"))
+
+    @testsupport.skip_if_local
+    def test_nested_resource_locality_conflict(self):
+        """
+        --- tasks:
+        class R1(Resource):
+            local = True
+
+        class R2(Resource):
+            requires = ["r1"]
+
+        class A(Task):
+            requires = ["r2"]
+        ---
+        """
+        with self.assertRaises(Exception):
+            self.build("a")
+        self.assertIn("Local resource cannot be required by non-local resource", self.lastLog())
+
+    @testsupport.skip_if_local
+    def test_nested_resource_locality_conflict_2(self):
+        """
+        --- tasks:
+        class R1(Resource):
+            pass
+
+        class R2(Resource):
+            local = True
+            requires = ["r1"]
+
+        class A(Task):
+            requires = ["r2"]
+        ---
+        """
+        with self.assertRaises(Exception):
+            self.build("a")
+        self.assertIn("Local resource cannot require a non-local resource", self.lastLog())
+
+    @testsupport.skip_if_local
     def test_local_task_with_extension(self):
         """
         --- tasks:

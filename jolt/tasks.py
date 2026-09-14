@@ -2850,6 +2850,13 @@ class Resource(Task):
     They are invoked to acquire and release a resource, such as hardware equipment,
     before and after the execution of a task. No artifact is produced by a resource.
 
+    A resource may require other resources. Those are acquired before, and released after,
+    the resource that requires them, and their artifacts are available in the ``deps``
+    context passed to :func:`~acquire` and :func:`~release`. The ``owner`` argument is
+    always the consuming task, never an intermediate resource. In a distributed build,
+    a resource and the resources it requires are acquired on the same host; a resource
+    with ``local`` set to True may therefore not be required by a non-local resource.
+
     Implementors should override :func:`~acquire` and :func:`~release`.
 
     """
