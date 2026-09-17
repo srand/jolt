@@ -1,0 +1,65 @@
+from contextlib import contextmanager
+import importlib.util
+import os
+import re
+import shutil
+import sys
+import tempfile
+sys.path.append(".")
+
+from testsupport import JoltTest
+from jolt import filesystem as fs
+from jolt import log
+
+
+class LogInternal(JoltTest):
+    name = "int/log"
+
+    @contextmanager
+    def _outside_module(self, source):
+        """ Write a module outside the current directory and yield its path. """
+        tmpdir = tempfile.mkdtemp()
+        try:
+            pathname = os.path.join(tmpdir, "raiser.py")
+            with open(pathname, "w") as f:
+                f.write(source)
+            yield pathname
+        finally:
+            shutil.rmtree(tmpdir, ignore_errors=True)
+
+    def test_as_relpath_of_path_below_root(self):
+        root = os.path.join(self.ws, "workspace")
+        self.assertEqual(fs.as_relpath(os.path.join(root, "test.jolt"), root), "test.jolt")
+
+    def test_as_relpath_of_path_outside_root(self):
+        # A path outside the root is returned as it is. Spelling it relative
+        # would be a chain of parent directories at best, and on Windows a path
+        # on another drive has no relative spelling at all.
+        root = os.path.join(self.ws, "workspace")
+        pathname = os.path.join(self.ws, "elsewhere", "test.jolt")
+        self.assertEqual(fs.as_relpath(pathname, root), pathname)
+
+    def test_exception_msg_names_file_outside_current_directory(self):
+        with self._outside_module("def boom():\n    raise ValueError('boom')\n") as pathname:
+            spec = importlib.util.spec_from_file_location("raiser", pathname)
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+
+            try:
+                module.boom()
+            except ValueError as e:
+                msg = log.format_exception_msg(e)
+
+        self.assertIn("ValueError: boom", msg)
+        self.assertEqual(re.search(r"\(([^()]*), line \d+, in [^()]*\)", msg).group(1), pathname)
+
+    def test_syntax_error_msg_names_file_outside_current_directory(self):
+        with self._outside_module("def broken(:\n    pass\n") as pathname:
+            try:
+                with open(pathname) as f:
+                    compile(f.read(), pathname, "exec")
+            except SyntaxError as e:
+                msg = log.format_exception_msg(e)
+
+        self.assertIn("SyntaxError:", msg)
+        self.assertEqual(re.search(r"\(([^()]*), line \d+\)", msg).group(1), pathname)

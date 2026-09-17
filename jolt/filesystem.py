@@ -39,6 +39,18 @@ def is_relative_to(pathname, rootdir):
         return False
 
 
+def as_relpath(pathname, rootdir):
+    """ Return pathname relative to rootdir, or unchanged if it lies outside.
+
+    A path outside rootdir has no useful relative spelling: at best a chain of
+    parent directories, and on Windows none at all when the two are on
+    different drives, where os.path.relpath raises ValueError instead.
+    """
+    if not is_relative_to(pathname, rootdir):
+        return pathname
+    return os.path.relpath(pathname, rootdir)
+
+
 def userhome():
     return os.path.expanduser("~")
 

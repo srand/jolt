@@ -270,18 +270,14 @@ def format_exception_msg(exc):
         return str(exc)
 
     elif isinstance(exc, SyntaxError):
-        filename = fs.path.relpath(
-            te.filename,
-            fs.path.commonprefix([os.getcwd(), te.filename]))
+        filename = fs.as_relpath(te.filename, os.getcwd())
         return "SyntaxError: {} ({}, line {})".format(
             te.text.strip(),
             filename,
             te.lineno)
 
     else:
-        filename = fs.path.relpath(
-            te.stack[-1].filename,
-            fs.path.commonprefix([os.getcwd(), te.stack[-1].filename]))
+        filename = fs.as_relpath(te.stack[-1].filename, os.getcwd())
         return "{}: {} ({}, line {}, in {})".format(
             type(exc).__name__,
             str(exc) or te.stack[-1].line,

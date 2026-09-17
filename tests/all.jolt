@@ -32,6 +32,7 @@ class All(Alias):
         "ext/symlinks",
         "flake8",
         "int/loader",
+        "int/log",
         "int/tools",
         "int/utils",
         "nfr",
