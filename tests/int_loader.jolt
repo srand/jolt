@@ -1,0 +1,32 @@
+import sys
+sys.path.append(".")
+
+from testsupport import JoltTest
+
+
+class LoaderInternal(JoltTest):
+    name = "int/loader"
+
+    def test_recipe_with_utf8_characters(self):
+        # Recipes are UTF-8, so reading one must not depend on the encoding of
+        # the machine's locale. The character written below exists in no legacy
+        # Windows code page, which is what makes such a recipe unreadable on a
+        # machine whose locale encoding is one, such as cp1252. It is spelled
+        # as an escape so that this recipe itself stays pure ASCII.
+        with self.tools.cwd(self.ws):
+            self.tools.write_file(
+                "unicode.jolt",
+                "from jolt import *\n"
+                "\n"
+                "\n"
+                "class Unicode(Task):\n"
+                "    # \u65e5\n"
+                "    pass\n",
+                expand=False)
+
+        # An ASCII locale stands in for a legacy code page: Python then reads
+        # files with a codec that cannot represent the recipe's bytes at all.
+        with self.tools.environ(LC_ALL="C", LANG="C", PYTHONUTF8="0", PYTHONCOERCECLOCALE="0"):
+            r = self.jolt("list")
+
+        self.assertIn("unicode", r)

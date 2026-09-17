@@ -50,14 +50,18 @@ class Recipe(object):
         """ Load the recipe source from the file system. """
         raise_error_if(self.source is not None, "recipe already loaded: {}", self.path)
 
-        with open(self.path) as f:
+        # Recipes are Python source and therefore UTF-8, just like the
+        # interpreter assumes when it executes them. Reading them with the
+        # locale's encoding would make a recipe unloadable on any machine
+        # whose locale is a legacy code page, such as cp1252 on Windows.
+        with open(self.path, encoding="utf-8") as f:
             self.source = f.read()
 
     def save(self):
         """ Save the recipe source to the file system. """
         raise_error_if(self.source is None, "recipe source unknown: {}", self.path)
 
-        with open(self.path, "w") as f:
+        with open(self.path, "w", encoding="utf-8") as f:
             f.write(self.source)
 
 
@@ -414,7 +418,7 @@ def import_workspace(buildenv: common_pb.BuildEnvironment):
     # Write .jolt files into workspace
     for file in buildenv.workspace.files:
         if file.content:
-            with open(file.path, "w") as f:
+            with open(file.path, "w", encoding="utf-8") as f:
                 f.write(file.content)
 
 
