@@ -99,6 +99,32 @@ func (s *LogStashTestSuite) TestEvict() {
 	reader.Close()
 }
 
+func (s *LogStashTestSuite) TestActiveReopenedLogIsNotEvicted() {
+	config := new(MockLogStashConfig)
+	config.On("MaxSize").Return(2048)
+	fs := afero.NewBasePathFs(afero.NewOsFs(), s.T().TempDir())
+	stash := NewLogStash(config, fs)
+
+	writer, err := stash.Append("log1")
+	assert.NoError(s.T(), err)
+	s.writeLines(writer, strings.Repeat("1", 100), 1)
+	assert.NoError(s.T(), writer.Close())
+
+	// Reopening a completed log must remove it from the LRU for as long as
+	// the new appender is active.
+	writer, err = stash.Append("log1")
+	assert.NoError(s.T(), err)
+	defer writer.Close()
+
+	other, err := stash.Append("log2")
+	assert.NoError(s.T(), err)
+	s.writeLines(other, strings.Repeat("2", 100), 100)
+	assert.NoError(s.T(), other.Close())
+
+	_, err = fs.Stat("log1")
+	assert.NoError(s.T(), err)
+}
+
 func (s *LogStashTestSuite) TestCreate() {
 	// Create two log files in the stash
 	writer, err := s.stash.Append("log1")

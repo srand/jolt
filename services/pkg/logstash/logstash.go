@@ -3,6 +3,8 @@ package logstash
 import (
 	"io"
 	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/spf13/afero"
 	"github.com/srand/jolt/scheduler/pkg/log"
@@ -30,7 +32,12 @@ type logFile struct {
 	size int64
 }
 
+func canonicalLogPath(path string) string {
+	return strings.TrimLeft(filepath.Clean(path), string(filepath.Separator))
+}
+
 func newLogFile(fs utils.Fs, path string) *logFile {
+	path = canonicalLogPath(path)
 	var size int64 = 0
 
 	st, err := fs.Stat(path)
@@ -111,8 +118,7 @@ func (s *logStash) Unlock() {
 
 // Append a log record to the logstash server
 func (s *logStash) Append(id string) (LogWriter, error) {
-	var file utils.File
-
+	id = canonicalLogPath(id)
 	file, err := s.fs.Open(id)
 	if err != nil {
 		file, err = s.fs.Create(id)
@@ -137,6 +143,7 @@ func (s *logStash) Append(id string) (LogWriter, error) {
 
 // ReadLog reads a log from the logstash server
 func (s *logStash) Read(id string) (LogReader, error) {
+	id = canonicalLogPath(id)
 	file, err := s.fs.Open(id)
 	if err != nil {
 		return nil, err
