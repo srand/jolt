@@ -52,7 +52,7 @@ class GitRepository(object):
             self.repository = pygit2.Repository(self.gitpath)
         elif os.path.exists(gitpath):
             with self.tools.cwd(self.path):
-                path = self.tools.run("git rev-parse --git-dir", output=False)
+                path = self.tools.run("git rev-parse --git-dir", output=False, new_session=True)
             self.gitpath = os.path.join(self.path, path)
             self.repository = pygit2.Repository(self.gitpath)
         else:
@@ -112,7 +112,7 @@ class GitRepository(object):
         # reachable borrowed objects into the local repository, so persistent CI
         # workspaces no longer depend on the shared reference cache remaining
         # unchanged after checkout.
-        self.tools.run("git repack -a -d -k", output_on_error=True)
+        self.tools.run("git repack -a -d -k", output_on_error=True, new_session=True)
         self.tools.unlink(alternates, ignore_errors=True)
 
     def clone(self, submodules=False, rev=None, shallow=False):
@@ -134,27 +134,27 @@ class GitRepository(object):
             log.info("Fetching {0} into {1}", rev, self.path)
             self.tools.mkdir(self.path)
             with self.tools.cwd(self.path):
-                self.tools.run("git init", output_on_error=True)
+                self.tools.run("git init", output_on_error=True, new_session=True)
                 if refpath:
                     self._configure_alternates(refpath)
                 self._fetch_revision(rev)
                 self._dissociate_alternates()
-                self.tools.run("git checkout -f FETCH_HEAD", output_on_error=True)
+                self.tools.run("git checkout -f FETCH_HEAD", output_on_error=True, new_session=True)
                 if not self.is_valid_sha(rev):
                     # Create a local tag so that the revision can later be
                     # resolved (e.g. by rev_parse) without re-contacting the
                     # remote.
-                    self.tools.run("git tag -f {rev} FETCH_HEAD", rev=rev, output_on_error=True)
+                    self.tools.run("git tag -f {rev} FETCH_HEAD", rev=rev, output_on_error=True, new_session=True)
         elif fs.path.exists(self.path):
             log.info("Cloning into {0}", self.path)
             # Directory already exists: initialise and fetch instead of cloning
             with self.tools.cwd(self.path):
-                self.tools.run("git init", output_on_error=True)
+                self.tools.run("git init", output_on_error=True, new_session=True)
                 if refpath:
                     self._configure_alternates(refpath)
                 self.fetch()
                 self._dissociate_alternates()
-                self.tools.run("git checkout -f FETCH_HEAD", output_on_error=True)
+                self.tools.run("git checkout -f FETCH_HEAD", output_on_error=True, new_session=True)
         else:
             log.info("Cloning into {0}", self.path)
             extra_clone_options = config.get("git", "clone_options", "")
@@ -183,7 +183,8 @@ class GitRepository(object):
         with self.tools.environ(GIT_INDEX_FILE=self._git_jolt_index()), self.tools.cwd(self.path):
             return self.tools.run("git diff --binary --no-ext-diff HEAD ./",
                                   output_on_error=True,
-                                  output_rstrip=False)
+                                  output_rstrip=False,
+                                  new_session=True)
 
     def diff(self):
         diff = self.diff_unchecked()
@@ -202,7 +203,7 @@ class GitRepository(object):
             with open(patchfile, "wb") as f:
                 f.write(patch.encode())
             log.info("Applying patch to {0}", self.path)
-            self.tools.run("git apply --whitespace=nowarn {patchfile}", patchfile=patchfile)
+            self.tools.run("git apply --whitespace=nowarn {patchfile}", patchfile=patchfile, new_session=True)
 
     def head(self):
         if not self.is_cloned():
@@ -244,7 +245,8 @@ class GitRepository(object):
         with tools.environ(GIT_INDEX_FILE=self._git_jolt_index()), tools.cwd(self.path):
             tree = tools.run(
                 "git -c core.safecrlf=false add -A && git write-tree",
-                output_on_error=True)
+                output_on_error=True,
+                new_session=True)
         return tree
 
     def tree_hash(self, rev=None, path="/"):
@@ -282,11 +284,11 @@ class GitRepository(object):
 
     def clean(self):
         with self.tools.cwd(self.path):
-            return self.tools.run("git clean -dfx", output_on_error=True)
+            return self.tools.run("git clean -dfx", output_on_error=True, new_session=True)
 
     def reset(self):
         with self.tools.cwd(self.path):
-            return self.tools.run("git reset --hard", output_on_error=True)
+            return self.tools.run("git reset --hard", output_on_error=True, new_session=True)
 
     @utils.retried.on_exception(JoltCommandError, pattern="Command failed: git fetch", count=6, backoff=[2, 5, 10, 15, 20, 30])
     def fetch(self, commit=None):
@@ -330,13 +332,13 @@ class GitRepository(object):
         log.verbose("Checking out {0} in {1}", rev, self.path)
         with self.tools.cwd(self.path):
             try:
-                self.tools.run("git checkout -f {rev}", rev=rev, output=False)
+                self.tools.run("git checkout -f {rev}", rev=rev, output=False, new_session=True)
                 if submodules:
                     self._update_submodules()
             except Exception:
                 self.fetch(commit=commit)
                 try:
-                    self.tools.run("git checkout -f {rev}", rev=rev, output_on_error=True)
+                    self.tools.run("git checkout -f {rev}", rev=rev, output_on_error=True, new_session=True)
                     if submodules:
                         self._update_submodules()
                 except Exception:
