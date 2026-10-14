@@ -29,6 +29,12 @@ def locked(func):
 
 
 class GitRepository(object):
+    # Local ref used to anchor a shallowly fetched revision. FETCH_HEAD is not
+    # one of the reachability roots that git uses (refs, HEAD, the reflogs and
+    # the index), so a real ref is required to keep the fetched objects alive
+    # through repack/gc until the revision has been checked out.
+    fetchref = "refs/jolt/head"
+
     def __init__(self, url, path, relpath, refspecs=None):
         self.path = path
         self.relpath = relpath
@@ -98,69 +104,100 @@ class GitRepository(object):
         self.tools.mkdir(".git/objects/info")
         self.tools.write_file(".git/objects/info/alternates", objects_path)
 
-    def _dissociate_alternates(self):
-        """Copy borrowed reference objects locally and remove git alternates."""
-        if not config.getboolean("git", "dissociate", False):
+    def _fetch_reference(self, refpath, rev=None, depth=None):
+        """ Copy objects from a reference repository into the local repository.
+
+        In contrast to git alternates, the objects become owned by the local
+        repository, so the workspace stays intact when the reference repository
+        is later pruned, repacked or removed. The reference repository is only
+        a cache: whatever it cannot provide is fetched from the remote in the
+        next step, which is why a failure here is not an error.
+        """
+        if not os.path.isdir(refpath):
             return
 
-        alternates = ".git/objects/info/alternates"
-        if not self.tools.exists(alternates):
-            return
+        if rev:
+            # Tag auto-following would fetch tags pointing at the revision, and
+            # the objects behind them, which is more than was asked for.
+            refspec = "+{0}:{1}".format(rev, self.fetchref)
+            notags = "--no-tags"
+        else:
+            # The default refspecs already fetch every tag explicitly
+            refspec = " ".join(self.default_refspecs + self.refspecs)
+            notags = ""
 
-        # ``git clone --dissociate`` is unavailable for the manual init/fetch
-        # paths below.  Repacking before removing the alternates file copies the
-        # reachable borrowed objects into the local repository, so persistent CI
-        # workspaces no longer depend on the shared reference cache remaining
-        # unchanged after checkout.
-        self.tools.run("git repack -a -d -k", output_on_error=True, new_session=True)
-        self.tools.unlink(alternates, ignore_errors=True)
+        with self.tools.cwd(self.path):
+            log.info("Fetching {0} from {1}", rev or "commits", refpath)
+            try:
+                self.tools.run(
+                    "git fetch --force {notags} {depth} {refpath} {refspec}",
+                    notags=notags,
+                    depth="--depth={0}".format(depth) if depth else "",
+                    refpath=refpath,
+                    refspec=refspec,
+                    output=False,
+                    new_session=True)
+            except JoltCommandError as e:
+                # A cache miss is routine, don't alarm the user about it
+                log.verbose(
+                    "Reference repository '{0}' could not provide {1}: {2}",
+                    refpath, rev or "commits", "\n".join(e.stderr))
 
     def clone(self, submodules=False, rev=None, shallow=False):
         """ Clone the repository.
 
         :param submodules: Initialize and update submodules after cloning.
         :param rev: Revision (tag or commit) to fetch and check out. Only used
-            when ``shallow`` is False, in which case it is required.
+            when ``shallow`` is True, in which case it is required.
         :param shallow: Clone the repository without its full history.
             When True, only ``rev`` is fetched (shallow, depth 1) and checked
             out, avoiding the cost of a full clone.
         """
         refpath = self._get_reference_path()
+        dissociate = config.getboolean("git", "dissociate", False)
 
-        if shallow:
-            raise_error_if(
-                not rev,
-                "A revision is required to fetch repository '{0}' when shallow cloning is enabled", self.relpath)
-            log.info("Fetching {0} into {1}", rev, self.path)
+        raise_error_if(
+            shallow and not rev,
+            "A revision is required to fetch repository '{0}' when shallow cloning is enabled", self.relpath)
+
+        if shallow or fs.path.exists(self.path):
+            # Only a single revision is wanted, or the directory already
+            # exists: initialize and fetch instead of cloning.
+            if shallow:
+                log.info("Fetching {0} into {1}", rev, self.path)
+            else:
+                log.info("Cloning into {0}", self.path)
             self.tools.mkdir(self.path)
             with self.tools.cwd(self.path):
                 self.tools.run("git init", output_on_error=True, new_session=True)
                 if refpath:
-                    self._configure_alternates(refpath)
-                self._fetch_revision(rev)
-                self._dissociate_alternates()
+                    if dissociate:
+                        # Copy the objects out of the reference repository
+                        # rather than borrowing them, so that the workspace
+                        # never depends on it again and there is nothing to
+                        # dissociate from afterwards.
+                        self._fetch_reference(
+                            refpath,
+                            rev=rev if shallow else None,
+                            depth=1 if shallow else None)
+                    else:
+                        self._configure_alternates(refpath)
+                if shallow:
+                    self._fetch_revision(rev)
+                else:
+                    self.fetch()
                 self.tools.run("git checkout -f FETCH_HEAD", output_on_error=True, new_session=True)
-                if not self.is_valid_sha(rev):
+                if shallow and not self.is_valid_sha(rev):
                     # Create a local tag so that the revision can later be
                     # resolved (e.g. by rev_parse) without re-contacting the
                     # remote.
                     self.tools.run("git tag -f {rev} FETCH_HEAD", rev=rev, output_on_error=True, new_session=True)
-        elif fs.path.exists(self.path):
-            log.info("Cloning into {0}", self.path)
-            # Directory already exists: initialise and fetch instead of cloning
-            with self.tools.cwd(self.path):
-                self.tools.run("git init", output_on_error=True, new_session=True)
-                if refpath:
-                    self._configure_alternates(refpath)
-                self.fetch()
-                self._dissociate_alternates()
-                self.tools.run("git checkout -f FETCH_HEAD", output_on_error=True, new_session=True)
         else:
             log.info("Cloning into {0}", self.path)
             extra_clone_options = config.get("git", "clone_options", "")
             if refpath and os.path.isdir(refpath):
-                dissociate = "--dissociate" if config.getboolean("git", "dissociate", False) else ""
-                self.tools.run("git clone --reference-if-able {0} {1} {2} {3} {4}", refpath, dissociate, extra_clone_options, self.url, self.path, output_on_error=True, new_session=True)
+                # git clones with --reference are dissociated by git itself
+                self.tools.run("git clone --reference-if-able {0} {1} {2} {3} {4}", refpath, "--dissociate" if dissociate else "", extra_clone_options, self.url, self.path, output_on_error=True, new_session=True)
             else:
                 self.tools.run("git clone {0} {1} {2}", extra_clone_options, self.url, self.path, output_on_error=True, new_session=True)
 
@@ -314,12 +351,16 @@ class GitRepository(object):
         extra_fetch_options = config.get("git", "fetch_options", "")
         with self.tools.cwd(self.path):
             log.info("Fetching {0} from {1}", rev, self.url)
+            # The revision is fetched into a local ref, not just FETCH_HEAD, so
+            # that its objects are reachable for git. Tag auto-following is
+            # disabled to keep the fetch down to the requested revision.
             self.tools.run(
-                "git fetch --force --depth={depth} {extra_fetch_options} {url} {rev}",
+                "git fetch --force --no-tags --depth={depth} {extra_fetch_options} {url} +{rev}:{ref}",
                 depth=depth,
                 extra_fetch_options=extra_fetch_options,
                 url=self.url,
                 rev=rev,
+                ref=self.fetchref,
                 output_on_error=True,
                 new_session=True)
 

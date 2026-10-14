@@ -20,6 +20,24 @@ class GitApi(testsupport.JoltTest):
     def append(self, filepath, content):
         self.tools.append_file(os.path.join(self.ws, filepath), content)
 
+    def _create_tagged_repo(self, name):
+        """ Create a bare repo carrying a lightweight and an annotated tag.
+
+        Neither tag is at the tip of the branch, so fetching one really has to
+        resolve the tag instead of just taking whatever the branch points at.
+        """
+        git = "git -c user.email='e@mail' -c user.name='Name'"
+        with self.tools.cwd(self.ws):
+            self.tools.run("git init {0}_work", name)
+            with self.tools.cwd("{0}_work".format(name)):
+                self.tools.write_file("f.txt", "content")
+                self.tools.run(git + " add .")
+                self.tools.run(git + " commit -m c1")
+                self.tools.run("git tag light_tag")
+                self.tools.run(git + " tag -a -m annotated annotated_tag")
+                self.tools.run(git + " commit --allow-empty -m c2")
+            self.tools.run("git clone --bare {0}_work {0}.git", name)
+
     def test_diffsize(self):
         """
         --- tasks:
@@ -557,6 +575,63 @@ class GitApi(testsupport.JoltTest):
             self.assertNotExists("hello_world/.git/objects/info/alternates")
             self.tools.run("git -C hello_world fsck --connectivity-only", output_on_error=True)
 
+    def test_reference_repo_dissociate_shallow(self):
+        """
+        --- config:
+        [git]
+        reference = reference
+        dissociate = true
+
+        --- tasks:
+        class A(Task):
+            requires = ["git:url=https://github.com/gideont/hello_world.git,path=hello_world,shallow=true,rev=74cf3e97a31007f9c1e28852de3e17b69a728bcd"]
+        ---
+        """
+        with self.tools.cwd(self.ws):
+            self.tools.run("git clone --bare https://github.com/gideont/hello_world.git reference/github.com/gideont/hello_world.git")
+
+        self.build("a")
+        with self.tools.cwd(self.ws):
+            self.assertNotExists("hello_world/.git/objects/info/alternates")
+
+            # Only the requested revision may have been fetched
+            self.assertEqual("1", self.tools.run("git -C hello_world rev-list --count --all"))
+
+            # The borrowed objects must have been copied into the workspace,
+            # which may therefore survive the loss of the reference repository.
+            self.tools.rmtree("reference")
+            self.tools.run("git -C hello_world fsck --connectivity-only", output_on_error=True)
+            self.tools.run("git -C hello_world checkout -f HEAD", output_on_error=True)
+            self.assertEqual(
+                "74cf3e97a31007f9c1e28852de3e17b69a728bcd",
+                self.tools.run("git -C hello_world rev-parse HEAD"))
+
+    def test_reference_repo_dissociate_stale(self):
+        """
+        --- config:
+        [git]
+        reference = reference
+        dissociate = true
+
+        --- tasks:
+        class A(Task):
+            requires = ["git:url=https://github.com/gideont/hello_world.git,path=hello_world,shallow=true,rev=74cf3e97a31007f9c1e28852de3e17b69a728bcd"]
+        ---
+        """
+        # A reference repository without the requested revision is just a cache
+        # miss, the revision must then be fetched from the remote instead.
+        with self.tools.cwd(self.ws):
+            self.tools.run("git init --bare reference/github.com/gideont/hello_world.git")
+
+        self.build("a")
+        with self.tools.cwd(self.ws):
+            self.assertNotExists("hello_world/.git/objects/info/alternates")
+            self.tools.rmtree("reference")
+            self.tools.run("git -C hello_world fsck --connectivity-only", output_on_error=True)
+            self.assertEqual(
+                "74cf3e97a31007f9c1e28852de3e17b69a728bcd",
+                self.tools.run("git -C hello_world rev-parse HEAD"))
+
     @testsupport.skip_if_local
     def test_parallel_clone(self):
         """
@@ -656,6 +731,73 @@ class GitApi(testsupport.JoltTest):
             self.tools.run("git clone https://github.com/gideont/hello_world.git shallow_false_precloned")
 
         self.build("a")
+
+    def test_shallow_true_with_tag(self):
+        """
+        --- tasks:
+        class Light(Task):
+            requires = ["git:url={ws}/tagged.git,path=light,shallow=true,rev=light_tag"]
+
+            def run(self, deps, tools):
+                with tools.cwd("light"):
+                    assert tools.run("git rev-list --count --all") == "1", "history is not shallow"
+                    assert tools.run("git cat-file -t light_tag") == "commit"
+                    assert tools.run("git rev-list -1 light_tag") == tools.run("git rev-parse HEAD")
+
+        class Annotated(Task):
+            requires = ["git:url={ws}/tagged.git,path=annotated,shallow=true,rev=annotated_tag"]
+
+            def run(self, deps, tools):
+                with tools.cwd("annotated"):
+                    assert tools.run("git rev-list --count --all") == "1", "history is not shallow"
+                    assert tools.run("git cat-file -t annotated_tag") == "tag", "not an annotated tag"
+                    assert tools.run("git rev-list -1 annotated_tag") == tools.run("git rev-parse HEAD")
+        ---
+        """
+        if self.network:
+            self.skipTest("network build not supported")
+
+        self._create_tagged_repo("tagged")
+        self.build("light annotated")
+
+    def test_reference_repo_dissociate_shallow_tag(self):
+        """
+        --- config:
+        [git]
+        reference = reference
+        dissociate = true
+
+        --- tasks:
+        class A(Task):
+            requires = ["git:url=file://localhost{ws}/tagged.git,path=tagged,shallow=true,rev=annotated_tag"]
+        ---
+        """
+        if self.network:
+            self.skipTest("network build not supported")
+
+        self._create_tagged_repo("tagged")
+        with self.tools.cwd(self.ws):
+            # Reference repositories are named after the url: <host>/<path>
+            self.tools.run("git clone --bare tagged.git {0}".format(
+                os.path.join("reference", "localhost" + self.ws, "tagged.git")))
+
+        r = self.build("a")
+        # The tag must have been resolved in the reference repository
+        self.assertIn("Fetching annotated_tag from", r)
+        self.assertNotIn("could not provide", r)
+
+        with self.tools.cwd(self.ws):
+            self.assertNotExists("tagged/.git/objects/info/alternates")
+            self.assertEqual("1", self.tools.run("git -C tagged rev-list --count --all"))
+
+            # The objects must have been copied, not borrowed
+            self.tools.rmtree("reference")
+            self.tools.run("git -C tagged fsck --connectivity-only", output_on_error=True)
+            self.tools.run("git -C tagged checkout -f HEAD", output_on_error=True)
+            self.assertEqual("tag", self.tools.run("git -C tagged cat-file -t annotated_tag"))
+            self.assertEqual(
+                self.tools.run("git -C tagged rev-list -1 annotated_tag"),
+                self.tools.run("git -C tagged rev-parse HEAD"))
 
     @testsupport.skip_if_local
     def test_shallow_true_with_submodules(self):
