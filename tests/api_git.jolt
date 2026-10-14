@@ -799,6 +799,68 @@ class GitApi(testsupport.JoltTest):
                 self.tools.run("git -C tagged rev-list -1 annotated_tag"),
                 self.tools.run("git -C tagged rev-parse HEAD"))
 
+    def test_shallow_true_without_rev(self):
+        """
+        --- tasks:
+        class A(Task):
+            requires = ["git:url={ws}/norev.git,path=norev,shallow=true"]
+
+            def run(self, deps, tools):
+                with tools.cwd("norev"):
+                    assert tools.run("git rev-list --count --all") == "1", "history is not shallow"
+        ---
+        """
+        if self.network:
+            self.skipTest("network build not supported")
+
+        self._create_tagged_repo("norev")
+        self.build("a")
+        with self.tools.cwd(self.ws):
+            # An unset revision fetches the remote's default branch
+            self.assertEqual(
+                self.tools.run("git -C norev.git rev-parse HEAD"),
+                self.tools.run("git -C norev rev-parse HEAD"))
+
+    def test_reference_repo_dissociate_shallow_without_rev(self):
+        """
+        --- config:
+        [git]
+        reference = reference
+        dissociate = true
+
+        --- tasks:
+        class A(Task):
+            requires = ["git:url=file://localhost{ws}/norev.git,path=norev,shallow=true"]
+        ---
+        """
+        if self.network:
+            self.skipTest("network build not supported")
+
+        git = "git -c user.email='e@mail' -c user.name='Name'"
+        self._create_tagged_repo("norev")
+        with self.tools.cwd(self.ws):
+            self.tools.run("git clone --bare norev.git {0}".format(
+                os.path.join("reference", "localhost" + self.ws, "norev.git")))
+
+            # The remote moves on, so the cached default branch tip is stale
+            self.tools.run(git + " -C norev_work commit --allow-empty -m c3")
+            self.tools.run(git + " -C norev_work push ../norev.git HEAD")
+            expected = self.tools.run("git -C norev.git rev-parse HEAD")
+
+        r = self.build("a")
+        self.assertIn("Fetching HEAD from", r)
+
+        with self.tools.cwd(self.ws):
+            self.assertNotExists("norev/.git/objects/info/alternates")
+            self.assertEqual("1", self.tools.run("git -C norev rev-list --count --all"))
+
+            # The remote decides the revision, not the reference repository
+            self.assertEqual(expected, self.tools.run("git -C norev rev-parse HEAD"))
+
+            self.tools.rmtree("reference")
+            self.tools.run("git -C norev fsck --connectivity-only", output_on_error=True)
+            self.tools.run("git -C norev checkout -f HEAD", output_on_error=True)
+
     @testsupport.skip_if_local
     def test_shallow_true_with_submodules(self):
         """

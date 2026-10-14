@@ -104,7 +104,14 @@ class GitRepository(object):
         self.tools.mkdir(".git/objects/info")
         self.tools.write_file(".git/objects/info/alternates", objects_path)
 
-    def _fetch_reference(self, refpath, rev=None, depth=None):
+    def _revision_refspec(self, rev=None):
+        """ Refspec fetching a single revision into a local ref.
+
+        An unspecified revision means the remote's default branch.
+        """
+        return "+{0}:{1}".format(rev or "HEAD", self.fetchref)
+
+    def _fetch_reference(self, refpath, shallow=False, rev=None, depth=1):
         """ Copy objects from a reference repository into the local repository.
 
         In contrast to git alternates, the objects become owned by the local
@@ -116,23 +123,25 @@ class GitRepository(object):
         if not os.path.isdir(refpath):
             return
 
-        if rev:
+        if shallow:
             # Tag auto-following would fetch tags pointing at the revision, and
             # the objects behind them, which is more than was asked for.
-            refspec = "+{0}:{1}".format(rev, self.fetchref)
+            what = rev or "HEAD"
+            refspec = self._revision_refspec(rev)
             notags = "--no-tags"
         else:
             # The default refspecs already fetch every tag explicitly
+            what = "commits"
             refspec = " ".join(self.default_refspecs + self.refspecs)
             notags = ""
 
         with self.tools.cwd(self.path):
-            log.info("Fetching {0} from {1}", rev or "commits", refpath)
+            log.info("Fetching {0} from {1}", what, refpath)
             try:
                 self.tools.run(
                     "git fetch --force {notags} {depth} {refpath} {refspec}",
                     notags=notags,
-                    depth="--depth={0}".format(depth) if depth else "",
+                    depth="--depth={0}".format(depth) if shallow else "",
                     refpath=refpath,
                     refspec=refspec,
                     output=False,
@@ -141,30 +150,27 @@ class GitRepository(object):
                 # A cache miss is routine, don't alarm the user about it
                 log.verbose(
                     "Reference repository '{0}' could not provide {1}: {2}",
-                    refpath, rev or "commits", "\n".join(e.stderr))
+                    refpath, what, "\n".join(e.stderr))
 
     def clone(self, submodules=False, rev=None, shallow=False):
         """ Clone the repository.
 
         :param submodules: Initialize and update submodules after cloning.
         :param rev: Revision (tag or commit) to fetch and check out. Only used
-            when ``shallow`` is True, in which case it is required.
+            when ``shallow`` is True, where it defaults to the remote's default
+            branch.
         :param shallow: Clone the repository without its full history.
-            When True, only ``rev`` is fetched (shallow, depth 1) and checked
-            out, avoiding the cost of a full clone.
+            When True, only a single revision is fetched (shallow, depth 1)
+            and checked out, avoiding the cost of a full clone.
         """
         refpath = self._get_reference_path()
         dissociate = config.getboolean("git", "dissociate", False)
-
-        raise_error_if(
-            shallow and not rev,
-            "A revision is required to fetch repository '{0}' when shallow cloning is enabled", self.relpath)
 
         if shallow or fs.path.exists(self.path):
             # Only a single revision is wanted, or the directory already
             # exists: initialize and fetch instead of cloning.
             if shallow:
-                log.info("Fetching {0} into {1}", rev, self.path)
+                log.info("Fetching {0} into {1}", rev or "HEAD", self.path)
             else:
                 log.info("Cloning into {0}", self.path)
             self.tools.mkdir(self.path)
@@ -176,10 +182,7 @@ class GitRepository(object):
                         # rather than borrowing them, so that the workspace
                         # never depends on it again and there is nothing to
                         # dissociate from afterwards.
-                        self._fetch_reference(
-                            refpath,
-                            rev=rev if shallow else None,
-                            depth=1 if shallow else None)
+                        self._fetch_reference(refpath, shallow=shallow, rev=rev)
                     else:
                         self._configure_alternates(refpath)
                 if shallow:
@@ -187,7 +190,7 @@ class GitRepository(object):
                 else:
                     self.fetch()
                 self.tools.run("git checkout -f FETCH_HEAD", output_on_error=True, new_session=True)
-                if shallow and not self.is_valid_sha(rev):
+                if shallow and rev and not self.is_valid_sha(rev):
                     # Create a local tag so that the revision can later be
                     # resolved (e.g. by rev_parse) without re-contacting the
                     # remote.
@@ -346,21 +349,23 @@ class GitRepository(object):
                 new_session=True)
 
     @utils.retried.on_exception(JoltCommandError, pattern="Command failed: git fetch", count=6, backoff=[2, 5, 10, 15, 20, 30])
-    def _fetch_revision(self, rev, depth=1):
-        """ Fetch a single revision (tag or commit) without its history. """
+    def _fetch_revision(self, rev=None, depth=1):
+        """ Fetch a single revision (tag or commit) without its history.
+
+        An unspecified revision fetches the remote's default branch.
+        """
         extra_fetch_options = config.get("git", "fetch_options", "")
         with self.tools.cwd(self.path):
-            log.info("Fetching {0} from {1}", rev, self.url)
+            log.info("Fetching {0} from {1}", rev or "HEAD", self.url)
             # The revision is fetched into a local ref, not just FETCH_HEAD, so
             # that its objects are reachable for git. Tag auto-following is
             # disabled to keep the fetch down to the requested revision.
             self.tools.run(
-                "git fetch --force --no-tags --depth={depth} {extra_fetch_options} {url} +{rev}:{ref}",
+                "git fetch --force --no-tags --depth={depth} {extra_fetch_options} {url} {refspec}",
                 depth=depth,
                 extra_fetch_options=extra_fetch_options,
                 url=self.url,
-                rev=rev,
-                ref=self.fetchref,
+                refspec=self._revision_refspec(rev),
                 output_on_error=True,
                 new_session=True)
 
@@ -536,8 +541,8 @@ class Git(WorkspaceResource, FileInfluence):
     rev = Parameter(required=False, help="Specific commit or tag to be checked out.")
     """ Specific commit or tag to be checked out.
 
-    Required when ``shallow`` is True and the repository has not already
-    been cloned. Optional otherwise. """
+    When ``shallow`` is True and the repository has not already been cloned,
+    an unset revision fetches the remote's default branch. Optional. """
 
     hash = BooleanParameter(required=False, help="Let repo content influence the hash of consuming tasks.")
     """ Let repo content influence the hash of consuming tasks. Default ``True``. Optional. """
