@@ -183,6 +183,11 @@ func (h *EventHub) applyTask(info *protocol.TaskInfo, now time.Time) {
 	switch {
 	case info.Status == protocol.TaskStatus_TASK_QUEUED:
 		// The task may have been returned to the queue after being assigned.
+		// The timestamps describe the current attempt, so they are dropped
+		// along with the assignment and restamped when the task is picked up
+		// again. QueuedAt is kept, as it records the first time the client
+		// asked for the task.
+		info.AssignedAt = nil
 		info.StartedAt = nil
 		info.EndedAt = nil
 		info.WorkerId = ""

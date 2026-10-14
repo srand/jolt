@@ -250,17 +250,22 @@ func (s *priorityScheduler) ScheduleTask(buildId, identity string) (TaskUpdateOb
 		return nil, utils.GrpcError(utils.ErrTerminalBuild)
 	}
 
-	task, observer, err := build.ScheduleTask(identity)
+	// The task may be assigned to an idle worker while it is being enqueued,
+	// before ScheduleTask returns. Both the telemetry callbacks and the initial
+	// queued event must therefore be in place before that happens, or the
+	// assignment goes unobserved and the queued event arrives late enough to
+	// overwrite it.
+	task, observer, err := build.ScheduleTask(identity, func(task *Task) {
+		// Install telemetry callbacks
+		task.SetScheduler(s)
+
+		// Post scheduling telemetry to observers
+		s.TaskScheduled(task)
+	})
 	if err != nil {
 		log.Debug("exe - task - failed to schedule task in build:", err)
 		return nil, err
 	}
-
-	// Install telemetry callbacks
-	task.SetScheduler(s)
-
-	// Post scheduling telemetry to observers
-	s.TaskScheduled(task)
 
 	log.Debugf("exe - task - id: %s, name: %s", task.Identity(), task.Name())
 

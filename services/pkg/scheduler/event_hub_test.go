@@ -333,6 +333,55 @@ func TestEventHubReleasesWorkerOnRequeue(t *testing.T) {
 	assert.Nil(t, released.Task, "worker must be released when its task is requeued")
 }
 
+// A requeued task is assigned again later, and the reported assignment must
+// describe the attempt in progress rather than the one that was abandoned.
+func TestEventHubRestampsAssignmentAfterRequeue(t *testing.T) {
+	hub, _ := newTestHub(t)
+
+	platform := NewPlatform()
+	platform.AddProperty("worker.hostname", "builder1")
+	id, _ := uuid.NewRandom()
+	worker := &priorityWorker{id: id, platform: platform, taskPlatform: NewPlatform()}
+
+	task := newTestTask(t, "task")
+
+	postSync(t, hub, func() {
+		hub.WorkerEnlisted(worker)
+		hub.TaskScheduled(task)
+	})
+
+	consumer, err := hub.Subscribe(context.Background(), nil)
+	require.NoError(t, err)
+	require.NotNil(t, recv(t, consumer).GetSnapshot())
+
+	task.AssignToWorker(worker)
+	hub.TaskStatusChanged(task, protocol.TaskStatus_TASK_ASSIGNED)
+	first := recv(t, consumer).GetTask()
+	require.NotNil(t, first)
+	require.NotNil(t, first.AssignedAt)
+	recv(t, consumer) // worker acquires the task
+
+	// The worker is lost and the scheduler returns the task to the queue.
+	task.AssignToWorker(nil)
+	hub.TaskStatusChanged(task, protocol.TaskStatus_TASK_QUEUED)
+	requeued := recv(t, consumer).GetTask()
+	require.NotNil(t, requeued)
+	assert.Nil(t, requeued.AssignedAt, "a queued task is not assigned to anyone")
+	recv(t, consumer) // worker releases the task
+
+	// Assigned again, to the same worker.
+	task.AssignToWorker(worker)
+	hub.TaskStatusChanged(task, protocol.TaskStatus_TASK_ASSIGNED)
+	second := recv(t, consumer).GetTask()
+	require.NotNil(t, second)
+	require.NotNil(t, second.AssignedAt)
+	assert.True(t, second.AssignedAt.AsTime().After(first.AssignedAt.AsTime()),
+		"reassignment must be restamped, got %v after %v",
+		second.AssignedAt.AsTime(), first.AssignedAt.AsTime())
+	assert.Equal(t, first.QueuedAt.AsTime(), second.QueuedAt.AsTime(),
+		"queued time records the client's request and must survive a requeue")
+}
+
 func TestEventFilterDefaultsToEverything(t *testing.T) {
 	filter := NewEventFilter(&protocol.StreamEventsRequest{})
 	assert.True(t, filter.Tasks)

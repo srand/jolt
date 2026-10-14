@@ -244,7 +244,12 @@ func (b *priorityBuild) Id() string {
 // Schedule one the build's tasks for execution.
 // Returns the task and an observer for task updates.
 // Returns an error if the task does not exist.
-func (b *priorityBuild) ScheduleTask(identity string) (*Task, TaskUpdateObserver, error) {
+//
+// The prepare callback, if any, is invoked with the task once it is queued for
+// the client but before it is offered to the workers. Enqueuing the task may
+// assign it to an already idle worker without returning here first, so anything
+// that must observe the assignment has to be installed from the callback.
+func (b *priorityBuild) ScheduleTask(identity string, prepare func(*Task)) (*Task, TaskUpdateObserver, error) {
 	b.Lock()
 	defer b.Unlock()
 
@@ -268,6 +273,10 @@ func (b *priorityBuild) ScheduleTask(identity string) (*Task, TaskUpdateObserver
 	}
 
 	observer := task.NewUpdateObserver()
+
+	if prepare != nil {
+		prepare(task)
+	}
 
 	// Add the task to the queue.
 	// The task will be executed when a worker becomes available.
