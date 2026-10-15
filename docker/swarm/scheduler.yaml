@@ -14,3 +14,13 @@
 # would be the dashboard itself.
 public_http:
   - http://localhost:8080
+
+# Without an explicit size the stash keeps nothing: LogStashConfig.SetDefaults
+# leaves it at 0, and the LRU treats 0 as zero capacity rather than unbounded,
+# so each log is deleted the moment its task finishes and the writer closes.
+# The log is readable while the task runs — an open writer is held out of the
+# LRU — which makes the loss look like it only affects completed tasks.
+#
+# Storage here is in memory (the default), so this is RAM, not disk.
+logstash:
+  size: 1GB
