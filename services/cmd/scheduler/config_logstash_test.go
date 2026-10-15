@@ -40,3 +40,45 @@ func TestSetDefaultsStoresInMemoryWhenUnconfigured(t *testing.T) {
 
 	assert.Equal(t, "memory", config.StorageType)
 }
+
+func TestValidateRejectsAnUnparseableSize(t *testing.T) {
+	config := LogStashConfig{MaxSize_: "abc"}
+
+	err := config.Validate()
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "abc", "the error should name the offending value")
+}
+
+// ParseSize's pattern is unanchored, so this yields a single byte rather than
+// an error -- a stash that size discards every log as soon as its task
+// completes, which is the failure the size budget exists to prevent. A typo
+// must not be able to reinstate it quietly.
+func TestValidateRejectsASizeThatParsesToNearlyNothing(t *testing.T) {
+	for _, size := range []string{"1.5GB", "1 potato"} {
+		config := LogStashConfig{MaxSize_: size}
+
+		err := config.Validate()
+		assert.Error(t, err, "size %q parses to one byte and must not be accepted", size)
+	}
+}
+
+func TestValidateRejectsAnExplicitZeroSize(t *testing.T) {
+	config := LogStashConfig{MaxSize_: "0"}
+
+	assert.Error(t, config.Validate(), "a zero budget keeps nothing and must fail loudly")
+}
+
+func TestValidateAcceptsAConfiguredSize(t *testing.T) {
+	for _, size := range []string{"10GB", "1GB", "512MiB"} {
+		config := LogStashConfig{MaxSize_: size}
+
+		assert.NoError(t, config.Validate(), "size %q should be accepted", size)
+	}
+}
+
+func TestValidateAcceptsTheDefault(t *testing.T) {
+	config := LogStashConfig{}
+	config.SetDefaults()
+
+	assert.NoError(t, config.Validate(), "the default must pass its own validation")
+}

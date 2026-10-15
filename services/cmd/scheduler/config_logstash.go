@@ -14,6 +14,12 @@ import (
 // disk storage is configured, so this is a RAM budget by default.
 const defaultMaxSize = "1GB"
 
+// Smallest budget a stash can usefully run with. Sizes below this are typos
+// rather than intent: ParseSize's pattern is unanchored, so "1.5GB" yields a
+// single byte and "1 potato" does too, each leaving a stash that discards
+// every log as soon as its task completes.
+const minMaxSize = 1 << 20
+
 type LogStashConfig struct {
 	// Maximum size of the logstash.
 	// When the size is exceeded, oldest entries will be removed.
@@ -30,6 +36,24 @@ type LogStashConfig struct {
 func (c *LogStashConfig) MaxSize() int64 {
 	size, _ := utils.ParseSize(c.MaxSize_)
 	return size
+}
+
+// Validate reports a size the stash cannot usefully run with. Startup fails on
+// one rather than proceeding, because the alternative is a scheduler that
+// quietly throws away every task log the moment the task finishes.
+func (c *LogStashConfig) Validate() error {
+	size, err := utils.ParseSize(c.MaxSize_)
+	if err != nil {
+		return fmt.Errorf("invalid logstash size %q: %w", c.MaxSize_, err)
+	}
+
+	if size < minMaxSize {
+		return fmt.Errorf(
+			"logstash size %q is %s, below the %s minimum: a stash that small discards every log as soon as its task completes",
+			c.MaxSize_, utils.HumanByteSize(size), utils.HumanByteSize(minMaxSize))
+	}
+
+	return nil
 }
 
 func (c *LogStashConfig) CreateFs() (utils.Fs, error) {

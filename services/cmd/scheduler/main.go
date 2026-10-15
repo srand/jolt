@@ -38,6 +38,11 @@ var rootCmd = &cobra.Command{
 		}
 
 		config.LogStash.SetDefaults()
+
+		if err := config.LogStash.Validate(); err != nil {
+			log.Fatal(err)
+		}
+
 		config.Log()
 
 		verbosity, err := cmd.Flags().GetCount("verbose")
