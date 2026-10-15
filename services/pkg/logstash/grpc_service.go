@@ -21,7 +21,14 @@ func NewLogStashService(stash LogStash) *LogStashService {
 
 // ReadLog reads a log from the logstash server
 func (s *LogStashService) ReadLog(req *protocol.ReadLogRequest, stream protocol.LogStash_ReadLogServer) error {
-	reader, err := s.stash.Read(req.Id)
+	var reader LogReader
+	var err error
+
+	if req.GetFollow() {
+		reader, err = s.stash.Follow(stream.Context(), req.Id)
+	} else {
+		reader, err = s.stash.Read(req.Id)
+	}
 	if err != nil {
 		return err
 	}

@@ -14,6 +14,10 @@ message ReadLogRequest {
     // May be left empty if no filtering is desired.
     google.protobuf.Timestamp before = 2;
     google.protobuf.Timestamp after = 3;
+
+    // Do not end the stream at the end of the log while it is still being
+    // written. The stream ends when the log is complete.
+    bool follow = 4;
 }
 
 // Response with log file data
