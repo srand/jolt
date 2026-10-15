@@ -210,6 +210,8 @@ func (s *logStash) releaseLocked(id string, stream *logStream) {
 // Returns the channel to wait on for more data, and whether the log is
 // drained: no writer is open, so what is on disk is all there will ever be.
 func (s *logStash) watch(id string) (<-chan struct{}, bool) {
+	id = canonicalLogPath(id)
+
 	s.Lock()
 	defer s.Unlock()
 
@@ -222,12 +224,16 @@ func (s *logStash) watch(id string) (<-chan struct{}, bool) {
 }
 
 func (s *logStash) addFollower(id string) {
+	id = canonicalLogPath(id)
+
 	s.Lock()
 	defer s.Unlock()
 	s.streamLocked(id).followers++
 }
 
 func (s *logStash) dropFollower(id string) {
+	id = canonicalLogPath(id)
+
 	s.Lock()
 	defer s.Unlock()
 
@@ -243,6 +249,8 @@ func (s *logStash) dropFollower(id string) {
 // Called after every log line. Runs on the hot path, so it does nothing at all
 // unless somebody is actually following the log.
 func (s *logStash) logWritten(id string) {
+	id = canonicalLogPath(id)
+
 	s.Lock()
 	defer s.Unlock()
 

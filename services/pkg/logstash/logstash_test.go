@@ -183,6 +183,20 @@ func (s *LogStashTestSuite) TestWatchTracksOpenWriters() {
 	assert.True(s.T(), drained)
 }
 
+func (s *LogStashTestSuite) TestWatchCanonicalizesId() {
+	stash := s.stash.(*logStash)
+
+	writer, err := stash.Append("log1")
+	assert.NoError(s.T(), err)
+	defer writer.Close()
+
+	// "/log1" and "log1" must resolve to the same stream: Append and Read
+	// both canonicalize the id before using it as a key, and the registry
+	// methods must do the same or a non-canonical lookup silently misses.
+	_, drained := stash.watch("/log1")
+	assert.False(s.T(), drained)
+}
+
 func (s *LogStashTestSuite) TestWriteWakesWaiters() {
 	stash := s.stash.(*logStash)
 
