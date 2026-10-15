@@ -91,22 +91,73 @@ func (s *FollowTestSuite) TestFollowReturnsErrorForMissingLog() {
 // again for a real follower, leaking the stream entry forever, and reads as
 // "no followers" while a real follower is registered, silently dropping that
 // follower's wakeups.
+//
+// This needs a live second follower and an open writer at the moment of the
+// double close: with no other follower, and the writer already closed, the
+// stream entry is already gone by the time the second Close runs (releaseLocked
+// deletes it once writers == 0 && followers == 0 after the first Close), so
+// dropFollower's pre-existing "unknown id" guard — not the fix under test —
+// is what the second call hits. That shape passes whether or not Close is
+// idempotent, so it would not have caught the defect this test is for.
 func (s *FollowTestSuite) TestFollowCloseIsIdempotent() {
 	writer, err := s.stash.Append("log1")
 	assert.NoError(s.T(), err)
-	assert.NoError(s.T(), writer.WriteLine(s.line("only")))
-	assert.NoError(s.T(), writer.Close())
+	assert.NoError(s.T(), writer.WriteLine(s.line("first")))
+	defer writer.Close()
 
-	reader, err := s.stash.Follow(context.Background(), "log1")
+	survivor, err := s.stash.Follow(context.Background(), "log1")
+	assert.NoError(s.T(), err)
+	defer survivor.Close()
+
+	doubled, err := s.stash.Follow(context.Background(), "log1")
 	assert.NoError(s.T(), err)
 
-	assert.NoError(s.T(), reader.Close())
-	assert.NoError(s.T(), reader.Close())
+	line, err := survivor.ReadLine()
+	assert.NoError(s.T(), err)
+	assert.Equal(s.T(), "first", line.Message)
 
+	line, err = doubled.ReadLine()
+	assert.NoError(s.T(), err)
+	assert.Equal(s.T(), "first", line.Message)
+
+	// Close the same follower twice while the survivor and the writer are
+	// both still live.
+	assert.NoError(s.T(), doubled.Close())
+	assert.NoError(s.T(), doubled.Close())
+
+	// State check: the registry must still record exactly the surviving
+	// follower, not an over-decremented count. This is what catches the
+	// entry-leak/miscount defect directly, independent of timing.
 	s.stash.Lock()
-	_, tracked := s.stash.streams["log1"]
+	stream, tracked := s.stash.streams["log1"]
 	s.stash.Unlock()
-	assert.False(s.T(), tracked, "a double close left stream state behind")
+	assert.True(s.T(), tracked, "the double close tore down the stream entry the surviving follower still needs")
+	if tracked {
+		assert.Equal(s.T(), 1, stream.followers, "the double close corrupted the follower count")
+	}
+
+	// Behavioural check: the actual user-visible symptom. If the follower
+	// count was driven to zero, logWritten's "any followers?" check sees
+	// none and never wakes the survivor, so this would park until the
+	// writer closes instead of delivering the new line.
+	pending := s.readAsync(survivor)
+
+	select {
+	case <-pending:
+		s.T().Fatal("ReadLine returned before the line was written")
+	case <-time.After(100 * time.Millisecond):
+	}
+
+	assert.NoError(s.T(), writer.WriteLine(s.line("second")))
+
+	select {
+	case result := <-pending:
+		assert.NoError(s.T(), result.err)
+		assert.NotNil(s.T(), result.line)
+		assert.Equal(s.T(), "second", result.line.Message)
+	case <-time.After(2 * time.Second):
+		s.T().Fatal("the surviving follower stopped receiving lines after an unrelated double close")
+	}
 }
 
 func (s *FollowTestSuite) TestFollowBlocksThenDeliversNewLine() {
