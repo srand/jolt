@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	echo "github.com/labstack/echo/v4"
+	"github.com/srand/jolt/scheduler/pkg/log"
 	"github.com/srand/jolt/scheduler/pkg/protocol"
 )
 
@@ -36,7 +37,10 @@ func NewHttpHandler(stash LogStash, r *echo.Echo) http.Handler {
 
 			if err != nil {
 				// The status is already sent, so there is nowhere to report
-				// this but the log.
+				// this but the log. Debug, not Error: the common cause is a
+				// worker dying mid-record (io.ErrUnexpectedEOF), which is
+				// routine and already visible via the task's own status.
+				log.Debugf("read - log - id: %s - error: %v", c.Param("id"), err)
 				return nil
 			}
 

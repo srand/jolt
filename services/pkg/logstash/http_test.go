@@ -13,6 +13,11 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// Used for GET requests against a follow stream. If a flush regression makes
+// the handler block before sending headers, this bounds the failure to a
+// legible timeout instead of the test binary's own default.
+var followClient = &http.Client{Timeout: 10 * time.Second}
+
 func newTestHttpServer(t *testing.T) (*httptest.Server, LogStash) {
 	t.Helper()
 
@@ -83,7 +88,7 @@ func TestGetLogWithFollowStreamsLinesAsTheyAreWritten(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NoError(t, writer.WriteLine(testLine("first")))
 
-	response, err := http.Get(server.URL + "/logs/log1?follow=1")
+	response, err := followClient.Get(server.URL + "/logs/log1?follow=1")
 	assert.NoError(t, err)
 	defer response.Body.Close()
 	assert.Equal(t, http.StatusOK, response.StatusCode)
@@ -125,7 +130,7 @@ func TestGetLogWithFollowEndsOnACompletedLog(t *testing.T) {
 	assert.NoError(t, writer.WriteLine(testLine("first")))
 	assert.NoError(t, writer.Close())
 
-	response, err := http.Get(server.URL + "/logs/log1?follow=1")
+	response, err := followClient.Get(server.URL + "/logs/log1?follow=1")
 	assert.NoError(t, err)
 	defer response.Body.Close()
 
