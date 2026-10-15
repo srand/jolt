@@ -49,16 +49,25 @@ func TestValidateRejectsAnUnparseableSize(t *testing.T) {
 	assert.Contains(t, err.Error(), "abc", "the error should name the offending value")
 }
 
-// ParseSize's pattern is unanchored, so this yields a single byte rather than
-// an error -- a stash that size discards every log as soon as its task
-// completes, which is the failure the size budget exists to prevent. A typo
-// must not be able to reinstate it quietly.
+// These parse cleanly but leave a stash that keeps essentially nothing, which
+// discards every log as soon as its task completes -- the failure the size
+// budget exists to prevent.
 func TestValidateRejectsASizeThatParsesToNearlyNothing(t *testing.T) {
-	for _, size := range []string{"1.5GB", "1 potato"} {
+	for _, size := range []string{"1B", "1K", "512KiB"} {
 		config := LogStashConfig{MaxSize_: size}
 
 		err := config.Validate()
-		assert.Error(t, err, "size %q parses to one byte and must not be accepted", size)
+		assert.Error(t, err, "size %q is too small to be usable and must not be accepted", size)
+	}
+}
+
+// Malformed sizes are ParseSize's job, but Validate is where startup learns
+// about them, so it must surface rather than swallow them.
+func TestValidateRejectsSizesThatDoNotParse(t *testing.T) {
+	for _, size := range []string{"1.5GB", "1 potato", "-5GB", "1GG"} {
+		config := LogStashConfig{MaxSize_: size}
+
+		assert.Error(t, config.Validate(), "size %q does not parse and must not be accepted", size)
 	}
 }
 

@@ -14,10 +14,10 @@ import (
 // disk storage is configured, so this is a RAM budget by default.
 const defaultMaxSize = "1GB"
 
-// Smallest budget a stash can usefully run with. Sizes below this are typos
-// rather than intent: ParseSize's pattern is unanchored, so "1.5GB" yields a
-// single byte and "1 potato" does too, each leaving a stash that discards
-// every log as soon as its task completes.
+// Smallest budget a stash can usefully run with. Malformed sizes are rejected
+// by ParseSize; this catches the ones that parse but ask for a stash that
+// keeps essentially nothing, which discards every log as soon as its task
+// completes. There is no deployment that wants that, so it fails loudly.
 const minMaxSize = 1 << 20
 
 type LogStashConfig struct {

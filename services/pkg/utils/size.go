@@ -7,7 +7,10 @@ import (
 	"strings"
 )
 
-var sizeRe = regexp.MustCompile(`(0|[1-9][0-9]*) ?([KMGTPE]i?)?B?`)
+// Anchored on purpose. Without ^ and $ the pattern matched a leading prefix
+// and silently ignored the remainder, so malformed input parsed into a value
+// nobody asked for -- "1.5GB" became one byte, "-5GB" became five gigabytes.
+var sizeRe = regexp.MustCompile(`^(0|[1-9][0-9]*) ?([KMGTPE]i?)?B?$`)
 
 func ParseSize(size string) (int64, error) {
 	size = strings.TrimSpace(size)
