@@ -15,7 +15,7 @@ from google.protobuf import timestamp_pb2 as google_dot_protobuf_dot_timestamp__
 from jolt import common_pb2 as jolt_dot_common__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\'jolt/plugins/remote_execution/log.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x11jolt/common.proto\"s\n\x0eReadLogRequest\x12\n\n\x02id\x18\x01 \x01(\t\x12*\n\x06\x62\x65\x66ore\x18\x02 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12)\n\x05\x61\x66ter\x18\x03 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\"9\n\x0fReadLogResponse\x12\n\n\x02id\x18\x01 \x01(\t\x12\x1a\n\x08loglines\x18\x02 \x03(\x0b\x32\x08.LogLine2:\n\x08LogStash\x12.\n\x07ReadLog\x12\x0f.ReadLogRequest\x1a\x10.ReadLogResponse0\x01\x42\x0eZ\x0cpkg/protocolb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\'jolt/plugins/remote_execution/log.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x11jolt/common.proto\"\x83\x01\n\x0eReadLogRequest\x12\n\n\x02id\x18\x01 \x01(\t\x12*\n\x06\x62\x65\x66ore\x18\x02 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12)\n\x05\x61\x66ter\x18\x03 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x0e\n\x06\x66ollow\x18\x04 \x01(\x08\"9\n\x0fReadLogResponse\x12\n\n\x02id\x18\x01 \x01(\t\x12\x1a\n\x08loglines\x18\x02 \x03(\x0b\x32\x08.LogLine2:\n\x08LogStash\x12.\n\x07ReadLog\x12\x0f.ReadLogRequest\x1a\x10.ReadLogResponse0\x01\x42\x0eZ\x0cpkg/protocolb\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -23,10 +23,10 @@ _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'jolt.plugins.remote_executi
 if _descriptor._USE_C_DESCRIPTORS == False:
   _globals['DESCRIPTOR']._options = None
   _globals['DESCRIPTOR']._serialized_options = b'Z\014pkg/protocol'
-  _globals['_READLOGREQUEST']._serialized_start=95
-  _globals['_READLOGREQUEST']._serialized_end=210
-  _globals['_READLOGRESPONSE']._serialized_start=212
-  _globals['_READLOGRESPONSE']._serialized_end=269
-  _globals['_LOGSTASH']._serialized_start=271
-  _globals['_LOGSTASH']._serialized_end=329
+  _globals['_READLOGREQUEST']._serialized_start=96
+  _globals['_READLOGREQUEST']._serialized_end=227
+  _globals['_READLOGRESPONSE']._serialized_start=229
+  _globals['_READLOGRESPONSE']._serialized_end=286
+  _globals['_LOGSTASH']._serialized_start=288
+  _globals['_LOGSTASH']._serialized_end=346
 # @@protoc_insertion_point(module_scope)
