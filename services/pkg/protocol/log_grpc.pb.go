@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.3.0
 // - protoc             v4.24.4
-// source: services/pkg/logstash/log.proto
+// source: jolt/plugins/remote_execution/log.proto
 
 package protocol
 
@@ -136,5 +136,5 @@ var LogStash_ServiceDesc = grpc.ServiceDesc{
 			ServerStreams: true,
 		},
 	},
-	Metadata: "services/pkg/logstash/log.proto",
+	Metadata: "jolt/plugins/remote_execution/log.proto",
 }
