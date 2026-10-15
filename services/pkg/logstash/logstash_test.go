@@ -273,6 +273,43 @@ func (s *LogStashTestSuite) TestStreamStateIsReleasedWhenIdle() {
 	assert.False(s.T(), tracked, "stream state leaked after the last writer closed")
 }
 
+// A writer closed twice must not corrupt the shared registry's writer count,
+// the same way a follower closed twice must not (see log_reader_follow_test.go's
+// TestFollowCloseIsIdempotent). An over-decremented count never reads back as
+// zero again, leaking the stream entry forever and leaving watch reporting
+// drained == false permanently - parking every follower of this id, forever.
+//
+// This needs a live follower at the moment of the double close: with no
+// follower registered, the first Close already releases the stream entry
+// (releaseLocked deletes it once writers == 0 && followers == 0), so the
+// second Close hits the pre-existing "unknown id" guard rather than the floor
+// under test.
+func (s *LogStashTestSuite) TestWriterCloseIsIdempotent() {
+	stash := s.stash.(*logStash)
+
+	writer, err := stash.Append("log1")
+	assert.NoError(s.T(), err)
+
+	stash.addFollower("log1")
+	defer stash.dropFollower("log1")
+
+	assert.NoError(s.T(), writer.Close())
+	assert.NoError(s.T(), writer.Close())
+
+	stash.Lock()
+	stream, tracked := stash.streams["log1"]
+	stash.Unlock()
+	assert.True(s.T(), tracked, "the double close tore down the stream entry the follower still needs")
+	if tracked {
+		assert.Equal(s.T(), 0, stream.writers, "the double close drove the writer count negative")
+	}
+
+	// Behavioural check: watch must be able to report "drained" again once
+	// the (single) real writer has closed, even after the extra Close.
+	_, drained := stash.watch("log1")
+	assert.True(s.T(), drained, "watch never reports drained after a writer double close, parking followers forever")
+}
+
 func TestLogStash(t *testing.T) {
 	suite.Run(t, &LogStashTestSuite{})
 }

@@ -197,6 +197,15 @@ func (s *logStash) logClosed(writer *fileLogWriter) {
 		return
 	}
 
+	// Refuse to go negative, mirroring dropFollower below. A writer closed
+	// twice would otherwise send writers to -1: it would never read back as
+	// zero again, so watch would report drained == false forever and every
+	// follower of this id - including every future one - would park until
+	// its context is cancelled, for the life of the process.
+	if stream.writers == 0 {
+		return
+	}
+
 	stream.writers--
 	if stream.writers == 0 {
 		// Wake followers so they can see that the log is finished.
