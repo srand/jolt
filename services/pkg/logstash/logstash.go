@@ -265,6 +265,16 @@ func (s *logStash) dropFollower(id string) {
 		return
 	}
 
+	// Refuse to go negative. A follower that drops twice (a double Close, in
+	// particular) must not desync the count: an over-decremented counter
+	// never reads back as zero for a real follower's dropFollower, which
+	// leaks the stream entry forever, and it reads as zero for logWritten's
+	// "any followers?" check while a real follower is still registered,
+	// silently dropping that follower's wakeups.
+	if stream.followers == 0 {
+		return
+	}
+
 	stream.followers--
 	s.releaseLocked(id, stream)
 }

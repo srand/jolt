@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/gob"
 	"io"
+	"sync"
 
 	"github.com/srand/jolt/scheduler/pkg/protocol"
 	"github.com/srand/jolt/scheduler/pkg/utils"
@@ -40,6 +41,13 @@ func (r *tailReader) Read(p []byte) (int, error) {
 		if drained {
 			return 0, io.EOF
 		}
+		if notify == nil {
+			// Defensive: watch() only hands back a nil channel paired with
+			// drained == true today, so this should be unreachable. If that
+			// pairing ever changes, selecting on a nil channel would park us
+			// here until ctx is cancelled rather than fail loudly.
+			return 0, io.EOF
+		}
 
 		select {
 		case <-notify:
@@ -50,10 +58,12 @@ func (r *tailReader) Read(p []byte) (int, error) {
 }
 
 type followLogReader struct {
-	decoder *gob.Decoder
-	file    utils.File
-	stash   *logStash
-	id      string
+	decoder   *gob.Decoder
+	file      utils.File
+	stash     *logStash
+	id        string
+	closeOnce sync.Once
+	closeErr  error
 }
 
 func newFollowLogReader(ctx context.Context, stash *logStash, file utils.File, id string) *followLogReader {
@@ -77,7 +87,15 @@ func (r *followLogReader) ReadLine() (*protocol.LogLine, error) {
 	return &line, nil
 }
 
+// Close is idempotent: a reader may be closed more than once in ordinary Go
+// usage (an explicit Close plus a deferred one on an error path, say), and a
+// second call to dropFollower would corrupt the shared registry's follower
+// count for every other follower of the same log. Only the first call does
+// anything; later calls replay its result.
 func (r *followLogReader) Close() error {
-	r.stash.dropFollower(r.id)
-	return r.file.Close()
+	r.closeOnce.Do(func() {
+		r.stash.dropFollower(r.id)
+		r.closeErr = r.file.Close()
+	})
+	return r.closeErr
 }
