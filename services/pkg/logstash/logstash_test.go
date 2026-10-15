@@ -4,6 +4,7 @@ import (
 	"io"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/spf13/afero"
 	"github.com/srand/jolt/scheduler/pkg/protocol"
@@ -149,6 +150,113 @@ func (s *LogStashTestSuite) TestCreate() {
 	reader, err = stash.Read("log2")
 	assert.NoError(s.T(), err)
 	reader.Close()
+}
+
+func (s *LogStashTestSuite) TestWatchReportsDrainedForUnknownLog() {
+	stash := s.stash.(*logStash)
+
+	notify, drained := stash.watch("nosuchlog")
+	assert.Nil(s.T(), notify)
+	assert.True(s.T(), drained)
+}
+
+func (s *LogStashTestSuite) TestWatchTracksOpenWriters() {
+	stash := s.stash.(*logStash)
+
+	first, err := stash.Append("log1")
+	assert.NoError(s.T(), err)
+
+	_, drained := stash.watch("log1")
+	assert.False(s.T(), drained)
+
+	second, err := stash.Append("log1")
+	assert.NoError(s.T(), err)
+	assert.NoError(s.T(), first.Close())
+
+	// One writer is still open, so the log is not drained.
+	_, drained = stash.watch("log1")
+	assert.False(s.T(), drained)
+
+	assert.NoError(s.T(), second.Close())
+
+	_, drained = stash.watch("log1")
+	assert.True(s.T(), drained)
+}
+
+func (s *LogStashTestSuite) TestWriteWakesWaiters() {
+	stash := s.stash.(*logStash)
+
+	writer, err := stash.Append("log1")
+	assert.NoError(s.T(), err)
+	defer writer.Close()
+
+	// A registered follower is what makes notification observable.
+	stash.addFollower("log1")
+	defer stash.dropFollower("log1")
+
+	notify, _ := stash.watch("log1")
+	s.writeLines(writer, "line", 1)
+
+	select {
+	case <-notify:
+	case <-time.After(2 * time.Second):
+		s.T().Fatal("writing a line did not wake waiters")
+	}
+}
+
+func (s *LogStashTestSuite) TestLastWriterCloseWakesWaiters() {
+	stash := s.stash.(*logStash)
+
+	writer, err := stash.Append("log1")
+	assert.NoError(s.T(), err)
+
+	stash.addFollower("log1")
+	defer stash.dropFollower("log1")
+
+	notify, _ := stash.watch("log1")
+	assert.NoError(s.T(), writer.Close())
+
+	select {
+	case <-notify:
+	case <-time.After(2 * time.Second):
+		s.T().Fatal("closing the last writer did not wake waiters")
+	}
+}
+
+func (s *LogStashTestSuite) TestWritingWithoutFollowersDoesNotBlock() {
+	stash := s.stash.(*logStash)
+
+	writer, err := stash.Append("log1")
+	assert.NoError(s.T(), err)
+
+	// Nobody is following, so notification must do nothing at all. If this
+	// ever blocks or panics, every task on the scheduler pays for it.
+	done := make(chan struct{})
+	go func() {
+		s.writeLines(writer, "line", 1000)
+		close(done)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		s.T().Fatal("writing lines blocked with no follower registered")
+	}
+
+	assert.NoError(s.T(), writer.Close())
+}
+
+func (s *LogStashTestSuite) TestStreamStateIsReleasedWhenIdle() {
+	stash := s.stash.(*logStash)
+
+	writer, err := stash.Append("log1")
+	assert.NoError(s.T(), err)
+	assert.NoError(s.T(), writer.Close())
+
+	stash.Lock()
+	_, tracked := stash.streams["log1"]
+	stash.Unlock()
+	assert.False(s.T(), tracked, "stream state leaked after the last writer closed")
 }
 
 func TestLogStash(t *testing.T) {

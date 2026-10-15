@@ -16,18 +16,25 @@ type fileLogWriter struct {
 	file    utils.File
 	encoder *gob.Encoder
 	stash   *logStash
+	id      string
 }
 
-func newFileLogWriter(stash *logStash, file utils.File) *fileLogWriter {
+func newFileLogWriter(stash *logStash, file utils.File, id string) *fileLogWriter {
 	return &fileLogWriter{
 		file:    file,
 		encoder: gob.NewEncoder(file),
 		stash:   stash,
+		id:      id,
 	}
 }
 
 func (r *fileLogWriter) WriteLine(line *protocol.LogLine) error {
-	return r.encoder.Encode(line)
+	if err := r.encoder.Encode(line); err != nil {
+		return err
+	}
+
+	r.stash.logWritten(r.id)
+	return nil
 }
 
 func (r *fileLogWriter) Close() error {

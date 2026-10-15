@@ -68,19 +68,29 @@ func (f *logFile) Unlink() error {
 	return f.fs.Remove(f.path)
 }
 
+// Tracks the writers and followers of a single log, so that a follow reader
+// can tell "nothing written yet" from "nothing will be written".
+type logStream struct {
+	writers   int
+	followers int
+	notify    chan struct{}
+}
+
 type logStash struct {
-	mu     utils.RWMutex
-	config LogStashConfig
-	fs     utils.Fs
-	lru    *utils.LRU[*logFile]
+	mu      utils.RWMutex
+	config  LogStashConfig
+	fs      utils.Fs
+	lru     *utils.LRU[*logFile]
+	streams map[string]*logStream
 }
 
 // Create a new Logstash GRPC interface
 func NewLogStash(config LogStashConfig, fs utils.Fs) LogStash {
 	stash := &logStash{
-		mu:     utils.NewRWMutex(),
-		config: config,
-		fs:     fs,
+		mu:      utils.NewRWMutex(),
+		config:  config,
+		fs:      fs,
+		streams: map[string]*logStream{},
 	}
 
 	stash.lru = utils.NewLRU[*logFile](config.MaxSize(), func(item *logFile) bool {
@@ -134,11 +144,12 @@ func (s *logStash) Append(id string) (LogWriter, error) {
 
 	s.Lock()
 	s.lru.Remove(id)
+	s.streamLocked(id).writers++
 	s.Unlock()
 
 	log.Debug("add - log - id:", id)
 
-	return newFileLogWriter(s, file), nil
+	return newFileLogWriter(s, file, id), nil
 }
 
 // ReadLog reads a log from the logstash server
@@ -157,4 +168,88 @@ func (s *logStash) logClosed(writer *fileLogWriter) {
 	defer s.Unlock()
 
 	s.lru.Add(newLogFile(s.fs, writer.Path()))
+
+	stream, ok := s.streams[writer.id]
+	if !ok {
+		return
+	}
+
+	stream.writers--
+	if stream.writers == 0 {
+		// Wake followers so they can see that the log is finished.
+		s.wakeLocked(stream)
+	}
+	s.releaseLocked(writer.id, stream)
+}
+
+// Returns the tracking state for id, creating it if absent.
+// Callers must hold s.mu.
+func (s *logStash) streamLocked(id string) *logStream {
+	stream, ok := s.streams[id]
+	if !ok {
+		stream = &logStream{notify: make(chan struct{})}
+		s.streams[id] = stream
+	}
+	return stream
+}
+
+// Wakes everything waiting on the stream by closing the channel it handed out,
+// then installs a fresh one for the next wait. Callers must hold s.mu.
+func (s *logStash) wakeLocked(stream *logStream) {
+	close(stream.notify)
+	stream.notify = make(chan struct{})
+}
+
+// Forgets a stream once nothing refers to it. Callers must hold s.mu.
+func (s *logStash) releaseLocked(id string, stream *logStream) {
+	if stream.writers == 0 && stream.followers == 0 {
+		delete(s.streams, id)
+	}
+}
+
+// Returns the channel to wait on for more data, and whether the log is
+// drained: no writer is open, so what is on disk is all there will ever be.
+func (s *logStash) watch(id string) (<-chan struct{}, bool) {
+	s.Lock()
+	defer s.Unlock()
+
+	stream, ok := s.streams[id]
+	if !ok {
+		return nil, true
+	}
+
+	return stream.notify, stream.writers == 0
+}
+
+func (s *logStash) addFollower(id string) {
+	s.Lock()
+	defer s.Unlock()
+	s.streamLocked(id).followers++
+}
+
+func (s *logStash) dropFollower(id string) {
+	s.Lock()
+	defer s.Unlock()
+
+	stream, ok := s.streams[id]
+	if !ok {
+		return
+	}
+
+	stream.followers--
+	s.releaseLocked(id, stream)
+}
+
+// Called after every log line. Runs on the hot path, so it does nothing at all
+// unless somebody is actually following the log.
+func (s *logStash) logWritten(id string) {
+	s.Lock()
+	defer s.Unlock()
+
+	stream, ok := s.streams[id]
+	if !ok || stream.followers == 0 {
+		return
+	}
+
+	s.wakeLocked(stream)
 }
