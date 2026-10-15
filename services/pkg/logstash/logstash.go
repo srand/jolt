@@ -1,6 +1,7 @@
 package logstash
 
 import (
+	"context"
 	"io"
 	"os"
 	"path/filepath"
@@ -24,6 +25,11 @@ type LogStash interface {
 
 	// ReadLog reads a log from the logstash server
 	Read(id string) (LogReader, error)
+
+	// Follow reads a log like Read, but does not end the stream while the log
+	// is still being written. It ends when the last writer closes, or when ctx
+	// is cancelled.
+	Follow(ctx context.Context, id string) (LogReader, error)
 }
 
 type logFile struct {
@@ -161,6 +167,23 @@ func (s *logStash) Read(id string) (LogReader, error) {
 	}
 
 	return newFileLogReader(file), nil
+}
+
+// Follow reads a log, blocking at the end of the file while it is still
+// being written.
+func (s *logStash) Follow(ctx context.Context, id string) (LogReader, error) {
+	id = canonicalLogPath(id)
+
+	// Register before opening, so a writer closing in between still wakes us.
+	s.addFollower(id)
+
+	file, err := s.fs.Open(id)
+	if err != nil {
+		s.dropFollower(id)
+		return nil, err
+	}
+
+	return newFollowLogReader(ctx, s, file, id), nil
 }
 
 func (s *logStash) logClosed(writer *fileLogWriter) {
