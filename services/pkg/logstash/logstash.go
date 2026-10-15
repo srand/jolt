@@ -15,7 +15,9 @@ import (
 type LogStashConfig interface {
 	// Get the maximum allowed size of the stash
 	// If the stash is larger than this, the oldest entries will be removed.
-	// If this is 0, the stash will be unbounded.
+	// A size of 0 is zero capacity, not unbounded: every log is evicted as
+	// soon as it is handed to the cache, which happens when its writer
+	// closes. Callers are expected to supply a non-zero budget.
 	MaxSize() int64
 }
 

@@ -313,3 +313,29 @@ func (s *LogStashTestSuite) TestWriterCloseIsIdempotent() {
 func TestLogStash(t *testing.T) {
 	suite.Run(t, &LogStashTestSuite{})
 }
+
+// A zero budget is zero capacity, not unbounded: the LRU trims as soon as a
+// closed log is handed back to it, and eviction unlinks the file. The symptom
+// is deliberately confusing, because a log stays readable while its writer is
+// open -- Append holds it out of the LRU -- so only completed tasks lose their
+// logs. The scheduler's configuration default exists to avoid this; this test
+// pins the behaviour it is defaulting away from.
+func TestZeroSizeStashDiscardsLogsOnceTheWriterCloses(t *testing.T) {
+	config := new(MockLogStashConfig)
+	config.On("MaxSize").Return(0)
+	stash := NewLogStash(config, afero.NewMemMapFs())
+
+	writer, err := stash.Append("log1")
+	assert.NoError(t, err)
+	assert.NoError(t, writer.WriteLine(testLine("only")))
+
+	// Still readable: the open writer keeps it out of the cache.
+	reader, err := stash.Read("log1")
+	assert.NoError(t, err)
+	assert.NoError(t, reader.Close())
+
+	assert.NoError(t, writer.Close())
+
+	_, err = stash.Read("log1")
+	assert.Error(t, err, "a zero-budget stash retains nothing once the writer closes")
+}

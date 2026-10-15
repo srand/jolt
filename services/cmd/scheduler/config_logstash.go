@@ -8,10 +8,18 @@ import (
 	"github.com/srand/jolt/scheduler/pkg/utils"
 )
 
+// Default maximum size of the stash. A stash must not be left on a zero
+// budget: the LRU reads that as zero capacity rather than as unbounded, and
+// discards every log as soon as its task completes. Stored in memory unless
+// disk storage is configured, so this is a RAM budget by default.
+const defaultMaxSize = "1GB"
+
 type LogStashConfig struct {
 	// Maximum size of the logstash.
 	// When the size is exceeded, oldest entries will be removed.
-	// Supported suffixes:
+	// Supported suffixes: K, M, G, T, P, E and their binary counterparts
+	// Ki, Mi, Gi, Ti, Pi, Ei, each optionally followed by B.
+	// Defaults to defaultMaxSize when unset.
 	MaxSize_ string `mapstructure:"size"`
 	// Storage type: "memory" or "disk"
 	StorageType string `mapstructure:"storage"`
@@ -53,6 +61,9 @@ func (c *LogStashConfig) CreateFs() (utils.Fs, error) {
 func (c *LogStashConfig) SetDefaults() {
 	if c.StorageType == "" {
 		c.StorageType = "memory"
+	}
+	if c.MaxSize_ == "" {
+		c.MaxSize_ = defaultMaxSize
 	}
 }
 
