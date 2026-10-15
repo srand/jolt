@@ -19,6 +19,9 @@ services:
       - "80:80"
   scheduler:
     image: robrt/jolt-scheduler:latest
+    configs:
+      - source: scheduler.yaml
+        target: /etc/jolt/scheduler.yaml
     ports:
       - "8080:8080"
       - "9090:9090"
@@ -37,6 +40,8 @@ services:
       - cache-node:/data/cache
       - /etc/machine-id:/etc/machine-id
 configs:
+  scheduler.yaml:
+    file: ./scheduler.yaml
   worker.conf:
     file: ./worker.conf
 volumes:

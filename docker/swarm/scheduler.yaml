@@ -1,0 +1,16 @@
+# Scheduler configuration for the docker compose deployment.
+#
+# The listen addresses keep their defaults (tcp://:9090 for gRPC, tcp://:8080
+# for HTTP); only the public address needs stating.
+#
+# public_http is the address the scheduler hands out to clients in each task's
+# log URL, so it has to be reachable by whoever reads those logs — the
+# dashboard. This deployment publishes the scheduler's HTTP port on the host,
+# and `jolt run` starts only cache, scheduler and worker, leaving the dashboard
+# to run outside the compose network. So the host address is the right one.
+#
+# If you instead run the dashboard as a service inside this compose project,
+# change this to http://scheduler:8080 — "localhost" inside that container
+# would be the dashboard itself.
+public_http:
+  - http://localhost:8080
