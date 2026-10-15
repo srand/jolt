@@ -1,7 +1,6 @@
 package logstash
 
 import (
-	"bufio"
 	"fmt"
 	"io"
 	"net/http"
@@ -12,7 +11,15 @@ import (
 
 func NewHttpHandler(stash LogStash, r *echo.Echo) http.Handler {
 	r.GET("/logs/:id", func(c echo.Context) error {
-		reader, err := stash.Read(c.Param("id"))
+		var reader LogReader
+		var err error
+
+		// Following keeps the response open while the task is still writing.
+		if c.QueryParam("follow") == "1" {
+			reader, err = stash.Follow(c.Request().Context(), c.Param("id"))
+		} else {
+			reader, err = stash.Read(c.Param("id"))
+		}
 		if err != nil {
 			return c.String(http.StatusNotFound, err.Error())
 		}
@@ -20,7 +27,6 @@ func NewHttpHandler(stash LogStash, r *echo.Echo) http.Handler {
 
 		c.Response().Header().Set(echo.HeaderContentType, echo.MIMETextPlain)
 		c.Response().WriteHeader(http.StatusOK)
-		writer := bufio.NewWriter(c.Response())
 
 		for {
 			record, err := reader.ReadLine()
@@ -29,7 +35,9 @@ func NewHttpHandler(stash LogStash, r *echo.Echo) http.Handler {
 			}
 
 			if err != nil {
-				return c.String(http.StatusInternalServerError, err.Error())
+				// The status is already sent, so there is nowhere to report
+				// this but the log.
+				return nil
 			}
 
 			// Convert level to string
@@ -50,11 +58,13 @@ func NewHttpHandler(stash LogStash, r *echo.Echo) http.Handler {
 				level,
 				record.Message)
 
-			if _, err := writer.WriteString(line); err != nil {
-				return c.String(http.StatusInternalServerError, err.Error())
+			if _, err := c.Response().Write([]byte(line)); err != nil {
+				return nil
 			}
 
-			writer.Flush()
+			// Push the line out now. A bufio.Writer would only move it into
+			// net/http's own buffer, where it would wait for ~4KB of company.
+			c.Response().Flush()
 		}
 	})
 
