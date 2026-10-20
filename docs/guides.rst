@@ -759,6 +759,9 @@ Each of the components is deployed as a separate container. Information about th
 images and their configuration environment variables can be found in
 :ref:`container_images`
 
+For service metrics, worker-pool utilization and scrape configuration, see
+:ref:`monitoring-prometheus`.
+
 
 Adapting Task Definitions
 ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -907,6 +910,3 @@ Alternatively, if you are using a separate configuration file:
     .. code:: bash
 
       $ jolt -c client.conf build --network <task>
-
-
-

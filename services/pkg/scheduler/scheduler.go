@@ -57,10 +57,30 @@ type Scheduler interface {
 	ListWorkers() *protocol.ListWorkersResponse
 }
 
+// Worker platform dimensions used for statistics. Worker-specific properties
+// such as hostnames and IDs are deliberately excluded so workers are aggregated.
+type WorkerPlatform struct {
+	OS   string
+	Arch string
+
+	// Sorted, comma-separated nonempty Jolt labels, or "unknown" if absent.
+	Label string
+}
+
+// Worker counts for a platform. Active workers are connected workers that are
+// not available for scheduling, including workers awaiting acknowledgement.
+type WorkerStatistics struct {
+	Workers       int64
+	ActiveWorkers int64
+}
+
 // Scheduler statistics
 type SchedulerStatistics struct {
 	// Number of workers
 	Workers int64
+
+	// Worker counts grouped by operating system, CPU architecture and Jolt label set
+	WorkersByPlatform map[WorkerPlatform]WorkerStatistics
 
 	// Number of builds in progress
 	Builds int64

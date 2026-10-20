@@ -3,6 +3,8 @@ package scheduler
 import (
 	"context"
 	"fmt"
+	"slices"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -651,14 +653,29 @@ func (s *priorityScheduler) Statistics() *SchedulerStatistics {
 	defer s.RUnlock()
 
 	stats := &SchedulerStatistics{
-		Workers:         int64(len(s.workers)),
-		Builds:          int64(len(s.builds)),
-		CompletedBuilds: s.numCompletedBuilds,
-		QueuedTasks:     0,
-		RunningTasks:    0,
-		FailedTasks:     s.numFailedTasks,
-		SuccessfulTasks: s.numSuccessfulTasks,
-		CompletedTasks:  s.numCompletedTasks,
+		Workers:           int64(len(s.workers)),
+		WorkersByPlatform: make(map[WorkerPlatform]WorkerStatistics),
+		Builds:            int64(len(s.builds)),
+		CompletedBuilds:   s.numCompletedBuilds,
+		QueuedTasks:       0,
+		RunningTasks:      0,
+		FailedTasks:       s.numFailedTasks,
+		SuccessfulTasks:   s.numSuccessfulTasks,
+		CompletedTasks:    s.numCompletedTasks,
+	}
+
+	for id, worker := range s.workers {
+		platform := WorkerPlatform{
+			OS:    workerPlatformProperty(worker.Platform(), "node.os"),
+			Arch:  workerPlatformProperty(worker.Platform(), "node.arch"),
+			Label: workerPlatformLabels(worker.Platform()),
+		}
+		counts := stats.WorkersByPlatform[platform]
+		counts.Workers++
+		if _, available := s.availWorkers[id]; !available {
+			counts.ActiveWorkers++
+		}
+		stats.WorkersByPlatform[platform] = counts
 	}
 
 	for _, build := range s.builds {
@@ -671,6 +688,35 @@ func (s *priorityScheduler) Statistics() *SchedulerStatistics {
 	}
 
 	return stats
+}
+
+// Missing and conflicting OS/architecture properties use stable buckets rather
+// than selecting an arbitrary value from the platform's unordered set of properties.
+func workerPlatformProperty(platform *Platform, key string) string {
+	values, _ := platform.GetPropertiesForKey(key)
+	switch len(values) {
+	case 0:
+		return "unknown"
+	case 1:
+		if values[0] == "" {
+			return "unknown"
+		}
+		return values[0]
+	default:
+		return "multiple"
+	}
+}
+
+// Preserve distinct sets of Jolt labels with a stable comma-separated value.
+// Empty labels are ignored; workers without nonempty labels use "unknown".
+func workerPlatformLabels(platform *Platform) string {
+	labels, _ := platform.GetPropertiesForKey("label")
+	labels = slices.DeleteFunc(labels, func(label string) bool { return label == "" })
+	if len(labels) == 0 {
+		return "unknown"
+	}
+	slices.Sort(labels)
+	return strings.Join(labels, ",")
 }
 
 // Get information about running builds
