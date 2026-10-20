@@ -3,6 +3,8 @@ package scheduler
 import (
 	"context"
 	"fmt"
+	"slices"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -517,13 +519,14 @@ func (s *priorityScheduler) NewWorker(platform, taskPlatform *Platform) (Worker,
 
 	id, _ := uuid.NewRandom()
 	worker := &priorityWorker{
-		ctx:          ctx,
-		cancel:       cancel,
-		builds:       make(chan Build, 1),
-		id:           id,
-		platform:     platform,
-		taskPlatform: taskPlatform,
-		scheduler:    s,
+		ctx:           ctx,
+		cancel:        cancel,
+		builds:        make(chan Build, 1),
+		id:            id,
+		platform:      platform,
+		taskPlatform:  taskPlatform,
+		statsPlatform: newWorkerPlatform(platform),
+		scheduler:     s,
 	}
 
 	s.Lock()
@@ -651,14 +654,25 @@ func (s *priorityScheduler) Statistics() *SchedulerStatistics {
 	defer s.RUnlock()
 
 	stats := &SchedulerStatistics{
-		Workers:         int64(len(s.workers)),
-		Builds:          int64(len(s.builds)),
-		CompletedBuilds: s.numCompletedBuilds,
-		QueuedTasks:     0,
-		RunningTasks:    0,
-		FailedTasks:     s.numFailedTasks,
-		SuccessfulTasks: s.numSuccessfulTasks,
-		CompletedTasks:  s.numCompletedTasks,
+		Workers:           int64(len(s.workers)),
+		WorkersByPlatform: make(map[WorkerPlatform]WorkerStatistics),
+		Builds:            int64(len(s.builds)),
+		CompletedBuilds:   s.numCompletedBuilds,
+		QueuedTasks:       0,
+		RunningTasks:      0,
+		FailedTasks:       s.numFailedTasks,
+		SuccessfulTasks:   s.numSuccessfulTasks,
+		CompletedTasks:    s.numCompletedTasks,
+	}
+
+	for id, worker := range s.workers {
+		platform := worker.(*priorityWorker).statsPlatform
+		counts := stats.WorkersByPlatform[platform]
+		counts.Workers++
+		if _, available := s.availWorkers[id]; !available {
+			counts.ActiveWorkers++
+		}
+		stats.WorkersByPlatform[platform] = counts
 	}
 
 	for _, build := range s.builds {
@@ -671,6 +685,32 @@ func (s *priorityScheduler) Statistics() *SchedulerStatistics {
 	}
 
 	return stats
+}
+
+// Statistics dimensions are derived once at registration because a worker's
+// platform never changes while it is connected.
+func newWorkerPlatform(platform *Platform) WorkerPlatform {
+	return WorkerPlatform{
+		OS:    workerPlatformValue(platform, "node.os"),
+		Arch:  workerPlatformValue(platform, "node.arch"),
+		Label: workerPlatformValue(platform, "label"),
+	}
+}
+
+var workerPlatformValueEscaper = strings.NewReplacer("\\", "\\\\", ",", "\\,")
+
+// Join the nonempty values of a property into a stable, unambiguous string.
+// Values are sorted and escaped so that a value containing a comma cannot be
+// mistaken for several values. Workers without any value get an empty string,
+// which Prometheus treats the same as an absent label.
+func workerPlatformValue(platform *Platform, key string) string {
+	values, _ := platform.GetPropertiesForKey(key)
+	values = slices.DeleteFunc(values, func(value string) bool { return value == "" })
+	slices.Sort(values)
+	for i, value := range values {
+		values[i] = workerPlatformValueEscaper.Replace(value)
+	}
+	return strings.Join(values, ",")
 }
 
 // Get information about running builds

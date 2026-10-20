@@ -25,6 +25,9 @@ type priorityWorker struct {
 	// the properties that must be fulfilled by the tasks.
 	taskPlatform *Platform
 
+	// The platform dimensions used to group the worker in statistics.
+	statsPlatform WorkerPlatform
+
 	// The scheduler that the worker belongs to.
 	scheduler *priorityScheduler
 
