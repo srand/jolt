@@ -1242,6 +1242,60 @@ class BuildCli(testsupport.JoltTest):
             self.assertNotIn("error2", data)
             self.assertNotIn("error3", data)
 
+    @testsupport.JoltTest.parameterized([
+        "main@a", "extra@a", "main@b", "main@c", "main@d",
+    ])
+    def test_partially_cached_extensions(self, missing):
+        """
+        --- tasks:
+        from jolt import config
+
+        @attributes.artifact("extra")
+        class A(Task):
+            def run(self, deps, tools):
+                assert not tools.glob(config.get_cachedir() + "/**/stale.txt"), "Old artifacts were not discarded"
+
+            def publish(self, artifact, tools):
+                artifact.cxxinfo.macros.append("TEST")
+
+            def publish_extra(self, artifact, tools):
+                pass
+
+        class B(Task):
+            extends = "a"
+
+            def run(self, deps, tools):
+                assert deps["a"].cxxinfo.macros.items() == ["TEST"]
+
+        class C(Task):
+            extends = "b"
+
+        class D(Task):
+            extends = "a"
+        ---
+        """
+        if self.network:
+            self.skipTest("Requires direct access to the local build cache")
+        r = self.build("a b c d")
+        self.assertEqual(self.tasks(r), ["a", "b", "c", "d"])
+        artifacts = self.artifacts(r)
+        self.assertEqual(len(artifacts), 5)
+        self.assertNoBuild(self.build("a b c d"))
+
+        # Leave every other artifact cached, including extension artifacts.
+        artifact_name, task_name = missing.split("@")
+        for artifact in artifacts:
+            self.tools.write_file(os.path.join(artifact, "stale.txt"), "stale")
+            if os.path.basename(os.path.dirname(artifact)) == task_name and artifact.endswith("-" + artifact_name):
+                self.tools.rmtree(artifact)
+
+        r = self.build("a b c d")
+        self.assertEqual(self.tasks(r), ["a", "b", "c", "d"])
+        self.assertEqual(self.artifacts(r), artifacts)
+        for artifact in artifacts:
+            self.assertNotExists(artifact, "stale.txt")
+        self.assertNoBuild(self.build("a b c d"))
+
     def test_extended_taint(self):
         """
         --- tasks:

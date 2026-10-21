@@ -104,16 +104,16 @@ class TaskQueue(object):
         self._timer.cancel()
 
     def is_aborted(self):
-        """ Returns true if the task queue has been aborted. """
+        """Returns true if the task queue has been aborted."""
         return self._aborted
 
     def in_progress(self, task):
-        """ Returns true if the task is in progress. """
+        """Returns true if the task is in progress."""
         with self.futures_lock:
             return task in self.futures.values()
 
     def empty(self):
-        """ Returns true if the task queue is empty. """
+        """Returns true if the task queue is empty."""
         with self.futures_lock:
             return len(self.futures) == 0
 
@@ -139,7 +139,7 @@ class Executor(object):
         self.factory = factory
 
     def schedule(self, env):
-        """ Schedule the task for execution.
+        """Schedule the task for execution.
 
         This method is called by the task queue to schedule the task for execution
         in the factory thread pool. The method must return a Future object that
@@ -170,7 +170,7 @@ class Executor(object):
         pass
 
     def is_aborted(self):
-        """ Check if executor has been aborted. """
+        """Check if executor has been aborted."""
         return self.factory.is_aborted()
 
     def run(self, env):
@@ -226,9 +226,8 @@ class LocalExecutor(Executor):
         try:
             with hooks.task_run(task):
                 self.task.run(
-                    env,
-                    force_build=self.force_build,
-                    force_upload=self.force_upload)
+                    env, force_build=self.force_build, force_upload=self.force_upload
+                )
 
         except Exception as e:
             log.exception(e, error=False)
@@ -323,6 +322,7 @@ class Downloader(Executor):
     Downloader executors are typically run in parallel with other executors.
 
     """
+
     def __init__(self, factory, task, *args, **kwargs):
         super().__init__(factory, *args, **kwargs)
         self.task = task
@@ -345,7 +345,9 @@ class Downloader(Executor):
             task.started_download()
             raise_task_error_if(
                 not task.download(persistent_only=True),
-                task, "Failed to download task artifact")
+                task,
+                "Failed to download task artifact",
+            )
         except Exception as e:
             with task.task.report() as report:
                 report.add_exception(e)
@@ -355,7 +357,7 @@ class Downloader(Executor):
             task.finished_download()
 
     def run(self, env):
-        """ Downloads artifacts. """
+        """Downloads artifacts."""
 
         self._download(self.task)
         for ext in self.task.extensions:
@@ -394,7 +396,9 @@ class Uploader(Executor):
             task.started_upload()
             raise_task_error_if(
                 not task.upload(persistent_only=True),
-                task, "Failed to upload task artifact")
+                task,
+                "Failed to upload task artifact",
+            )
         except Exception as e:
             with task.task.report() as report:
                 report.add_exception(e)
@@ -404,7 +408,7 @@ class Uploader(Executor):
             task.finished_upload()
 
     def run(self, env):
-        """ Uploads artifacts. """
+        """Uploads artifacts."""
 
         self._upload(self.task)
         for ext in self.task.extensions:
@@ -435,12 +439,14 @@ class ExecutorRegistry(object):
 
     def __init__(self, options=None):
         self._options = options or JoltOptions()
-        self._factories = [factory(self._options) for factory in self.__class__.executor_factories]
+        self._factories = [
+            factory(self._options) for factory in self.__class__.executor_factories
+        ]
         self._local_factory = LocalExecutorFactory(self._options)
         self._concurrent_factory = ConcurrentLocalExecutorFactory(self._options)
 
     def shutdown(self):
-        """ Shuts all executor factories and thread-pools down """
+        """Shuts all executor factories and thread-pools down"""
 
         for factory in self._factories:
             factory.shutdown()
@@ -448,23 +454,23 @@ class ExecutorRegistry(object):
         self._concurrent_factory.shutdown()
 
     def create_session(self, graph):
-        """ Creates a session for all factories. """
+        """Creates a session for all factories."""
         return {factory: factory.create_session(graph) for factory in self._factories}
 
     def create_skipper(self, task):
-        """ Creates an executor that skips a task. """
+        """Creates an executor that skips a task."""
         return SkipTask(self._concurrent_factory, task)
 
     def create_downloader(self, task):
-        """ Creates an executor that downloads task artifacts. """
+        """Creates an executor that downloads task artifacts."""
         return Downloader(self._concurrent_factory, task)
 
     def create_uploader(self, task):
-        """ Creates an executor that uploads task artifacts. """
+        """Creates an executor that uploads task artifacts."""
         return Uploader(self._concurrent_factory, task)
 
     def create_local(self, task, force=False):
-        """ Creates an executor that runs a task locally. """
+        """Creates an executor that runs a task locally."""
         task.set_locally_executed()
         return self._local_factory.create(task, force=force)
 
@@ -493,13 +499,21 @@ class ExecutorFactory(object):
     is also responsible for hosting a thread pool that will run the executors it creates.
 
     """
+
     class QueueItem(object):
         """
         The type of item that is put into the queue thread-pool queue.
 
         It wraps the executor and its priority.
         """
-        def __init__(self, priority: int, future: Future, executor: Executor, env: JoltEnvironment):
+
+        def __init__(
+            self,
+            priority: int,
+            future: Future,
+            executor: Executor,
+            env: JoltEnvironment,
+        ):
             self.priority = priority
             self.future = future
             self.executor = executor
@@ -541,11 +555,11 @@ class ExecutorFactory(object):
         self._options = options or JoltOptions()
 
     def is_aborted(self):
-        """ Returns true if the build and thus the factory has been aborted. """
+        """Returns true if the build and thus the factory has been aborted."""
         return self._aborted
 
     def is_keep_going(self):
-        """ Returns true if the build should continue even if a task fails. """
+        """Returns true if the build should continue even if a task fails."""
         return self._options.keep_going
 
     def shutdown(self):
@@ -596,7 +610,9 @@ class ExecutorFactory(object):
         execution once it is completed.
         """
         future = Future()
-        self._queue.put(ExecutorFactory.QueueItem(-executor.task.weight, future, executor, env))
+        self._queue.put(
+            ExecutorFactory.QueueItem(-executor.task.weight, future, executor, env)
+        )
         self.pool.submit(self._run)
         return future
 
@@ -613,14 +629,14 @@ class LocalExecutorFactory(ExecutorFactory):
 
     def __init__(self, options=None):
         max_workers = config.getint(
-            "jolt", "parallel_tasks",
-            os.getenv("JOLT_PARALLEL_TASKS", 1 if options is None else options.jobs))
-        super().__init__(
-            options=options,
-            max_workers=max_workers)
+            "jolt",
+            "parallel_tasks",
+            os.getenv("JOLT_PARALLEL_TASKS", 1 if options is None else options.jobs),
+        )
+        super().__init__(options=options, max_workers=max_workers)
 
     def create(self, task, force=False):
-        """ Create a LocalExecutor for the task. """
+        """Create a LocalExecutor for the task."""
         return LocalExecutor(self, task, force_build=force)
 
 
@@ -635,9 +651,7 @@ class ConcurrentLocalExecutorFactory(ExecutorFactory):
 
     def __init__(self, options=None):
         max_workers = tools.Tools().thread_count()
-        super().__init__(
-            options=options,
-            max_workers=max_workers)
+        super().__init__(options=options, max_workers=max_workers)
 
     def create(self, task):
         raise NotImplementedError()
@@ -656,15 +670,17 @@ class NetworkExecutorFactory(ExecutorFactory):
 
 
 def ensure_executor_return(func):
-    """ Decorator to ensure that an executor is returned by factories. """
+    """Decorator to ensure that an executor is returned by factories."""
 
     @wraps(func)
     def wrapper(self, session, task):
         executor = func(self, session, task)
         raise_task_error_if(
-            not executor, task,
+            not executor,
+            task,
             "no executor can execute the task; "
-            "requesting a distributed network build without proper configuration?")
+            "requesting a distributed network build without proper configuration?",
+        )
         return executor
 
     return wrapper
@@ -684,6 +700,7 @@ class ExecutionStrategy(object):
     Strategies are selected by the user through command line options.
 
     """
+
     def create_executor(self, session, task):
         """
         Create an executor for the task.
@@ -719,7 +736,7 @@ class LocalStrategy(ExecutionStrategy, PruneStrategy):
 
     @ensure_executor_return
     def create_executor(self, session, task):
-        """ Create an executor for the task. """
+        """Create an executor for the task."""
 
         if task.is_alias() or task.is_resource():
             return self.executors.create_skipper(task)
@@ -732,7 +749,7 @@ class LocalStrategy(ExecutionStrategy, PruneStrategy):
         return self.executors.create_local(task)
 
     def should_prune_requirements(self, task):
-        """ Prune task requirements if possible """
+        """Prune task requirements if possible"""
 
         if task.is_alias() or not task.is_cacheable():
             return False
@@ -791,7 +808,7 @@ class DistributedStrategy(ExecutionStrategy, PruneStrategy):
 
     @ensure_executor_return
     def create_executor(self, session, task):
-        """ Create an executor for the task. """
+        """Create an executor for the task."""
 
         if task.is_alias() or task.is_resource():
             return self.executors.create_skipper(task)
@@ -813,8 +830,11 @@ class DistributedStrategy(ExecutionStrategy, PruneStrategy):
 
         remote = task.is_available_remotely()
         if remote:
-            if task.is_goal() and self.cache.download_enabled() and \
-               not task.is_available_locally():
+            if (
+                task.is_goal()
+                and self.cache.download_enabled()
+                and not task.is_available_locally()
+            ):
                 return self.executors.create_downloader(task)
             return self.executors.create_skipper(task)
         else:
@@ -826,7 +846,7 @@ class DistributedStrategy(ExecutionStrategy, PruneStrategy):
         return self.executors.create_network(session, task)
 
     def should_prune_requirements(self, task):
-        """ Prune task requirements if possible """
+        """Prune task requirements if possible"""
 
         if task.is_alias() or not task.is_cacheable():
             return False
@@ -851,14 +871,16 @@ class WorkerStrategy(ExecutionStrategy, PruneStrategy):
 
     @ensure_executor_return
     def create_executor(self, session, task):
-        """ Create an executor for the task. """
+        """Create an executor for the task."""
 
         if task.is_alias() or task.is_resource():
             return self.executors.create_skipper(task)
 
         raise_task_error_if(
-            not self.cache.upload_enabled(), task,
-            "Artifact upload must be enabled for workers, fix configuration")
+            not self.cache.upload_enabled(),
+            task,
+            "Artifact upload must be enabled for workers, fix configuration",
+        )
 
         if not task.is_cacheable():
             return self.executors.create_local(task)
@@ -880,12 +902,14 @@ class WorkerStrategy(ExecutionStrategy, PruneStrategy):
         if task.is_available_remotely():
             return self.executors.create_downloader(task)
         elif not task.is_goal():
-            raise_task_error(task, "Task artifact removed from global cache, cannot continue")
+            raise_task_error(
+                task, "Task artifact removed from global cache, cannot continue"
+            )
 
         return self.executors.create_local(task)
 
     def should_prune_requirements(self, task):
-        """ Prune task requirements if possible """
+        """Prune task requirements if possible"""
 
         if task.is_alias() or not task.is_cacheable():
             return False

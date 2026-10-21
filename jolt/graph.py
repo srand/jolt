@@ -113,7 +113,7 @@ class TaskProxy(object):
         return "({0} {1})".format(self.short_qualified_name, self.identity[:8])
 
     def log_running_time(self):
-        """ Emits an information log line every 5 mins a task has been running. """
+        """Emits an information log line every 5 mins a task has been running."""
         if not self.is_running():
             return
         minutes = int(self.duration_running.seconds / 60)
@@ -170,7 +170,9 @@ class TaskProxy(object):
         self.task.weight = weight
 
     def __str__(self):
-        return "{0}{1}".format(self.short_qualified_name, "*" if self.is_extension() else '')
+        return "{0}{1}".format(
+            self.short_qualified_name, "*" if self.is_extension() else ""
+        )
 
     def info(self, fmt, *args, **kwargs):
         self.task.info(fmt + " " + self.log_name, *args, **kwargs)
@@ -238,8 +240,17 @@ class TaskProxy(object):
         if extensions:
             for dep in self.extensions:
                 dep_artifacts += dep.artifacts
-        artifacts = filter(lambda a: not a.is_session(), self._artifacts + dep_artifacts)
-        return all(map(lambda artifact: self.cache.is_available_remotely(artifact, cache=cache), artifacts))
+        artifacts = filter(
+            lambda a: not a.is_session(), self._artifacts + dep_artifacts
+        )
+        return all(
+            map(
+                lambda artifact: self.cache.is_available_remotely(
+                    artifact, cache=cache
+                ),
+                artifacts,
+            )
+        )
 
     def is_cacheable(self):
         return self.task.is_cacheable()
@@ -261,7 +272,9 @@ class TaskProxy(object):
         return self.task.identity is not None
 
     def is_goal(self, with_extensions=True):
-        return self._goal or (with_extensions and any([e.is_goal() for e in self.extensions]))
+        return self._goal or (
+            with_extensions and any([e.is_goal() for e in self.extensions])
+        )
 
     def is_local(self):
         if self.is_extension():
@@ -319,7 +332,21 @@ class TaskProxy(object):
         return all(map(lambda artifact: artifact.is_uploadable(), artifacts))
 
     @contextmanager
-    def lock_artifacts(self, discard=False):
+    def lock_artifacts(self, discard=False, extensions=False):
+        if extensions and self.extensions and not self.is_resource():
+            tasks = [self] + self.extensions
+            with self.cache.lock_artifacts(
+                [artifact for task in tasks for artifact in task.artifacts],
+                discard=discard,
+            ) as artifacts:
+                locked = {artifact.identity: artifact for artifact in artifacts}
+                for task in tasks:
+                    task._artifacts = [
+                        locked[artifact.identity] for artifact in task.artifacts
+                    ]
+                yield self.artifacts
+            return
+
         artifacts = []
         stack = ExitStack()
         try:
@@ -357,12 +384,26 @@ class TaskProxy(object):
         if session_only or download_all:
             for artifact in artifacts_session:
                 if not self.cache.download(artifact, force=force):
-                    self.warning("Failed to download session artifact: {}", artifact.identity)
+                    self.warning(
+                        "Failed to download session artifact: {}", artifact.identity
+                    )
         if persistent_only or download_all:
-            success = all([self.cache.download(artifact, force=force) for artifact in artifacts_persistent])
+            success = all(
+                [
+                    self.cache.download(artifact, force=force)
+                    for artifact in artifacts_persistent
+                ]
+            )
         return success
 
-    def upload(self, force=False, locked=False, session_only=False, persistent_only=False, artifacts=None):
+    def upload(
+        self,
+        force=False,
+        locked=False,
+        session_only=False,
+        persistent_only=False,
+        artifacts=None,
+    ):
         artifacts = artifacts or self._artifacts
         if session_only:
             artifacts = list(filter(lambda a: a.is_session(), artifacts))
@@ -372,7 +413,12 @@ class TaskProxy(object):
             return True
         if not self.is_uploadable(artifacts):
             return False
-        return all([self.cache.upload(artifact, force=force, locked=locked) for artifact in artifacts])
+        return all(
+            [
+                self.cache.upload(artifact, force=force, locked=locked)
+                for artifact in artifacts
+            ]
+        )
 
     def resolve_requirement_alias(self, name):
         return self.requirement_aliases.get(name)
@@ -422,7 +468,9 @@ class TaskProxy(object):
 
     def set_owner(self, owner):
         self._owner = owner
-        self.task.exported_name = f"{self.short_qualified_name}@@{owner.short_qualified_name}"
+        self.task.exported_name = (
+            f"{self.short_qualified_name}@@{owner.short_qualified_name}"
+        )
 
     def finalize(self, dag):
         log.debug("Finalizing: " + self.short_qualified_name)
@@ -444,22 +492,34 @@ class TaskProxy(object):
         # Exclude transitive alias and resource dependencies. Directly required resources
         # are retained, including those required by a resource.
         self.children = list(
-            filter(lambda n: dag.are_neighbors(self, n) or (not n.is_alias() and not n.is_resource()),
-                   utils.unique_list(self.children)))
+            filter(
+                lambda n: dag.are_neighbors(self, n)
+                or (not n.is_alias() and not n.is_resource()),
+                utils.unique_list(self.children),
+            )
+        )
 
         # A resource and the resources it requires are acquired on the same host
-        if self.options.network and self.is_resource() and not self.is_workspace_resource():
+        if (
+            self.options.network
+            and self.is_resource()
+            and not self.is_workspace_resource()
+        ):
             for child in self.children:
                 if not child.is_resource() or child.is_workspace_resource():
                     continue
                 raise_task_error_if(
-                    self.is_local() and not child.is_local(), self,
+                    self.is_local() and not child.is_local(),
+                    self,
                     "Local resource cannot require a non-local resource '{}'",
-                    child.short_qualified_name)
+                    child.short_qualified_name,
+                )
                 raise_task_error_if(
-                    not self.is_local() and child.is_local(), child,
+                    not self.is_local() and child.is_local(),
+                    child,
                     "Local resource cannot be required by non-local resource '{}'",
-                    self.short_qualified_name)
+                    self.short_qualified_name,
+                )
 
         # Prepare workspace resources for this task so that influence can be calculated
         for child in self.children:
@@ -519,7 +579,10 @@ class TaskProxy(object):
 
     def restarted_execution(self, remote=False):
         hooks.task_finished_execution(self)
-        self.task.warning("Remote execution interrupted {}" if remote else "Execution interrupted {}", self.log_name)
+        self.task.warning(
+            "Remote execution interrupted {}" if remote else "Execution interrupted {}",
+            self.log_name,
+        )
         self.queued()
 
     def started_execution(self, remote=False):
@@ -547,11 +610,17 @@ class TaskProxy(object):
             self.set_failed()
 
         if self.duration_queued and self.duration_running:
-            logfn("{0} {1} after {2} {3}", what, how,
-                  self.duration_running,
-                  self.duration_queued.diff(self.duration_running))
+            logfn(
+                "{0} {1} after {2} {3}",
+                what,
+                how,
+                self.duration_running,
+                self.duration_queued.diff(self.duration_running),
+            )
         elif self.duration_queued:
-            logfn("{0} {1} after {2}", what, how, self.duration_queued or utils.duration())
+            logfn(
+                "{0} {1} after {2}", what, how, self.duration_queued or utils.duration()
+            )
         else:
             logfn("{0} {1} immediately", what, how)
 
@@ -573,20 +642,26 @@ class TaskProxy(object):
         self._failed("Upload")
 
     def failed_execution(self, remote=False, interrupt=False):
-        self._failed(what="Remote execution" if remote else "Execution", interrupt=interrupt)
+        self._failed(
+            what="Remote execution" if remote else "Execution", interrupt=interrupt
+        )
 
     def _finished(self, what="Execution"):
         raise_task_error_if(
             self.is_completed() and not self.is_extension(),
-            self, "task has already been completed")
+            self,
+            "task has already been completed",
+        )
         self._completed = True
         try:
             self.graph.remove_node(self)
         except KeyError:
             self.warning("Pruned task was executed")
-        self.task.info(colors.green(what + " finished after {0} {1}" + self.log_name),
-                       self.duration_running or "00s",
-                       self.duration_queued.diff(self.duration_running))
+        self.task.info(
+            colors.green(what + " finished after {0} {1}" + self.log_name),
+            self.duration_running or "00s",
+            self.duration_queued.diff(self.duration_running),
+        )
         hooks.task_finished(self)
 
     def finished_download(self):
@@ -626,11 +701,21 @@ class TaskProxy(object):
         with self.tools:
             self.task.clean(self.tools)
             for artifact in self.artifacts:
-                discarded = cache.discard(artifact, if_expired, onerror=fs.onerror_warning)
+                discarded = cache.discard(
+                    artifact, if_expired, onerror=fs.onerror_warning
+                )
                 if discarded:
-                    log.debug("Discarded: {} ({})", self.short_qualified_name, artifact.identity)
+                    log.debug(
+                        "Discarded: {} ({})",
+                        self.short_qualified_name,
+                        artifact.identity,
+                    )
                 else:
-                    log.debug(" Retained: {} ({})", self.short_qualified_name, artifact.identity)
+                    log.debug(
+                        " Retained: {} ({})",
+                        self.short_qualified_name,
+                        artifact.identity,
+                    )
 
     def _acquires_resource(self, resource):
         """
@@ -658,7 +743,9 @@ class TaskProxy(object):
                     # Resource already acquired by the client when running as worker
                     raise_task_error_if(
                         not child.download(force=True),
-                        child, "Failed to download task artifact")
+                        child,
+                        "Failed to download task artifact",
+                    )
                 continue
 
             if resource_only:
@@ -666,18 +753,31 @@ class TaskProxy(object):
 
             raise_task_error_if(
                 not child.is_completed() and child.is_unstable,
-                self, "Task depends on failed task '{}'", child.short_qualified_name)
+                self,
+                "Task depends on failed task '{}'",
+                child.short_qualified_name,
+            )
             if not child.is_available_locally(extensions=False):
                 raise_task_error_if(
                     not child.download(force=True),
-                    child, "Failed to download task artifact")
+                    child,
+                    "Failed to download task artifact",
+                )
 
     def partially_available_locally(self):
-        availability = map(lambda a: self.cache.is_available_locally(a), self.artifacts)
+        artifacts = [
+            artifact
+            for task in [self] + self.extensions
+            for artifact in task.artifacts
+            if not artifact.is_session()
+        ]
+        availability = [
+            self.cache.is_available_locally(artifact) for artifact in artifacts
+        ]
         return any(availability) and not all(availability)
 
     def _validate_platform(self):
-        """ Validates that the task is runnable on the current platform. """
+        """Validates that the task is runnable on the current platform."""
         platform_os, platform_arch = utils.platform_os_arch()
 
         os = self.task.platform.get("node.os")
@@ -685,14 +785,18 @@ class TaskProxy(object):
             os = self.tools.expand(os)
             raise_task_error_if(
                 os != platform_os,
-                self, f"Task is not runnable on current platform (wants node.os={os})")
+                self,
+                f"Task is not runnable on current platform (wants node.os={os})",
+            )
 
         arch = self.task.platform.get("node.arch")
         if arch:
             arch = self.tools.expand(arch)
             raise_task_error_if(
                 arch != platform_arch,
-                self, f"Task is not runnable on current platform (wants node.arch={arch})")
+                self,
+                f"Task is not runnable on current platform (wants node.arch={arch})",
+            )
 
     def run_acquire(self, artifact, owner, log_prefix=False):
         """
@@ -704,11 +808,23 @@ class TaskProxy(object):
         try:
             if not self.is_workspace_resource():
                 ts = utils.duration()
-                log.info(colors.blue("Resource acquisition started ({} for {})"), self.short_qualified_name, owner.short_qualified_name)
+                log.info(
+                    colors.blue("Resource acquisition started ({} for {})"),
+                    self.short_qualified_name,
+                    owner.short_qualified_name,
+                )
 
             try:
-                with log.thread_prefix(owner.identity[:8]) if log_prefix else nullcontext():
-                    acquire = getattr(self.task, "acquire_" + artifact.name) if artifact.name != "main" else self.task.acquire
+                with (
+                    log.thread_prefix(owner.identity[:8])
+                    if log_prefix
+                    else nullcontext()
+                ):
+                    acquire = (
+                        getattr(self.task, "acquire_" + artifact.name)
+                        if artifact.name != "main"
+                        else self.task.acquire
+                    )
                     acquire(artifact, self.deps, self.tools, owner.task)
             finally:
                 # Always commit the resource session artifact to the cache, even if the acquisition failed.
@@ -716,11 +832,21 @@ class TaskProxy(object):
                     self.cache.commit(artifact)
 
             if not self.is_workspace_resource():
-                log.info(colors.green("Resource acquisition finished after {} ({} for {})"), ts, self.short_qualified_name, owner.short_qualified_name)
+                log.info(
+                    colors.green("Resource acquisition finished after {} ({} for {})"),
+                    ts,
+                    self.short_qualified_name,
+                    owner.short_qualified_name,
+                )
 
         except (KeyboardInterrupt, Exception) as e:
             if not self.is_workspace_resource():
-                log.error(colors.red("Resource acquisition failed after {} ({} for {})"), ts, self.short_qualified_name, owner.short_qualified_name)
+                log.error(
+                    colors.red("Resource acquisition failed after {} ({} for {})"),
+                    ts,
+                    self.short_qualified_name,
+                    owner.short_qualified_name,
+                )
             if self.task.release_on_error:
                 with utils.ignore_exception():
                     self.run_release(artifact, owner)
@@ -733,18 +859,36 @@ class TaskProxy(object):
         try:
             if not self.is_workspace_resource():
                 ts = utils.duration()
-                log.info(colors.blue("Resource release started ({} for {})"), self.short_qualified_name, owner.short_qualified_name)
+                log.info(
+                    colors.blue("Resource release started ({} for {})"),
+                    self.short_qualified_name,
+                    owner.short_qualified_name,
+                )
 
             with log.thread_prefix(owner.identity[:8]) if log_prefix else nullcontext():
-                release = getattr(self.task, "release_" + artifact.name) if artifact.name != "main" else self.task.release
+                release = (
+                    getattr(self.task, "release_" + artifact.name)
+                    if artifact.name != "main"
+                    else self.task.release
+                )
                 release(artifact, self.deps, self.tools, owner.task)
 
             if not self.is_workspace_resource():
-                log.info(colors.green("Resource release finished after {} ({} for {})"), ts, self.short_qualified_name, owner.short_qualified_name)
+                log.info(
+                    colors.green("Resource release finished after {} ({} for {})"),
+                    ts,
+                    self.short_qualified_name,
+                    owner.short_qualified_name,
+                )
 
         except (KeyboardInterrupt, Exception) as e:
             if not self.is_workspace_resource():
-                log.error(colors.red("Resource release failed after {} ({} for {})"), ts, self.short_qualified_name, owner.short_qualified_name)
+                log.error(
+                    colors.red("Resource release failed after {} ({} for {})"),
+                    ts,
+                    self.short_qualified_name,
+                    owner.short_qualified_name,
+                )
             raise e
 
     @contextmanager
@@ -771,11 +915,14 @@ class TaskProxy(object):
     @contextmanager
     def _run_resources_no_dep_download(self):
         # Log messages are prefixed with task identity if resources are acquired in parallel
-        log_prefix = self.options.network and not self.options.worker and not self.is_local()
+        log_prefix = (
+            self.options.network and not self.options.worker and not self.is_local()
+        )
 
         # Collect list of resource dependencies acquired by this task
         resource_deps = [
-            child for child in self.children
+            child
+            for child in self.children
             if child.is_resource() and self._acquires_resource(child)
         ]
 
@@ -783,7 +930,9 @@ class TaskProxy(object):
             # Acquire resource dependencies in reverse order.
             acquired = set()
             for resource in reversed(resource_deps):
-                exitstack.enter_context(self._acquire_resource(resource, log_prefix, acquired))
+                exitstack.enter_context(
+                    self._acquire_resource(resource, log_prefix, acquired)
+                )
 
             yield
 
@@ -804,7 +953,9 @@ class TaskProxy(object):
         with ExitStack() as exitstack:
             nested_deps = [child for child in resource.children if child.is_resource()]
             for nested in reversed(nested_deps):
-                exitstack.enter_context(self._acquire_resource(nested, log_prefix, acquired))
+                exitstack.enter_context(
+                    self._acquire_resource(nested, log_prefix, acquired)
+                )
 
             acquired = []
 
@@ -812,7 +963,11 @@ class TaskProxy(object):
                 # Always discard resource artifacts before acquiring the resource.
                 # They should not exist in the cache when the resource is acquired,
                 # but may exist if the resource was previously acquired by an interrupted build.
-                with resource.lock_artifacts(discard=True) if not resource.is_workspace_resource() else nullcontext():
+                with (
+                    resource.lock_artifacts(discard=True)
+                    if not resource.is_workspace_resource()
+                    else nullcontext()
+                ):
                     resource.deps = self.cache.get_context(resource)
                     exitstack.enter_context(resource.deps)
 
@@ -824,7 +979,11 @@ class TaskProxy(object):
                         finally:
                             # Always upload the artifact session artifact to the cache, even if the acquisition failed.
                             if not resource.is_workspace_resource():
-                                resource.upload(locked=False, session_only=True, artifacts=[artifact])
+                                resource.upload(
+                                    locked=False,
+                                    session_only=True,
+                                    artifacts=[artifact],
+                                )
 
                 yield resource
 
@@ -853,19 +1012,33 @@ class TaskProxy(object):
                     self.skipped()
                     return
 
-                available_remotely = self.cache.download_enabled() and self.is_available_remotely()
+                available_remotely = (
+                    self.cache.download_enabled() and self.is_available_remotely()
+                )
                 if not available_locally and available_remotely:
-                    available_locally = self.download()
+                    # Availability covers the whole group, so download all of
+                    # it before deciding whether any member must execute.
+                    available_locally = (
+                        all([task.download() for task in [self] + self.extensions])
+                        and self.is_available_locally()
+                    )
 
                 if not available_locally and self.partially_available_locally():
                     force_build = True
 
             if force_build or not available_locally:
+                # Once execution is necessary, rebuild all extensions as well.
+                # Discard their artifacts before starting the extended task so
+                # no outputs or metadata from an earlier execution survive.
+                force_build = True
                 with log.threadsink() as buildlog:
                     if self.task.is_runnable():
                         log.verbose("Host: {0}", getenv("HOSTNAME", "localhost"))
 
-                    with self.lock_artifacts(discard=not self.is_resource()) as artifacts:
+                    with self.lock_artifacts(
+                        discard=not self.is_resource(),
+                        extensions=not self.is_extension(),
+                    ) as artifacts:
                         exitstack = ExitStack()
 
                         # Indicates whether session artifacts have been published
@@ -888,24 +1061,34 @@ class TaskProxy(object):
                                     # Run task
                                     try:
                                         hooks.task_prerun(self, context, self.tools)
-                                        with self.tools.timeout(seconds=config.getint("jolt", "task_timeout")):
+                                        with self.tools.timeout(
+                                            seconds=config.getint(
+                                                "jolt", "task_timeout"
+                                            )
+                                        ):
                                             self.task.run(context, self.tools)
                                     finally:
                                         hooks.task_postrun(self, context, self.tools)
 
                                     # Publish persistent artifacts
                                     if not self.is_available_locally(extensions=False):
-                                        for artifact in filter(lambda a: not a.is_session(), artifacts):
+                                        for artifact in filter(
+                                            lambda a: not a.is_session(), artifacts
+                                        ):
                                             self.publish(context, artifact, buildlog)
                                     else:
-                                        self.info("Publication skipped, already in local cache")
+                                        self.info(
+                                            "Publication skipped, already in local cache"
+                                        )
 
                                 finally:
                                     # Session artifacts should be uploaded
                                     upload_session_artifacts = []
 
                                     # Publish session artifacts to local cache
-                                    for artifact in filter(lambda a: a.is_session(), artifacts):
+                                    for artifact in filter(
+                                        lambda a: a.is_session(), artifacts
+                                    ):
                                         self.publish(context, artifact)
                                         upload_session_artifacts.append(artifact)
 
@@ -917,7 +1100,9 @@ class TaskProxy(object):
                             raise e
 
                         except Exception as e:
-                            self.failed_execution(interrupt=queue.is_aborted() if queue else False)
+                            self.failed_execution(
+                                interrupt=queue.is_aborted() if queue else False
+                            )
 
                             with utils.ignore_exception():
                                 exitstack.close()
@@ -927,6 +1112,7 @@ class TaskProxy(object):
 
                             if cli.debug_enabled:
                                 import pdb
+
                                 extype, value, tb = sys.exc_info()
                                 pdb.post_mortem(tb)
 
@@ -940,24 +1126,39 @@ class TaskProxy(object):
                             # artifact may become unpack():ed before we have a chance to.
                             if force_upload or force_build or not available_remotely:
                                 raise_task_error_if(
-                                    not self.upload(force=force_upload, locked=False, persistent_only=True) \
+                                    not self.upload(
+                                        force=force_upload,
+                                        locked=False,
+                                        persistent_only=True,
+                                    )
                                     and self.cache.upload_enabled(),
-                                    self, "Failed to upload task artifact")
+                                    self,
+                                    "Failed to upload task artifact",
+                                )
 
                         finally:
                             # Upload published session artifacts to remote cache
                             raise_task_error_if(
-                                upload_session_artifacts \
-                                and not self.upload(force=force_upload, locked=False, session_only=True, artifacts=upload_session_artifacts) \
+                                upload_session_artifacts
+                                and not self.upload(
+                                    force=force_upload,
+                                    locked=False,
+                                    session_only=True,
+                                    artifacts=upload_session_artifacts,
+                                )
                                 and self.cache.upload_enabled(),
-                                self, "Failed to upload session artifact")
+                                self,
+                                "Failed to upload session artifact",
+                            )
 
             elif force_upload or not available_remotely:
                 self.started_upload()
                 raise_task_error_if(
-                    not self.upload(force=force_upload, persistent_only=True) \
+                    not self.upload(force=force_upload, persistent_only=True)
                     and self.cache.upload_enabled(),
-                    self, "Failed to upload task artifact")
+                    self,
+                    "Failed to upload task artifact",
+                )
                 self.finished_upload()
 
             else:
@@ -965,13 +1166,21 @@ class TaskProxy(object):
                 self.info("Execution skipped, already in local cache")
 
             for extension in self.extensions:
+                # The root's extension list also contains nested extensions.
+                # During a rebuild their parent executes them. For cache reuse,
+                # visit them here since a cached parent returns immediately.
+                if force_build and extension._extended_task is not self:
+                    continue
                 with hooks.task_run(extension):
                     extension.run(env, force_upload, force_build)
 
     def publish(self, context, artifact, buildlog=None):
         hooks.task_prepublish(self, artifact, self.tools)
-        publish = self.task.publish if artifact.is_main() else \
-            getattr(self.task, "publish_" + artifact.name)
+        publish = (
+            self.task.publish
+            if artifact.is_main()
+            else getattr(self.task, "publish_" + artifact.name)
+        )
         publish(artifact, self.tools)
         self.task._verify_influence(context, artifact, self.tools)
         if artifact.is_main() and buildlog:
@@ -988,7 +1197,7 @@ class TaskProxy(object):
         return self.task.report()
 
     def unpack(self):
-        """ Unpacks all artifacts produced by this task. """
+        """Unpacks all artifacts produced by this task."""
         for artifact in self.artifacts:
             self.cache.unpack(artifact)
 
@@ -1131,7 +1340,10 @@ class Graph(object):
         with self._mutex:
             log.debug("[GRAPH] Listing all nodes")
             for node in self.topological_nodes:
-                log.debug("[GRAPH]   " + node.short_qualified_name + " ({})", len(self._children[node].keys()))
+                log.debug(
+                    "[GRAPH]   " + node.short_qualified_name + " ({})",
+                    len(self._children[node].keys()),
+                )
 
     def is_leaf(self, node):
         with self._mutex:
@@ -1162,7 +1374,7 @@ class GraphBuilder(object):
         self.options = options or JoltOptions()
 
     def _get_owner(self, node):
-        """ Returns the task consuming a resource required by node. """
+        """Returns the task consuming a resource required by node."""
         while node is not None and node.is_resource() and node._owner is not None:
             node = node._owner
         return node
@@ -1173,8 +1385,9 @@ class GraphBuilder(object):
         node = self.nodes.get(name) or self.resources.get((owner, name))
         if not node:
             task = self.registry.get_task(name, buildenv=self.buildenv)
-            node = self.nodes.get(task.qualified_name) or \
-                self.resources.get((owner, task.qualified_name))
+            node = self.nodes.get(task.qualified_name) or self.resources.get(
+                (owner, task.qualified_name)
+            )
             if node is not None:
                 return node
             node = TaskProxy(task, self.graph, self.cache, self.options)
@@ -1209,7 +1422,9 @@ class GraphBuilder(object):
 
         for requirement in node.task.requires:
             alias, _, task, name = utils.parse_aliased_task_name(requirement)
-            child = self._get_node(progress, utils.format_task_name(task, name), parent=node)
+            child = self._get_node(
+                progress, utils.format_task_name(task, name), parent=node
+            )
 
             # Create direct edges from alias parents to alias children
             if child.is_alias():
@@ -1235,13 +1450,17 @@ class GraphBuilder(object):
                 yield p
 
     def build(self, task_list, influence=True):
-        with self._progress("Building graph", len(self.graph.tasks), "tasks") as progress:
+        with self._progress(
+            "Building graph", len(self.graph.tasks), "tasks"
+        ) as progress:
             goals = [self._get_node(progress, task) for task in task_list]
             self.graph._nodes_by_name = self.nodes
 
         if influence:
             topological_nodes = self.graph.topological_nodes
-            with self._progress("Collecting task influence", len(self.graph.tasks), "tasks") as p:
+            with self._progress(
+                "Collecting task influence", len(self.graph.tasks), "tasks"
+            ) as p:
                 for node in reversed(topological_nodes):
                     node.finalize(self.graph)
                     p.update(1)
@@ -1258,9 +1477,11 @@ class GraphBuilder(object):
                 node.task.weight += max([a.weight for a in node.ancestors] + [0])
                 min_time = max(node.task.weight, min_time)
 
-            log.verbose("Time estimate: {}- {}",
-                        utils.duration_diff(min_time),
-                        utils.duration_diff(max_time))
+            log.verbose(
+                "Time estimate: {}- {}",
+                utils.duration_diff(min_time),
+                utils.duration_diff(max_time),
+            )
 
         self.graph.requested_goals = goals
         self.graph.goals = []
