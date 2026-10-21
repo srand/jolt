@@ -6,7 +6,7 @@ require (
 	github.com/denisbrodbeck/machineid v1.0.1
 	github.com/golang/protobuf v1.5.4
 	github.com/google/uuid v1.6.0
-	github.com/klauspost/compress v1.18.6
+	github.com/klauspost/compress v1.18.7
 	github.com/labstack/echo/v4 v4.15.4
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/spf13/afero v1.15.0
