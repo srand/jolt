@@ -860,7 +860,12 @@ class TaskProxy(object):
                 if not available_locally and self.partially_available_locally():
                     force_build = True
 
-            if force_build or not available_locally:
+            # Extensions must be rebuilt if the extended task is executed,
+            # otherwise they may reuse artifacts built against a previous
+            # instance of the extended task's artifact.
+            executed = force_build or not available_locally
+
+            if executed:
                 with log.threadsink() as buildlog:
                     if self.task.is_runnable():
                         log.verbose("Host: {0}", getenv("HOSTNAME", "localhost"))
@@ -966,7 +971,7 @@ class TaskProxy(object):
 
             for extension in self.extensions:
                 with hooks.task_run(extension):
-                    extension.run(env, force_upload, force_build)
+                    extension.run(env, force_upload, force_build or executed)
 
     def publish(self, context, artifact, buildlog=None):
         hooks.task_prepublish(self, artifact, self.tools)

@@ -1270,3 +1270,90 @@ class BuildCli(testsupport.JoltTest):
 
         # Check that the artifacts are different
         self.assertNotEqual(a1[0], a2[0])
+
+    @testsupport.skip_if_network
+    def test_extension_rebuilt_when_extended_missing(self):
+        """
+        --- tasks:
+        class A(Task):
+            def publish(self, artifact, tools):
+                with tools.cwd(artifact.path):
+                    tools.write_file("a.txt", "a")
+
+        class B(Task):
+            extends = "a"
+
+            def publish(self, artifact, tools):
+                with tools.cwd(artifact.path):
+                    tools.write_file("b.txt", "b")
+        ---
+        """
+        r = self.build("a b")
+        self.assertBuild(r, "a")
+        self.assertBuild(r, "b")
+        a1 = self.artifacts(r)
+
+        # Place a marker in the extension artifact so that
+        # we can tell whether it is discarded or reused.
+        with self.tools.cwd(self.ws, a1[1]):
+            self.tools.write_file("stale.txt", "stale")
+
+        # Remove the extended task from the local cache,
+        # keeping the extension artifact.
+        self.jolt("clean a")
+        self.assertNotExists(a1[0])
+        self.assertExists(a1[1], "stale.txt")
+
+        # Both tasks must be rebuilt and the stale extension artifact discarded
+        r = self.build("a b")
+        self.assertBuild(r, "a")
+        self.assertBuild(r, "b")
+        a2 = self.artifacts(r)
+
+        self.assertExists(a2[0], "a.txt")
+        self.assertExists(a2[1], "b.txt")
+        self.assertNotExists(a2[1], "stale.txt")
+
+    @testsupport.skip_if_network
+    def test_extended_rebuilt_when_extension_missing(self):
+        """
+        --- tasks:
+        class A(Task):
+            def publish(self, artifact, tools):
+                with tools.cwd(artifact.path):
+                    tools.write_file("a.txt", "a")
+
+        class B(Task):
+            extends = "a"
+
+            def publish(self, artifact, tools):
+                with tools.cwd(artifact.path):
+                    tools.write_file("b.txt", "b")
+        ---
+        """
+        r = self.build("a b")
+        self.assertBuild(r, "a")
+        self.assertBuild(r, "b")
+        a1 = self.artifacts(r)
+
+        # Place a marker in the extended artifact so that
+        # we can tell whether it is discarded or reused.
+        with self.tools.cwd(self.ws, a1[0]):
+            self.tools.write_file("stale.txt", "stale")
+
+        # Remove the extension from the local cache,
+        # keeping the extended task artifact.
+        self.jolt("clean b")
+        self.assertExists(a1[0], "stale.txt")
+        self.assertNotExists(a1[1])
+
+        # Extensions are built in the context of the extended task,
+        # so both tasks must be rebuilt and the stale extended artifact discarded
+        r = self.build("a b")
+        self.assertBuild(r, "a")
+        self.assertBuild(r, "b")
+        a2 = self.artifacts(r)
+
+        self.assertExists(a2[0], "a.txt")
+        self.assertExists(a2[1], "b.txt")
+        self.assertNotExists(a2[0], "stale.txt")
