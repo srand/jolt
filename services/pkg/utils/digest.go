@@ -73,3 +73,8 @@ func (d Digest) Algorithm() HashAlgorithm {
 func (d Digest) Hex() string {
 	return d.hex
 }
+
+// String returns the digest as "algorithm:hex", the form accepted by ParseDigest.
+func (d Digest) String() string {
+	return string(d.alg) + ":" + d.hex
+}

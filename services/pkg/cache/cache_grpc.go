@@ -66,7 +66,7 @@ func (svc *cacheService) checkTree(ctx context.Context, server CacheService_HasT
 	// Read the tree from the cache.
 	reader, err := svc.cache.ReadObject(digest)
 	if err != nil {
-		response.MissingTrees = append(response.MissingTrees, digest.Hex())
+		response.MissingTrees = append(response.MissingTrees, digest.String())
 		goto sendResponse
 	}
 

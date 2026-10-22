@@ -49,3 +49,15 @@ func TestParseDigestFail(t *testing.T) {
 	_, err = ParseDigest("sha1:")
 	assert.Error(t, err)
 }
+
+func TestDigestString(t *testing.T) {
+	// The string form includes the algorithm and parses back to the same digest.
+	for _, s := range []string{
+		"sha1:7d97e98f8af710c7e7fe703abc8f639e0ee507c4",
+		"blake3:fe3d8d834ae52bf4961af02f1b2db179331137c3281d1dd8a2dd565949eacabe",
+	} {
+		d, err := ParseDigest(s)
+		assert.NoError(t, err)
+		assert.Equal(t, s, d.String())
+	}
+}

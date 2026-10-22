@@ -171,7 +171,7 @@ func TestHasTreeReportsMissing(t *testing.T) {
 	assert.NoError(t, err)
 
 	trees, objects := stream.missing()
-	assert.Equal(t, []string{missingTree[len("blake3:"):]}, trees)
+	assert.Equal(t, []string{missingTree}, trees)
 	assert.Equal(t, []string{missingFile}, objects)
 }
 
