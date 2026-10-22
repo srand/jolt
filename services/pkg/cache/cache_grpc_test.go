@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/binary"
 	"encoding/hex"
+	"fmt"
 	"io"
 	"sort"
 	"sync"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/spf13/afero"
 	"github.com/srand/jolt/scheduler/pkg/fstree"
+	"github.com/srand/jolt/scheduler/pkg/log"
 	"github.com/srand/jolt/scheduler/pkg/utils"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc"
@@ -121,7 +123,7 @@ func blake3Digest(data []byte) string {
 	return "blake3:" + hex.EncodeToString(h.Sum(nil))
 }
 
-func newTestCache(t *testing.T) *trackingCache {
+func newTestCache(t testing.TB) *trackingCache {
 	config := &MockCacheConfig{}
 	config.On("MaxSize").Return(1 << 30)
 	config.On("ExpirationTime").Return(time.Duration(0))
@@ -132,7 +134,7 @@ func newTestCache(t *testing.T) *trackingCache {
 }
 
 // Store data in the cache and return its digest.
-func put(t *testing.T, c Cache, data []byte) string {
+func put(t testing.TB, c Cache, data []byte) string {
 	digest := blake3Digest(data)
 	d, err := utils.ParseDigest(digest)
 	assert.NoError(t, err)
@@ -145,7 +147,7 @@ func put(t *testing.T, c Cache, data []byte) string {
 	return digest
 }
 
-func hasTree(t *testing.T, c Cache, ctx context.Context, digests ...string) (*hasTreeStream, error) {
+func hasTree(t testing.TB, c Cache, ctx context.Context, digests ...string) (*hasTreeStream, error) {
 	stream := &hasTreeStream{ctx: ctx}
 	err := NewCacheService(c).HasTree(&HasTreeRequest{Digest: digests}, stream)
 	return stream, err
@@ -273,4 +275,37 @@ func TestHasTreeVisitsDuplicatesOnce(t *testing.T) {
 	_, objects := stream.missing()
 	assert.Equal(t, []string{missing}, objects, "missing object reported more than once")
 	assert.Equal(t, int64(2), c.reads.Load(), "trees read more than once")
+}
+
+// Measures HasTree on a workspace that is already complete in a cache
+// stored on disk, which is what every push of an unchanged workspace costs.
+func BenchmarkHasTreeComplete(b *testing.B) {
+	log.SetLevel(log.WarningLevel)
+
+	config := &MockCacheConfig{}
+	config.On("MaxSize").Return(1 << 30)
+	config.On("ExpirationTime").Return(time.Duration(0))
+
+	lru, err := NewLRUCache(afero.NewBasePathFs(afero.NewOsFs(), b.TempDir()), config)
+	assert.NoError(b, err)
+
+	var dirs []treeEntry
+	for d := 0; d < 200; d++ {
+		var files []treeEntry
+		for f := 0; f < 50; f++ {
+			digest := put(b, lru, []byte(fmt.Sprintf("file %d %d", d, f)))
+			files = append(files, treeEntry{fmt.Sprintf("file%d.txt", f), digest, fstree.InodeType_Regular})
+		}
+		dirs = append(dirs, treeEntry{fmt.Sprintf("dir%d", d), put(b, lru, encodeTree(files...)), fstree.InodeType_Directory})
+	}
+	root := put(b, lru, encodeTree(dirs...))
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		stream, err := hasTree(b, lru, context.Background(), root)
+		if err != nil || len(stream.responses) != 0 {
+			b.Fatal("tree not complete", err)
+		}
+	}
 }
