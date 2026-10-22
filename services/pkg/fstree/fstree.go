@@ -88,10 +88,38 @@ func ReadTree(reader io.Reader) (*Tree, error) {
 
 	// Fields are only a few bytes each, so read through a buffer instead of
 	// issuing a read on the underlying reader for every one of them.
-	reader = bufio.NewReader(reader)
+	br := bufio.NewReader(reader)
 
-	var magic uint16
-	err := binary.Read(reader, binary.LittleEndian, &magic)
+	// Integers are decoded from a single scratch buffer, and digests read into
+	// another, since binary.Read and fresh slices would allocate for every
+	// field of every entry.
+	var scratch [8]byte
+	readUint := func(size int) (uint64, error) {
+		if _, err := io.ReadFull(br, scratch[:size]); err != nil {
+			return 0, err
+		}
+		switch size {
+		case 2:
+			return uint64(binary.LittleEndian.Uint16(scratch[:])), nil
+		case 4:
+			return uint64(binary.LittleEndian.Uint32(scratch[:])), nil
+		default:
+			return binary.LittleEndian.Uint64(scratch[:]), nil
+		}
+	}
+
+	// Skips a field that is not needed, such as a path or symlink target.
+	skip := func(length uint64) error {
+		if _, err := br.Discard(int(length)); err != nil {
+			if err == io.EOF {
+				return io.ErrUnexpectedEOF
+			}
+			return err
+		}
+		return nil
+	}
+
+	magic, err := readUint(2)
 	if err != nil {
 		return nil, err
 	}
@@ -99,8 +127,7 @@ func ReadTree(reader io.Reader) (*Tree, error) {
 		return nil, fmt.Errorf("invalid magic number: %x", magic)
 	}
 
-	var version uint16
-	err = binary.Read(reader, binary.LittleEndian, &version)
+	version, err := readUint(2)
 	if err != nil {
 		return nil, err
 	}
@@ -109,11 +136,11 @@ func ReadTree(reader io.Reader) (*Tree, error) {
 	}
 
 	tree := NewTree(InodeType_Directory)
+	var digest []byte
 
 	for {
 		// Read the path.
-		var pathLength uint64
-		err = binary.Read(reader, binary.LittleEndian, &pathLength)
+		pathLength, err := readUint(8)
 		if err == io.EOF {
 			break
 		}
@@ -128,15 +155,12 @@ func ReadTree(reader io.Reader) (*Tree, error) {
 			return nil, fmt.Errorf("path length out of range: %d", pathLength)
 		}
 
-		path := make([]byte, pathLength)
-		_, err = io.ReadFull(reader, path)
-		if err != nil {
+		if err := skip(pathLength); err != nil {
 			return nil, err
 		}
 
 		// Read the digest.
-		var digestLength uint64
-		err = binary.Read(reader, binary.LittleEndian, &digestLength)
+		digestLength, err := readUint(8)
 		if err != nil {
 			return nil, err
 		}
@@ -145,23 +169,24 @@ func ReadTree(reader io.Reader) (*Tree, error) {
 			return nil, fmt.Errorf("digest length out of range: %d", digestLength)
 		}
 
-		digest := make([]byte, digestLength)
-		_, err = io.ReadFull(reader, digest)
-		if err != nil {
+		if uint64(cap(digest)) < digestLength {
+			digest = make([]byte, digestLength)
+		}
+		digest = digest[:digestLength]
+		if _, err := io.ReadFull(br, digest); err != nil {
 			return nil, err
 		}
 
 		// Read the status.
-		var status uint32
-		err = binary.Read(reader, binary.LittleEndian, &status)
+		status64, err := readUint(4)
 		if err != nil {
 			return nil, err
 		}
+		status := uint32(status64)
 
 		// Read the target if the inode is a symlink.
 		if (status & InodeType_Symlink) != 0 {
-			var targetLength uint64
-			err = binary.Read(reader, binary.LittleEndian, &targetLength)
+			targetLength, err := readUint(8)
 			if err != nil {
 				return nil, err
 			}
@@ -170,9 +195,7 @@ func ReadTree(reader io.Reader) (*Tree, error) {
 				return nil, fmt.Errorf("target length out of range: %d", targetLength)
 			}
 
-			target := make([]byte, targetLength)
-			_, err = io.ReadFull(reader, target)
-			if err != nil {
+			if err := skip(targetLength); err != nil {
 				return nil, err
 			}
 		}
