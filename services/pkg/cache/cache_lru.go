@@ -225,18 +225,13 @@ func (c *lruCache) HasObjects(digests []utils.Digest) []CacheItem {
 		item.access = now
 	})
 
-	// Then check that each object still exists on disk, as hasFile does,
-	// without holding the lock.
+	// Objects are only ever removed from disk by the cache itself, which
+	// removes them from the LRU at the same time, so the LRU is not checked
+	// against the disk here. HasTree looks up every object of a workspace
+	// for each push, and a stat each was its main cost.
 	result := make([]CacheItem, len(digests))
-	for i, path := range paths {
+	for i := range paths {
 		if !found[i] {
-			c.recordMiss()
-			continue
-		}
-
-		if _, err := c.fs.Stat(path); err != nil {
-			log.Warn("inconsistent cache: file not found on disk:", path)
-			c.lru.Remove(path)
 			c.recordMiss()
 			continue
 		}

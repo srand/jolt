@@ -195,26 +195,31 @@ func (s *LRUCacheTestSuite) TestFilesRejectPathsOutsideFilesDirectory() {
 func (s *LRUCacheTestSuite) TestHasObjects() {
 	cache := s.newCache()
 
-	present := utils.NewDigest(utils.Sha1Algorithm, "356a192b7913b04c54574d18c28d46e6395428ab")
-	absent := utils.NewDigest(utils.Sha1Algorithm, "da4b9237bacccdf19c0760cab7aec4a8359010b0")
-	deleted := utils.NewDigest(utils.Sha1Algorithm, "77de68daecd823babbb58edb1c8e14d7106e83bb")
-	s.write(cache, present, []byte("1"))
-	s.write(cache, deleted, []byte("3"))
+	d1 := utils.NewDigest(utils.Sha1Algorithm, "356a192b7913b04c54574d18c28d46e6395428ab")
+	d2 := utils.NewDigest(utils.Sha1Algorithm, "da4b9237bacccdf19c0760cab7aec4a8359010b0")
+	d3 := utils.NewDigest(utils.Sha1Algorithm, "77de68daecd823babbb58edb1c8e14d7106e83bb")
+	d4 := utils.NewDigest(utils.Sha1Algorithm, "1b6453892473a467d07372d45eb05abc2031647a")
+	absent := utils.NewDigest(utils.Sha1Algorithm, "ac3478d69a3c81fa62e60f5c3696165a4e5e6ac4")
 
-	// An object removed from disk behind the cache's back is missing, even
-	// though the cache still knows about it.
-	hex := deleted.Hex()
-	assert.NoError(s.T(), s.fs.Remove("objects/"+hex[:2]+"/"+hex[2:6]+"/"+hex[6:]))
+	// The cache holds two bytes, so writing a third object evicts the first.
+	s.write(cache, d1, []byte("1"))
+	s.write(cache, d2, []byte("2"))
+	s.write(cache, d3, []byte("3"))
 
-	items := cache.HasObjects([]utils.Digest{present, absent, deleted})
-	assert.Len(s.T(), items, 3)
+	items := cache.HasObjects([]utils.Digest{d1, d2, d3, absent})
+	assert.Len(s.T(), items, 4)
+	assert.Nil(s.T(), items[0], "evicted")
+	assert.NotNil(s.T(), items[1])
+	assert.NotNil(s.T(), items[2])
+	assert.Nil(s.T(), items[3], "never written")
+
+	// A lookup makes the object the most recently used, so d3 rather
+	// than d2 is evicted next.
+	cache.HasObjects([]utils.Digest{d2})
+	s.write(cache, d4, []byte("4"))
+	items = cache.HasObjects([]utils.Digest{d2, d3})
 	assert.NotNil(s.T(), items[0])
 	assert.Nil(s.T(), items[1])
-	assert.Nil(s.T(), items[2])
-
-	// The deleted object is forgotten.
-	assert.Nil(s.T(), cache.HasObject(deleted))
-	assert.NotNil(s.T(), cache.HasObject(present))
 }
 
 func TestLRUCacheTestSuite(t *testing.T) {
