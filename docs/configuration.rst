@@ -474,6 +474,8 @@ These configuration keys exist:
         for the password when needed and stores it in a keyring for future use.
 
 
+.. _configuration-plugins-jobserver:
+
 Jobserver
 ^^^^^^^^^
 
@@ -880,7 +882,7 @@ All Jolt services can be deployed using container images. The following
 sections detail how to configure the services using environment variables
 and/or configuration files.
 
- .. _configuration-services-cache:
+.. _configuration-services-cache:
 
 Cache
 ^^^^^
@@ -1035,8 +1037,6 @@ Its container image is available at `robrt/jolt-dashboard <https://hub.docker.co
       - | Port to serve the web application on.
         | Default: 8080
 
- .. _configuration-services-scheduler:
-
 
 Jobserver
 ^^^^^^^^^
@@ -1095,6 +1095,8 @@ the :ref:`Jobserver <configuration-plugins-jobserver>` plugin section:
     [jobserver]
     path = /dev/jobserver
 
+
+.. _configuration-services-scheduler:
 
 Scheduler
 ^^^^^^^^^
