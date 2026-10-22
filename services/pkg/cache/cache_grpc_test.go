@@ -7,6 +7,8 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
+	"net/http"
+	"net/http/httptest"
 	"sort"
 	"sync"
 	"sync/atomic"
@@ -407,4 +409,49 @@ func TestHasTreeReportsEvictedParsedTree(t *testing.T) {
 	trees, objects = stream.missing()
 	assert.Empty(t, trees)
 	assert.Equal(t, []string{file}, objects)
+}
+
+func TestHasTreeMetrics(t *testing.T) {
+	c := newTestCache(t)
+
+	file := put(t, c, []byte("file"))
+	sub := put(t, c, encodeTree(treeEntry{"file.txt", file, fstree.InodeType_Regular}))
+	root := put(t, c, encodeTree(treeEntry{"sub", sub, fstree.InodeType_Directory}))
+
+	svc := NewCacheService(c, 64<<20)
+	for range 2 {
+		_, err := hasTreeWith(svc, context.Background(), root)
+		assert.NoError(t, err)
+	}
+
+	response := httptest.NewRecorder()
+	NewHttpHandler(c, svc).ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/metrics", nil))
+	assert.Equal(t, http.StatusOK, response.Code)
+	body := response.Body.String()
+
+	for _, metric := range []struct {
+		name, kind string
+		value      int64
+	}{
+		{"jolt_cache_hastree_requests_total", "counter", 2},
+		{"jolt_cache_hastree_trees_total", "counter", 4},
+		{"jolt_cache_hastree_objects_total", "counter", 2},
+		// Both trees are read and parsed by the first request only.
+		{"jolt_cache_tree_cache_misses_total", "counter", 2},
+		{"jolt_cache_tree_cache_hits_total", "counter", 2},
+		{"jolt_cache_tree_cache_evictions_total", "counter", 0},
+		{"jolt_cache_tree_cache_trees", "gauge", 2},
+		{"jolt_cache_tree_cache_size_bytes", "gauge", 4 * parsedTreeDigestSize},
+	} {
+		assert.Contains(t, body, fmt.Sprintf("# TYPE %s %s\n# HELP %s ", metric.name, metric.kind, metric.name))
+		assert.Contains(t, body, fmt.Sprintf("\n%s %d\n", metric.name, metric.value))
+	}
+	assert.Contains(t, body, "# TYPE jolt_cache_hastree_seconds_total counter\n")
+	assert.Regexp(t, `\njolt_cache_hastree_seconds_total [0-9.e-]+\n`, body)
+
+	// Without a service, the handler reports the cache only.
+	response = httptest.NewRecorder()
+	NewHttpHandler(c, nil).ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/metrics", nil))
+	assert.NotContains(t, response.Body.String(), "hastree")
+	assert.Contains(t, response.Body.String(), "jolt_cache_artifacts")
 }

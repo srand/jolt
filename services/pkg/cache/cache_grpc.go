@@ -4,6 +4,8 @@ import (
 	context "context"
 	"io"
 	sync "sync"
+	"sync/atomic"
+	"time"
 
 	"github.com/srand/jolt/scheduler/pkg/fstree"
 	"github.com/srand/jolt/scheduler/pkg/log"
@@ -64,19 +66,67 @@ func shardOf(hex string) uint8 {
 	return nibble(hex[0])<<4 | nibble(hex[1])
 }
 
+// Statistics about HasTree requests and the parsed trees kept for them.
+type TreeStats struct {
+	// HasTree requests served, and the total time spent serving them
+	Requests int64
+	Duration time.Duration
+
+	// Trees and objects checked by the requests
+	Trees   int64
+	Objects int64
+
+	// Lookups of parsed trees kept in memory, and how many were evicted
+	// to make room for others
+	CacheHits      int64
+	CacheMisses    int64
+	CacheEvictions int64
+
+	// Parsed trees kept in memory, and the memory they use
+	CachedTrees int64
+	CacheSize   int64
+}
+
+// The gRPC cache service.
+type CacheGrpcService interface {
+	CacheServiceServer
+
+	// Returns statistics about HasTree requests.
+	TreeStatistics() TreeStats
+}
+
 type cacheService struct {
 	UnimplementedCacheServiceServer
 	cache Cache
 	trees *treeCache
+
+	requests atomic.Int64
+	duration atomic.Int64
+	checked  atomic.Int64
+	objects  atomic.Int64
 }
 
 // Creates the gRPC cache service. It keeps up to treeCacheSize bytes of
 // parsed trees in memory, which should hold the trees of the workspaces
 // being pushed. A tree that does not fit is read from the cache instead.
-func NewCacheService(cache Cache, treeCacheSize int64) CacheServiceServer {
+func NewCacheService(cache Cache, treeCacheSize int64) CacheGrpcService {
 	return &cacheService{
 		cache: cache,
 		trees: newTreeCache(treeCacheSize),
+	}
+}
+
+func (svc *cacheService) TreeStatistics() TreeStats {
+	return TreeStats{
+		Requests:       svc.requests.Load(),
+		Duration:       time.Duration(svc.duration.Load()),
+		Trees:          svc.checked.Load(),
+		Objects:        svc.objects.Load(),
+		CacheHits:      svc.trees.hits.Load(),
+		CacheMisses:    svc.trees.misses.Load(),
+		CacheEvictions: svc.trees.evictions.Load(),
+		CachedTrees:    int64(svc.trees.lru.Count()),
+		CacheSize:      svc.trees.lru.Size(),
 	}
 }
 
@@ -143,6 +193,8 @@ func (svc *cacheService) checkTree(ctx context.Context, server CacheService_HasT
 		MissingObjects: make([]string, 0),
 	}
 
+	svc.checked.Add(1)
+
 	tree, err := svc.readTree(digest)
 	if err != nil {
 		return err
@@ -175,6 +227,7 @@ func (svc *cacheService) checkTree(ctx context.Context, server CacheService_HasT
 			}
 		}
 
+		svc.objects.Add(int64(len(objects)))
 		for i, item := range svc.cache.HasObjects(objects) {
 			if item == nil {
 				response.MissingObjects = append(response.MissingObjects, objects[i].String())
@@ -197,6 +250,12 @@ func (svc *cacheService) checkTree(ctx context.Context, server CacheService_HasT
 }
 
 func (svc *cacheService) HasTree(req *HasTreeRequest, server CacheService_HasTreeServer) error {
+	start := time.Now()
+	defer func() {
+		svc.requests.Add(1)
+		svc.duration.Add(int64(time.Since(start)))
+	}()
+
 	eg, ctx := errgroup.WithContext(server.Context())
 	eg.SetLimit(hasTreeConcurrency)
 	trees := []utils.Digest{}

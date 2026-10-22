@@ -1,6 +1,8 @@
 package cache
 
 import (
+	"sync/atomic"
+
 	"github.com/srand/jolt/scheduler/pkg/fstree"
 	"github.com/srand/jolt/scheduler/pkg/utils"
 )
@@ -53,16 +55,29 @@ func parseTree(digest utils.Digest, tree *fstree.Tree) (*parsedTree, error) {
 // change, so a parsed tree is valid as long as its object is in the cache.
 type treeCache struct {
 	lru *utils.LRU[*parsedTree]
+
+	hits      atomic.Int64
+	misses    atomic.Int64
+	evictions atomic.Int64
 }
 
 func newTreeCache(size int64) *treeCache {
-	return &treeCache{
-		lru: utils.NewLRU[*parsedTree](size, func(*parsedTree) bool { return true }),
-	}
+	c := &treeCache{}
+	c.lru = utils.NewLRU[*parsedTree](size, func(*parsedTree) bool {
+		c.evictions.Add(1)
+		return true
+	})
+	return c
 }
 
 func (c *treeCache) get(digest utils.Digest) (*parsedTree, bool) {
-	return c.lru.Get(digest.String())
+	tree, found := c.lru.Get(digest.String())
+	if found {
+		c.hits.Add(1)
+	} else {
+		c.misses.Add(1)
+	}
+	return tree, found
 }
 
 func (c *treeCache) add(tree *parsedTree) {

@@ -58,8 +58,9 @@ type FindBlobsResponse struct {
 	Present []utils.Digest `json:"present"`
 }
 
-// NewHttpHandler creates a new HTTP handler for the cache.
-func NewHttpHandler(cache Cache) http.Handler {
+// NewHttpHandler creates a new HTTP handler for the cache. Its metrics
+// include statistics of the gRPC service, if one is given.
+func NewHttpHandler(cache Cache, service CacheGrpcService) http.Handler {
 	r := echo.New()
 	r.HideBanner = true
 	r.Use(utils.HttpLogger)
@@ -242,8 +243,40 @@ func NewHttpHandler(cache Cache) http.Handler {
 		metrics += fmt.Sprintln("# HELP jolt_cache_size_bytes The current size of all artifacts in the cache, in bytes.")
 		metrics += fmt.Sprintf("jolt_cache_size_bytes %d\n", stats.Size)
 
+		if service != nil {
+			metrics += treeMetrics(service.TreeStatistics())
+		}
+
 		return c.String(http.StatusOK, metrics)
 	})
 
 	return r
+}
+
+// Formats statistics of HasTree requests as metrics.
+func treeMetrics(stats TreeStats) string {
+	metric := func(name, kind, help string, value any) string {
+		return fmt.Sprintf("# TYPE %s %s\n# HELP %s %s\n%s %v\n", name, kind, name, help, name, value)
+	}
+
+	metrics := ""
+	metrics += metric("jolt_cache_hastree_requests_total", "counter",
+		"The total number of HasTree requests, which check that a workspace tree is complete.", stats.Requests)
+	metrics += metric("jolt_cache_hastree_seconds_total", "counter",
+		"The total time spent serving HasTree requests, in seconds.", stats.Duration.Seconds())
+	metrics += metric("jolt_cache_hastree_trees_total", "counter",
+		"The total number of trees checked by HasTree requests.", stats.Trees)
+	metrics += metric("jolt_cache_hastree_objects_total", "counter",
+		"The total number of objects checked by HasTree requests.", stats.Objects)
+	metrics += metric("jolt_cache_tree_cache_hits_total", "counter",
+		"The total number of trees checked whose parsed content was kept in memory.", stats.CacheHits)
+	metrics += metric("jolt_cache_tree_cache_misses_total", "counter",
+		"The total number of trees checked that had to be read and parsed.", stats.CacheMisses)
+	metrics += metric("jolt_cache_tree_cache_evictions_total", "counter",
+		"The total number of parsed trees dropped from memory to make room for others.", stats.CacheEvictions)
+	metrics += metric("jolt_cache_tree_cache_trees", "gauge",
+		"The number of parsed trees currently kept in memory.", stats.CachedTrees)
+	metrics += metric("jolt_cache_tree_cache_size_bytes", "gauge",
+		"The approximate memory used by parsed trees kept in memory, in bytes.", stats.CacheSize)
+	return metrics
 }

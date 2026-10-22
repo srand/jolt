@@ -80,7 +80,7 @@ var rootCmd = &cobra.Command{
 			go serveGrpc(service, address)
 		}
 
-		handler := cache.NewHttpHandler(lru)
+		handler := cache.NewHttpHandler(lru, service)
 
 		if config.Listen == nil || len(config.Listen) == 0 {
 			if config.Insecure {
