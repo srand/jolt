@@ -115,7 +115,7 @@ func ReadTree(reader io.Reader) (*Tree, error) {
 		}
 
 		path := make([]byte, pathLength)
-		_, err = reader.Read(path)
+		_, err = io.ReadFull(reader, path)
 		if err != nil {
 			return nil, err
 		}
@@ -128,7 +128,7 @@ func ReadTree(reader io.Reader) (*Tree, error) {
 		}
 
 		digest := make([]byte, digestLength)
-		_, err = reader.Read(digest)
+		_, err = io.ReadFull(reader, digest)
 		if err != nil {
 			return nil, err
 		}
@@ -149,7 +149,7 @@ func ReadTree(reader io.Reader) (*Tree, error) {
 			}
 
 			target := make([]byte, targetLength)
-			_, err = reader.Read(target)
+			_, err = io.ReadFull(reader, target)
 			if err != nil {
 				return nil, err
 			}
