@@ -302,10 +302,17 @@ func BenchmarkHasTreeComplete(b *testing.B) {
 
 	b.ReportAllocs()
 	b.ResetTimer()
+	cpuStart, cpuOk := processCPUTime()
 	for i := 0; i < b.N; i++ {
 		stream, err := hasTree(b, lru, context.Background(), root)
 		if err != nil || len(stream.responses) != 0 {
 			b.Fatal("tree not complete", err)
 		}
+	}
+
+	// HasTree runs its checks in parallel, so the time it takes says little
+	// about the CPU time it costs a busy service.
+	if cpuEnd, ok := processCPUTime(); ok && cpuOk {
+		b.ReportMetric(float64(cpuEnd-cpuStart)/float64(b.N), "cpu-ns/op")
 	}
 }
