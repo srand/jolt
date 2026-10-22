@@ -253,3 +253,24 @@ func TestHasTreeDeeperThanConcurrencyLimit(t *testing.T) {
 	_, objects := stream.missing()
 	assert.Equal(t, []string{missing}, objects)
 }
+
+func TestHasTreeVisitsDuplicatesOnce(t *testing.T) {
+	c := newTestCache(t)
+
+	// The same subtree appears twice, as identical directories do, and
+	// the same missing file appears in both it and the root.
+	missing := blake3Digest([]byte("missing"))
+	sub := put(t, c, encodeTree(treeEntry{"missing.txt", missing, fstree.InodeType_Regular}))
+	root := put(t, c, encodeTree(
+		treeEntry{"a", sub, fstree.InodeType_Directory},
+		treeEntry{"b", sub, fstree.InodeType_Directory},
+		treeEntry{"missing.txt", missing, fstree.InodeType_Regular},
+	))
+
+	stream, err := hasTree(t, c, context.Background(), root, root)
+	assert.NoError(t, err)
+
+	_, objects := stream.missing()
+	assert.Equal(t, []string{missing}, objects, "missing object reported more than once")
+	assert.Equal(t, int64(2), c.reads.Load(), "trees read more than once")
+}

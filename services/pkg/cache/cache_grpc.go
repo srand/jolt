@@ -21,6 +21,26 @@ import (
 // number would open as many files as the tree has directories.
 var hasTreeConcurrency = 64
 
+// Set of digests that a HasTree request has already checked. Identical
+// directories and files occur many times in a workspace, but each only needs
+// to be checked, and reported missing, once.
+type digestSet struct {
+	sync.Mutex
+	digests map[utils.Digest]struct{}
+}
+
+// Adds the digest to the set and returns true if it was not already present.
+func (s *digestSet) add(digest utils.Digest) bool {
+	s.Lock()
+	defer s.Unlock()
+
+	if _, found := s.digests[digest]; found {
+		return false
+	}
+	s.digests[digest] = struct{}{}
+	return true
+}
+
 type cacheService struct {
 	UnimplementedCacheServiceServer
 	cache Cache
@@ -50,7 +70,7 @@ func (svc *cacheService) HasObject(ctx context.Context, req *HasObjectRequest) (
 	}, nil
 }
 
-func (svc *cacheService) checkTree(ctx context.Context, server CacheService_HasTreeServer, m *sync.Mutex, eg *errgroup.Group, digest utils.Digest) error {
+func (svc *cacheService) checkTree(ctx context.Context, server CacheService_HasTreeServer, m *sync.Mutex, eg *errgroup.Group, seen *digestSet, digest utils.Digest) error {
 	var tree *fstree.Tree
 
 	// Stop walking once the client is gone or another subtree has failed.
@@ -85,12 +105,16 @@ func (svc *cacheService) checkTree(ctx context.Context, server CacheService_HasT
 				return status.Errorf(codes.InvalidArgument, "invalid digest: %v", err)
 			}
 
+			if !seen.add(digest) {
+				continue
+			}
+
 			// Check the subtree here if no slot is free. Waiting for one
 			// would deadlock once every running check is waiting too.
 			if !eg.TryGo(func() error {
-				return svc.checkTree(ctx, server, m, eg, digest)
+				return svc.checkTree(ctx, server, m, eg, seen, digest)
 			}) {
-				if err := svc.checkTree(ctx, server, m, eg, digest); err != nil {
+				if err := svc.checkTree(ctx, server, m, eg, seen, digest); err != nil {
 					return err
 				}
 			}
@@ -101,6 +125,10 @@ func (svc *cacheService) checkTree(ctx context.Context, server CacheService_HasT
 		default:
 			if err != nil {
 				return status.Errorf(codes.InvalidArgument, "invalid digest: %v", err)
+			}
+
+			if !seen.add(digest) {
+				continue
 			}
 
 			if info := svc.cache.HasObject(digest); info == nil {
@@ -130,6 +158,7 @@ func (svc *cacheService) HasTree(req *HasTreeRequest, server CacheService_HasTre
 	eg.SetLimit(hasTreeConcurrency)
 	trees := []utils.Digest{}
 	m := sync.Mutex{}
+	seen := &digestSet{digests: make(map[utils.Digest]struct{})}
 
 	// For each digest in the list
 	for _, digest := range req.Digest {
@@ -137,15 +166,17 @@ func (svc *cacheService) HasTree(req *HasTreeRequest, server CacheService_HasTre
 		if err != nil {
 			return status.Errorf(codes.InvalidArgument, "invalid digest: %v", err)
 		}
-		trees = append(trees, d)
+		if seen.add(d) {
+			trees = append(trees, d)
+		}
 	}
 
 	for i := range trees {
 		digest := trees[i]
 		if !eg.TryGo(func() error {
-			return svc.checkTree(ctx, server, &m, eg, digest)
+			return svc.checkTree(ctx, server, &m, eg, seen, digest)
 		}) {
-			if err := svc.checkTree(ctx, server, &m, eg, digest); err != nil {
+			if err := svc.checkTree(ctx, server, &m, eg, seen, digest); err != nil {
 				eg.Wait()
 				return err
 			}
