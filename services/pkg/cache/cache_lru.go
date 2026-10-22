@@ -3,7 +3,6 @@ package cache
 import (
 	"fmt"
 	"io"
-	"path"
 	"path/filepath"
 	"sync"
 	"time"
@@ -89,8 +88,10 @@ func NewLRUCache(fs utils.Fs, config CacheConfig) (*lruCache, error) {
 }
 
 func (c *lruCache) pathFromDigest(digest utils.Digest) string {
+	// The hex string is validated by ParseDigest, so there is nothing for
+	// path.Join to clean, and concatenation avoids its allocations.
 	hex := digest.Hex()
-	return path.Join("objects", hex[:2], hex[2:6], hex[6:])
+	return "objects/" + hex[:2] + "/" + hex[2:6] + "/" + hex[6:]
 }
 
 func (c *lruCache) recordHit() {
