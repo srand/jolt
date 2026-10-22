@@ -3,6 +3,7 @@ package utils
 import (
 	"encoding/hex"
 	"fmt"
+	"regexp"
 	"strings"
 )
 
@@ -14,6 +15,10 @@ const (
 
 type HashAlgorithm string
 
+// The hex string of a digest is used as a file name in the cache, so the string
+// itself is checked rather than only that it decodes.
+var digestHexRe = regexp.MustCompile(`^[0-9a-f]+$`)
+
 type Digest struct {
 	alg HashAlgorithm
 	hex string
@@ -24,6 +29,11 @@ func ParseDigest(digest string) (Digest, error) {
 	if !found {
 		data = alg
 		alg = "sha1"
+	}
+
+	data = strings.ToLower(data)
+	if !digestHexRe.MatchString(data) {
+		return Digest{}, fmt.Errorf("invalid hex string: %q", data)
 	}
 
 	bytes, err := hex.DecodeString(data)
