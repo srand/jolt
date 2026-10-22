@@ -61,6 +61,7 @@ func (svc *cacheService) checkTree(server CacheService_HasTreeServer, m *sync.Mu
 	}
 
 	tree, err = fstree.ReadTree(reader)
+	reader.Close()
 	if err != nil {
 		return status.Errorf(codes.Internal, "failed to read tree: %v: %v", digest.Hex(), err)
 	}
