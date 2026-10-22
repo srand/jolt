@@ -49,12 +49,19 @@ class Jobserver:
 
     def cleanup(self):
         """Close the FD and remove the temporary directory/pipe."""
-        if self.fifo_fd is not None:
-            os.close(self.fifo_fd)
-            self.fifo_fd = None
+        # Safe to call more than once, including after a previous call was
+        # interrupted part way through.
+        fifo_fd, self.fifo_fd = self.fifo_fd, None
+        if fifo_fd is not None:
+            try:
+                os.close(fifo_fd)
+            except OSError:
+                pass
 
-        if os.path.exists(self.fifo_path):
+        try:
             os.unlink(self.fifo_path)
+        except FileNotFoundError:
+            pass
 
         if os.path.exists(self.path):
             try:
@@ -287,8 +294,16 @@ def launch_jobserver(slots, path=None, python_executable=None, new_session=True)
 
 
 def _serve_jobserver(path, slots, parent_sentinel_fd=None, parent_pid=None):
+    stopping = False
+
     def _shutdown(*_args):
-        raise SystemExit(0)
+        # Only interrupt the helper once. When the parent dies, the sentinel
+        # pipe and PR_SET_PDEATHSIG fire at about the same time, and a second
+        # SystemExit raised in the middle of cleanup would leave the FIFO behind.
+        nonlocal stopping
+        if not stopping:
+            stopping = True
+            raise SystemExit(0)
 
     # Install signal handlers BEFORE creating the FIFO. PR_SET_PDEATHSIG is
     # armed by the launcher's preexec_fn, so a SIGTERM can in theory arrive
@@ -322,6 +337,7 @@ def _serve_jobserver(path, slots, parent_sentinel_fd=None, parent_pid=None):
             elif shutdown_event.wait(timeout=3600):
                 break
     finally:
+        stopping = True
         jobserver.cleanup()
 
 
