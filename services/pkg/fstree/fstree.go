@@ -1,6 +1,7 @@
 package fstree
 
 import (
+	"bufio"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -84,6 +85,10 @@ func ReadTree(reader io.Reader) (*Tree, error) {
 	//   - If status == Inode_Symlink:
 	//     - Length of target (uint64)
 	//     - Target (string)
+
+	// Fields are only a few bytes each, so read through a buffer instead of
+	// issuing a read on the underlying reader for every one of them.
+	reader = bufio.NewReader(reader)
 
 	var magic uint16
 	err := binary.Read(reader, binary.LittleEndian, &magic)

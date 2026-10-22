@@ -3,6 +3,7 @@ package fstree
 import (
 	"bytes"
 	"encoding/binary"
+	"io"
 	"testing"
 	"testing/iotest"
 
@@ -80,4 +81,24 @@ func TestReadTreeOversizedField(t *testing.T) {
 	binary.Write(&buf, binary.LittleEndian, uint64(1)<<40)
 	_, err := ReadTree(&buf)
 	assert.Error(t, err)
+}
+
+type countingReader struct {
+	reader io.Reader
+	reads  int
+}
+
+func (r *countingReader) Read(p []byte) (int, error) {
+	r.reads++
+	return r.reader.Read(p)
+}
+
+func TestReadTreeBuffersReads(t *testing.T) {
+	// Tree objects are read straight from files. Each field must not cost
+	// a read of its own on the underlying reader, i.e. a system call.
+	reader := &countingReader{reader: bytes.NewReader(encodeTree(testChildren))}
+	tree, err := ReadTree(reader)
+	assert.NoError(t, err)
+	assertTree(t, tree)
+	assert.LessOrEqual(t, reader.reads, 2)
 }
