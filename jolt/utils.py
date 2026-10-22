@@ -645,36 +645,136 @@ def hostname():
     return socket.gethostname()
 
 
+# Maximum time by which a deferred operation's own timeout may expire after
+# a timeout() block for the block to wait for it instead of interrupting it.
+DEFERRED_TIMEOUT_GRACE = 1
+
+# Thread ident -> stack of active _TimeoutDeferral objects. Each stack is
+# only modified by its own thread and read by timeout timer threads.
+_timeout_deferrals = {}
+
+
+class _TimeoutDeferral(object):
+    def __init__(self, seconds):
+        self.deadline = time.monotonic() + seconds
+        self._state = {}
+
+    def handoff(self, context):
+        """ Called by an expired timeout to hand its exception over.
+
+        Returns False if the deferral has already ended, in which case the
+        timeout must interrupt the thread itself.
+        """
+        # dict.setdefault is atomic, which decides the race with end()
+        # without taking a lock in the thread being interrupted.
+        return self._state.setdefault("owner", context) is not None
+
+    def end(self):
+        """ Ends the deferral and returns the timeout handed over, if any. """
+        return self._state.setdefault("owner", None)
+
+
+def _innermost_deferral(tid):
+    try:
+        return _timeout_deferrals[tid][-1]
+    except (KeyError, IndexError):
+        return None
+
+
+@contextlib.contextmanager
+def deferred_timeout(seconds):
+    """ A context manager that defers asynchronous timeouts.
+
+    Use it around an operation that enforces a timeout of its own, given
+    by seconds. If a timeout() block expires while the operation runs, and
+    the operation's own timeout expires no later than DEFERRED_TIMEOUT_GRACE
+    seconds after it, the operation is not interrupted. Instead, the timeout
+    exception is raised when the operation returns, unless the operation
+    raises its own.
+
+    Interrupting an operation asynchronously may leave locks it holds,
+    such as the logging module lock, acquired forever.
+    """
+    if seconds is None:
+        yield
+        return
+
+    tid = threading.get_ident()
+    deferral = _TimeoutDeferral(seconds)
+    stack = _timeout_deferrals.setdefault(tid, [])
+    try:
+        stack.append(deferral)
+        yield
+    finally:
+        # End the deferral before removing it so that a timeout racing
+        # with the removal interrupts the thread instead of being lost.
+        context = deferral.end()
+        stack.remove(deferral)
+        if not stack:
+            _timeout_deferrals.pop(tid, None)
+
+    if context is not None and context._active:
+        raise context._exc
+
+
 def timeout(seconds, exception_type):
     """ A context manager that enforces a timeout.
 
     If the block of code takes longer than the specified timeout,
     the context manager will raise an asyncronous TimeoutError.
+
+    The exception is raised inside the block, or when the block exits if
+    the timeout expired as it ended, but never after the block has exited.
     """
 
     class TimeoutContext(object):
         def __init__(self, timeout, exception_type):
             self._timer = threading.Timer(timeout, self._raise_timeout)
+            self._timer.daemon = True
             self._tid = threading.current_thread().ident
             self._exc = exception_type
+            self._active = False
+            self._fired = False
 
         def _raise_timeout(self):
+            if not self._active:
+                return
+
+            deferral = _innermost_deferral(self._tid)
+            if deferral is not None and \
+               deferral.deadline <= time.monotonic() + DEFERRED_TIMEOUT_GRACE and \
+               deferral.handoff(self):
+                return
+
+            self._fired = True
             tid = ctypes.c_ulong(self._tid)
             ret = ctypes.pythonapi.PyThreadState_SetAsyncExc(
                 tid, ctypes.py_object(self._exc))
 
             if ret == 0:
-                raise ValueError("Invalid thread ID {self._tid}")
+                raise ValueError(f"Invalid thread ID {self._tid}")
             elif ret > 1:
                 ctypes.pythonapi.PyThreadState_SetAsyncExc(tid, None)
                 raise SystemError("PyThreadState_SetAsyncExc failed")
 
         def __enter__(self):
+            self._active = True
             self._timer.start()
             return self
 
         def __exit__(self, exc_type, exc_value, traceback):
+            self._active = False
             self._timer.cancel()
+            # Wait for a timer callback that may already be injecting.
+            self._timer.join()
+
+            if self._fired and exc_type is None:
+                # The timeout expired as the block ended and its exception
+                # may still be pending. Raise it here rather than at some
+                # arbitrary point after the block.
+                ctypes.pythonapi.PyThreadState_SetAsyncExc(
+                    ctypes.c_ulong(self._tid), None)
+                raise self._exc
             return None
 
     return TimeoutContext(seconds, exception_type)

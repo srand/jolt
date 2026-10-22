@@ -6,6 +6,10 @@ from testsupport import JoltTest
 from jolt import utils
 
 
+class Timeout(Exception):
+    pass
+
+
 class UtilsInternal(JoltTest):
     name = "int/utils"
 
@@ -23,3 +27,62 @@ class UtilsInternal(JoltTest):
         self.exc_count = 0
         with self.assertRaises(AssertionError):
             self.raise2()
+
+    def _spin(self, seconds):
+        end = time.monotonic() + seconds
+        while time.monotonic() < end:
+            time.sleep(0.01)
+
+    def test_timeout_interrupts_block(self):
+        with self.assertRaises(Timeout):
+            with utils.timeout(0.2, Timeout):
+                self._spin(5)
+
+    def test_timeout_fired_late_is_raised_at_exit(self):
+        # Simulate a timer that injected its exception as the block ended.
+        with self.assertRaises(Timeout):
+            with utils.timeout(60, Timeout) as ctx:
+                ctx._fired = True
+        self._spin(0.2)
+
+    def test_timeout_after_exit_is_ignored(self):
+        with utils.timeout(60, Timeout) as ctx:
+            pass
+        ctx._raise_timeout()
+        self._spin(0.2)
+        self.assertFalse(ctx._fired)
+
+    def test_deferred_timeout_raised_on_return(self):
+        completed = False
+        with self.assertRaises(Timeout):
+            with utils.timeout(0.2, Timeout):
+                with utils.deferred_timeout(1):
+                    self._spin(0.5)
+                    completed = True
+        self.assertTrue(completed)
+
+    def test_deferred_timeout_keeps_own_exception(self):
+        with self.assertRaises(ValueError):
+            with utils.timeout(0.2, Timeout):
+                with utils.deferred_timeout(1):
+                    self._spin(0.5)
+                    raise ValueError()
+        self._spin(0.2)
+
+    def test_deferred_timeout_not_deferred_beyond_bound(self):
+        completed = False
+        with self.assertRaises(Timeout):
+            with utils.timeout(0.2, Timeout):
+                with utils.deferred_timeout(30):
+                    self._spin(5)
+                    completed = True
+        self.assertFalse(completed)
+
+    def test_deferred_timeout_without_bound(self):
+        completed = False
+        with self.assertRaises(Timeout):
+            with utils.timeout(0.2, Timeout):
+                with utils.deferred_timeout(None):
+                    self._spin(5)
+                    completed = True
+        self.assertFalse(completed)

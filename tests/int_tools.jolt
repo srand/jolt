@@ -8,6 +8,7 @@ from unittest.mock import MagicMock, patch
 
 from testsupport import JoltTest
 from jolt import tools
+from jolt import utils
 from jolt.error import JoltTimeoutError
 
 
@@ -239,3 +240,20 @@ class ToolsInternal(JoltTest):
 
         cleanup.assert_called_once_with(process, (reader,))
         close_streams.assert_called_once()
+
+    def test_run_defers_block_timeout(self):
+        # The command ignores SIGTERM, so stopping it after its own timeout
+        # takes a while. The block deadline expires meanwhile and must not
+        # interrupt the cleanup and leave the command running.
+        with self.assertRaises(JoltTimeoutError) as cm:
+            with utils.timeout(1.5, JoltTimeoutError):
+                tools._run(
+                    [sys.executable, "-c",
+                     "import signal, time; "
+                     "signal.signal(signal.SIGTERM, signal.SIG_IGN); "
+                     "time.sleep(30)"],
+                    None,
+                    None,
+                    timeout=1,
+                    shell=False)
+        self.assertIn("Command timeout", str(cm.exception))

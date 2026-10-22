@@ -335,6 +335,14 @@ class _PopenFile(object):
 def _run(cmd, cwd, env, *args, **kwargs):
     options = _normalize_run_kwargs(kwargs)
 
+    # The command enforces its own timeout. Don't let an expiring timeout()
+    # block interrupt it asynchronously, for example while it stops the
+    # process or logs output.
+    with utils.deferred_timeout(options["timeout"]):
+        return _run_command(cmd, cwd, env, options)
+
+
+def _run_command(cmd, cwd, env, options):
     log.debug("Running: '{0}' (CWD: {1})", cmd, cwd)
 
     p = None
