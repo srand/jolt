@@ -24,21 +24,44 @@ var hasTreeConcurrency = 64
 // Set of digests that a HasTree request has already checked. Identical
 // directories and files occur many times in a workspace, but each only needs
 // to be checked, and reported missing, once.
+//
+// Every subtree check adds to the set concurrently, so it is split into shards
+// by the first byte of the digest, each with its own lock.
 type digestSet struct {
-	sync.Mutex
-	digests map[utils.Digest]struct{}
+	shards [256]struct {
+		sync.Mutex
+		digests map[utils.Digest]struct{}
+	}
 }
 
 // Adds the digest to the set and returns true if it was not already present.
 func (s *digestSet) add(digest utils.Digest) bool {
-	s.Lock()
-	defer s.Unlock()
+	shard := &s.shards[shardOf(digest.Hex())]
+	shard.Lock()
+	defer shard.Unlock()
 
-	if _, found := s.digests[digest]; found {
+	if shard.digests == nil {
+		shard.digests = make(map[utils.Digest]struct{})
+	}
+	if _, found := shard.digests[digest]; found {
 		return false
 	}
-	s.digests[digest] = struct{}{}
+	shard.digests[digest] = struct{}{}
 	return true
+}
+
+// Returns the value of the first byte of a lower case hex string.
+func shardOf(hex string) uint8 {
+	nibble := func(c byte) uint8 {
+		if c >= 'a' {
+			return c - 'a' + 10
+		}
+		return c - '0'
+	}
+	if len(hex) < 2 {
+		return 0
+	}
+	return nibble(hex[0])<<4 | nibble(hex[1])
 }
 
 type cacheService struct {
@@ -158,7 +181,7 @@ func (svc *cacheService) HasTree(req *HasTreeRequest, server CacheService_HasTre
 	eg.SetLimit(hasTreeConcurrency)
 	trees := []utils.Digest{}
 	m := sync.Mutex{}
-	seen := &digestSet{digests: make(map[utils.Digest]struct{})}
+	seen := &digestSet{}
 
 	// For each digest in the list
 	for _, digest := range req.Digest {
