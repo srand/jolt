@@ -212,6 +212,41 @@ func (c *lruCache) HasObject(digest utils.Digest) CacheItem {
 	return c.hasFile(path)
 }
 
+func (c *lruCache) HasObjects(digests []utils.Digest) []CacheItem {
+	paths := make([]string, len(digests))
+	for i, digest := range digests {
+		paths[i] = c.pathFromDigest(digest)
+	}
+
+	// Look up all objects under a single acquisition of the LRU lock, which
+	// every lookup otherwise contends for.
+	now := time.Now()
+	items, found := c.lru.UpdateAll(paths, func(item *lruItem) {
+		item.access = now
+	})
+
+	// Then check that each object still exists on disk, as hasFile does,
+	// without holding the lock.
+	result := make([]CacheItem, len(digests))
+	for i, path := range paths {
+		if !found[i] {
+			c.recordMiss()
+			continue
+		}
+
+		if _, err := c.fs.Stat(path); err != nil {
+			log.Warn("inconsistent cache: file not found on disk:", path)
+			c.lru.Remove(path)
+			c.recordMiss()
+			continue
+		}
+
+		c.recordHit()
+		result[i] = items[i]
+	}
+	return result
+}
+
 func (c *lruCache) ReadObject(digest utils.Digest) (io.ReadCloser, error) {
 	path := c.pathFromDigest(digest)
 	return c.readFile(path)

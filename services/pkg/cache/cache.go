@@ -33,6 +33,10 @@ type Cache interface {
 	// Returns true if the cache contains the object with the given digest.
 	HasObject(utils.Digest) CacheItem
 
+	// Does what HasObject does for each of the digests, returning the items
+	// in the same order, with nil for those not in the cache.
+	HasObjects([]utils.Digest) []CacheItem
+
 	// Returns a reader for the object with the given digest.
 	ReadObject(utils.Digest) (io.ReadCloser, error)
 

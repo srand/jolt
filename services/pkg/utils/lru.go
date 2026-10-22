@@ -126,6 +126,29 @@ func (lru *LRU[E]) Update(path string, fn func(E)) (item E, ok bool) {
 	return
 }
 
+// UpdateAll does what Update does for each of the paths, under a single
+// acquisition of the LRU lock. It returns the items in the order of the
+// paths, and whether each was found.
+func (lru *LRU[E]) UpdateAll(paths []string, fn func(E)) (items []E, found []bool) {
+	items = make([]E, len(paths))
+	found = make([]bool, len(paths))
+
+	lru.mu.Lock()
+	defer lru.mu.Unlock()
+
+	for i, path := range paths {
+		if ele, hit := lru.cacheMap[path]; hit {
+			lru.cacheList.MoveToFront(ele)
+			items[i] = ele.Value.(E)
+			found[i] = true
+			if fn != nil {
+				fn(items[i])
+			}
+		}
+	}
+	return items, found
+}
+
 func (lru *LRU[E]) Count() int {
 	lru.mu.Lock()
 	defer lru.mu.Unlock()

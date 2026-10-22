@@ -96,6 +96,10 @@ func (svc *cacheService) HasObject(ctx context.Context, req *HasObjectRequest) (
 func (svc *cacheService) checkTree(ctx context.Context, server CacheService_HasTreeServer, m *sync.Mutex, eg *errgroup.Group, seen *digestSet, digest utils.Digest) error {
 	var tree *fstree.Tree
 
+	// Objects of the tree, looked up together once all children are known
+	var objects []utils.Digest
+	var objectNames []string
+
 	// Stop walking once the client is gone or another subtree has failed.
 	if err := ctx.Err(); err != nil {
 		return status.FromContextError(err).Err()
@@ -154,9 +158,14 @@ func (svc *cacheService) checkTree(ctx context.Context, server CacheService_HasT
 				continue
 			}
 
-			if info := svc.cache.HasObject(digest); info == nil {
-				response.MissingObjects = append(response.MissingObjects, child.Digest())
-			}
+			objects = append(objects, digest)
+			objectNames = append(objectNames, child.Digest())
+		}
+	}
+
+	for i, item := range svc.cache.HasObjects(objects) {
+		if item == nil {
+			response.MissingObjects = append(response.MissingObjects, objectNames[i])
 		}
 	}
 

@@ -192,6 +192,31 @@ func (s *LRUCacheTestSuite) TestFilesRejectPathsOutsideFilesDirectory() {
 	}
 }
 
+func (s *LRUCacheTestSuite) TestHasObjects() {
+	cache := s.newCache()
+
+	present := utils.NewDigest(utils.Sha1Algorithm, "356a192b7913b04c54574d18c28d46e6395428ab")
+	absent := utils.NewDigest(utils.Sha1Algorithm, "da4b9237bacccdf19c0760cab7aec4a8359010b0")
+	deleted := utils.NewDigest(utils.Sha1Algorithm, "77de68daecd823babbb58edb1c8e14d7106e83bb")
+	s.write(cache, present, []byte("1"))
+	s.write(cache, deleted, []byte("3"))
+
+	// An object removed from disk behind the cache's back is missing, even
+	// though the cache still knows about it.
+	hex := deleted.Hex()
+	assert.NoError(s.T(), s.fs.Remove("objects/"+hex[:2]+"/"+hex[2:6]+"/"+hex[6:]))
+
+	items := cache.HasObjects([]utils.Digest{present, absent, deleted})
+	assert.Len(s.T(), items, 3)
+	assert.NotNil(s.T(), items[0])
+	assert.Nil(s.T(), items[1])
+	assert.Nil(s.T(), items[2])
+
+	// The deleted object is forgotten.
+	assert.Nil(s.T(), cache.HasObject(deleted))
+	assert.NotNil(s.T(), cache.HasObject(present))
+}
+
 func TestLRUCacheTestSuite(t *testing.T) {
 	suite.Run(t, new(LRUCacheTestSuite))
 }

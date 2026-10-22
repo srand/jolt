@@ -117,3 +117,26 @@ func (suite *LRUTestSuite) TestConditionalEvict() {
 func TestLRUTestSuite(t *testing.T) {
 	suite.Run(t, new(LRUTestSuite))
 }
+
+func (suite *LRUTestSuite) TestUpdateAll() {
+	item1 := TestItem{path: "item1", size: 1}
+	item2 := TestItem{path: "item2", size: 1}
+	suite.lru.Add(item1)
+	suite.lru.Add(item2)
+
+	var updated []string
+	items, found := suite.lru.UpdateAll([]string{"item2", "missing", "item1"}, func(item TestItem) {
+		updated = append(updated, item.path)
+	})
+
+	suite.Equal([]bool{true, false, true}, found)
+	suite.Equal([]TestItem{item2, {}, item1}, items)
+	suite.Equal([]string{"item2", "item1"}, updated)
+
+	// Item1 was updated last and is now the most recently used, so item2 is
+	// the one evicted to make room.
+	item3 := TestItem{path: "item3", size: 1}
+	suite.mock.On("Evict", item2).Return(true)
+	suite.lru.Add(item3)
+	suite.mock.AssertExpectations(suite.T())
+}
