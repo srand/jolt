@@ -162,6 +162,36 @@ func (s *LRUCacheTestSuite) TestEvictOrder() {
 	assert.NotNil(s.T(), cache.HasObject(d3))
 }
 
+func (s *LRUCacheTestSuite) TestFiles() {
+	cache := s.newCache()
+
+	writer, err := cache.WriteFile("task/artifact.tar.zst")
+	assert.NoError(s.T(), err)
+	_, err = writer.Write([]byte("1"))
+	assert.NoError(s.T(), err)
+	assert.NoError(s.T(), writer.Close())
+
+	assert.NotNil(s.T(), cache.HasFile("task/artifact.tar.zst"))
+	reader, err := cache.ReadFile("task/artifact.tar.zst")
+	assert.NoError(s.T(), err)
+	assert.NoError(s.T(), reader.Close())
+}
+
+func (s *LRUCacheTestSuite) TestFilesRejectPathsOutsideFilesDirectory() {
+	cache := s.newCache()
+
+	digest := utils.NewDigest(utils.Sha1Algorithm, "356a192b7913b04c54574d18c28d46e6395428ab")
+	object := (cache.(*lruCache)).pathFromDigest(digest)
+
+	for _, path := range []string{"", "/etc/passwd", "../" + object, "task/../../" + object, ".."} {
+		_, err := cache.WriteFile(path)
+		assert.ErrorIs(s.T(), err, utils.ErrBadRequest, path)
+		_, err = cache.ReadFile(path)
+		assert.ErrorIs(s.T(), err, utils.ErrBadRequest, path)
+		assert.Nil(s.T(), cache.HasFile(path), path)
+	}
+}
+
 func TestLRUCacheTestSuite(t *testing.T) {
 	suite.Run(t, new(LRUCacheTestSuite))
 }

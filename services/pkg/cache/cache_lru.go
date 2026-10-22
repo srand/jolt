@@ -1,6 +1,7 @@
 package cache
 
 import (
+	"fmt"
 	"io"
 	"path"
 	"path/filepath"
@@ -171,16 +172,38 @@ func (c *lruCache) writeFile(path string) (WriteCloseDiscarder, error) {
 	return &lruFile{cache: c, file: file, path: path}, nil
 }
 
+// File paths come from clients and are relative to the files directory.
+// A path that is absolute or climbs out with ".." is rejected, so that a
+// client cannot reach other files in the cache, such as objects.
+func (c *lruCache) pathFromFile(path string) (string, error) {
+	if !filepath.IsLocal(path) {
+		return "", fmt.Errorf("%w: invalid file path: %q", utils.ErrBadRequest, path)
+	}
+	return filepath.Join("files", path), nil
+}
+
 func (c *lruCache) HasFile(path string) CacheItem {
-	return c.hasFile(filepath.Join("files", path))
+	path, err := c.pathFromFile(path)
+	if err != nil {
+		return nil
+	}
+	return c.hasFile(path)
 }
 
 func (c *lruCache) ReadFile(path string) (io.ReadCloser, error) {
-	return c.readFile(filepath.Join("files", path))
+	path, err := c.pathFromFile(path)
+	if err != nil {
+		return nil, err
+	}
+	return c.readFile(path)
 }
 
 func (c *lruCache) WriteFile(path string) (WriteCloseDiscarder, error) {
-	return c.writeFile(filepath.Join("files", path))
+	path, err := c.pathFromFile(path)
+	if err != nil {
+		return nil, err
+	}
+	return c.writeFile(path)
 }
 
 func (c *lruCache) HasObject(digest utils.Digest) CacheItem {
