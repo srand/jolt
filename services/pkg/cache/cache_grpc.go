@@ -16,6 +16,11 @@ import (
 // Generate protocol buffer code and gRPC stubs.
 //go:generate protoc -I. --go_out=../.. --go-grpc_out=../.. cache.proto
 
+// Maximum number of subtrees that a single HasTree request checks at once.
+// Each check opens a tree object and looks up its children, so an unbounded
+// number would open as many files as the tree has directories.
+var hasTreeConcurrency = 64
+
 type cacheService struct {
 	UnimplementedCacheServiceServer
 	cache Cache
@@ -80,9 +85,15 @@ func (svc *cacheService) checkTree(ctx context.Context, server CacheService_HasT
 				return status.Errorf(codes.InvalidArgument, "invalid digest: %v", err)
 			}
 
-			eg.Go(func() error {
+			// Check the subtree here if no slot is free. Waiting for one
+			// would deadlock once every running check is waiting too.
+			if !eg.TryGo(func() error {
 				return svc.checkTree(ctx, server, m, eg, digest)
-			})
+			}) {
+				if err := svc.checkTree(ctx, server, m, eg, digest); err != nil {
+					return err
+				}
+			}
 
 		case fstree.InodeType_Symlink:
 			// Skip symlinks.
@@ -116,6 +127,7 @@ sendResponse:
 
 func (svc *cacheService) HasTree(req *HasTreeRequest, server CacheService_HasTreeServer) error {
 	eg, ctx := errgroup.WithContext(server.Context())
+	eg.SetLimit(hasTreeConcurrency)
 	trees := []utils.Digest{}
 	m := sync.Mutex{}
 
@@ -130,9 +142,14 @@ func (svc *cacheService) HasTree(req *HasTreeRequest, server CacheService_HasTre
 
 	for i := range trees {
 		digest := trees[i]
-		eg.Go(func() error {
+		if !eg.TryGo(func() error {
 			return svc.checkTree(ctx, server, &m, eg, digest)
-		})
+		}) {
+			if err := svc.checkTree(ctx, server, &m, eg, digest); err != nil {
+				eg.Wait()
+				return err
+			}
+		}
 	}
 
 	if err := eg.Wait(); err != nil {

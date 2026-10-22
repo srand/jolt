@@ -22,8 +22,11 @@ import (
 // Cache that keeps track of readers that have not been closed.
 type trackingCache struct {
 	Cache
-	open  atomic.Int64
-	reads atomic.Int64
+	open   atomic.Int64
+	reads  atomic.Int64
+	active atomic.Int64
+	peak   atomic.Int64
+	delay  time.Duration
 }
 
 type trackedReader struct {
@@ -38,6 +41,18 @@ func (r *trackedReader) Close() error {
 }
 
 func (c *trackingCache) ReadObject(d utils.Digest) (io.ReadCloser, error) {
+	// Record how many lookups are in progress at once. The delay keeps
+	// concurrent lookups overlapping so that the peak is observable.
+	active := c.active.Add(1)
+	defer c.active.Add(-1)
+	for {
+		peak := c.peak.Load()
+		if active <= peak || c.peak.CompareAndSwap(peak, active) {
+			break
+		}
+	}
+	time.Sleep(c.delay)
+
 	reader, err := c.Cache.ReadObject(d)
 	if err != nil {
 		return nil, err
@@ -186,4 +201,55 @@ func TestHasTreeStopsWhenCanceled(t *testing.T) {
 	_, err := hasTree(t, c, ctx, root)
 	assert.Error(t, err)
 	assert.Equal(t, int64(0), c.reads.Load(), "trees read after cancellation")
+}
+
+func TestHasTreeLimitsConcurrency(t *testing.T) {
+	limit := hasTreeConcurrency
+	hasTreeConcurrency = 4
+	defer func() { hasTreeConcurrency = limit }()
+
+	c := newTestCache(t)
+	c.delay = time.Millisecond
+
+	// A wide tree, where every subtree can be checked at once.
+	file := put(t, c, []byte("file"))
+	var subs []treeEntry
+	for i := 0; i < 100; i++ {
+		sub := put(t, c, encodeTree(
+			treeEntry{"file.txt", file, fstree.InodeType_Regular},
+			treeEntry{"unique", put(t, c, []byte{byte(i)}), fstree.InodeType_Regular},
+		))
+		subs = append(subs, treeEntry{string(rune('a' + i)), sub, fstree.InodeType_Directory})
+	}
+	root := put(t, c, encodeTree(subs...))
+
+	_, err := hasTree(t, c, context.Background(), root)
+	assert.NoError(t, err)
+
+	// Subtrees run inline in the handler when no slot is free.
+	assert.LessOrEqual(t, c.peak.Load(), int64(hasTreeConcurrency+1))
+}
+
+func TestHasTreeDeeperThanConcurrencyLimit(t *testing.T) {
+	limit := hasTreeConcurrency
+	hasTreeConcurrency = 2
+	defer func() { hasTreeConcurrency = limit }()
+
+	c := newTestCache(t)
+
+	// Every level waits on the next, so a walk that blocks for a free slot
+	// while holding one would deadlock here.
+	missing := blake3Digest([]byte("missing"))
+	tree := put(t, c, encodeTree(treeEntry{"missing.txt", missing, fstree.InodeType_Regular}))
+	for i := 0; i < 20; i++ {
+		tree = put(t, c, encodeTree(treeEntry{"sub", tree, fstree.InodeType_Directory}))
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	stream, err := hasTree(t, c, ctx, tree)
+	assert.NoError(t, err)
+	_, objects := stream.missing()
+	assert.Equal(t, []string{missing}, objects)
 }
