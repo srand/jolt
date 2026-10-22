@@ -29,6 +29,36 @@ type trackingCache struct {
 	active atomic.Int64
 	peak   atomic.Int64
 	delay  time.Duration
+
+	// Objects to treat as evicted, by digest string
+	evicted sync.Map
+}
+
+func (c *trackingCache) evict(digest string) {
+	d, _ := utils.ParseDigest(digest)
+	c.evicted.Store(d.String(), true)
+}
+
+func (c *trackingCache) isEvicted(d utils.Digest) bool {
+	_, found := c.evicted.Load(d.String())
+	return found
+}
+
+func (c *trackingCache) HasObject(d utils.Digest) CacheItem {
+	if c.isEvicted(d) {
+		return nil
+	}
+	return c.Cache.HasObject(d)
+}
+
+func (c *trackingCache) HasObjects(digests []utils.Digest) []CacheItem {
+	items := c.Cache.HasObjects(digests)
+	for i, d := range digests {
+		if c.isEvicted(d) {
+			items[i] = nil
+		}
+	}
+	return items
 }
 
 type trackedReader struct {
@@ -54,6 +84,10 @@ func (c *trackingCache) ReadObject(d utils.Digest) (io.ReadCloser, error) {
 		}
 	}
 	time.Sleep(c.delay)
+
+	if c.isEvicted(d) {
+		return nil, utils.ErrNotFound
+	}
 
 	reader, err := c.Cache.ReadObject(d)
 	if err != nil {
@@ -148,8 +182,13 @@ func put(t testing.TB, c Cache, data []byte) string {
 }
 
 func hasTree(t testing.TB, c Cache, ctx context.Context, digests ...string) (*hasTreeStream, error) {
+	return hasTreeWith(NewCacheService(c), ctx, digests...)
+}
+
+// Calls HasTree on a given service, which keeps what it learns between calls.
+func hasTreeWith(svc CacheServiceServer, ctx context.Context, digests ...string) (*hasTreeStream, error) {
 	stream := &hasTreeStream{ctx: ctx}
-	err := NewCacheService(c).HasTree(&HasTreeRequest{Digest: digests}, stream)
+	err := svc.HasTree(&HasTreeRequest{Digest: digests}, stream)
 	return stream, err
 }
 
@@ -300,11 +339,15 @@ func BenchmarkHasTreeComplete(b *testing.B) {
 	}
 	root := put(b, lru, encodeTree(dirs...))
 
+	// The service runs for as long as the cache, so it is shared by all
+	// calls, as it is by all pushes.
+	svc := NewCacheService(lru)
+
 	b.ReportAllocs()
 	b.ResetTimer()
 	cpuStart, cpuOk := processCPUTime()
 	for i := 0; i < b.N; i++ {
-		stream, err := hasTree(b, lru, context.Background(), root)
+		stream, err := hasTreeWith(svc, context.Background(), root)
 		if err != nil || len(stream.responses) != 0 {
 			b.Fatal("tree not complete", err)
 		}
@@ -315,4 +358,53 @@ func BenchmarkHasTreeComplete(b *testing.B) {
 	if cpuEnd, ok := processCPUTime(); ok && cpuOk {
 		b.ReportMetric(float64(cpuEnd-cpuStart)/float64(b.N), "cpu-ns/op")
 	}
+}
+
+func TestHasTreeKeepsParsedTrees(t *testing.T) {
+	c := newTestCache(t)
+
+	file := put(t, c, []byte("file"))
+	sub := put(t, c, encodeTree(treeEntry{"file.txt", file, fstree.InodeType_Regular}))
+	root := put(t, c, encodeTree(treeEntry{"sub", sub, fstree.InodeType_Directory}))
+
+	svc := NewCacheService(c)
+	_, err := hasTreeWith(svc, context.Background(), root)
+	assert.NoError(t, err)
+	reads := c.reads.Load()
+
+	// Tree objects never change, so a service reads each only once.
+	stream, err := hasTreeWith(svc, context.Background(), root)
+	assert.NoError(t, err)
+	assert.Empty(t, stream.responses)
+	assert.Equal(t, reads, c.reads.Load(), "tree objects read again")
+}
+
+func TestHasTreeReportsEvictedParsedTree(t *testing.T) {
+	c := newTestCache(t)
+
+	file := put(t, c, []byte("file"))
+	sub := put(t, c, encodeTree(treeEntry{"file.txt", file, fstree.InodeType_Regular}))
+	root := put(t, c, encodeTree(treeEntry{"sub", sub, fstree.InodeType_Directory}))
+
+	svc := NewCacheService(c)
+	_, err := hasTreeWith(svc, context.Background(), root)
+	assert.NoError(t, err)
+
+	// A tree whose object was evicted must be uploaded again, even though
+	// the service still knows its content, or it could not be pulled.
+	c.evict(sub)
+	stream, err := hasTreeWith(svc, context.Background(), root)
+	assert.NoError(t, err)
+	trees, objects := stream.missing()
+	assert.Equal(t, []string{sub}, trees)
+	assert.Empty(t, objects)
+
+	// Likewise an evicted object of a tree the service knows.
+	c.evicted.Delete(sub)
+	c.evict(file)
+	stream, err = hasTreeWith(svc, context.Background(), root)
+	assert.NoError(t, err)
+	trees, objects = stream.missing()
+	assert.Empty(t, trees)
+	assert.Equal(t, []string{file}, objects)
 }

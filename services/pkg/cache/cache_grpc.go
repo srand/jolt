@@ -67,12 +67,48 @@ func shardOf(hex string) uint8 {
 type cacheService struct {
 	UnimplementedCacheServiceServer
 	cache Cache
+	trees *treeCache
 }
 
 func NewCacheService(cache Cache) CacheServiceServer {
 	return &cacheService{
 		cache: cache,
+		trees: newTreeCache(treeCacheSize),
 	}
+}
+
+// Returns the parsed children of a tree, or nil if the tree is not in the
+// cache. The tree object is looked up in the cache, which marks it as used,
+// before a parsed tree kept in memory is used, so that an evicted tree is
+// still reported missing.
+func (svc *cacheService) readTree(digest utils.Digest) (*parsedTree, error) {
+	if svc.cache.HasObjects([]utils.Digest{digest})[0] == nil {
+		return nil, nil
+	}
+
+	if parsed, found := svc.trees.get(digest); found {
+		return parsed, nil
+	}
+
+	reader, err := svc.cache.ReadObject(digest)
+	if err != nil {
+		// Evicted since it was looked up
+		return nil, nil
+	}
+
+	tree, err := fstree.ReadTree(reader)
+	reader.Close()
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to read tree: %v: %v", digest.Hex(), err)
+	}
+
+	parsed, err := parseTree(digest, tree)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid digest in tree: %v: %v", digest.Hex(), err)
+	}
+
+	svc.trees.add(parsed)
+	return parsed, nil
 }
 
 // HasObject returns a list of blobs that are either missing or present in the cache.
@@ -94,12 +130,6 @@ func (svc *cacheService) HasObject(ctx context.Context, req *HasObjectRequest) (
 }
 
 func (svc *cacheService) checkTree(ctx context.Context, server CacheService_HasTreeServer, m *sync.Mutex, eg *errgroup.Group, seen *digestSet, digest utils.Digest) error {
-	var tree *fstree.Tree
-
-	// Objects of the tree, looked up together once all children are known
-	var objects []utils.Digest
-	var objectNames []string
-
 	// Stop walking once the client is gone or another subtree has failed.
 	if err := ctx.Err(); err != nil {
 		return status.FromContextError(err).Err()
@@ -110,28 +140,15 @@ func (svc *cacheService) checkTree(ctx context.Context, server CacheService_HasT
 		MissingObjects: make([]string, 0),
 	}
 
-	// Read the tree from the cache.
-	reader, err := svc.cache.ReadObject(digest)
+	tree, err := svc.readTree(digest)
 	if err != nil {
+		return err
+	}
+
+	if tree == nil {
 		response.MissingTrees = append(response.MissingTrees, digest.String())
-		goto sendResponse
-	}
-
-	tree, err = fstree.ReadTree(reader)
-	reader.Close()
-	if err != nil {
-		return status.Errorf(codes.Internal, "failed to read tree: %v: %v", digest.Hex(), err)
-	}
-
-	for _, child := range tree.Children {
-		digest, err := utils.ParseDigest(child.Digest())
-
-		switch child.Type() {
-		case fstree.InodeType_Directory:
-			if err != nil {
-				return status.Errorf(codes.InvalidArgument, "invalid digest: %v", err)
-			}
-
+	} else {
+		for _, digest := range tree.trees {
 			if !seen.add(digest) {
 				continue
 			}
@@ -145,31 +162,23 @@ func (svc *cacheService) checkTree(ctx context.Context, server CacheService_HasT
 					return err
 				}
 			}
+		}
 
-		case fstree.InodeType_Symlink:
-			// Skip symlinks.
-
-		default:
-			if err != nil {
-				return status.Errorf(codes.InvalidArgument, "invalid digest: %v", err)
+		// Objects of the tree are looked up together
+		var objects []utils.Digest
+		for _, digest := range tree.objects {
+			if seen.add(digest) {
+				objects = append(objects, digest)
 			}
+		}
 
-			if !seen.add(digest) {
-				continue
+		for i, item := range svc.cache.HasObjects(objects) {
+			if item == nil {
+				response.MissingObjects = append(response.MissingObjects, objects[i].String())
 			}
-
-			objects = append(objects, digest)
-			objectNames = append(objectNames, child.Digest())
 		}
 	}
 
-	for i, item := range svc.cache.HasObjects(objects) {
-		if item == nil {
-			response.MissingObjects = append(response.MissingObjects, objectNames[i])
-		}
-	}
-
-sendResponse:
 	if len(response.MissingObjects) == 0 && len(response.MissingTrees) == 0 {
 		return nil
 	}
@@ -177,8 +186,7 @@ sendResponse:
 	m.Lock()
 	defer m.Unlock()
 
-	err = server.Send(response)
-	if err != nil {
+	if err := server.Send(response); err != nil {
 		return status.Errorf(codes.Internal, "failed to send response: %v", err)
 	}
 
