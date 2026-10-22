@@ -17,6 +17,11 @@ const (
 	TreeVersion = 1
 )
 
+// Upper bound for the length of a path, digest or symlink target in a tree
+// object. Lengths are read from the object, which any client can upload, so
+// they must be bounded before they are used to size an allocation.
+const MaxFieldLength = 1 << 20
+
 type Inode interface {
 	Type() int
 	Digest() string
@@ -114,6 +119,10 @@ func ReadTree(reader io.Reader) (*Tree, error) {
 			break
 		}
 
+		if pathLength > MaxFieldLength {
+			return nil, fmt.Errorf("path length out of range: %d", pathLength)
+		}
+
 		path := make([]byte, pathLength)
 		_, err = io.ReadFull(reader, path)
 		if err != nil {
@@ -125,6 +134,10 @@ func ReadTree(reader io.Reader) (*Tree, error) {
 		err = binary.Read(reader, binary.LittleEndian, &digestLength)
 		if err != nil {
 			return nil, err
+		}
+
+		if digestLength > MaxFieldLength {
+			return nil, fmt.Errorf("digest length out of range: %d", digestLength)
 		}
 
 		digest := make([]byte, digestLength)
@@ -146,6 +159,10 @@ func ReadTree(reader io.Reader) (*Tree, error) {
 			err = binary.Read(reader, binary.LittleEndian, &targetLength)
 			if err != nil {
 				return nil, err
+			}
+
+			if targetLength > MaxFieldLength {
+				return nil, fmt.Errorf("target length out of range: %d", targetLength)
 			}
 
 			target := make([]byte, targetLength)

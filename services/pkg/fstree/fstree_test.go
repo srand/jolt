@@ -70,3 +70,14 @@ func TestReadTreeTruncated(t *testing.T) {
 	_, err := ReadTree(bytes.NewReader(data[:len(data)-3]))
 	assert.Error(t, err)
 }
+
+func TestReadTreeOversizedField(t *testing.T) {
+	// Length fields come from the object and must not be trusted to size
+	// allocations, or a crafted object could exhaust the server's memory.
+	var buf bytes.Buffer
+	binary.Write(&buf, binary.LittleEndian, uint16(TreeMagic))
+	binary.Write(&buf, binary.LittleEndian, uint16(TreeVersion))
+	binary.Write(&buf, binary.LittleEndian, uint64(1)<<40)
+	_, err := ReadTree(&buf)
+	assert.Error(t, err)
+}
