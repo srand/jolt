@@ -4,6 +4,9 @@
 This script implements a CUSE jobserver device using ctypes bindings to libfuse3.
 It provides /dev/jobserver, tracks checked-out job server tokens per open file description,
 and returns leaked tokens when a client closes its file descriptor.
+
+No tokens are handed out while system pressure exceeds the limits set with
+JOLT_JOBSERVER_PRESSURE_MAX_{CPU,IO,MEMORY}.
 """
 
 from __future__ import annotations
@@ -11,11 +14,19 @@ from __future__ import annotations
 import ctypes
 import ctypes.util
 import errno
+import functools
 import os
 import signal
 import sys
+import threading
 from dataclasses import dataclass
-from typing import Any, Optional
+from typing import Any, Callable, Optional
+
+# Deployed as a standalone script next to jobserver_pressure.py
+if __package__:
+    from .jobserver_pressure import PressureMonitor, RESOURCES
+else:
+    from jobserver_pressure import PressureMonitor, RESOURCES
 
 
 POLLIN = 0x001
@@ -128,21 +139,31 @@ class Poller:
 
 
 class JobServer:
-    def __init__(self, tokens: Optional[int] = None, devname: str = "jobserver") -> None:
+    def __init__(
+        self,
+        tokens: Optional[int] = None,
+        devname: str = "jobserver",
+        pressure: Optional[dict] = None,
+        psi_path: Optional[str] = None,
+    ) -> None:
         self.tokens = tokens if tokens is not None else (os.cpu_count() or 1) + 1
         self.devname = devname
+        self.monitor = PressureMonitor(pressure, path=psi_path)
+        self.throttled = False
+        # Serializes FUSE callbacks with the pressure monitor thread
+        self.lock = threading.RLock()
         self.clients: dict[int, Client] = {}
         self.readers: list[Reader] = []
         self.pollers: list[Poller] = []
         self.client_handles: dict[int, Client] = {}
         self.lib = self._load_fuse()
         self._configure_fuse_symbols()
-        self._open_cb = OPEN_CB(self.dev_open)
-        self._release_cb = RELEASE_CB(self.dev_release)
-        self._read_cb = READ_CB(self.dev_read)
-        self._write_cb = WRITE_CB(self.dev_write)
-        self._poll_cb = POLL_CB(self.dev_poll)
-        self._interrupt_cb = INTERRUPT_CB(self.dev_interrupt)
+        self._open_cb = OPEN_CB(self._locked(self.dev_open))
+        self._release_cb = RELEASE_CB(self._locked(self.dev_release))
+        self._read_cb = READ_CB(self._locked(self.dev_read))
+        self._write_cb = WRITE_CB(self._locked(self.dev_write))
+        self._poll_cb = POLL_CB(self._locked(self.dev_poll))
+        self._interrupt_cb = INTERRUPT_CB(self._locked(self.dev_interrupt))
         self.ops = CuseLowlevelOps(
             None,
             None,
@@ -156,6 +177,39 @@ class JobServer:
             None,
             self._poll_cb,
         )
+
+    def _locked(self, func: Callable[..., None]) -> Callable[..., None]:
+        @functools.wraps(func)
+        def wrapper(*args: Any) -> None:
+            with self.lock:
+                func(*args)
+        return wrapper
+
+    def available(self) -> int:
+        """Number of tokens that may be handed out right now."""
+        return 0 if self.throttled else self.tokens
+
+    def regulate(self, stop: threading.Event, interval: float = 1.0) -> None:
+        """Stop handing out tokens while the system is under pressure."""
+        while not stop.wait(interval):
+            try:
+                throttled = self.monitor.update()
+            except (OSError, ValueError) as exc:
+                self.log("[PRESSURE] cannot read pressure, regulation disabled: %s\n", exc)
+                throttled = False
+                stop.set()
+            with self.lock:
+                if throttled == self.throttled:
+                    continue
+                self.throttled = throttled
+                self.log(
+                    "[PRESSURE] %s handing out tokens (%s), %d of %d tokens idle\n",
+                    "stopped" if throttled else "resumed",
+                    self.monitor.describe(),
+                    self.tokens,
+                    self.tokens + sum(client.balance for client in self.clients.values()),
+                )
+                self.wake_readers()
 
     @staticmethod
     def _load_fuse() -> ctypes.CDLL:
@@ -238,14 +292,14 @@ class JobServer:
         self.pollers.append(Poller(ph=ph.value if hasattr(ph, "value") else int(ph)))
 
     def wake_readers(self) -> None:
-        while self.readers and self.tokens:
+        while self.readers and self.available():
             reader = self.readers.pop(0)
             if reader.req:
                 reader.client.balance += 1
                 self.tokens -= 1
                 self.lib.fuse_reply_buf(fuse_req_t(reader.req), b".", 1)
 
-        if not self.tokens:
+        if not self.available():
             return
 
         while self.pollers:
@@ -300,7 +354,7 @@ class JobServer:
             self.lib.fuse_reply_err(req, errno.EBADF)
             return
 
-        if self.tokens >= size:
+        if self.available() >= size:
             client.balance += size
             self.tokens -= size
             self.lib.fuse_reply_buf(req, b".", size)
@@ -339,7 +393,7 @@ class JobServer:
         ph: fuse_pollhandle_p,
     ) -> None:
         events = fi.contents.poll_events & (POLLIN | POLLOUT)
-        if not self.tokens:
+        if not self.available():
             events &= ~POLLIN
             if not events:
                 self.poller_enqueue(ph)
@@ -363,11 +417,19 @@ class JobServer:
         if not session:
             return 1
 
+        stop = threading.Event()
+        if self.monitor.start():
+            self.log("Limiting pressure to %s\n", self.monitor.describe())
+            threading.Thread(target=self.regulate, args=(stop,), daemon=True).start()
+        elif self.monitor.limits:
+            self.log("Pressure information is unavailable, continuing without pressure limits\n")
+
         try:
             if self.lib.fuse_session_mount(session, mountpoint):
                 return 1
             return 1 if self.lib.fuse_session_loop(session) else 0
         finally:
+            stop.set()
             self.lib.fuse_session_unmount(session)
             self.lib.fuse_session_destroy(session)
             os.close(cuse_fd)
@@ -402,12 +464,17 @@ def main(argv: list[str]) -> int:
     try:
         tokens, fuse_argv = parse_args(argv)
         devname = os.getenv("JOLT_JOBSERVER_DEVNAME", "jobserver")
+        pressure = {
+            resource: os.getenv(f"JOLT_JOBSERVER_PRESSURE_MAX_{resource.upper()}")
+            for resource in RESOURCES
+        }
+        jobserver = JobServer(tokens, devname, pressure)
         print(f"Starting jobserver with {tokens} tokens on /dev/{devname}", file=sys.stderr)
-        return JobServer(tokens, devname).run(fuse_argv)
+        return jobserver.run(fuse_argv)
     except OSError as exc:
         print(f"{exc.filename or 'jobserver'}: {exc.strerror}", file=sys.stderr)
         return 1
-    except RuntimeError as exc:
+    except (RuntimeError, ValueError) as exc:
         print(exc, file=sys.stderr)
         return 1
 

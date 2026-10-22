@@ -523,6 +523,55 @@ These configuration keys exist:
         | If set when ``launch`` is ``false``, Jolt will attempt to connect to an already running
           jobserver helper process at the specified path.
 
+    * - ``pressure_max_cpu``
+      - Integer
+      - | The maximum CPU pressure allowed before the jobserver stops handing out tokens.
+        | See :ref:`Pressure regulation <configuration-plugins-jobserver-pressure>` below.
+        | Default: not set
+
+    * - ``pressure_max_io``
+      - Integer
+      - | The maximum IO pressure allowed before the jobserver stops handing out tokens.
+        | See :ref:`Pressure regulation <configuration-plugins-jobserver-pressure>` below.
+        | Default: not set
+
+    * - ``pressure_max_memory``
+      - Integer
+      - | The maximum memory pressure allowed before the jobserver stops handing out tokens.
+        | See :ref:`Pressure regulation <configuration-plugins-jobserver-pressure>` below.
+        | Default: not set
+
+.. _configuration-plugins-jobserver-pressure:
+
+**Pressure regulation**
+
+The jobserver can limit parallelism dynamically based on the Linux Pressure Stall
+Information (PSI) found in ``/proc/pressure``. This is mainly useful to avoid
+thrashing when memory runs low, for example when many large C++ translation units
+are compiled or linked at the same time.
+
+The pressure is measured as the number of microseconds per second that at least one
+task was stalled waiting for the resource, so limits range from 1 to 1000000. The
+values are sampled once per second. While any limit is exceeded, the jobserver hands
+out no tokens. Jobs that are already running are not affected, and each build tool
+can always run one job using its implicit token, so builds keep making progress.
+This is the same algorithm as BitBake's ``BB_PRESSURE_MAX_CPU``, ``BB_PRESSURE_MAX_IO``
+and ``BB_PRESSURE_MAX_MEMORY``, so the same limits can be used.
+
+Build tools take tokens directly from the jobserver FIFO, so the jobserver withholds
+tokens by taking them out of the FIFO as they are returned, competing with the build
+tools waiting for them. Parallelism therefore decreases gradually, at a rate that
+depends on how often jobs finish.
+
+Pressure regulation requires a Linux kernel with PSI support. If pressure information
+is unavailable, Jolt prints a warning and the jobserver runs without pressure limits.
+
+  .. code:: text
+
+    [jobserver]
+    launch = true
+    pressure_max_memory = 100000
+
 
 Logstash (HTTP)
 ^^^^^^^^^^^^^^^
@@ -1086,6 +1135,27 @@ The following configuration environment variables are available:
       - | The number of slots to use when launching the jobserver helper process.
         | This is used to limit the number of parallel jobs launched by compatible build tools.
         | Default: the number of CPUs available.
+
+    * - ``JOLT_JOBSERVER_PRESSURE_MAX_CPU``
+      - Integer
+      - | The maximum CPU pressure allowed before the jobserver stops handing out tokens.
+        | Default: not set
+
+    * - ``JOLT_JOBSERVER_PRESSURE_MAX_IO``
+      - Integer
+      - | The maximum IO pressure allowed before the jobserver stops handing out tokens.
+        | Default: not set
+
+    * - ``JOLT_JOBSERVER_PRESSURE_MAX_MEMORY``
+      - Integer
+      - | The maximum memory pressure allowed before the jobserver stops handing out tokens.
+        | Default: not set
+
+The pressure limits work as described for the
+:ref:`Jobserver <configuration-plugins-jobserver>` plugin, except that tokens are
+withheld immediately, since the server controls every read from the device.
+The pressure is system wide, so a single limit protects all workers on the node.
+State changes are logged to the container output.
 
 To use the jobserver when running tasks, configure the Jolt client as described in
 the :ref:`Jobserver <configuration-plugins-jobserver>` plugin section:

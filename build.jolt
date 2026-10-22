@@ -72,6 +72,7 @@ class JoltImage(docker.DockerImage):
 @influence.files("{dockerfile}")
 @attributes.requires("requires_push_{push}")
 @git.influence("jolt/plugins/jobserver_cuse.py")
+@git.influence("jolt/plugins/jobserver_pressure.py")
 class JobServerImage(docker.DockerImage):
     name = "jolt/jobserver"
     dockerfile = "docker/Dockerfile.jobserver"

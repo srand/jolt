@@ -13,13 +13,19 @@ import time
 
 from setproctitle import setproctitle
 
+# Also runs as a standalone script, see launch_jobserver().
+if __package__:
+    from .jobserver_pressure import PressureMonitor
+else:
+    from jobserver_pressure import PressureMonitor
+
 
 def _build_process_title(name):
     return " ".join([name] + sys.argv[1:])
 
 
 class Jobserver:
-    def __init__(self, path=None, slots=1):
+    def __init__(self, path=None, slots=1, pressure=None, psi_path=None, interval=1.0):
         # The pool size is N, but we put N-1 tokens in the pipe
         # because the parent process itself occupies one slot.
         self.slots = slots
@@ -42,6 +48,66 @@ class Jobserver:
         if slots > 1:
             os.write(self.fifo_fd, b'+' * (slots - 1))
 
+        # Tokens taken out of circulation while the system is under pressure
+        self.withheld = b""
+        self._withheld_lock = threading.Lock()
+        self._throttled = threading.Event()
+        self._regulator = None
+        self._regulator_stop = threading.Event()
+        monitor = PressureMonitor(pressure, path=psi_path)
+        if monitor.start():
+            self._regulator = threading.Thread(
+                target=self._regulate, args=(monitor, interval), daemon=True)
+            self._regulator.start()
+            # One reader per token increases the share of returned tokens
+            # that are withheld. They may block in read() until the process
+            # exits, so they share a file descriptor that is never closed.
+            withhold_fd = os.open(self.fifo_path, os.O_RDWR)
+            for _ in range(max(1, slots - 1)):
+                threading.Thread(target=self._withhold, args=(withhold_fd,), daemon=True).start()
+
+    def _regulate(self, monitor, interval):
+        """ Withhold tokens while the system is under pressure. """
+        try:
+            while not self._regulator_stop.wait(interval):
+                if monitor.update():
+                    self._throttled.set()
+                else:
+                    self._release()
+        except (OSError, ValueError):
+            # Pressure information is gone. Stop regulating.
+            self._release()
+
+    def _withhold(self, fd):
+        """
+        Take returned tokens out of circulation while throttled.
+
+        Clients take tokens straight from the pipe and usually read a new
+        token right after returning one, so tokens rarely stay in the pipe.
+        A blocking read puts this thread in line with the clients waiting
+        for tokens. It gets its share of the returned tokens and the pool
+        drains for as long as the pressure persists. Clients always keep
+        their implicit token, so builds still make progress.
+        """
+        while True:
+            self._throttled.wait()
+            token = os.read(fd, 1)
+            with self._withheld_lock:
+                if self._throttled.is_set():
+                    self.withheld += token
+                    continue
+            # Pressure dropped while waiting for the token
+            os.write(fd, token)
+
+    def _release(self):
+        with self._withheld_lock:
+            self._throttled.clear()
+            if self._regulator_stop.is_set():
+                return
+            while self.withheld:
+                written = os.write(self.fifo_fd, self.withheld)
+                self.withheld = self.withheld[written:]
+
     def get_env(self):
         """Returns the environment variables required for children to connect."""
         # Using the modern FIFO syntax supported by Make 4.4+ and Ninja
@@ -51,6 +117,9 @@ class Jobserver:
         """Close the FD and remove the temporary directory/pipe."""
         # Safe to call more than once, including after a previous call was
         # interrupted part way through.
+        self._regulator_stop.set()
+        if self._regulator is not None:
+            self._regulator.join(timeout=5)
         fifo_fd, self.fifo_fd = self.fifo_fd, None
         if fifo_fd is not None:
             try:
@@ -236,8 +305,14 @@ def _start_parent_liveness_monitor(parent_sentinel_fd=None, parent_pid=None):
     return shutdown_event
 
 
-def launch_jobserver(slots, path=None, python_executable=None, new_session=True):
-    """Launch a jobserver in the background and return a shareable handle."""
+def launch_jobserver(slots, path=None, python_executable=None, new_session=True,
+                     pressure=None, psi_path=None):
+    """Launch a jobserver in the background and return a shareable handle.
+
+    ``pressure`` maps 'cpu', 'io' and 'memory' to the maximum allowed
+    pressure, in microseconds of stall per second. No tokens are handed
+    out while any of them is exceeded.
+    """
     jobserver_path = path or tempfile.mkdtemp(prefix="jolt-jobserver-")
     command = [
         python_executable or sys.executable,
@@ -245,6 +320,11 @@ def launch_jobserver(slots, path=None, python_executable=None, new_session=True)
         "--slots", str(slots),
         "--path", jobserver_path,
     ]
+    for resource, limit in (pressure or {}).items():
+        if limit:
+            command.extend(["--pressure-max-" + resource, str(limit)])
+    if psi_path:
+        command.extend(["--psi-path", psi_path])
     preexec_fn = None
     parent_sentinel = None
     popen_kwargs = {}
@@ -293,7 +373,8 @@ def launch_jobserver(slots, path=None, python_executable=None, new_session=True)
     return BackgroundJobserver(process, jobserver_path, parent_sentinel=parent_sentinel)
 
 
-def _serve_jobserver(path, slots, parent_sentinel_fd=None, parent_pid=None):
+def _serve_jobserver(path, slots, parent_sentinel_fd=None, parent_pid=None,
+                     pressure=None, psi_path=None):
     stopping = False
 
     def _shutdown(*_args):
@@ -317,7 +398,7 @@ def _serve_jobserver(path, slots, parent_sentinel_fd=None, parent_pid=None):
     for signum in handled_signals:
         signal.signal(signum, _shutdown)
 
-    jobserver = Jobserver(path=path, slots=slots)
+    jobserver = Jobserver(path=path, slots=slots, pressure=pressure, psi_path=psi_path)
 
     # Belt-and-braces: ensure the FIFO and directory are removed even if the
     # helper exits via an unexpected path (e.g. an uncaught exception before
@@ -347,6 +428,10 @@ def _parse_args(argv=None):
     parser.add_argument("--parent-pid", type=int, help="PID of the launching process")
     parser.add_argument("--parent-sentinel-fd", type=int, help="Inherited pipe fd closed when the parent exits")
     parser.add_argument("--slots", type=int, required=True, help="Number of available slots")
+    parser.add_argument("--pressure-max-cpu", type=float, help="Maximum CPU pressure (us stall/s)")
+    parser.add_argument("--pressure-max-io", type=float, help="Maximum IO pressure (us stall/s)")
+    parser.add_argument("--pressure-max-memory", type=float, help="Maximum memory pressure (us stall/s)")
+    parser.add_argument("--psi-path", help=argparse.SUPPRESS)
     return parser.parse_args(argv)
 
 
@@ -359,6 +444,12 @@ def main(argv=None):
         args.slots,
         parent_sentinel_fd=args.parent_sentinel_fd,
         parent_pid=args.parent_pid,
+        pressure={
+            "cpu": args.pressure_max_cpu,
+            "io": args.pressure_max_io,
+            "memory": args.pressure_max_memory,
+        },
+        psi_path=args.psi_path,
     )
 
 

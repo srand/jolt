@@ -1,9 +1,13 @@
 #!/usr/bin/env python3
 
+import fcntl
 import os
+import struct
 import subprocess
 import sys
+import termios
 import textwrap
+import threading
 import time
 
 from jolt.utils import timeout
@@ -15,6 +19,8 @@ from testsupport import JoltTest
 from jolt.plugins.jobserver_main import find_jobserver
 from jolt.plugins.jobserver_main import launch_jobserver
 from jolt.plugins.jobserver_main import stat_is_fifo
+from jolt.plugins.jobserver_pressure import PressureMonitor
+from jolt.plugins.jobserver_pressure import parse_limits
 
 
 class JobserverExtension(JoltTest):
@@ -35,6 +41,21 @@ class JobserverExtension(JoltTest):
                 return
             time.sleep(interval)
         self.fail(message)
+
+    def _write_psi(self, psi_path, totals):
+        """ Write fake /proc/pressure files with the given 'some' totals. """
+        os.makedirs(psi_path, exist_ok=True)
+        for resource in ("cpu", "io", "memory"):
+            tmp_path = os.path.join(psi_path, resource + ".tmp")
+            with open(tmp_path, "w") as stream:
+                stream.write("some avg10=0.00 avg60=0.00 avg300=0.00 total={}\n".format(
+                    totals.get(resource, 0)))
+                stream.write("full avg10=0.00 avg60=0.00 avg300=0.00 total=0\n")
+            os.replace(tmp_path, os.path.join(psi_path, resource))
+
+    def _pending_tokens(self, fd):
+        """ Number of tokens in the FIFO, without taking them. """
+        return struct.unpack("i", fcntl.ioctl(fd, termios.FIONREAD, b"\0" * 4))[0]
 
     def _pid_exists(self, pid):
         try:
@@ -262,3 +283,208 @@ class JobserverExtension(JoltTest):
                         process.kill()
                         process.wait(timeout=5)
             jobserver.cleanup()
+
+    def test_pressure_limits(self):
+        self.assertEqual(parse_limits({"cpu": None, "io": "", "memory": "1000"}), {"memory": 1000.0})
+        self.assertEqual(parse_limits({"io": 1, "memory": 1000000}), {"io": 1.0, "memory": 1000000.0})
+        for limits in ({"memory": 0}, {"memory": 1000001}, {"memory": "abc"}, {"gpu": 1000}):
+            with self.assertRaises(ValueError, msg=str(limits)):
+                parse_limits(limits)
+
+    def test_pressure_monitor(self):
+        psi_path = os.path.join(self.ws, "psi")
+        self._write_psi(psi_path, {})
+
+        self.assertFalse(PressureMonitor({}, path=psi_path).start())
+        self.assertFalse(PressureMonitor({"memory": 1000}, path=os.path.join(self.ws, "nopsi")).start())
+
+        monitor = PressureMonitor({"cpu": 1000, "memory": 1000}, path=psi_path)
+        self.assertTrue(monitor.start())
+
+        # A second of memory stall in a fraction of a second exceeds the limit
+        self._write_psi(psi_path, {"memory": 1000000})
+        time.sleep(0.1)
+        self.assertTrue(monitor.update())
+        self.assertGreater(monitor.rates["memory"], 1000)
+        self.assertEqual(monitor.rates["cpu"], 0)
+
+        # No additional stall since the previous sample
+        time.sleep(0.1)
+        self.assertFalse(monitor.update())
+        self.assertEqual(monitor.rates["memory"], 0)
+
+    def test_pressure_withholds_tokens(self):
+        self._require_jobserver_support()
+
+        psi_path = os.path.join(self.ws, "psi")
+        self._write_psi(psi_path, {})
+        jobserver = launch_jobserver(
+            3,
+            path=os.path.join(self.ws, "jobserver-pressure"),
+            pressure={"memory": 1000},
+            psi_path=psi_path,
+        )
+        stop = threading.Event()
+
+        def stall():
+            total = 0
+            while not stop.wait(0.1):
+                total += 1000000
+                self._write_psi(psi_path, {"memory": total})
+
+        staller = threading.Thread(target=stall, daemon=True)
+        fd = os.open(jobserver.fifo_path, os.O_RDWR)
+
+        try:
+            self.assertEqual(self._pending_tokens(fd), 2)
+
+            staller.start()
+            self._wait_for(
+                lambda: self._pending_tokens(fd) == 0,
+                timeout=10,
+                message="tokens were not withheld while under pressure",
+            )
+            time.sleep(1.5)
+            self.assertEqual(self._pending_tokens(fd), 0)
+
+            stop.set()
+            staller.join()
+            self._wait_for(
+                lambda: self._pending_tokens(fd) == 2,
+                timeout=10,
+                message="tokens were not released when pressure dropped",
+            )
+        finally:
+            stop.set()
+            os.close(fd)
+            jobserver.cleanup()
+
+    def test_pressure_withholds_tokens_from_busy_clients(self):
+        """ Tokens are withheld even if clients take them back as soon as they are returned. """
+        self._require_jobserver_support()
+
+        slots = 5
+        psi_path = os.path.join(self.ws, "psi")
+        held_path = os.path.join(self.ws, "held")
+        stop_path = os.path.join(self.ws, "stop")
+        os.makedirs(held_path)
+        self._write_psi(psi_path, {})
+        jobserver = launch_jobserver(
+            slots,
+            path=os.path.join(self.ws, "jobserver-busy"),
+            pressure={"memory": 1000},
+            psi_path=psi_path,
+        )
+        worker_script = textwrap.dedent("""
+            import os
+            import sys
+            import time
+
+            fifo_path, marker_path, stop_path = sys.argv[1:4]
+            fd = os.open(fifo_path, os.O_RDWR)
+            while not os.path.exists(stop_path):
+                token = os.read(fd, 1)
+                open(marker_path, "w").close()
+                time.sleep(0.02)
+                os.unlink(marker_path)
+                os.write(fd, token)
+        """)
+        workers = [
+            subprocess.Popen(
+                [
+                    sys.executable,
+                    "-c",
+                    worker_script,
+                    jobserver.fifo_path,
+                    os.path.join(held_path, str(index)),
+                    stop_path,
+                ],
+                stdin=subprocess.DEVNULL,
+                cwd=self.ws,
+            )
+            for index in range(2 * slots)
+        ]
+        stop = threading.Event()
+
+        def stall():
+            total = 0
+            while not stop.wait(0.1):
+                total += 1000000
+                self._write_psi(psi_path, {"memory": total})
+
+        staller = threading.Thread(target=stall, daemon=True)
+
+        try:
+            self._wait_for(
+                lambda: len(os.listdir(held_path)) == slots - 1,
+                timeout=10,
+                message="workers never used all tokens",
+            )
+
+            staller.start()
+            self._wait_for(
+                lambda: len(os.listdir(held_path)) <= 1,
+                timeout=20,
+                interval=0.01,
+                message="tokens were not withheld from busy clients while under pressure",
+            )
+
+            stop.set()
+            staller.join()
+            self._wait_for(
+                lambda: len(os.listdir(held_path)) == slots - 1,
+                timeout=10,
+                interval=0.01,
+                message="tokens were not released to busy clients when pressure dropped",
+            )
+        finally:
+            stop.set()
+            with open(stop_path, "w"):
+                pass
+            for process in workers:
+                process.kill()
+                process.wait(timeout=5)
+            jobserver.cleanup()
+
+    def test_launch_config_with_pressure_limits(self):
+        """
+        --- config:
+
+        [jobserver]
+        launch = true
+        slots = 2
+        pressure_max_cpu = 1000000
+        pressure_max_io = 1000000
+        pressure_max_memory = 1000000
+
+        --- tasks:
+        class A(Task):
+            def run(self, deps, tools):
+                tools.write_file("makeflags.txt", tools.getenv("MAKEFLAGS"))
+        ---
+        """
+        self._require_jobserver_support()
+
+        result = self.build("a")
+
+        self.assertBuild(result, "a")
+        self.assertContains("makeflags.txt", "--jobserver-auth=fifo:")
+
+    def test_launch_config_rejects_invalid_pressure_limits(self):
+        """
+        --- config:
+
+        [jobserver]
+        launch = true
+        pressure_max_memory = 0
+
+        --- tasks:
+        class A(Task):
+            pass
+        ---
+        """
+        self._require_jobserver_support()
+
+        with self.assertRaises(Exception):
+            self.build("a")
+        self.assertIn("memory pressure limit must be between 1 and 1000000", self.lastLog())

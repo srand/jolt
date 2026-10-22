@@ -5,4 +5,5 @@ RUN apk add --no-cache \
     fuse3
 
 COPY jolt/plugins/jobserver_cuse.py /opt/jolt/jobserver.py
+COPY jolt/plugins/jobserver_pressure.py /opt/jolt/jobserver_pressure.py
 ENTRYPOINT ["python3", "/opt/jolt/jobserver.py"]
