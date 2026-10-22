@@ -5,9 +5,6 @@ import (
 	"github.com/srand/jolt/scheduler/pkg/utils"
 )
 
-// Maximum size of the parsed trees kept in memory by the cache service.
-var treeCacheSize int64 = 64 << 20
-
 // Approximate memory used for each digest held by a parsed tree.
 const parsedTreeDigestSize = 128
 

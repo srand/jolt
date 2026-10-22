@@ -182,7 +182,7 @@ func put(t testing.TB, c Cache, data []byte) string {
 }
 
 func hasTree(t testing.TB, c Cache, ctx context.Context, digests ...string) (*hasTreeStream, error) {
-	return hasTreeWith(NewCacheService(c), ctx, digests...)
+	return hasTreeWith(NewCacheService(c, 64<<20), ctx, digests...)
 }
 
 // Calls HasTree on a given service, which keeps what it learns between calls.
@@ -341,7 +341,7 @@ func BenchmarkHasTreeComplete(b *testing.B) {
 
 	// The service runs for as long as the cache, so it is shared by all
 	// calls, as it is by all pushes.
-	svc := NewCacheService(lru)
+	svc := NewCacheService(lru, 64<<20)
 
 	b.ReportAllocs()
 	b.ResetTimer()
@@ -367,7 +367,7 @@ func TestHasTreeKeepsParsedTrees(t *testing.T) {
 	sub := put(t, c, encodeTree(treeEntry{"file.txt", file, fstree.InodeType_Regular}))
 	root := put(t, c, encodeTree(treeEntry{"sub", sub, fstree.InodeType_Directory}))
 
-	svc := NewCacheService(c)
+	svc := NewCacheService(c, 64<<20)
 	_, err := hasTreeWith(svc, context.Background(), root)
 	assert.NoError(t, err)
 	reads := c.reads.Load()
@@ -386,7 +386,7 @@ func TestHasTreeReportsEvictedParsedTree(t *testing.T) {
 	sub := put(t, c, encodeTree(treeEntry{"file.txt", file, fstree.InodeType_Regular}))
 	root := put(t, c, encodeTree(treeEntry{"sub", sub, fstree.InodeType_Directory}))
 
-	svc := NewCacheService(c)
+	svc := NewCacheService(c, 64<<20)
 	_, err := hasTreeWith(svc, context.Background(), root)
 	assert.NoError(t, err)
 

@@ -73,9 +73,11 @@ var rootCmd = &cobra.Command{
 			config.ListenGrpc = []string{"tcp://:9090"}
 		}
 
-		// Start gRPC server
+		// Start gRPC server. All addresses share one service, and with it
+		// the parsed trees it keeps in memory.
+		service := cache.NewCacheService(lru, config.TreeCacheSize())
 		for _, address := range config.ListenGrpc {
-			go serveGrpc(lru, address)
+			go serveGrpc(service, address)
 		}
 
 		handler := cache.NewHttpHandler(lru)
@@ -123,6 +125,7 @@ func init() {
 	rootCmd.Flags().StringSliceP("listen-grpc", "g", []string{"tcp://:9090"}, "Addresses to listen on for GRPC connections")
 	rootCmd.Flags().StringP("max-size", "s", "10GB", "Maximum size of the cache.")
 	rootCmd.Flags().StringP("path", "p", "/data", "Path to cache storage on disk, or 'memory' to store files in memory.")
+	rootCmd.Flags().String("tree-cache-size", "1GiB", "Memory for parsed workspace trees, which speeds up pushes.")
 	rootCmd.Flags().CountP("verbose", "v", "Verbosity (repeatable)")
 
 	viper.BindPFlag("cert", rootCmd.Flags().Lookup("cert"))
@@ -133,6 +136,7 @@ func init() {
 	viper.BindPFlag("listen_http", rootCmd.Flags().Lookup("listen-http"))
 	viper.BindPFlag("max_size", rootCmd.Flags().Lookup("max-size"))
 	viper.BindPFlag("path", rootCmd.Flags().Lookup("path"))
+	viper.BindPFlag("tree_cache_size", rootCmd.Flags().Lookup("tree-cache-size"))
 	viper.BindPFlag("verbosity", rootCmd.Flags().Lookup("verbose"))
 }
 

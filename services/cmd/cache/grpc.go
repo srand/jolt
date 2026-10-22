@@ -12,7 +12,7 @@ import (
 )
 
 // Sets up a gRPC server on a specific listening address and starts it.
-func serveGrpc(theCache cache.Cache, address string) {
+func serveGrpc(service cache.CacheServiceServer, address string) {
 	// Parse URI
 	uri, err := url.Parse(address)
 	if err != nil {
@@ -52,7 +52,7 @@ func serveGrpc(theCache cache.Cache, address string) {
 
 	// Setup gRPC server
 	server := grpc.NewServer(opts...)
-	cache.RegisterCacheServiceServer(server, cache.NewCacheService(theCache))
+	cache.RegisterCacheServiceServer(server, service)
 	if err := server.Serve(socket); err != nil {
 		log.Fatal(err)
 	}

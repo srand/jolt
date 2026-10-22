@@ -70,7 +70,10 @@ type cacheService struct {
 	trees *treeCache
 }
 
-func NewCacheService(cache Cache) CacheServiceServer {
+// Creates the gRPC cache service. It keeps up to treeCacheSize bytes of
+// parsed trees in memory, which should hold the trees of the workspaces
+// being pushed. A tree that does not fit is read from the cache instead.
+func NewCacheService(cache Cache, treeCacheSize int64) CacheServiceServer {
 	return &cacheService{
 		cache: cache,
 		trees: newTreeCache(treeCacheSize),

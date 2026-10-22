@@ -42,12 +42,25 @@ type Config struct {
 	// Use "memory" to store files in memory.
 	Path string `mapstructure:"path"`
 
+	// Memory for the parsed trees of workspaces kept by the gRPC service, so
+	// that each push need not read and parse them again. It should hold the
+	// trees of the workspaces being pushed, roughly 13 MB per 100,000 files.
+	TreeCacheSize_ string `mapstructure:"tree_cache_size"`
+
 	// Log verbosity level: 0 = info, 1 = debug, 2 = trace
 	Verbosity int `mapstructure:"verbosity"`
 }
 
 func (c *Config) MaxSize() int64 {
 	size, err := utils.ParseSize(c.MaxSize_)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return size
+}
+
+func (c *Config) TreeCacheSize() int64 {
+	size, err := utils.ParseSize(c.TreeCacheSize_)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -68,5 +81,6 @@ func (c *Config) Log() {
 	log.Infof("  listen_grpc = %v", c.ListenGrpc)
 	log.Infof("  max_size = %d", c.MaxSize())
 	log.Infof("  path = %s", c.Path)
+	log.Infof("  tree_cache_size = %d", c.TreeCacheSize())
 	c.GRPCOptions.Log()
 }
