@@ -45,8 +45,13 @@ func (svc *cacheService) HasObject(ctx context.Context, req *HasObjectRequest) (
 	}, nil
 }
 
-func (svc *cacheService) checkTree(server CacheService_HasTreeServer, m *sync.Mutex, eg *errgroup.Group, digest utils.Digest) error {
+func (svc *cacheService) checkTree(ctx context.Context, server CacheService_HasTreeServer, m *sync.Mutex, eg *errgroup.Group, digest utils.Digest) error {
 	var tree *fstree.Tree
+
+	// Stop walking once the client is gone or another subtree has failed.
+	if err := ctx.Err(); err != nil {
+		return status.FromContextError(err).Err()
+	}
 
 	response := &HasTreeResponse{
 		MissingTrees:   make([]string, 0),
@@ -76,7 +81,7 @@ func (svc *cacheService) checkTree(server CacheService_HasTreeServer, m *sync.Mu
 			}
 
 			eg.Go(func() error {
-				return svc.checkTree(server, m, eg, digest)
+				return svc.checkTree(ctx, server, m, eg, digest)
 			})
 
 		case fstree.InodeType_Symlink:
@@ -110,7 +115,7 @@ sendResponse:
 }
 
 func (svc *cacheService) HasTree(req *HasTreeRequest, server CacheService_HasTreeServer) error {
-	eg := errgroup.Group{}
+	eg, ctx := errgroup.WithContext(server.Context())
 	trees := []utils.Digest{}
 	m := sync.Mutex{}
 
@@ -126,7 +131,7 @@ func (svc *cacheService) HasTree(req *HasTreeRequest, server CacheService_HasTre
 	for i := range trees {
 		digest := trees[i]
 		eg.Go(func() error {
-			return svc.checkTree(server, &m, &eg, digest)
+			return svc.checkTree(ctx, server, &m, eg, digest)
 		})
 	}
 

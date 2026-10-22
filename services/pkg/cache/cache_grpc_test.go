@@ -22,7 +22,8 @@ import (
 // Cache that keeps track of readers that have not been closed.
 type trackingCache struct {
 	Cache
-	open atomic.Int64
+	open  atomic.Int64
+	reads atomic.Int64
 }
 
 type trackedReader struct {
@@ -42,6 +43,7 @@ func (c *trackingCache) ReadObject(d utils.Digest) (io.ReadCloser, error) {
 		return nil, err
 	}
 	c.open.Add(1)
+	c.reads.Add(1)
 	return &trackedReader{ReadCloser: reader, cache: c}, nil
 }
 
@@ -168,4 +170,20 @@ func TestHasTreeClosesReaders(t *testing.T) {
 	_, err := hasTree(t, c, context.Background(), root)
 	assert.NoError(t, err)
 	assert.Equal(t, int64(0), c.open.Load(), "tree readers left open")
+}
+
+func TestHasTreeStopsWhenCanceled(t *testing.T) {
+	c := newTestCache(t)
+
+	file := put(t, c, []byte("file"))
+	sub := put(t, c, encodeTree(treeEntry{"file.txt", file, fstree.InodeType_Regular}))
+	root := put(t, c, encodeTree(treeEntry{"sub", sub, fstree.InodeType_Directory}))
+
+	// The client has gone away, there is no one to walk the tree for.
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	_, err := hasTree(t, c, ctx, root)
+	assert.Error(t, err)
+	assert.Equal(t, int64(0), c.reads.Load(), "trees read after cancellation")
 }
