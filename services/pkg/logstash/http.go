@@ -1,6 +1,7 @@
 package logstash
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -20,6 +21,9 @@ func NewHttpHandler(stash LogStash, r *echo.Echo) http.Handler {
 			reader, err = stash.Follow(c.Request().Context(), c.Param("id"))
 		} else {
 			reader, err = stash.Read(c.Param("id"))
+		}
+		if errors.Is(err, ErrInvalidLogId) {
+			return c.String(http.StatusBadRequest, err.Error())
 		}
 		if err != nil {
 			return c.String(http.StatusNotFound, err.Error())

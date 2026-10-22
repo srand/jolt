@@ -9,6 +9,8 @@ import (
 	"github.com/srand/jolt/scheduler/pkg/protocol"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -50,7 +52,7 @@ func testLine(message string) *protocol.LogLine {
 func TestReadLogWithoutFollowEndsAtEndOfLog(t *testing.T) {
 	service, stash := newTestService(t)
 
-	writer, err := stash.Append("log1")
+	writer, err := stash.Append(logId1)
 	assert.NoError(t, err)
 	assert.NoError(t, writer.WriteLine(testLine("first")))
 	// Deliberately left open: without follow the stream must still end.
@@ -60,7 +62,7 @@ func TestReadLogWithoutFollowEndsAtEndOfLog(t *testing.T) {
 
 	done := make(chan error, 1)
 	go func() {
-		done <- service.ReadLog(&protocol.ReadLogRequest{Id: "log1"}, stream)
+		done <- service.ReadLog(&protocol.ReadLogRequest{Id: logId1}, stream)
 	}()
 
 	select {
@@ -76,7 +78,7 @@ func TestReadLogWithoutFollowEndsAtEndOfLog(t *testing.T) {
 func TestReadLogWithFollowStreamsUntilTheLogIsComplete(t *testing.T) {
 	service, stash := newTestService(t)
 
-	writer, err := stash.Append("log1")
+	writer, err := stash.Append(logId1)
 	assert.NoError(t, err)
 	assert.NoError(t, writer.WriteLine(testLine("first")))
 
@@ -84,7 +86,7 @@ func TestReadLogWithFollowStreamsUntilTheLogIsComplete(t *testing.T) {
 
 	done := make(chan error, 1)
 	go func() {
-		done <- service.ReadLog(&protocol.ReadLogRequest{Id: "log1", Follow: true}, stream)
+		done <- service.ReadLog(&protocol.ReadLogRequest{Id: logId1, Follow: true}, stream)
 	}()
 
 	select {
@@ -118,4 +120,12 @@ func TestReadLogWithFollowStreamsUntilTheLogIsComplete(t *testing.T) {
 	case <-time.After(2 * time.Second):
 		t.Fatal("ReadLog did not end after the log was complete")
 	}
+}
+
+func TestReadLogWithInvalidIdIsInvalidArgument(t *testing.T) {
+	service, _ := newTestService(t)
+
+	stream := &fakeReadLogStream{ctx: context.Background(), responses: make(chan *protocol.ReadLogResponse, 8)}
+	err := service.ReadLog(&protocol.ReadLogRequest{Id: "../../etc/passwd"}, stream)
+	assert.Equal(t, codes.InvalidArgument, status.Code(err))
 }

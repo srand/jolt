@@ -1,10 +1,13 @@
 package logstash
 
 import (
+	"errors"
 	"io"
 
 	"github.com/srand/jolt/scheduler/pkg/protocol"
 	"github.com/srand/jolt/scheduler/pkg/utils"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 type LogStashService struct {
@@ -28,6 +31,9 @@ func (s *LogStashService) ReadLog(req *protocol.ReadLogRequest, stream protocol.
 		reader, err = s.stash.Follow(stream.Context(), req.Id)
 	} else {
 		reader, err = s.stash.Read(req.Id)
+	}
+	if errors.Is(err, ErrInvalidLogId) {
+		return status.Error(codes.InvalidArgument, err.Error())
 	}
 	if err != nil {
 		return err

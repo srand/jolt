@@ -59,12 +59,12 @@ func (s *FollowTestSuite) readAsync(reader LogReader) chan followReadResult {
 }
 
 func (s *FollowTestSuite) TestFollowEndsImmediatelyOnCompletedLog() {
-	writer, err := s.stash.Append("log1")
+	writer, err := s.stash.Append(logId1)
 	assert.NoError(s.T(), err)
 	assert.NoError(s.T(), writer.WriteLine(s.line("only")))
 	assert.NoError(s.T(), writer.Close())
 
-	reader, err := s.stash.Follow(context.Background(), "log1")
+	reader, err := s.stash.Follow(context.Background(), logId1)
 	assert.NoError(s.T(), err)
 	defer reader.Close()
 
@@ -77,11 +77,11 @@ func (s *FollowTestSuite) TestFollowEndsImmediatelyOnCompletedLog() {
 }
 
 func (s *FollowTestSuite) TestFollowReturnsErrorForMissingLog() {
-	_, err := s.stash.Follow(context.Background(), "nosuchlog")
+	_, err := s.stash.Follow(context.Background(), missingLogId)
 	assert.Error(s.T(), err)
 
 	s.stash.Lock()
-	_, tracked := s.stash.streams["nosuchlog"]
+	_, tracked := s.stash.streams[missingLogId]
 	s.stash.Unlock()
 	assert.False(s.T(), tracked, "a failed Follow leaked stream state")
 }
@@ -100,16 +100,16 @@ func (s *FollowTestSuite) TestFollowReturnsErrorForMissingLog() {
 // is what the second call hits. That shape passes whether or not Close is
 // idempotent, so it would not have caught the defect this test is for.
 func (s *FollowTestSuite) TestFollowCloseIsIdempotent() {
-	writer, err := s.stash.Append("log1")
+	writer, err := s.stash.Append(logId1)
 	assert.NoError(s.T(), err)
 	assert.NoError(s.T(), writer.WriteLine(s.line("first")))
 	defer writer.Close()
 
-	survivor, err := s.stash.Follow(context.Background(), "log1")
+	survivor, err := s.stash.Follow(context.Background(), logId1)
 	assert.NoError(s.T(), err)
 	defer survivor.Close()
 
-	doubled, err := s.stash.Follow(context.Background(), "log1")
+	doubled, err := s.stash.Follow(context.Background(), logId1)
 	assert.NoError(s.T(), err)
 
 	line, err := survivor.ReadLine()
@@ -129,7 +129,7 @@ func (s *FollowTestSuite) TestFollowCloseIsIdempotent() {
 	// follower, not an over-decremented count. This is what catches the
 	// entry-leak/miscount defect directly, independent of timing.
 	s.stash.Lock()
-	stream, tracked := s.stash.streams["log1"]
+	stream, tracked := s.stash.streams[logId1]
 	s.stash.Unlock()
 	assert.True(s.T(), tracked, "the double close tore down the stream entry the surviving follower still needs")
 	if tracked {
@@ -161,11 +161,11 @@ func (s *FollowTestSuite) TestFollowCloseIsIdempotent() {
 }
 
 func (s *FollowTestSuite) TestFollowBlocksThenDeliversNewLine() {
-	writer, err := s.stash.Append("log1")
+	writer, err := s.stash.Append(logId1)
 	assert.NoError(s.T(), err)
 	assert.NoError(s.T(), writer.WriteLine(s.line("first")))
 
-	reader, err := s.stash.Follow(context.Background(), "log1")
+	reader, err := s.stash.Follow(context.Background(), logId1)
 	assert.NoError(s.T(), err)
 	defer reader.Close()
 
@@ -196,12 +196,12 @@ func (s *FollowTestSuite) TestFollowBlocksThenDeliversNewLine() {
 }
 
 func (s *FollowTestSuite) TestFollowEndsWhenLastWriterCloses() {
-	first, err := s.stash.Append("log1")
+	first, err := s.stash.Append(logId1)
 	assert.NoError(s.T(), err)
-	second, err := s.stash.Append("log1")
+	second, err := s.stash.Append(logId1)
 	assert.NoError(s.T(), err)
 
-	reader, err := s.stash.Follow(context.Background(), "log1")
+	reader, err := s.stash.Follow(context.Background(), logId1)
 	assert.NoError(s.T(), err)
 	defer reader.Close()
 
@@ -227,16 +227,16 @@ func (s *FollowTestSuite) TestFollowEndsWhenLastWriterCloses() {
 
 // Review Focus 2.
 func (s *FollowTestSuite) TestOneFollowerClosingDoesNotEndAnother() {
-	writer, err := s.stash.Append("log1")
+	writer, err := s.stash.Append(logId1)
 	assert.NoError(s.T(), err)
 	assert.NoError(s.T(), writer.WriteLine(s.line("first")))
 	defer writer.Close()
 
-	keep, err := s.stash.Follow(context.Background(), "log1")
+	keep, err := s.stash.Follow(context.Background(), logId1)
 	assert.NoError(s.T(), err)
 	defer keep.Close()
 
-	leave, err := s.stash.Follow(context.Background(), "log1")
+	leave, err := s.stash.Follow(context.Background(), logId1)
 	assert.NoError(s.T(), err)
 
 	line, err := keep.ReadLine()
@@ -270,14 +270,14 @@ func (s *FollowTestSuite) TestOneFollowerClosingDoesNotEndAnother() {
 
 // Review Focus 4.
 func (s *FollowTestSuite) TestFollowUnblocksOnContextCancel() {
-	writer, err := s.stash.Append("log1")
+	writer, err := s.stash.Append(logId1)
 	assert.NoError(s.T(), err)
 	assert.NoError(s.T(), writer.WriteLine(s.line("first")))
 	defer writer.Close()
 
 	ctx, cancel := context.WithCancel(context.Background())
 
-	reader, err := s.stash.Follow(ctx, "log1")
+	reader, err := s.stash.Follow(ctx, logId1)
 	assert.NoError(s.T(), err)
 	defer reader.Close()
 
@@ -311,18 +311,18 @@ func (s *FollowTestSuite) TestFollowDecodesRecordSplitAcrossWaits() {
 	split := mark + (len(all)-mark)/2
 
 	// Register a writer so follow mode blocks, but write the bytes by hand.
-	writer, err := s.stash.Append("log1")
+	writer, err := s.stash.Append(logId1)
 	assert.NoError(s.T(), err)
 
-	file, err := s.fs.OpenFile("log1", os.O_WRONLY, 0644)
+	file, err := s.fs.OpenFile(logId1, os.O_WRONLY, 0644)
 	assert.NoError(s.T(), err)
 	defer file.Close()
 
 	_, err = file.Write(all[:split])
 	assert.NoError(s.T(), err)
-	s.stash.logWritten("log1")
+	s.stash.logWritten(logId1)
 
-	reader, err := s.stash.Follow(context.Background(), "log1")
+	reader, err := s.stash.Follow(context.Background(), logId1)
 	assert.NoError(s.T(), err)
 	defer reader.Close()
 
@@ -340,7 +340,7 @@ func (s *FollowTestSuite) TestFollowDecodesRecordSplitAcrossWaits() {
 
 	_, err = file.Write(all[split:])
 	assert.NoError(s.T(), err)
-	s.stash.logWritten("log1")
+	s.stash.logWritten(logId1)
 
 	select {
 	case result := <-pending:

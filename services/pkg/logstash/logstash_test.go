@@ -1,6 +1,7 @@
 package logstash
 
 import (
+	"context"
 	"io"
 	"strings"
 	"testing"
@@ -13,6 +14,13 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 	"google.golang.org/protobuf/types/known/timestamppb"
+)
+
+// Log ids are task instance UUIDs.
+const (
+	logId1       = "6f1c2a4e-8b3d-4f5a-9c7e-1d2b3a4c5e6f"
+	logId2       = "0a9b8c7d-6e5f-4a3b-8c2d-1e0f9a8b7c6d"
+	missingLogId = "3e4d5c6b-7a8f-4e9d-a0b1-c2d3e4f5a6b7"
 )
 
 // Mock config
@@ -52,19 +60,19 @@ func (s *LogStashTestSuite) writeLines(writer LogWriter, data string, count int)
 }
 
 func (s *LogStashTestSuite) TestEviction() {
-	writer, err := s.stash.Append("log1")
+	writer, err := s.stash.Append(logId1)
 	assert.NoError(s.T(), err)
 	s.writeLines(writer, strings.Repeat("1", 1024), 1023)
 	writer.Close()
 }
 
 func (s *LogStashTestSuite) TestWriteRead() {
-	writer, err := s.stash.Append("log1")
+	writer, err := s.stash.Append(logId1)
 	assert.NoError(s.T(), err)
 	s.writeLines(writer, strings.Repeat("1", 1000), 1000)
 	assert.NoError(s.T(), writer.Close())
 
-	reader, err := s.stash.Read("log1")
+	reader, err := s.stash.Read(logId1)
 	assert.NoError(s.T(), err)
 	defer reader.Close()
 
@@ -82,20 +90,20 @@ func (s *LogStashTestSuite) TestWriteRead() {
 }
 
 func (s *LogStashTestSuite) TestEvict() {
-	writer, err := s.stash.Append("log1")
+	writer, err := s.stash.Append(logId1)
 	assert.NoError(s.T(), err)
 	s.writeLines(writer, strings.Repeat("1", 1000), 1000)
 	assert.NoError(s.T(), writer.Close())
 
-	writer, err = s.stash.Append("log2")
+	writer, err = s.stash.Append(logId2)
 	assert.NoError(s.T(), err)
 	s.writeLines(writer, strings.Repeat("2", 1000), 1000)
 	assert.NoError(s.T(), writer.Close())
 
-	_, err = s.stash.Read("log1")
+	_, err = s.stash.Read(logId1)
 	assert.Error(s.T(), err)
 
-	reader, err := s.stash.Read("log2")
+	reader, err := s.stash.Read(logId2)
 	assert.NoError(s.T(), err)
 	reader.Close()
 }
@@ -106,34 +114,34 @@ func (s *LogStashTestSuite) TestActiveReopenedLogIsNotEvicted() {
 	fs := afero.NewBasePathFs(afero.NewOsFs(), s.T().TempDir())
 	stash := NewLogStash(config, fs)
 
-	writer, err := stash.Append("log1")
+	writer, err := stash.Append(logId1)
 	assert.NoError(s.T(), err)
 	s.writeLines(writer, strings.Repeat("1", 100), 1)
 	assert.NoError(s.T(), writer.Close())
 
 	// Reopening a completed log must remove it from the LRU for as long as
 	// the new appender is active.
-	writer, err = stash.Append("log1")
+	writer, err = stash.Append(logId1)
 	assert.NoError(s.T(), err)
 	defer writer.Close()
 
-	other, err := stash.Append("log2")
+	other, err := stash.Append(logId2)
 	assert.NoError(s.T(), err)
 	s.writeLines(other, strings.Repeat("2", 100), 100)
 	assert.NoError(s.T(), other.Close())
 
-	_, err = fs.Stat("log1")
+	_, err = fs.Stat(logId1)
 	assert.NoError(s.T(), err)
 }
 
 func (s *LogStashTestSuite) TestCreate() {
 	// Create two log files in the stash
-	writer, err := s.stash.Append("log1")
+	writer, err := s.stash.Append(logId1)
 	assert.NoError(s.T(), err)
 	s.writeLines(writer, strings.Repeat("1", 1000), 500)
 	assert.NoError(s.T(), writer.Close())
 
-	writer, err = s.stash.Append("log2")
+	writer, err = s.stash.Append(logId2)
 	assert.NoError(s.T(), err)
 	s.writeLines(writer, strings.Repeat("2", 1000), 500)
 	assert.NoError(s.T(), writer.Close())
@@ -143,11 +151,11 @@ func (s *LogStashTestSuite) TestCreate() {
 
 	// And verify that both logs where loaded from the
 	// filesystem into the cache
-	reader, err := stash.Read("log1")
+	reader, err := stash.Read(logId1)
 	assert.NoError(s.T(), err)
 	reader.Close()
 
-	reader, err = stash.Read("log2")
+	reader, err = stash.Read(logId2)
 	assert.NoError(s.T(), err)
 	reader.Close()
 }
@@ -155,7 +163,7 @@ func (s *LogStashTestSuite) TestCreate() {
 func (s *LogStashTestSuite) TestWatchReportsDrainedForUnknownLog() {
 	stash := s.stash.(*logStash)
 
-	notify, drained := stash.watch("nosuchlog")
+	notify, drained := stash.watch(missingLogId)
 	assert.Nil(s.T(), notify)
 	assert.True(s.T(), drained)
 }
@@ -163,52 +171,69 @@ func (s *LogStashTestSuite) TestWatchReportsDrainedForUnknownLog() {
 func (s *LogStashTestSuite) TestWatchTracksOpenWriters() {
 	stash := s.stash.(*logStash)
 
-	first, err := stash.Append("log1")
+	first, err := stash.Append(logId1)
 	assert.NoError(s.T(), err)
 
-	_, drained := stash.watch("log1")
+	_, drained := stash.watch(logId1)
 	assert.False(s.T(), drained)
 
-	second, err := stash.Append("log1")
+	second, err := stash.Append(logId1)
 	assert.NoError(s.T(), err)
 	assert.NoError(s.T(), first.Close())
 
 	// One writer is still open, so the log is not drained.
-	_, drained = stash.watch("log1")
+	_, drained = stash.watch(logId1)
 	assert.False(s.T(), drained)
 
 	assert.NoError(s.T(), second.Close())
 
-	_, drained = stash.watch("log1")
+	_, drained = stash.watch(logId1)
 	assert.True(s.T(), drained)
 }
 
-func (s *LogStashTestSuite) TestWatchCanonicalizesId() {
+func (s *LogStashTestSuite) TestCanonicalizesId() {
 	stash := s.stash.(*logStash)
 
-	writer, err := stash.Append("log1")
+	writer, err := stash.Append(strings.ToUpper(logId1))
 	assert.NoError(s.T(), err)
 	defer writer.Close()
 
-	// "/log1" and "log1" must resolve to the same stream: Append and Read
-	// both canonicalize the id before using it as a key, and the registry
-	// methods must do the same or a non-canonical lookup silently misses.
-	_, drained := stash.watch("/log1")
+	// Different spellings of the same UUID must resolve to the same log and
+	// the same stream, or a follower would silently miss the writer.
+	_, err = stash.Read("{" + logId1 + "}")
+	assert.NoError(s.T(), err)
+	_, drained := stash.watch(logId1)
 	assert.False(s.T(), drained)
+}
+
+func (s *LogStashTestSuite) TestRejectsInvalidId() {
+	for _, id := range []string{"", "log1", "../" + logId1, "/" + logId1, logId1 + "/x", "../../etc/passwd"} {
+		_, err := s.stash.Append(id)
+		assert.ErrorIs(s.T(), err, ErrInvalidLogId, id)
+		_, err = s.stash.Read(id)
+		assert.ErrorIs(s.T(), err, ErrInvalidLogId, id)
+		_, err = s.stash.Follow(context.Background(), id)
+		assert.ErrorIs(s.T(), err, ErrInvalidLogId, id)
+	}
+
+	// Nothing may have been created for a rejected id.
+	files, err := afero.ReadDir(s.fs, ".")
+	assert.NoError(s.T(), err)
+	assert.Empty(s.T(), files)
 }
 
 func (s *LogStashTestSuite) TestWriteWakesWaiters() {
 	stash := s.stash.(*logStash)
 
-	writer, err := stash.Append("log1")
+	writer, err := stash.Append(logId1)
 	assert.NoError(s.T(), err)
 	defer writer.Close()
 
 	// A registered follower is what makes notification observable.
-	stash.addFollower("log1")
-	defer stash.dropFollower("log1")
+	stash.addFollower(logId1)
+	defer stash.dropFollower(logId1)
 
-	notify, _ := stash.watch("log1")
+	notify, _ := stash.watch(logId1)
 	s.writeLines(writer, "line", 1)
 
 	select {
@@ -221,13 +246,13 @@ func (s *LogStashTestSuite) TestWriteWakesWaiters() {
 func (s *LogStashTestSuite) TestLastWriterCloseWakesWaiters() {
 	stash := s.stash.(*logStash)
 
-	writer, err := stash.Append("log1")
+	writer, err := stash.Append(logId1)
 	assert.NoError(s.T(), err)
 
-	stash.addFollower("log1")
-	defer stash.dropFollower("log1")
+	stash.addFollower(logId1)
+	defer stash.dropFollower(logId1)
 
-	notify, _ := stash.watch("log1")
+	notify, _ := stash.watch(logId1)
 	assert.NoError(s.T(), writer.Close())
 
 	select {
@@ -240,7 +265,7 @@ func (s *LogStashTestSuite) TestLastWriterCloseWakesWaiters() {
 func (s *LogStashTestSuite) TestWritingWithoutFollowersDoesNotBlock() {
 	stash := s.stash.(*logStash)
 
-	writer, err := stash.Append("log1")
+	writer, err := stash.Append(logId1)
 	assert.NoError(s.T(), err)
 
 	// Nobody is following, so notification must do nothing at all. If this
@@ -263,12 +288,12 @@ func (s *LogStashTestSuite) TestWritingWithoutFollowersDoesNotBlock() {
 func (s *LogStashTestSuite) TestStreamStateIsReleasedWhenIdle() {
 	stash := s.stash.(*logStash)
 
-	writer, err := stash.Append("log1")
+	writer, err := stash.Append(logId1)
 	assert.NoError(s.T(), err)
 	assert.NoError(s.T(), writer.Close())
 
 	stash.Lock()
-	_, tracked := stash.streams["log1"]
+	_, tracked := stash.streams[logId1]
 	stash.Unlock()
 	assert.False(s.T(), tracked, "stream state leaked after the last writer closed")
 }
@@ -287,17 +312,17 @@ func (s *LogStashTestSuite) TestStreamStateIsReleasedWhenIdle() {
 func (s *LogStashTestSuite) TestWriterCloseIsIdempotent() {
 	stash := s.stash.(*logStash)
 
-	writer, err := stash.Append("log1")
+	writer, err := stash.Append(logId1)
 	assert.NoError(s.T(), err)
 
-	stash.addFollower("log1")
-	defer stash.dropFollower("log1")
+	stash.addFollower(logId1)
+	defer stash.dropFollower(logId1)
 
 	assert.NoError(s.T(), writer.Close())
 	assert.NoError(s.T(), writer.Close())
 
 	stash.Lock()
-	stream, tracked := stash.streams["log1"]
+	stream, tracked := stash.streams[logId1]
 	stash.Unlock()
 	assert.True(s.T(), tracked, "the double close tore down the stream entry the follower still needs")
 	if tracked {
@@ -306,7 +331,7 @@ func (s *LogStashTestSuite) TestWriterCloseIsIdempotent() {
 
 	// Behavioural check: watch must be able to report "drained" again once
 	// the (single) real writer has closed, even after the extra Close.
-	_, drained := stash.watch("log1")
+	_, drained := stash.watch(logId1)
 	assert.True(s.T(), drained, "watch never reports drained after a writer double close, parking followers forever")
 }
 
@@ -325,17 +350,17 @@ func TestZeroSizeStashDiscardsLogsOnceTheWriterCloses(t *testing.T) {
 	config.On("MaxSize").Return(0)
 	stash := NewLogStash(config, afero.NewMemMapFs())
 
-	writer, err := stash.Append("log1")
+	writer, err := stash.Append(logId1)
 	assert.NoError(t, err)
 	assert.NoError(t, writer.WriteLine(testLine("only")))
 
 	// Still readable: the open writer keeps it out of the cache.
-	reader, err := stash.Read("log1")
+	reader, err := stash.Read(logId1)
 	assert.NoError(t, err)
 	assert.NoError(t, reader.Close())
 
 	assert.NoError(t, writer.Close())
 
-	_, err = stash.Read("log1")
+	_, err = stash.Read(logId1)
 	assert.Error(t, err, "a zero-budget stash retains nothing once the writer closes")
 }

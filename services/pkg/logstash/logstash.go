@@ -2,11 +2,12 @@ package logstash
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"io"
 	"os"
-	"path/filepath"
-	"strings"
 
+	"github.com/google/uuid"
 	"github.com/spf13/afero"
 	"github.com/srand/jolt/scheduler/pkg/log"
 	"github.com/srand/jolt/scheduler/pkg/utils"
@@ -40,12 +41,22 @@ type logFile struct {
 	size int64
 }
 
-func canonicalLogPath(path string) string {
-	return strings.TrimLeft(filepath.Clean(path), string(filepath.Separator))
+// ErrInvalidLogId is returned for a log id that is not a UUID.
+var ErrInvalidLogId = errors.New("invalid log id")
+
+// Log ids are task instance UUIDs and are used as file names in the stash.
+// Anything else is rejected, so that an id can never escape the stash
+// directory. The canonical form of the UUID is returned so that different
+// spellings of the same id refer to the same log.
+func canonicalLogId(id string) (string, error) {
+	parsed, err := uuid.Parse(id)
+	if err != nil {
+		return "", fmt.Errorf("%w: %q", ErrInvalidLogId, id)
+	}
+	return parsed.String(), nil
 }
 
 func newLogFile(fs utils.Fs, path string) *logFile {
-	path = canonicalLogPath(path)
 	var size int64 = 0
 
 	st, err := fs.Stat(path)
@@ -136,7 +147,10 @@ func (s *logStash) Unlock() {
 
 // Append a log record to the logstash server
 func (s *logStash) Append(id string) (LogWriter, error) {
-	id = canonicalLogPath(id)
+	id, err := canonicalLogId(id)
+	if err != nil {
+		return nil, err
+	}
 	file, err := s.fs.Open(id)
 	if err != nil {
 		file, err = s.fs.Create(id)
@@ -162,7 +176,10 @@ func (s *logStash) Append(id string) (LogWriter, error) {
 
 // ReadLog reads a log from the logstash server
 func (s *logStash) Read(id string) (LogReader, error) {
-	id = canonicalLogPath(id)
+	id, err := canonicalLogId(id)
+	if err != nil {
+		return nil, err
+	}
 	file, err := s.fs.Open(id)
 	if err != nil {
 		return nil, err
@@ -174,7 +191,10 @@ func (s *logStash) Read(id string) (LogReader, error) {
 // Follow reads a log, blocking at the end of the file while it is still
 // being written.
 func (s *logStash) Follow(ctx context.Context, id string) (LogReader, error) {
-	id = canonicalLogPath(id)
+	id, err := canonicalLogId(id)
+	if err != nil {
+		return nil, err
+	}
 
 	// Register before opening, so a writer closing in between still wakes us.
 	s.addFollower(id)
@@ -192,7 +212,7 @@ func (s *logStash) logClosed(writer *fileLogWriter) {
 	s.Lock()
 	defer s.Unlock()
 
-	s.lru.Add(newLogFile(s.fs, writer.Path()))
+	s.lru.Add(newLogFile(s.fs, writer.id))
 
 	stream, ok := s.streams[writer.id]
 	if !ok {
@@ -244,8 +264,6 @@ func (s *logStash) releaseLocked(id string, stream *logStream) {
 // Returns the channel to wait on for more data, and whether the log is
 // drained: no writer is open, so what is on disk is all there will ever be.
 func (s *logStash) watch(id string) (<-chan struct{}, bool) {
-	id = canonicalLogPath(id)
-
 	s.Lock()
 	defer s.Unlock()
 
@@ -258,16 +276,12 @@ func (s *logStash) watch(id string) (<-chan struct{}, bool) {
 }
 
 func (s *logStash) addFollower(id string) {
-	id = canonicalLogPath(id)
-
 	s.Lock()
 	defer s.Unlock()
 	s.streamLocked(id).followers++
 }
 
 func (s *logStash) dropFollower(id string) {
-	id = canonicalLogPath(id)
-
 	s.Lock()
 	defer s.Unlock()
 
@@ -293,8 +307,6 @@ func (s *logStash) dropFollower(id string) {
 // Called after every log line. Runs on the hot path, so it does nothing at all
 // unless somebody is actually following the log.
 func (s *logStash) logWritten(id string) {
-	id = canonicalLogPath(id)
-
 	s.Lock()
 	defer s.Unlock()
 
