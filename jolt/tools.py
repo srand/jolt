@@ -300,14 +300,18 @@ class _PopenFile(object):
         try:
             self._close_stdin()
             timedout = _wait_for_process(self._process, self._timeout)
-            remaining = self._process.stdout.read()
-            self._record_stdout(remaining)
-            self._stderr.join()
+            if timedout:
+                # Don't wait indefinitely for output from a stopped command.
+                self._stderr.join(READER_JOIN_TIMEOUT)
+            else:
+                remaining = self._process.stdout.read()
+                self._record_stdout(remaining)
+                self._stderr.join()
         except KeyboardInterrupt:
             _cleanup_interrupted_process(self._process, (self._stderr,))
             raise
         finally:
-            self._stderrbuf = [line for _, line in self._stderrlog]
+            self._stderrbuf = [line for _, line in list(self._stderrlog)]
             _close_process_streams(
                 self._process,
                 ((self._stderr.stream, self._stderr),))
@@ -376,8 +380,13 @@ def _run(cmd, cwd, env, *args, **kwargs):
                 output_rstrip=options["output_rstrip"])
 
         timedout = _wait_for_process(p, options["timeout"])
-        stdout.join()
-        stderr.join()
+
+        # A reader may never finish after a timeout, for example if its
+        # output callback is blocked or a descendant keeps the pipe open.
+        # Bound the wait so that the timeout error is always raised.
+        reader_timeout = READER_JOIN_TIMEOUT if timedout else None
+        stdout.join(reader_timeout)
+        stderr.join(reader_timeout)
 
     except KeyboardInterrupt:
         if p:
@@ -388,6 +397,9 @@ def _run(cmd, cwd, env, *args, **kwargs):
             _close_process_streams(
                 p,
                 ((reader.stream, reader) for reader in (stdout, stderr) if reader))
+
+    # Readers left running after a timeout may still append to the buffer.
+    logbuf = list(logbuf)
 
     if p.returncode != 0 and options["output_on_error"]:
         for reader, line in logbuf:

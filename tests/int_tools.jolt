@@ -8,6 +8,7 @@ from unittest.mock import MagicMock, patch
 
 from testsupport import JoltTest
 from jolt import tools
+from jolt.error import JoltTimeoutError
 
 
 class ToolsInternal(JoltTest):
@@ -124,6 +125,92 @@ class ToolsInternal(JoltTest):
         cleanup.assert_called_once_with(process, (stdout, stderr))
         close_streams.assert_called_once()
         stderr.join.assert_not_called()
+
+    @patch("jolt.tools._close_process_streams")
+    @patch("jolt.tools._wait_for_process", return_value=True)
+    @patch("jolt.tools.Reader")
+    @patch("jolt.tools.subprocess.Popen")
+    def test_run_bounds_reader_join_after_timeout(
+            self, popen, reader_type, wait_for_process, close_streams):
+        process = self.process()
+        process.returncode = -15
+        popen.return_value = process
+        stdout = MagicMock()
+        stdout.stream = process.stdout
+        stderr = MagicMock()
+        stderr.stream = process.stderr
+        reader_type.side_effect = [stdout, stderr]
+
+        with self.assertRaises(JoltTimeoutError):
+            tools._run("command", None, None, timeout=1)
+
+        stdout.join.assert_called_once_with(tools.READER_JOIN_TIMEOUT)
+        stderr.join.assert_called_once_with(tools.READER_JOIN_TIMEOUT)
+
+    def test_run_timeout_with_blocked_output_callback(self):
+        # The stderr reader's output callback never returns, as when it is
+        # blocked on a logging lock held by another thread.
+        blocked = threading.Event()
+        release = threading.Event()
+
+        def stderr_output(line, *args, **kwargs):
+            blocked.set()
+            release.wait(30)
+
+        result = []
+
+        def invoke():
+            try:
+                tools._run(
+                    [sys.executable, "-c",
+                     "import sys, time; "
+                     "print('line', file=sys.stderr, flush=True); "
+                     "time.sleep(30)"],
+                    None,
+                    None,
+                    timeout=1,
+                    shell=False)
+            except BaseException as exc:
+                result.append(exc)
+
+        try:
+            with patch("jolt.tools.log.stderr", stderr_output):
+                worker = threading.Thread(target=invoke, daemon=True)
+                worker.start()
+                self.assertTrue(blocked.wait(10))
+                worker.join(15)
+            self.assertFalse(worker.is_alive())
+        finally:
+            release.set()
+
+        self.assertEqual(len(result), 1)
+        self.assertIsInstance(result[0], JoltTimeoutError)
+
+    @patch("jolt.tools._close_process_streams")
+    @patch("jolt.tools._wait_for_process", return_value=True)
+    def test_popen_file_bounds_reader_join_after_timeout(
+            self, wait_for_process, close_streams):
+        process = self.process()
+        process.returncode = -15
+        options = {
+            "timeout": 1,
+            "output": False,
+            "output_on_error": False,
+            "output_rstrip": True,
+            "output_stderr": False,
+            "output_stdio": False,
+        }
+
+        with patch("jolt.tools.Reader") as reader_type:
+            reader = reader_type.return_value
+            reader.stream = process.stderr
+            popen_file = tools._PopenFile(process, **options)
+
+        with self.assertRaises(JoltTimeoutError):
+            popen_file.finalize()
+
+        reader.join.assert_called_once_with(tools.READER_JOIN_TIMEOUT)
+        process.stdout.read.assert_not_called()
 
     @patch("jolt.tools._close_process_streams")
     @patch("jolt.tools._cleanup_interrupted_process")
