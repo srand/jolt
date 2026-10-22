@@ -518,6 +518,7 @@ class GitApi(testsupport.JoltTest):
         with self.tools.cwd(a1[0]):
             self.assertEqual("639", self.tools.read_file("size.txt"))
 
+    @testsupport.skip_if_network
     def test_reference_repo(self):
         """
         --- config:
@@ -544,6 +545,7 @@ class GitApi(testsupport.JoltTest):
             self.assertExists("hello_world/.git/objects/info/alternates")
             self.tools.run("git -C hello_world fsck --connectivity-only", output_on_error=True)
 
+    @testsupport.skip_if_network
     def test_reference_repo_dissociate(self):
         """
         --- config:
@@ -575,6 +577,7 @@ class GitApi(testsupport.JoltTest):
             self.assertNotExists("hello_world/.git/objects/info/alternates")
             self.tools.run("git -C hello_world fsck --connectivity-only", output_on_error=True)
 
+    @testsupport.skip_if_network
     def test_reference_repo_dissociate_shallow(self):
         """
         --- config:
@@ -606,6 +609,7 @@ class GitApi(testsupport.JoltTest):
                 "74cf3e97a31007f9c1e28852de3e17b69a728bcd",
                 self.tools.run("git -C hello_world rev-parse HEAD"))
 
+    @testsupport.skip_if_network
     def test_reference_repo_dissociate_stale(self):
         """
         --- config:
