@@ -61,3 +61,34 @@ func TestDigestString(t *testing.T) {
 		assert.Equal(t, s, d.String())
 	}
 }
+
+func TestParseDigestCanonicalHex(t *testing.T) {
+	// Mixed case refers to the same object and is stored in lower case.
+	d, err := ParseDigest("blake3:FE3d8D834ae52bf4961af02f1b2db179331137c3281d1dd8a2dd565949eacABE")
+	assert.NoError(t, err)
+	assert.Equal(t, "fe3d8d834ae52bf4961af02f1b2db179331137c3281d1dd8a2dd565949eacabe", d.Hex())
+
+	// Any character that is not a hex digit is rejected, wherever it is.
+	for _, s := range []string{
+		"sha1:g7d97e98f8af710c7e7fe703abc8f639e0ee507c",
+		"sha1:7d97e98f8af710c7e7fe703abc8f639e0ee507cg",
+		"sha1:7d97e98f8af710c7e7fe/03abc8f639e0ee507c4",
+		"sha1:7d97e98f8af710c7e7fe.03abc8f639e0ee507c4",
+		"sha1:7d97e98f8af710c7e7fe 03abc8f639e0ee507c4",
+		"sha1:7d97e98f8af710c7e7fe\x0003abc8f639e0ee507c4",
+		// Odd number of hex digits
+		"sha1:7d97e98f8af710c7e7fe703abc8f639e0ee507c",
+	} {
+		_, err := ParseDigest(s)
+		assert.Error(t, err, "%q", s)
+	}
+}
+
+func BenchmarkParseDigest(b *testing.B) {
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		if _, err := ParseDigest("blake3:fe3d8d834ae52bf4961af02f1b2db179331137c3281d1dd8a2dd565949eacabe"); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
