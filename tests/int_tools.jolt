@@ -25,6 +25,25 @@ class ToolsInternal(JoltTest):
         process.stderr = MagicMock()
         return process
 
+    @patch("jolt.config.get", return_value="3")
+    def test_thread_count_configured(self, _):
+        self.assertEqual(tools.Tools().thread_count(), 3)
+
+    @patch("jolt.config.get", return_value="0")
+    def test_thread_count_zero_is_cpu_count(self, _):
+        t = tools.Tools()
+        self.assertEqual(t.thread_count(), t.cpu_count())
+
+    @patch("jolt.config.get", side_effect=lambda section, key, default=None, *args, **kwargs: default)
+    def test_thread_count_env_zero_is_cpu_count(self, _):
+        t = tools.Tools()
+        with t.environ(JOLT_THREADS="0"):
+            self.assertEqual(t.thread_count(), t.cpu_count())
+        with t.environ(JOLT_THREADS=""):
+            self.assertEqual(t.thread_count(), t.cpu_count())
+        with t.environ(JOLT_THREADS="5"):
+            self.assertEqual(t.thread_count(), 5)
+
     def test_reader_is_daemon(self):
         stream = MagicMock()
         stream.readline.side_effect = [b"output\n", b""]

@@ -140,6 +140,7 @@ The ``[jolt]`` config section contains global configuration:
       - Integer
       - | Used to limit the number of threads used by third party tools such as Ninja.
           The environment variable ``JOLT_THREADS`` can also be used.
+          A value of ``0`` selects the number of CPUs available.
         | The default value is the number of CPUs available.
 
   The following environment variables can be used to override the configuration:

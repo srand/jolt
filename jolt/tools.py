@@ -1090,11 +1090,14 @@ class Tools(object):
     def thread_count(self):
         """ Number of threads to use for a task.
 
+        The number is configured with ``jolt.threads`` or ``JOLT_THREADS``.
+        A value of 0 selects the number of CPUs on the host.
+
         Returns:
             int: number of threads to use.
         """
-        threads = config.get("jolt", "threads", self.getenv("JOLT_THREADS", None))
-        return int(threads) if threads else self.cpu_count()
+        threads = config.getint("jolt", "threads", self.getenv("JOLT_THREADS") or None)
+        return threads if threads else self.cpu_count()
 
     @contextmanager
     def cwd(self, pathname, *args):
