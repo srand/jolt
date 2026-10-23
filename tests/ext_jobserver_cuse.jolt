@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import os
+import stat
 import subprocess
 import sys
 import textwrap
@@ -40,3 +41,13 @@ class JobserverCuse(JoltTest):
         with self.tools.runprefix("docker run --privileged --device {device} alpine:latest "):
             for i in range(5):
                  self.tools.run("dd if={device} bs=1 count=1", timeout=1)
+
+    def test_device_accessible(self):
+        """ Test that all users may open the device node, which is created for root only. """
+        mode = None
+        for _ in range(50):
+            mode = stat.S_IMODE(os.stat(self.device).st_mode)
+            if mode == 0o666:
+                break
+            time.sleep(0.1)
+        self.assertEqual(0o666, mode)

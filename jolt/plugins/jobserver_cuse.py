@@ -19,6 +19,7 @@ import os
 import signal
 import sys
 import threading
+import time
 from dataclasses import dataclass
 from typing import Any, Callable, Optional
 
@@ -102,12 +103,13 @@ POLL_CB = ctypes.CFUNCTYPE(
     None, fuse_req_t, ctypes.POINTER(FuseFileInfo), fuse_pollhandle_p
 )
 INTERRUPT_CB = ctypes.CFUNCTYPE(None, fuse_req_t, ctypes.c_void_p)
+INIT_DONE_CB = ctypes.CFUNCTYPE(None, ctypes.c_void_p)
 
 
 class CuseLowlevelOps(ctypes.Structure):
     _fields_ = [
         ("init", ctypes.c_void_p),
-        ("init_done", ctypes.c_void_p),
+        ("init_done", INIT_DONE_CB),
         ("destroy", ctypes.c_void_p),
         ("open", OPEN_CB),
         ("read", READ_CB),
@@ -164,9 +166,10 @@ class JobServer:
         self._write_cb = WRITE_CB(self._locked(self.dev_write))
         self._poll_cb = POLL_CB(self._locked(self.dev_poll))
         self._interrupt_cb = INTERRUPT_CB(self._locked(self.dev_interrupt))
+        self._init_done_cb = INIT_DONE_CB(self.dev_init_done)
         self.ops = CuseLowlevelOps(
             None,
-            None,
+            self._init_done_cb,
             None,
             self._open_cb,
             self._read_cb,
@@ -307,6 +310,33 @@ class JobServer:
             ph = fuse_pollhandle_p(poller.ph)
             self.lib.fuse_lowlevel_notify_poll(ph)
             self.lib.fuse_pollhandle_destroy(ph)
+
+    def make_accessible(self, path: str, timeout: float = 10.0) -> None:
+        """
+        Lets all users open the device node, which is created for root
+        only. The node appears shortly after the device is registered, so
+        this waits for it.
+        """
+        deadline = time.monotonic() + timeout
+        while True:
+            try:
+                os.chmod(path, 0o666)
+                return
+            except FileNotFoundError:
+                if time.monotonic() >= deadline:
+                    self.log("warning: device node %s did not appear, its permissions are unchanged\n", path)
+                    return
+                time.sleep(0.05)
+            except OSError as exc:
+                self.log("warning: cannot change permissions of %s: %s\n", path, exc)
+                return
+
+    def dev_init_done(self, _userdata: ctypes.c_void_p) -> None:
+        # The device is registered, and its node is about to be created. Wait
+        # for it on another thread, so as not to hold up requests.
+        threading.Thread(
+            target=self.make_accessible, args=(os.path.join("/dev", self.devname),), daemon=True
+        ).start()
 
     def dev_open(self, req: fuse_req_t, fi: Any) -> None:
         ctx = self.lib.fuse_req_ctx(req).contents

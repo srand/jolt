@@ -1,5 +1,9 @@
 import ctypes
+import os
+import stat
 import sys
+import threading
+import time
 from unittest import mock
 
 sys.path.append(".")
@@ -43,3 +47,45 @@ class JobserverCuseInternal(JoltTest):
         req = self.poll(server, POLLIN | POLLOUT, None)
         server.lib.fuse_reply_poll.assert_called_once_with(req, POLLIN | POLLOUT)
         self.assertEqual([], server.pollers)
+
+    def test_device_node_made_accessible(self):
+        """ The device node, created for root only, is made accessible to all users. """
+        server = self.server(tokens=1)
+        with self.tools.tmpdir("cuse") as tmp:
+            path = os.path.join(tmp, "jobserver")
+            os.close(os.open(path, os.O_CREAT | os.O_WRONLY, 0o600))
+            server.make_accessible(path)
+            self.assertEqual(0o666, stat.S_IMODE(os.stat(path).st_mode))
+
+    def test_device_node_made_accessible_once_created(self):
+        """ The node appears shortly after the device is registered. """
+        server = self.server(tokens=1)
+        with self.tools.tmpdir("cuse") as tmp:
+            path = os.path.join(tmp, "jobserver")
+
+            def create():
+                time.sleep(0.2)
+                os.close(os.open(path, os.O_CREAT | os.O_WRONLY, 0o600))
+
+            creator = threading.Thread(target=create)
+            creator.start()
+            server.make_accessible(path, timeout=5)
+            creator.join()
+            self.assertEqual(0o666, stat.S_IMODE(os.stat(path).st_mode))
+
+    def test_device_node_missing(self):
+        server = self.server(tokens=1)
+        with self.tools.tmpdir("cuse") as tmp:
+            path = os.path.join(tmp, "jobserver")
+            with mock.patch.object(server, "log") as log:
+                server.make_accessible(path, timeout=0.2)
+            self.assertFalse(os.path.exists(path))
+            self.assertIn("did not appear", log.call_args[0][0])
+
+    def test_init_done_makes_device_node_accessible(self):
+        server = self.server(tokens=1)
+        called = threading.Event()
+        with mock.patch.object(server, "make_accessible", side_effect=lambda path: called.set()) as make:
+            server.dev_init_done(None)
+            self.assertTrue(called.wait(5))
+        make.assert_called_once_with("/dev/jobserver")
