@@ -34,9 +34,7 @@ type Cache interface {
 	HasObject(utils.Digest) CacheItem
 
 	// Does what HasObject does for each of the digests, returning the items
-	// in the same order, with nil for those not in the cache. Unlike
-	// HasObject, it answers from what the cache knows it stores without
-	// checking the disk, as only the cache removes objects from it.
+	// in the same order, with nil for those not in the cache.
 	HasObjects([]utils.Digest) []CacheItem
 
 	// Returns a reader for the object with the given digest.

@@ -35,6 +35,9 @@ type trackingCache struct {
 
 	// Objects to treat as evicted, by digest string
 	evicted sync.Map
+
+	// Storage of the cache
+	fs afero.Fs
 }
 
 func (c *trackingCache) evict(digest string) {
@@ -165,9 +168,10 @@ func newTestCache(t testing.TB) *trackingCache {
 	config.On("MaxSize").Return(1 << 30)
 	config.On("ExpirationTime").Return(time.Duration(0))
 
-	lru, err := NewLRUCache(afero.NewMemMapFs(), config)
+	fs := afero.NewMemMapFs()
+	lru, err := NewLRUCache(fs, config)
 	assert.NoError(t, err)
-	return &trackingCache{Cache: lru}
+	return &trackingCache{Cache: lru, fs: fs}
 }
 
 // Store data in the cache and return its digest.
@@ -507,4 +511,34 @@ func TestHasTreeReportsDigestsAsTheClientWroteThem(t *testing.T) {
 		trees, _ := stream.missing()
 		assert.Equal(t, []string{name}, trees)
 	}
+}
+
+func TestHasTreeReportsObjectsRemovedFromStorage(t *testing.T) {
+	c := newTestCache(t)
+
+	file := put(t, c, []byte("file"))
+	sub := put(t, c, encodeTree(treeEntry{"file.txt", file, fstree.InodeType_Regular}))
+	root := put(t, c, encodeTree(treeEntry{"sub", sub, fstree.InodeType_Directory}))
+
+	svc := NewCacheService(c, 64<<20)
+	stream, err := hasTreeWith(svc, context.Background(), root)
+	assert.NoError(t, err)
+	assert.Empty(t, stream.responses)
+
+	// Storage wiped behind the service's back, as when a cache volume is
+	// cleared, after the service has parsed the trees. Pushes must upload
+	// the objects again, or pulls of them fail.
+	assert.NoError(t, c.fs.RemoveAll("objects"))
+
+	stream, err = hasTreeWith(svc, context.Background(), root)
+	assert.NoError(t, err)
+	trees, _ := stream.missing()
+	assert.Equal(t, []string{root}, trees)
+
+	// With the root uploaded again, its children are missing too
+	put(t, c, encodeTree(treeEntry{"sub", sub, fstree.InodeType_Directory}))
+	stream, err = hasTreeWith(svc, context.Background(), root)
+	assert.NoError(t, err)
+	trees, _ = stream.missing()
+	assert.Equal(t, []string{sub}, trees)
 }
