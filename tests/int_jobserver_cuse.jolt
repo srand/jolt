@@ -1,0 +1,45 @@
+import ctypes
+import sys
+from unittest import mock
+
+sys.path.append(".")
+
+from testsupport import JoltTest
+from jolt.plugins import jobserver_cuse
+from jolt.plugins.jobserver_cuse import FuseFileInfo, JobServer, POLLIN, POLLOUT
+
+
+class JobserverCuseInternal(JoltTest):
+    name = "int/jobserver/cuse"
+
+    def server(self, tokens):
+        # The FUSE library is replaced, the callbacks are called directly
+        with mock.patch.object(JobServer, "_load_fuse", return_value=mock.MagicMock()):
+            return JobServer(tokens=tokens)
+
+    def poll(self, server, events, ph):
+        fi = FuseFileInfo()
+        fi.poll_events = events
+        req = object()
+        server.dev_poll(req, ctypes.pointer(fi), ph)
+        return req
+
+    def test_poll_without_handle_is_answered(self):
+        """ A poll without a handle must still be answered, or the client blocks in the kernel. """
+        server = self.server(tokens=0)
+        req = self.poll(server, POLLIN, None)
+        server.lib.fuse_reply_poll.assert_called_once_with(req, 0)
+        self.assertEqual([], server.pollers)
+
+    def test_poll_with_handle_is_queued(self):
+        """ A poll with a handle is answered and woken when a token is returned. """
+        server = self.server(tokens=0)
+        req = self.poll(server, POLLIN, 1234)
+        server.lib.fuse_reply_poll.assert_called_once_with(req, 0)
+        self.assertEqual([jobserver_cuse.Poller(ph=1234)], server.pollers)
+
+    def test_poll_with_tokens_is_readable(self):
+        server = self.server(tokens=1)
+        req = self.poll(server, POLLIN | POLLOUT, None)
+        server.lib.fuse_reply_poll.assert_called_once_with(req, POLLIN | POLLOUT)
+        self.assertEqual([], server.pollers)

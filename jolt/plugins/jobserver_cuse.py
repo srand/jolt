@@ -395,7 +395,10 @@ class JobServer:
         events = fi.contents.poll_events & (POLLIN | POLLOUT)
         if not self.available():
             events &= ~POLLIN
-            if not events:
+            # A poll may come without a handle, and then there is no one to
+            # notify later. Either way it must be answered, or the client
+            # blocks in the kernel, keeping its tokens, until it is closed.
+            if not events and ph:
                 self.poller_enqueue(ph)
         self.lib.fuse_reply_poll(req, events)
 
