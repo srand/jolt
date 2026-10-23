@@ -1,6 +1,7 @@
 package cache
 
 import (
+	"strings"
 	"sync/atomic"
 
 	"github.com/srand/jolt/scheduler/pkg/fstree"
@@ -10,11 +11,32 @@ import (
 // Approximate memory used for each digest held by a parsed tree.
 const parsedTreeDigestSize = 128
 
+// A digest as named by a client, which may be "algorithm:hex" or, as fstree
+// releases before 26 name sha1 digests, bare hex. Clients look up reported
+// digests by name, so they are reported in the form the client used.
+type namedDigest struct {
+	digest utils.Digest
+	bare   bool
+}
+
+func newNamedDigest(name string) (namedDigest, error) {
+	digest, err := utils.ParseDigest(name)
+	return namedDigest{digest: digest, bare: !strings.Contains(name, ":")}, err
+}
+
+// Returns the digest in the form the client named it.
+func (d namedDigest) name() string {
+	if d.bare {
+		return d.digest.Hex()
+	}
+	return d.digest.String()
+}
+
 // The children of a tree object, parsed.
 type parsedTree struct {
 	digest  string
-	trees   []utils.Digest
-	objects []utils.Digest
+	trees   []namedDigest
+	objects []namedDigest
 }
 
 func (t *parsedTree) Path() string {
@@ -35,7 +57,7 @@ func parseTree(digest utils.Digest, tree *fstree.Tree) (*parsedTree, error) {
 			continue
 		}
 
-		childDigest, err := utils.ParseDigest(child.Digest())
+		childDigest, err := newNamedDigest(child.Digest())
 		if err != nil {
 			return nil, err
 		}

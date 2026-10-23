@@ -182,7 +182,7 @@ func (svc *cacheService) HasObject(ctx context.Context, req *HasObjectRequest) (
 	}, nil
 }
 
-func (svc *cacheService) checkTree(ctx context.Context, server CacheService_HasTreeServer, m *sync.Mutex, eg *errgroup.Group, seen *digestSet, digest utils.Digest) error {
+func (svc *cacheService) checkTree(ctx context.Context, server CacheService_HasTreeServer, m *sync.Mutex, eg *errgroup.Group, seen *digestSet, named namedDigest) error {
 	// Stop walking once the client is gone or another subtree has failed.
 	if err := ctx.Err(); err != nil {
 		return status.FromContextError(err).Err()
@@ -195,42 +195,44 @@ func (svc *cacheService) checkTree(ctx context.Context, server CacheService_HasT
 
 	svc.checked.Add(1)
 
-	tree, err := svc.readTree(digest)
+	tree, err := svc.readTree(named.digest)
 	if err != nil {
 		return err
 	}
 
 	if tree == nil {
-		response.MissingTrees = append(response.MissingTrees, digest.String())
+		response.MissingTrees = append(response.MissingTrees, named.name())
 	} else {
-		for _, digest := range tree.trees {
-			if !seen.add(digest) {
+		for _, child := range tree.trees {
+			if !seen.add(child.digest) {
 				continue
 			}
 
 			// Check the subtree here if no slot is free. Waiting for one
 			// would deadlock once every running check is waiting too.
 			if !eg.TryGo(func() error {
-				return svc.checkTree(ctx, server, m, eg, seen, digest)
+				return svc.checkTree(ctx, server, m, eg, seen, child)
 			}) {
-				if err := svc.checkTree(ctx, server, m, eg, seen, digest); err != nil {
+				if err := svc.checkTree(ctx, server, m, eg, seen, child); err != nil {
 					return err
 				}
 			}
 		}
 
 		// Objects of the tree are looked up together
-		var objects []utils.Digest
-		for _, digest := range tree.objects {
-			if seen.add(digest) {
-				objects = append(objects, digest)
+		var objects []namedDigest
+		var digests []utils.Digest
+		for _, child := range tree.objects {
+			if seen.add(child.digest) {
+				objects = append(objects, child)
+				digests = append(digests, child.digest)
 			}
 		}
 
 		svc.objects.Add(int64(len(objects)))
-		for i, item := range svc.cache.HasObjects(objects) {
+		for i, item := range svc.cache.HasObjects(digests) {
 			if item == nil {
-				response.MissingObjects = append(response.MissingObjects, objects[i].String())
+				response.MissingObjects = append(response.MissingObjects, objects[i].name())
 			}
 		}
 	}
@@ -258,17 +260,17 @@ func (svc *cacheService) HasTree(req *HasTreeRequest, server CacheService_HasTre
 
 	eg, ctx := errgroup.WithContext(server.Context())
 	eg.SetLimit(hasTreeConcurrency)
-	trees := []utils.Digest{}
+	trees := []namedDigest{}
 	m := sync.Mutex{}
 	seen := &digestSet{}
 
 	// For each digest in the list
 	for _, digest := range req.Digest {
-		d, err := utils.ParseDigest(digest)
+		d, err := newNamedDigest(digest)
 		if err != nil {
 			return status.Errorf(codes.InvalidArgument, "invalid digest: %v", err)
 		}
-		if seen.add(d) {
+		if seen.add(d.digest) {
 			trees = append(trees, d)
 		}
 	}

@@ -3,6 +3,7 @@ package cache
 import (
 	"bytes"
 	"context"
+	"crypto/sha1"
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
@@ -454,4 +455,56 @@ func TestHasTreeMetrics(t *testing.T) {
 	NewHttpHandler(c, nil).ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/metrics", nil))
 	assert.NotContains(t, response.Body.String(), "hastree")
 	assert.Contains(t, response.Body.String(), "jolt_cache_artifacts")
+}
+
+// Stores data in the cache as a sha1 object and returns its digest as bare
+// hex, as fstree releases before 26 named objects.
+func putSha1(t testing.TB, c Cache, data []byte) string {
+	sum := sha1.Sum(data)
+	hex := hex.EncodeToString(sum[:])
+
+	writer, err := c.WriteObject(utils.NewDigest(utils.Sha1Algorithm, hex))
+	assert.NoError(t, err)
+	_, err = writer.Write(data)
+	assert.NoError(t, err)
+	assert.NoError(t, writer.Close())
+	return hex
+}
+
+func TestHasTreeReportsDigestsAsTheClientWroteThem(t *testing.T) {
+	c := newTestCache(t)
+
+	// A client that names objects by bare hex, as older fstree releases do,
+	// looks reported objects up by name and must get them back in that form.
+	sum := sha1.Sum([]byte("missing"))
+	missingFile := hex.EncodeToString(sum[:])
+	sum = sha1.Sum([]byte("missing tree"))
+	missingTree := hex.EncodeToString(sum[:])
+
+	present := putSha1(t, c, []byte("present"))
+	root := putSha1(t, c, encodeTree(
+		treeEntry{"present.txt", present, fstree.InodeType_Regular},
+		treeEntry{"missing.txt", missingFile, fstree.InodeType_Regular},
+		treeEntry{"gone", missingTree, fstree.InodeType_Directory},
+	))
+
+	svc := NewCacheService(c, 64<<20)
+	for range 2 {
+		// Once read from the object and once from the parsed tree kept
+		stream, err := hasTreeWith(svc, context.Background(), root)
+		assert.NoError(t, err)
+		trees, objects := stream.missing()
+		assert.Equal(t, []string{missingTree}, trees)
+		assert.Equal(t, []string{missingFile}, objects)
+	}
+
+	// A missing tree named in the request is reported as it was named.
+	sum = sha1.Sum([]byte("absent root"))
+	absent := hex.EncodeToString(sum[:])
+	for _, name := range []string{absent, "sha1:" + absent} {
+		stream, err := hasTreeWith(svc, context.Background(), name)
+		assert.NoError(t, err)
+		trees, _ := stream.missing()
+		assert.Equal(t, []string{name}, trees)
+	}
 }
