@@ -1,10 +1,11 @@
 from jolt import attributes, BooleanParameter, Parameter
-from jolt.pkgs import boost, cmake, mysql, sqlite
+from jolt.pkgs import boost, cmake, fmt, mysql, sqlite, unixodbc
 from jolt.plugins import cxxinfo, git, cmake
 from jolt.tasks import TaskRegistry
 
 
 @attributes.requires("requires_boost_{boost[on,off]}")
+@attributes.requires("requires_fmt")
 @attributes.requires("requires_git")
 @attributes.requires("requires_mysql_{mysql[on,off]}")
 @attributes.requires("requires_odbc_{odbc[on,off]}")
@@ -22,12 +23,14 @@ class Soci(cmake.CMake):
     odbc = BooleanParameter(False, help="Enable ODBC support")
 
     requires_boost_on = ["boost"]
+    requires_fmt = ["fmt:shared={shared}"]
     requires_git = ["git:url=https://github.com/SOCI/soci.git,rev=v{version}"]
     requires_mysql_on = ["libmysqlclient"]
     requires_sqlite_on = ["sqlite"]
-    requires_odbc_on = ["odbc"]
+    requires_odbc_on = ["unixodbc"]
     srcdir = "{git[soci]}"
     options = [
+        "SOCI_FMT_BUILTIN=OFF",
         "SOCI_TESTS=OFF",
         "SOCI_SHARED={shared[ON,OFF]}",
         "SOCI_SQLITE3={sqlite[ON,OFF]}",
