@@ -1,11 +1,12 @@
 from jolt import attributes, Parameter, Task
-from jolt.pkgs import cbindgen, glslang, libdrm, libglvnd, libva, x11
-from jolt.pkgs import meson, rust, spirv_llvm, wayland
+from jolt.pkgs import cbindgen, glslang, libdrm, libexpat, libglvnd, libva, x11
+from jolt.pkgs import meson, rust, spirv_llvm, wayland, wayland_protocols
 from jolt.plugins import git
 from jolt.tasks import TaskRegistry
 
 
 @attributes.requires("requires_cbindgen")
+@attributes.requires("requires_expat")
 @attributes.requires("requires_git")
 @attributes.requires("requires_glslang")
 @attributes.requires("requires_libdrm")
@@ -23,10 +24,11 @@ from jolt.tasks import TaskRegistry
 @attributes.common_metadata()
 class Mesa(Task):
     name = "mesa"
-    version = Parameter("25.3.2", help="Mesa version.")
+    version = Parameter("26.2.5", help="Mesa version.")
 
     requires_cbindgen = ["cbindgen"]
-    requires_git = ["git:url=https://gitlab.freedesktop.org/mesa/mesa.git,rev=mesa-{version}"]
+    requires_expat = ["libexpat:pic=true"]
+    requires_git =["git:url=https://gitlab.freedesktop.org/mesa/mesa.git,rev=mesa-{version}"]
     requires_glslang = ["glslang"]
     requires_libdrm = ["libdrm"]
     requires_libglvnd = ["libglvnd"]
@@ -38,7 +40,7 @@ class Mesa(Task):
     requires_meson = ["meson"]
     requires_rust = ["rust", "rust-bindgen"]
     requires_spirv_llvm = ["spirv-llvm-translator"]
-    requires_wayland = ["wayland"]
+    requires_wayland = ["wayland", "wayland-protocols"]
     requires_xrandr = ["libxrandr"]
 
     def run(self, deps, tools):
