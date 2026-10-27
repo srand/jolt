@@ -244,9 +244,11 @@ class OpenSSL(Task):
                 tools.run("nmake")
                 tools.run("nmake install")
             else:
-                tools.run("{srcdir}/config --prefix={installdir} no-tests {shared[,no-shared]} {target}")
+                # Use the system's CA certificates and configuration. Only
+                # the software is installed, not the system directories.
+                tools.run("{srcdir}/config --prefix={installdir} --openssldir=/etc/ssl no-tests {shared[,no-shared]} {target}")
                 tools.run("make -j{}", tools.cpu_count())
-                tools.run("make install")
+                tools.run("make install_sw")
 
     def publish(self, artifact, tools):
         with tools.cwd(self.installdir):
