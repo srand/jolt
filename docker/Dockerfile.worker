@@ -1,6 +1,6 @@
 FROM docker.io/golang:1.27-trixie as tools
 ARG DEBIAN_FRONTEND=noninteractive
-ARG BLAKE3_VERSION=1.8.3
+ARG BLAKE3_VERSION=1.8.7
 RUN apt-get update && apt-get install -y \
     protobuf-compiler-grpc \
     protobuf-compiler \
