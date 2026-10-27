@@ -245,7 +245,9 @@ def start_file_log():
         outdated = logfiles[:len(logfiles) - logcount + 1]
         logfiles = logfiles[-logcount + 1:]
         for file in outdated:
-            os.unlink(file)
+            # Concurrent invocations may already have removed the file
+            with utils.ignore_exception(FileNotFoundError):
+                os.unlink(file)
 
     _file = logging.FileHandler(logfile)
     _file.setLevel(EXCEPTION)
