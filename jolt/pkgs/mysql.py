@@ -1,5 +1,5 @@
 from jolt import attributes, BooleanParameter, Parameter
-from jolt.pkgs import boost, curl, libedit, libtirpc, lz4, openssl, rapidjson, zlib, zstd
+from jolt.pkgs import boost, curl, libedit, libtirpc, libudev_zero, lz4, openssl, rapidjson, zlib, zstd
 from jolt.plugins import cmake, cxxinfo, git, pkgconfig
 from jolt.tasks import TaskRegistry
 
@@ -7,6 +7,7 @@ from jolt.tasks import TaskRegistry
 @attributes.requires("requires_curl")
 @attributes.requires("requires_{system}_libedit")
 @attributes.requires("requires_{system}_libtirpc")
+@attributes.requires("requires_{system}_libudev")
 @attributes.requires("requires_lz4")
 @attributes.requires("requires_ncurses")
 @attributes.requires("requires_rapidjson")
@@ -25,6 +26,8 @@ class MySQLBase(cmake.CMake):
     requires_darwin_libedit = ["libedit:shared=true"]
     requires_linux_libedit = requires_darwin_libedit
     requires_linux_libtirpc = ["libtirpc"]
+    # Required by libfido2 for WebAuthn authentication
+    requires_linux_libudev = ["libudev-zero"]
     requires_lz4 = ["lz4"]
     requires_rapidjson = ["rapidjson"]
     requires_src = ["git:url=https://github.com/mysql/mysql-server,path={buildroot}/git-mysql,submodules=true"]
@@ -32,6 +35,15 @@ class MySQLBase(cmake.CMake):
     requires_zlib = ["zlib"]
     requires_zstd = ["zstd"]
     srcdir = "{git[mysql-server]}"
+
+    def run(self, deps, tools):
+        if self.system != "linux":
+            return super().run(deps, tools)
+        # libudev.h is looked for with check_include_file, which ignores pkg-config
+        with tools.environ(
+            CFLAGS=tools.run("pkg-config --cflags libudev").strip() + " " + tools.getenv("CFLAGS", ""),
+        ):
+            super().run(deps, tools)
 
 
 @cxxinfo.publish(libraries=["mysqlclient"])
