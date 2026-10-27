@@ -86,24 +86,57 @@ def stderr_write(line):
 
 
 class Reader(threading.Thread):
-    def __init__(self, parent, stream, output=None, logbuf=None, output_rstrip=True):
+    # A line of output, terminated by a newline or by a carriage return
+    _segment = re.compile(rb"([^\r\n]*)([\r\n])")
+
+    def __init__(self, parent, stream, output=None, logbuf=None, output_rstrip=True, progress=None):
         super(Reader, self).__init__()
         self.daemon = True
         self.output = output
         self.output_rstrip = output_rstrip
         self.parent = parent
+        self.progress = progress
         self.stream = stream
         self.logbuf = logbuf if logbuf is not None else []
         self.start()
+
+    def _lines(self):
+        for line in iter(self.stream.readline, b''):
+            if self.output_rstrip:
+                line = line.rstrip()
+            yield line.decode(errors='ignore')
+
+    def _progress_lines(self):
+        """
+        Passes every line to the progress callback.
+
+        Lines terminated by a carriage return redraw a progress indicator
+        and are never logged. Other lines are logged unless the progress
+        callback consumes them by returning True.
+        """
+        pending = b""
+        for chunk in iter(lambda: self.stream.read1(65536), b''):
+            pending += chunk
+            end = 0
+            for match in self._segment.finditer(pending):
+                end = match.end()
+                line = match.group(1).decode(errors='ignore')
+                if not line.strip():
+                    continue
+                consumed = self.progress(line)
+                if match.group(2) == b"\n" and not consumed:
+                    yield line.rstrip() if self.output_rstrip else line
+            pending = pending[end:]
+        if pending.strip():
+            line = pending.decode(errors='ignore')
+            if not self.progress(line):
+                yield line.rstrip() if self.output_rstrip else line
 
     def run(self):
         line = ""
         try:
             with log.map_thread(self, self.parent):
-                for line in iter(self.stream.readline, b''):
-                    if self.output_rstrip:
-                        line = line.rstrip()
-                    line = line.decode(errors='ignore')
+                for line in self._progress_lines() if self.progress else self._lines():
                     if self.output:
                         self.output(line)
                     self.logbuf.append((self, line))
@@ -129,6 +162,7 @@ def _normalize_run_kwargs(kwargs):
         "output_stdio": kwargs.get("output_stdio", False),
         "output_stdout": kwargs.get("output_stdout", True),
         "output_stderr": kwargs.get("output_stderr", True),
+        "progress": kwargs.get("progress"),
         "return_stderr": kwargs.get("return_stderr", False),
         "shell": kwargs.get("shell", True),
         "timeout": timeout if type(timeout) is int and timeout > 0 else None,
@@ -243,7 +277,8 @@ class _PopenFile(object):
             process.stderr,
             output=stderr_func if options["output"] else None,
             logbuf=self._stderrlog,
-            output_rstrip=options["output_rstrip"])
+            output_rstrip=options["output_rstrip"],
+            progress=options.get("progress"))
 
     def _emit_stdout(self, data):
         if not self._output:
@@ -382,7 +417,8 @@ def _run_command(cmd, cwd, env, options):
                 p.stderr,
                 output=stderr_func if options["output"] else None,
                 logbuf=logbuf,
-                output_rstrip=options["output_rstrip"])
+                output_rstrip=options["output_rstrip"],
+                progress=options["progress"])
 
         timedout = _wait_for_process(p, options["timeout"])
 
@@ -1874,6 +1910,11 @@ class Tools(object):
             output_rstrip (boolean, optional): By default, output written
                 to stdout is stripped from whitespace at the end of the
                 string. This can be disabled by setting this argument to False.
+            progress (callable, optional): Called with every line written
+                to stderr, including lines terminated by a carriage return
+                which commands use to redraw progress indicators. Those
+                lines are not logged. Other lines are logged unless the
+                callable returns True. Default: None.
             shell (boolean, optional): Use a shell to run the command.
                 Default: True.
             timeout (int, optional): Timeout in seconds. The command will
@@ -1953,6 +1994,11 @@ class Tools(object):
             output_rstrip (boolean, optional): By default, output written
                 to stdout is stripped from whitespace at the end of the
                 string. This can be disabled by setting this argument to False.
+            progress (callable, optional): Called with every line written
+                to stderr, including lines terminated by a carriage return
+                which commands use to redraw progress indicators. Those
+                lines are not logged. Other lines are logged unless the
+                callable returns True. Default: None.
             shell (boolean, optional): Use a shell to run the command.
                 Default: True.
             timeout (int, optional): Timeout in seconds. The command will

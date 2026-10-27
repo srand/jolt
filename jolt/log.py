@@ -912,8 +912,13 @@ class _RichProgress(object):
                 _ProgressDisplay.progress.update(self._task, description=desc)
 
 
+def is_progress_enabled(debug=False):
+    """ Whether progress bars are drawn, as opposed to only logged. """
+    return not debug and is_interactive() and not is_verbose() and not is_silenced()
+
+
 def progress(desc, count, unit, estimates=True, debug=False):
-    if not debug and is_interactive() and not is_verbose() and not is_silenced():
+    if is_progress_enabled(debug):
         return _RichProgress(desc, count, unit, estimates)
     return progress_log(desc, count, unit)
 

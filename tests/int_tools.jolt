@@ -55,6 +55,40 @@ class ToolsInternal(JoltTest):
         self.assertTrue(reader.daemon)
         self.assertEqual(logbuf, [(reader, "output")])
 
+    def test_reader_progress_lines(self):
+        # Chunks split lines, and carriage returns redraw progress
+        stream = MagicMock()
+        stream.read1.side_effect = [
+            b"Cloning into 'x'...\nReceiving objects:  50% (1/2)\rReceiv",
+            b"ing objects: 100% (2/2), done.\nwarning: last\n",
+            b"",
+        ]
+        progress = MagicMock(side_effect=lambda line: line.startswith("Receiving"))
+        logbuf = []
+
+        reader = tools.Reader(threading.current_thread(), stream, logbuf=logbuf, progress=progress)
+        reader.join()
+
+        self.assertEqual(
+            [call.args[0] for call in progress.call_args_list],
+            [
+                "Cloning into 'x'...",
+                "Receiving objects:  50% (1/2)",
+                "Receiving objects: 100% (2/2), done.",
+                "warning: last",
+            ])
+        self.assertEqual(logbuf, [(reader, "Cloning into 'x'..."), (reader, "warning: last")])
+
+    def test_reader_progress_never_logs_redrawn_lines(self):
+        stream = MagicMock()
+        stream.read1.side_effect = [b"remote: Enumerating objects: 3\r", b"tail", b""]
+        logbuf = []
+
+        reader = tools.Reader(threading.current_thread(), stream, logbuf=logbuf, progress=lambda line: False)
+        reader.join()
+
+        self.assertEqual(logbuf, [(reader, "tail")])
+
     def test_close_process_streams_skips_active_reader(self):
         process = self.process()
         reader = MagicMock()

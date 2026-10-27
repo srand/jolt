@@ -1,3 +1,4 @@
+from contextlib import contextmanager
 import functools
 import os
 import pygit2
@@ -39,6 +40,42 @@ def _changes_workspace(func):
         finally:
             fstree.invalidate_workspace_index(args[0].path)
     return wrapper
+
+
+class GitProgress(object):
+    """ Shows the progress that git writes to stderr as a progress bar. """
+
+    # For example "Receiving objects:  45% (4500/10000), 12.30 MiB | 4.10 MiB/s"
+    _pattern = re.compile(r"^(?:remote: )?([A-Za-z ]+):\s+\d+% \((\d+)/(\d+)\)")
+
+    def __init__(self, desc):
+        self._desc = desc
+        self._bar = None
+        self._phase = None
+        self._completed = 0
+        self._total = 0
+
+    def __enter__(self):
+        self._bar = log.progress(self._desc, None, " objects", estimates=False).__enter__()
+        return self
+
+    def __exit__(self, *args):
+        return self._bar.__exit__(*args)
+
+    def __call__(self, line):
+        """ Updates the bar from a line of git output. Returns True if it was progress. """
+        match = self._pattern.match(line)
+        if not match:
+            return False
+        phase, completed, total = match.group(1), int(match.group(2)), int(match.group(3))
+        # Each phase, and each submodule, counts from zero again
+        if phase != self._phase or total != self._total or completed < self._completed:
+            self._phase, self._completed, self._total = phase, 0, total
+            self._bar.reset(total=total)
+            self._bar.set_description("{}: {}".format(self._desc, phase.lower()))
+        self._bar.update(completed - self._completed)
+        self._completed = completed
+        return True
 
 
 class GitRepository(object):
@@ -117,6 +154,25 @@ class GitRepository(object):
         self.tools.mkdir(".git/objects/info")
         self.tools.write_file(".git/objects/info/alternates", objects_path)
 
+    @property
+    def _name(self):
+        """ Short name of the repository, for display. """
+        name, _ = fs.path.splitext(fs.path.basename(str(self.url).rstrip("/")))
+        return name
+
+    @contextmanager
+    def _progress(self, desc):
+        """ Progress bar for a git command, and the option that enables its progress output.
+
+        Git only reports progress to a terminal unless asked to. The output
+        is parsed, so it must not be translated.
+        """
+        if not log.is_progress_enabled():
+            yield "", None
+            return
+        with GitProgress(desc) as progress, self.tools.environ(LC_ALL="C", GIT_PROGRESS_DELAY="0"):
+            yield "--progress", progress
+
     def _revision_refspec(self, rev=None):
         """ Refspec fetching a single revision into a local ref.
 
@@ -151,14 +207,17 @@ class GitRepository(object):
         with self.tools.cwd(self.path):
             log.info("Fetching {0} from {1}", what, refpath)
             try:
-                self.tools.run(
-                    "git fetch --force {notags} {depth} {refpath} {refspec}",
-                    notags=notags,
-                    depth="--depth={0}".format(depth) if shallow else "",
-                    refpath=refpath,
-                    refspec=refspec,
-                    output=False,
-                    new_session=True)
+                with self._progress("Fetching " + self._name) as (progress_option, progress):
+                    self.tools.run(
+                        "git fetch --force {progress_option} {notags} {depth} {refpath} {refspec}",
+                        progress_option=progress_option,
+                        notags=notags,
+                        depth="--depth={0}".format(depth) if shallow else "",
+                        refpath=refpath,
+                        refspec=refspec,
+                        output=False,
+                        progress=progress,
+                        new_session=True)
             except JoltCommandError as e:
                 # A cache miss is routine, don't alarm the user about it
                 log.verbose(
@@ -212,11 +271,12 @@ class GitRepository(object):
         else:
             log.info("Cloning into {0}", self.path)
             extra_clone_options = config.get("git", "clone_options", "")
-            if refpath and os.path.isdir(refpath):
-                # git clones with --reference are dissociated by git itself
-                self.tools.run("git clone --reference-if-able {0} {1} {2} {3} {4}", refpath, "--dissociate" if dissociate else "", extra_clone_options, self.url, self.path, output_on_error=True, new_session=True)
-            else:
-                self.tools.run("git clone {0} {1} {2}", extra_clone_options, self.url, self.path, output_on_error=True, new_session=True)
+            with self._progress("Cloning " + self._name) as (progress_option, progress):
+                if refpath and os.path.isdir(refpath):
+                    # git clones with --reference are dissociated by git itself
+                    self.tools.run("git clone {0} --reference-if-able {1} {2} {3} {4} {5}", progress_option, refpath, "--dissociate" if dissociate else "", extra_clone_options, self.url, self.path, output_on_error=True, progress=progress, new_session=True)
+                else:
+                    self.tools.run("git clone {0} {1} {2} {3}", progress_option, extra_clone_options, self.url, self.path, output_on_error=True, progress=progress, new_session=True)
 
         self._init_repo()
         raise_error_if(
@@ -357,13 +417,16 @@ class GitRepository(object):
         refspec = " ".join(self.default_refspecs + self.refspecs)
         with self.tools.cwd(self.path):
             log.info("Fetching {0} from {1}", commit or refspec or 'commits', self.url)
-            self.tools.run(
-                "git fetch --force --prune {extra_fetch_options} {url} {what}",
-                extra_fetch_options=extra_fetch_options,
-                url=self.url,
-                what=commit or refspec or '',
-                output_on_error=True,
-                new_session=True)
+            with self._progress("Fetching " + self._name) as (progress_option, progress):
+                self.tools.run(
+                    "git fetch --force --prune {progress_option} {extra_fetch_options} {url} {what}",
+                    progress_option=progress_option,
+                    extra_fetch_options=extra_fetch_options,
+                    url=self.url,
+                    what=commit or refspec or '',
+                    output_on_error=True,
+                    progress=progress,
+                    new_session=True)
 
     @utils.retried.on_exception(JoltCommandError, pattern="Command failed: git fetch", count=6, backoff=[2, 5, 10, 15, 20, 30])
     def _fetch_revision(self, rev=None, depth=1):
@@ -377,14 +440,17 @@ class GitRepository(object):
             # The revision is fetched into a local ref, not just FETCH_HEAD, so
             # that its objects are reachable for git. Tag auto-following is
             # disabled to keep the fetch down to the requested revision.
-            self.tools.run(
-                "git fetch --force --no-tags --depth={depth} {extra_fetch_options} {url} {refspec}",
-                depth=depth,
-                extra_fetch_options=extra_fetch_options,
-                url=self.url,
-                refspec=self._revision_refspec(rev),
-                output_on_error=True,
-                new_session=True)
+            with self._progress("Fetching " + self._name) as (progress_option, progress):
+                self.tools.run(
+                    "git fetch --force --no-tags --depth={depth} {progress_option} {extra_fetch_options} {url} {refspec}",
+                    depth=depth,
+                    progress_option=progress_option,
+                    extra_fetch_options=extra_fetch_options,
+                    url=self.url,
+                    refspec=self._revision_refspec(rev),
+                    output_on_error=True,
+                    progress=progress,
+                    new_session=True)
 
     @_changes_workspace
     def checkout(self, rev, commit=None, submodules=False):
@@ -412,8 +478,8 @@ class GitRepository(object):
         return True
 
     def _update_submodules(self):
-        with self.tools.cwd(self.path):
-            self.tools.run("git submodule update --init --recursive", output_on_error=True, new_session=True)
+        with self.tools.cwd(self.path), self._progress("Updating submodules of " + self._name) as (progress_option, progress):
+            self.tools.run("git submodule update --init --recursive {0}", progress_option, output_on_error=True, progress=progress, new_session=True)
 
 
 _gits = {}

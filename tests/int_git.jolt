@@ -1,0 +1,47 @@
+import sys
+sys.path.append(".")
+
+from unittest.mock import MagicMock, patch
+
+from testsupport import JoltTest
+from jolt.plugins import git
+
+
+class GitInternal(JoltTest):
+    name = "int/git"
+
+    def progress(self):
+        bar = MagicMock()
+        bar.__enter__.return_value = bar
+        with patch("jolt.log.progress", return_value=bar):
+            progress = git.GitProgress("Cloning repo").__enter__()
+        return progress, bar
+
+    def test_progress_ignores_other_lines(self):
+        progress, bar = self.progress()
+        self.assertFalse(progress("Cloning into 'repo'..."))
+        self.assertFalse(progress("remote: Enumerating objects: 1234, done."))
+        bar.update.assert_not_called()
+
+    def test_progress_advances_within_phase(self):
+        progress, bar = self.progress()
+        self.assertTrue(progress("Receiving objects:  10% (10/100), 1.00 MiB | 2.00 MiB/s"))
+        self.assertTrue(progress("Receiving objects:  45% (45/100), 4.50 MiB | 2.00 MiB/s"))
+        bar.reset.assert_called_once_with(total=100)
+        bar.set_description.assert_called_once_with("Cloning repo: receiving objects")
+        self.assertEqual([call.args[0] for call in bar.update.call_args_list], [10, 35])
+
+    def test_progress_restarts_for_each_phase(self):
+        progress, bar = self.progress()
+        progress("remote: Counting objects: 100% (50/50), done.")
+        progress("Receiving objects: 100% (80/80), done.")
+        progress("Resolving deltas:  50% (20/40)")
+        self.assertEqual([call.kwargs["total"] for call in bar.reset.call_args_list], [50, 80, 40])
+        self.assertEqual([call.args[0] for call in bar.update.call_args_list], [50, 80, 20])
+
+    def test_progress_restarts_for_next_submodule(self):
+        progress, bar = self.progress()
+        progress("Receiving objects: 100% (80/80), done.")
+        progress("Receiving objects:  25% (20/80)")
+        self.assertEqual(bar.reset.call_count, 2)
+        self.assertEqual([call.args[0] for call in bar.update.call_args_list], [80, 20])
