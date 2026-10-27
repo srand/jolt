@@ -9,8 +9,8 @@ from jolt.tasks import Task, TaskRegistry
 @attributes.system
 class B2(Task):
     name = "b2"
-    version = Parameter("5.4.2", help="B2 version.")
-    requires_git = ["git:url=https://github.com/bfgroup/b2.git"]
+    version = Parameter("5.6.1", help="B2 version.")
+    requires_git = ["git:url=https://github.com/bfgroup/b2.git,rev={version}"]
 
     def run(self, artifact, tools):
         self.builddir = tools.builddir("build", incremental=True)
