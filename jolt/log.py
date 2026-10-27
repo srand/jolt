@@ -585,6 +585,7 @@ class _TerminalEcho(object):
     process is terminated by SIGTERM or SIGHUP.
     """
 
+    lock = threading.RLock()
     fd = None
     attrs = None
     pid = None
@@ -594,6 +595,11 @@ class _TerminalEcho(object):
     @staticmethod
     @utils.delay_interrupt
     def disable():
+        with _TerminalEcho.lock:
+            _TerminalEcho._disable()
+
+    @staticmethod
+    def _disable():
         if os.name != "posix" or _TerminalEcho.attrs is not None:
             return
         try:
@@ -616,6 +622,11 @@ class _TerminalEcho(object):
     @staticmethod
     @utils.delay_interrupt
     def restore():
+        with _TerminalEcho.lock:
+            _TerminalEcho._restore()
+
+    @staticmethod
+    def _restore():
         # Forked child processes must not restore the terminal of the parent
         if _TerminalEcho.attrs is None or _TerminalEcho.pid != os.getpid():
             return
@@ -625,6 +636,34 @@ class _TerminalEcho(object):
             pass
         _TerminalEcho.fd, _TerminalEcho.attrs, _TerminalEcho.pid = None, None, None
         _TerminalEcho._remove_handlers()
+
+    @staticmethod
+    def _is_disabled_for(fd):
+        """ Returns True if echo is disabled for the terminal of the fd. """
+        if _TerminalEcho.attrs is None or _TerminalEcho.pid != os.getpid():
+            return False
+        try:
+            return os.path.samestat(os.fstat(fd), os.fstat(_TerminalEcho.fd))
+        except OSError:
+            return False
+
+    @staticmethod
+    def get_attrs(fd):
+        with _TerminalEcho.lock:
+            # Report the attributes from before echo was disabled, so that
+            # restoring them later doesn't disable echo again.
+            if _TerminalEcho._is_disabled_for(fd):
+                return list(_TerminalEcho.attrs)
+            return termios.tcgetattr(fd)
+
+    @staticmethod
+    def set_attrs(fd, attrs):
+        with _TerminalEcho.lock:
+            # Keep echo disabled while progress bars are shown
+            if _TerminalEcho._is_disabled_for(fd):
+                attrs = list(attrs)
+                attrs[3] &= ~termios.ECHO
+            termios.tcsetattr(fd, termios.TCSANOW, attrs)
 
     @staticmethod
     def _install_handlers():
@@ -661,6 +700,26 @@ class _TerminalEcho(object):
             # Terminate the process the way the signal would have
             signal.signal(signum, signal.SIG_DFL)
             os.kill(os.getpid(), signum)
+
+
+def terminal_state(fd):
+    """
+    Returns the attributes of the terminal of a file descriptor.
+
+    Use with :func:`set_terminal_state` to restore the terminal after
+    running a command that may change it. Echo of typed keys disabled
+    while progress bars are shown is not included.
+    """
+    return _TerminalEcho.get_attrs(fd)
+
+
+def set_terminal_state(fd, attrs):
+    """
+    Restores attributes of the terminal of a file descriptor returned by
+    :func:`terminal_state`, keeping echo disabled while progress bars are
+    shown.
+    """
+    _TerminalEcho.set_attrs(fd, attrs)
 
 
 def restore_terminal():

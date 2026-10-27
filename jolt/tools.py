@@ -754,9 +754,9 @@ class Tools(object):
     def _capture_termios(self):
         states = [None, None, None]
         try:
-            states[0] = termios.tcgetattr(sys.stdin.fileno())
-            states[1] = termios.tcgetattr(sys.stdout.fileno())
-            states[2] = termios.tcgetattr(sys.stderr.fileno())
+            states[0] = log.terminal_state(sys.stdin.fileno())
+            states[1] = log.terminal_state(sys.stdout.fileno())
+            states[2] = log.terminal_state(sys.stderr.fileno())
         except KeyboardInterrupt as e:
             raise e
         except Exception:
@@ -766,11 +766,11 @@ class Tools(object):
     def _restore_termios(self, states):
         stdin_state, stdout_state, stderr_state = states
         if stdin_state:
-            termios.tcsetattr(sys.stdin.fileno(), termios.TCSANOW, stdin_state)
+            log.set_terminal_state(sys.stdin.fileno(), stdin_state)
         if stdout_state:
-            termios.tcsetattr(sys.stdout.fileno(), termios.TCSANOW, stdout_state)
+            log.set_terminal_state(sys.stdout.fileno(), stdout_state)
         if stderr_state:
-            termios.tcsetattr(sys.stderr.fileno(), termios.TCSANOW, stderr_state)
+            log.set_terminal_state(sys.stderr.fileno(), stderr_state)
 
     def append_file(self, pathname, content, expand=True):
         """ Appends data at the end of a file.
