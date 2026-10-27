@@ -49,6 +49,7 @@ from jolt.pkgs import libfastjson
 from jolt.pkgs import libffi
 from jolt.pkgs import libglvnd
 from jolt.pkgs import libpciaccess
+from jolt.pkgs import libpng
 from jolt.pkgs import libseccomp
 from jolt.pkgs import libtool
 from jolt.pkgs import libunwind
@@ -158,6 +159,7 @@ class Default(Alias):
         "libevent",
         "libexpat",
         "libmysqlclient",
+        "libpng",
         "libva",
         "libvorbis",
         "libxml2",
