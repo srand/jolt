@@ -39,6 +39,32 @@ in the worker container image, but this is not recommended as it makes administr
 of the build cluster more difficult, especially when multiple different versions
 of the same tool are required.
 
+
+Build Parameters
+~~~~~~~~~~~~~~~~
+
+Build submissions carry the ``[params]`` configuration section as
+``config.*`` entries in ``BuildEnvironment.parameters``. They can be used to
+attribute builds, for example to a user and a CI job:
+
+  .. code:: bash
+
+    $ jolt -c params.username=alice -c params.origin="$BUILD_URL" build -n my-task
+
+The scheduler forwards the parameters unchanged in administration events.
+They are supplied by the client and are not verified.
+
+.. warning::
+
+   Build parameters are visible to all administration event subscribers.
+   Do not put secrets in ``[params]``.
+
+Parameters do not change task identities unless a task explicitly declares an
+influence, such as ``@influence.config("params", "origin")``. They do however
+contribute to the build ID, so otherwise identical submissions with different
+parameters are registered as separate builds.
+
+
 Docker Swarm
 ~~~~~~~~~~~~
 

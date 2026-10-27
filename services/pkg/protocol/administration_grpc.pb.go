@@ -36,8 +36,8 @@ type AdministrationClient interface {
 	ListWorkers(ctx context.Context, in *ListWorkersRequest, opts ...grpc.CallOption) (*ListWorkersResponse, error)
 	Reschedule(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// Subscribe to scheduler state changes. The first event is a snapshot of
-	// all queued and running tasks and all connected workers, followed by
-	// incremental updates.
+	// all queued and running tasks, connected workers and registered builds,
+	// followed by incremental updates. Build parameters are visible to subscribers.
 	StreamEvents(ctx context.Context, in *StreamEventsRequest, opts ...grpc.CallOption) (Administration_StreamEventsClient, error)
 }
 
@@ -126,8 +126,8 @@ type AdministrationServer interface {
 	ListWorkers(context.Context, *ListWorkersRequest) (*ListWorkersResponse, error)
 	Reschedule(context.Context, *emptypb.Empty) (*emptypb.Empty, error)
 	// Subscribe to scheduler state changes. The first event is a snapshot of
-	// all queued and running tasks and all connected workers, followed by
-	// incremental updates.
+	// all queued and running tasks, connected workers and registered builds,
+	// followed by incremental updates. Build parameters are visible to subscribers.
 	StreamEvents(*StreamEventsRequest, Administration_StreamEventsServer) error
 	mustEmbedUnimplementedAdministrationServer()
 }

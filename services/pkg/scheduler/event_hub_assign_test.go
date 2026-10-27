@@ -65,9 +65,11 @@ func TestEventHubAssignedAtWhenAssignedWhileScheduling(t *testing.T) {
 
 	snapshot := recv(t, consumer).GetSnapshot()
 	require.NotNil(t, snapshot)
+	require.Len(t, snapshot.Tasks, 2)
 
 	var info *protocol.TaskInfo
 	for _, task := range snapshot.Tasks {
+		assert.Equal(t, build.Id(), task.BuildId)
 		if task.Instance == task2.Instance() {
 			info = task
 		}

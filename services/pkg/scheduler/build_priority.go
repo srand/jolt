@@ -8,6 +8,7 @@ import (
 
 	"github.com/srand/jolt/scheduler/pkg/protocol"
 	"github.com/srand/jolt/scheduler/pkg/utils"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type TaskWalkFunc func(*priorityBuild, *Task) bool
@@ -24,8 +25,14 @@ type priorityBuild struct {
 	// The build environment as provided by the client.
 	environment *protocol.BuildEnvironment
 
+	// Private copy of the client parameters, published in build metadata.
+	parameters []*protocol.Property
+
+	// Scheduler telemetry, separate from client observers that keep a build alive.
+	statusChanged func(*protocol.BuildInfo)
+
 	// The unique identifier of the build.
-	// This is the SHA1 hash of the build request.
+	// This is the BLAKE3 hash of the build request.
 	id string
 
 	// The priority of the build.
@@ -117,8 +124,43 @@ func (b *priorityBuild) NumRunningTasks() int {
 func (b *priorityBuild) Cancel() {
 	b.Lock()
 	defer b.Unlock()
-	b.status = protocol.BuildStatus_BUILD_CANCELLED
+	if b.status != protocol.BuildStatus_BUILD_ACCEPTED {
+		return
+	}
+	b.setStatusNoLock(protocol.BuildStatus_BUILD_CANCELLED)
 	b.ctxCancel()
+}
+
+// Caller holds the build lock. The parameters are shared and must not be modified.
+func (b *priorityBuild) infoNoLock() *protocol.BuildInfo {
+	return &protocol.BuildInfo{
+		Id:          b.id,
+		Status:      b.status,
+		ScheduledAt: timestamppb.New(b.scheduledAt),
+		Parameters:  b.parameters,
+	}
+}
+
+func (b *priorityBuild) setStatusNoLock(status protocol.BuildStatus) {
+	b.status = status
+	if b.statusChanged != nil {
+		b.statusChanged(b.infoNoLock())
+	}
+	b.buildObservers.Post(&protocol.BuildUpdate{BuildId: b.id, Status: status})
+}
+
+// Atomically recheck cleanup eligibility and mark natural completion. Clients
+// can submit more tasks while an accepted build still has an observer.
+func (b *priorityBuild) finishIfTerminal() bool {
+	b.Lock()
+	defer b.Unlock()
+	if !b.isTerminalNoLock() {
+		return false
+	}
+	if b.status == protocol.BuildStatus_BUILD_ACCEPTED {
+		b.setStatusNoLock(protocol.BuildStatus_BUILD_COMPLETED)
+	}
+	return true
 }
 
 // Close the build and all its tasks.
@@ -176,44 +218,39 @@ func (b *priorityBuild) IsDone() bool {
 
 // Returns true if the build is terminal.
 func (b *priorityBuild) IsTerminal() bool {
-	if b.IsCancelled() {
+	b.RLock()
+	defer b.RUnlock()
+	return b.isTerminalNoLock()
+}
+
+func (b *priorityBuild) isTerminalNoLock() bool {
+	if b.isCancelled() || b.queue == nil {
 		return true
 	}
-
-	if b.HasObserver() {
-		return false
-	}
-
-	if b.HasQueuedTask() {
-		return false
-	}
-
-	if b.HasRunningTask() {
-		return false
-	}
-
-	return true
+	return !b.hasObserverNoLock() && b.queue.Empty() && !b.queue.HasUnackedData()
 }
 
 // Returns true if the build or one of its tasks has an observer.
 func (b *priorityBuild) HasObserver() bool {
 	b.RLock()
-	observers := b.buildObservers
-	b.RUnlock()
+	defer b.RUnlock()
+	return b.hasObserverNoLock()
+}
 
-	if observers == nil {
+func (b *priorityBuild) hasObserverNoLock() bool {
+	if b.buildObservers == nil {
 		return false
 	}
 
-	if observers.HasObserver() {
+	if b.buildObservers.HasObserver() {
 		return true
 	}
-
-	task := b.FindQueuedTask(func(b *priorityBuild, t *Task) bool {
-		return t.HasObserver()
+	if b.queue == nil {
+		return false
+	}
+	return !b.queue.Walk(func(_ *utils.Unicast[*Task], task *Task) bool {
+		return !task.HasObserver()
 	})
-
-	return task != nil
 }
 
 // Returns true if the build has a queued task.
@@ -289,20 +326,6 @@ func (b *priorityBuild) ScheduleTask(identity string, prepare func(*Task)) (*Tas
 	return task, observer, nil
 }
 
-// Returns the queued task with the given identity, or nil.
-func (b *priorityBuild) FindQueuedTask(walkFn TaskWalkFunc) *Task {
-	var lastTask *Task
-
-	if b.WalkQueuedTasks(func(b *priorityBuild, t *Task) bool {
-		lastTask = t
-		return !walkFn(b, t)
-	}) {
-		return nil
-	}
-
-	return lastTask
-}
-
 // Return the build status
 func (b *priorityBuild) Status() protocol.BuildStatus {
 	b.RLock()
@@ -324,19 +347,6 @@ func (b *priorityBuild) WalkTasks(walkFn TaskWalkFunc) bool {
 	return true
 }
 
-// Iterate over all queued tasks.
-// Returns false if the walk was aborted by the walkFn returning false.
-func (b *priorityBuild) WalkQueuedTasks(walkFn TaskWalkFunc) bool {
-	b.RLock()
-	defer b.RUnlock()
-	if b.queue == nil {
-		return true
-	}
-	return b.queue.Walk(func(unicast *utils.Unicast[*Task], task *Task) bool {
-		return walkFn(b, task)
-	})
-}
-
 // Creates a new task executor for the build.
 func (b *priorityBuild) NewExecutor(scheduler Scheduler, worker Worker) (Executor, error) {
 	b.RLock()
@@ -355,7 +365,8 @@ func (b *priorityBuild) NewExecutor(scheduler Scheduler, worker Worker) (Executo
 
 // Create a new build update observer.
 func (b *priorityBuild) NewUpdateObserver() BuildUpdateObserver {
-	// Locking is not necessary here because the build observers have their own locks.
+	b.RLock()
+	defer b.RUnlock()
 	return b.buildObservers.NewObserver()
 }
 

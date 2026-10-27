@@ -130,6 +130,22 @@ message TaskInfo {
     google.protobuf.Timestamp assigned_at = 13;
 }
 
+// Registered build metadata, without its task graph or full environment.
+message BuildInfo {
+    string id = 1;
+    BuildStatus status = 2;
+    google.protobuf.Timestamp scheduled_at = 3;
+
+    // Client configuration parameters, forwarded as-is. Visible to administration
+    // subscribers; clients must not include secrets in parameters.
+    repeated Property parameters = 4;
+}
+
+// A build has been removed after terminal cleanup.
+message BuildRemoved {
+    string id = 1;
+}
+
 // Full state of a worker as known by the scheduler.
 message WorkerInfo {
     // Unique identifier of the worker
@@ -162,15 +178,16 @@ message Snapshot {
     repeated TaskInfo tasks = 1;
     repeated WorkerInfo workers = 2;
     google.protobuf.Timestamp timestamp = 3;
+    // All registered builds, including terminal builds awaiting removal.
+    repeated BuildInfo builds = 4;
 }
 
 message StreamEventsRequest {
-    // Only stream events for tasks and workers, respectively.
-    // If neither is set, both are streamed.
+    // Select event kinds. If none is set, tasks, workers and builds are streamed.
     bool tasks = 1;
     bool workers = 2;
 
-    // Only stream events for tasks belonging to this build
+    // Only stream this build, its tasks and workers assigned to its tasks
     string build_id = 3;
 
     // Only stream events for tasks with these statuses
@@ -184,6 +201,9 @@ message StreamEventsRequest {
 
     // Do not send the initial snapshot
     bool no_snapshot = 7;
+
+    // Include build events. Task status, labels and hostname do not filter builds.
+    bool builds = 8;
 }
 
 // An incremental update of the scheduler's state.
@@ -204,10 +224,16 @@ message SchedulerEvent {
 
         // Keepalive, sent when the stream is otherwise idle
         google.protobuf.Timestamp heartbeat = 5;
+
+        // A build was registered or changed status
+        BuildInfo build = 6;
+
+        // A build was removed after terminal cleanup
+        BuildRemoved build_removed = 7;
     }
 }
 
-// This service is not yet implemented.
+// Scheduler administration and monitoring.
 service Administration {
     rpc CancelBuild(CancelBuildRequest) returns (CancelBuildResponse);
     rpc ListBuilds(ListBuildsRequest) returns (ListBuildsResponse);
@@ -215,7 +241,7 @@ service Administration {
     rpc Reschedule(google.protobuf.Empty) returns (google.protobuf.Empty);
 
     // Subscribe to scheduler state changes. The first event is a snapshot of
-    // all queued and running tasks and all connected workers, followed by
-    // incremental updates.
+    // all queued and running tasks, connected workers and registered builds,
+    // followed by incremental updates. Build parameters are visible to subscribers.
     rpc StreamEvents(StreamEventsRequest) returns (stream SchedulerEvent);
 }
