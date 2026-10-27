@@ -21,7 +21,7 @@ from jolt.tasks import TaskRegistry
 @pkgconfig.requires()
 class MySQLBase(cmake.CMake):
     abstract = True
-    version = Parameter("9.5.0", help="MySQL version.")
+    version = Parameter("26.10.0", help="MySQL version.")
     requires_curl = ["curl"]
     requires_darwin_libedit = ["libedit:shared=true"]
     requires_linux_libedit = requires_darwin_libedit
@@ -30,7 +30,7 @@ class MySQLBase(cmake.CMake):
     requires_linux_libudev = ["libudev-zero"]
     requires_lz4 = ["lz4"]
     requires_rapidjson = ["rapidjson"]
-    requires_src = ["git:url=https://github.com/mysql/mysql-server,path={buildroot}/git-mysql,submodules=true"]
+    requires_src = ["git:url=https://github.com/mysql/mysql-server,path={buildroot}/git-mysql,rev=mysql-{version},submodules=true"]
     requires_ssl = ["openssl"]
     requires_zlib = ["zlib"]
     requires_zstd = ["zstd"]
