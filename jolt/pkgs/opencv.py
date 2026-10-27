@@ -9,7 +9,7 @@ from jolt.tasks import TaskRegistry
 @cmake.use_ninja()
 class OpenCV(cmake.CMake):
     name = "opencv"
-    version = Parameter("4.12.0", help="OpenCV version.")
+    version = Parameter("5.0.0", help="OpenCV version.")
     shared = BooleanParameter(False, help="Build shared libraries.")
     requires_git = ["git:url=https://github.com/opencv/opencv.git,rev={version}"]
     srcdir = "{git[opencv]}"
