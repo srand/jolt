@@ -190,7 +190,7 @@ func NewHttpHandler(cache Cache, service CacheGrpcService) http.Handler {
 		writeJSON(w, http.StatusCreated, nil)
 	})
 
-	mux.HandleFunc("HEAD /files/{path}", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("HEAD /files/{path...}", func(w http.ResponseWriter, r *http.Request) {
 		if info := cache.HasFile(r.PathValue("path")); info != nil {
 			w.Header().Set("Content-Length", fmt.Sprint(info.Size()))
 			writeJSON(w, http.StatusOK, nil)
@@ -200,7 +200,7 @@ func NewHttpHandler(cache Cache, service CacheGrpcService) http.Handler {
 		newError(w, r, utils.ErrNotFound)
 	})
 
-	mux.HandleFunc("GET /files/{path}", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /files/{path...}", func(w http.ResponseWriter, r *http.Request) {
 		reader, err := cache.ReadFile(r.PathValue("path"))
 		if err != nil {
 			newError(w, r, err)
@@ -246,7 +246,7 @@ func NewHttpHandler(cache Cache, service CacheGrpcService) http.Handler {
 		writeJSON(w, http.StatusOK, response)
 	})
 
-	mux.HandleFunc("PUT /files/{path}", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("PUT /files/{path...}", func(w http.ResponseWriter, r *http.Request) {
 		writer, err := cache.WriteFile(r.PathValue("path"))
 		if err != nil {
 			newError(w, r, err)

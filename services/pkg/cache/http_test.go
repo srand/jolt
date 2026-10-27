@@ -1,6 +1,7 @@
 package cache
 
 import (
+	"bytes"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -38,5 +39,26 @@ func TestHttpGetObjectSetsContentLength(t *testing.T) {
 	NewHttpHandler(c, nil).ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/objects/"+digest, nil))
 	assert.Equal(t, http.StatusOK, response.Code)
 	assert.Equal(t, strconv.Itoa(len(data)), response.Header().Get("Content-Length"))
+	assert.Equal(t, data, response.Body.Bytes())
+}
+
+// Clients store artifacts below a directory named after the task.
+func TestHttpFileInSubdirectory(t *testing.T) {
+	c := newTestCache(t).Cache
+	handler := NewHttpHandler(c, nil)
+	data := []byte("file content")
+	path := "/files/task/file.tar.zst"
+
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, httptest.NewRequest(http.MethodPut, path, bytes.NewReader(data)))
+	assert.Equal(t, http.StatusCreated, response.Code)
+
+	response = httptest.NewRecorder()
+	handler.ServeHTTP(response, httptest.NewRequest(http.MethodHead, path, nil))
+	assert.Equal(t, http.StatusOK, response.Code)
+
+	response = httptest.NewRecorder()
+	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, path, nil))
+	assert.Equal(t, http.StatusOK, response.Code)
 	assert.Equal(t, data, response.Body.Bytes())
 }
