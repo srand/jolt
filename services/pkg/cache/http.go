@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 
 	"github.com/labstack/echo/v4"
 	"github.com/srand/jolt/scheduler/pkg/log"
@@ -60,6 +61,20 @@ type FindBlobsResponse struct {
 
 // NewHttpHandler creates a new HTTP handler for the cache. Its metrics
 // include statistics of the gRPC service, if one is given.
+// Sets the Content-Length of a response from the file being sent, so that
+// clients can show the progress of the download. The size is taken from the
+// open file instead of looking up the cache entry again, which would count
+// as another cache hit.
+func setContentLength(c echo.Context, reader io.Reader) {
+	file, ok := reader.(interface{ Stat() (os.FileInfo, error) })
+	if !ok {
+		return
+	}
+	if info, err := file.Stat(); err == nil && info.Mode().IsRegular() {
+		c.Response().Header().Set(echo.HeaderContentLength, fmt.Sprint(info.Size()))
+	}
+}
+
 func NewHttpHandler(cache Cache, service CacheGrpcService) http.Handler {
 	r := echo.New()
 	r.HideBanner = true
@@ -90,6 +105,8 @@ func NewHttpHandler(cache Cache, service CacheGrpcService) http.Handler {
 			return newError(c, err)
 		}
 		defer reader.Close()
+
+		setContentLength(c, reader)
 
 		if _, err := io.Copy(c.Response().Writer, reader); err != nil {
 			return newError(c, err)
@@ -166,6 +183,8 @@ func NewHttpHandler(cache Cache, service CacheGrpcService) http.Handler {
 			return newError(c, err)
 		}
 		defer reader.Close()
+
+		setContentLength(c, reader)
 
 		if _, err := io.Copy(c.Response().Writer, reader); err != nil {
 			return newError(c, err)
