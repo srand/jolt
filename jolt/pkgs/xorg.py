@@ -220,7 +220,7 @@ class Xrandr(autotools.Autotools):
 class Xrender(autotools.Autotools):
     name = "xorg/libxrender"
     version = Parameter("0.9.13", help="Xrender version.")
-    requiers_macros = ["xorg/macros"]
+    requires_macros = ["xorg/macros"]
     requires_renderproto = ["xorg/renderproto"]
     requires_src = ["fetch:alias=src,url=https://www.x.org/releases/individual/lib/libXrender-{version}.tar.gz"]
     requires_x11 = ["xorg/libx11"]
