@@ -10,7 +10,7 @@ class PkgConfPosix(autotools.Autotools):
     """ Package that provides the 'pkgconf' binary, an alternative implementation of 'pkg-config'. """
 
     name = "pkgconf/posix"
-    version = Parameter("2.5.1", help="pkg-config version.")
+    version = Parameter("3.0.10", help="pkg-config version.")
     requires_git = ["git:url=https://github.com/pkgconf/pkgconf.git,rev=pkgconf-{version}"]
     srcdir = "{git[pkgconf]}"
     options = ["--enable-static", "--disable-shared"]
@@ -30,7 +30,7 @@ class PkgConfWin32(meson.Meson):
     """ Package that provides the 'pkgconf' binary, an alternative implementation of 'pkg-config'. """
 
     name = "pkgconf/win32"
-    version = Parameter("2.5.1", help="pkg-config version.")
+    version = Parameter("3.0.10", help="pkg-config version.")
     requires_git = ["git:url=https://github.com/pkgconf/pkgconf.git,rev=pkgconf-{version}"]
     srcdir = "{git[pkgconf]}"
     options = [
@@ -53,7 +53,7 @@ class PkgConf(Alias):
     """ Alias for pkgconf package. """
 
     name = "pkgconf"
-    version = Parameter("2.5.1", help="pkg-config version.")
+    version = Parameter("3.0.10", help="pkg-config version.")
     requires_darwin = ["pkgconf/posix:version={version}"]
     requires_linux = requires_darwin
     requires_windows = ["pkgconf/win32:version={version}"]
