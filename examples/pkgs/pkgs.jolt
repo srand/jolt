@@ -56,6 +56,7 @@ from jolt.pkgs import libtool
 from jolt.pkgs import libunwind
 from jolt.pkgs import libva
 from jolt.pkgs import libvorbis
+from jolt.pkgs import libxkbcommon
 from jolt.pkgs import libxml2
 from jolt.pkgs import libxslt
 from jolt.pkgs import libyajl
@@ -245,6 +246,7 @@ class Default(Alias):
         "libglvnd",
         "libpciaccess",
         "libseccomp",
+        "libxkbcommon",
         "mesa",
         "wayland",
         "wayland-protocols",
