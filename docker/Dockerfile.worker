@@ -1,4 +1,4 @@
-FROM docker.io/golang:1.25-trixie as tools
+FROM docker.io/golang:1.27-trixie as tools
 ARG DEBIAN_FRONTEND=noninteractive
 ARG BLAKE3_VERSION=1.8.3
 RUN apt-get update && apt-get install -y \
