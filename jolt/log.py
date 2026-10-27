@@ -14,16 +14,19 @@ import logging.handlers
 from contextlib import contextmanager
 from rich.console import Console
 from rich.live import Live
+from rich.measure import Measurement
 from rich.progress import (
-    BarColumn,
     DownloadColumn,
     MofNCompleteColumn,
     Progress,
+    ProgressColumn,
     TextColumn,
     TimeElapsedColumn,
     TimeRemainingColumn,
     TransferSpeedColumn,
 )
+from rich.style import Style
+from rich.table import Column
 from rich.text import Text
 try:
     from StringIO import StringIO
@@ -395,28 +398,124 @@ def progress_log(desc, count, unit):
     return _Progress(desc)
 
 
+class _BlockBar(object):
+    """ Progress bar drawn with block characters across the available width. """
+
+    _partial = " ▏▎▍▌▋▊▉"
+
+    def __init__(self, completed, total, finished):
+        self.completed = completed
+        self.total = total
+        self.finished = finished
+
+    def __rich_console__(self, console, options):
+        width = options.max_width
+        ratio = min(1.0, self.completed / self.total) if self.total else 0.0
+        full, eighths = divmod(int(ratio * width * 8), 8)
+        bar = "█" * full
+        if eighths and full < width:
+            bar += self._partial[eighths]
+        color = console.get_style("bar.finished" if self.finished else "bar.complete").color
+        yield Text(bar.ljust(width), style=Style(color=color, bgcolor="grey23"), end="")
+
+    def __rich_measure__(self, console, options):
+        return Measurement(1, options.max_width)
+
+
+class _BlockBarColumn(ProgressColumn):
+    """ Column with a block progress bar that fills the remaining width. """
+
+    def __init__(self):
+        super().__init__(table_column=Column(ratio=1, no_wrap=True))
+
+    def render(self, task):
+        if task.total is None:
+            return Text("")
+        return _BlockBar(task.completed, task.total, task.finished)
+
+
+class _DescriptionColumn(TextColumn):
+    """
+    Description column with a fixed width.
+
+    The width, including the log level, shrinks in narrow terminals to
+    leave room for the bar and the other columns.
+    """
+
+    max_width = 48
+    min_width = 24
+    reserved_width = 52
+
+    def __init__(self):
+        super().__init__("[   INFO] {task.description}", markup=False)
+
+    def get_table_column(self):
+        width = max(self.min_width, min(self.max_width, _console.width - self.reserved_width))
+        return Column(width=width, no_wrap=True, overflow="ellipsis")
+
+
+class _DetailsColumn(ProgressColumn):
+    """ Counters of a progress bar, in a format depending on the unit. """
+
+    def __init__(self):
+        super().__init__(table_column=Column(width=24, justify="right", no_wrap=True, overflow="ellipsis"))
+        self._download = DownloadColumn()
+        self._speed = TransferSpeedColumn()
+        self._count = MofNCompleteColumn()
+
+    def render(self, task):
+        unit = task.fields.get("unit", "")
+        if task.total is None:
+            return Text("{:.0f} {}".format(task.completed, unit))
+        if unit == "B":
+            return Text.assemble(self._download.render(task), " ", self._speed.render(task))
+        return Text.assemble(self._count.render(task), " ", unit)
+
+
+class _RemainingColumn(ProgressColumn):
+    """ Estimated time remaining, for bars with estimates only. """
+
+    def __init__(self):
+        super().__init__(table_column=Column(width=7, no_wrap=True))
+        self._remaining = TimeRemainingColumn()
+
+    def render(self, task):
+        if task.total is None or not task.fields.get("estimates"):
+            return Text("")
+        return self._remaining.render(task)
+
+
 class _ProgressDisplay(object):
     """
     Live terminal region that shows all open progress bars.
 
-    The region is redrawn a few times per second and log output is
-    printed above it.
+    All bars are rows of one table with fixed width columns, except for
+    the bar itself, so that bars shown at the same time line up. The
+    region is redrawn a few times per second and log output is printed
+    above it.
     """
 
     lock = threading.RLock()
     live = None
-    bars = []
+    progress = Progress(
+        _DescriptionColumn(),
+        _BlockBarColumn(),
+        _DetailsColumn(),
+        TimeElapsedColumn(table_column=Column(width=7, no_wrap=True)),
+        _RemainingColumn(),
+        console=_console,
+        auto_refresh=False,
+        expand=True)
 
     def __rich_console__(self, console, options):
         # Called by the refresh thread of rich while it holds its own
         # lock, don't take the display lock here.
-        for bar in list(_ProgressDisplay.bars):
-            yield bar.progress.get_renderable()
+        yield _ProgressDisplay.progress.make_tasks_table(_ProgressDisplay.progress.tasks)
 
     @staticmethod
-    def add(bar):
+    def add(desc, total, unit, estimates):
         with _ProgressDisplay.lock:
-            _ProgressDisplay.bars.append(bar)
+            task = _ProgressDisplay.progress.add_task(desc, total=total, unit=unit, estimates=estimates)
             if _ProgressDisplay.live is None:
                 _ProgressDisplay.live = Live(
                     _ProgressDisplay(),
@@ -426,60 +525,59 @@ class _ProgressDisplay(object):
                     redirect_stdout=False,
                     redirect_stderr=False)
                 _ProgressDisplay.live.start()
+            return task
 
     @staticmethod
-    def remove(bar):
+    def remove(task_id):
         with _ProgressDisplay.lock:
-            if bar not in _ProgressDisplay.bars:
+            progress = _ProgressDisplay.progress
+            tasks = [task for task in progress.tasks if task.id == task_id]
+            if not tasks:
                 return
 
             # The live region is erased when stopped, stop it before the
             # last bar is removed so that no empty line is left behind.
-            if len(_ProgressDisplay.bars) == 1:
+            if len(progress.tasks) == 1:
                 _ProgressDisplay.live.stop()
                 _ProgressDisplay.live = None
-            _ProgressDisplay.bars.remove(bar)
+            progress.remove_task(task_id)
 
-            # Leave the final state of the bar in the terminal
-            _console.print(bar.progress.get_renderable())
+            # Leave the final state of the bar in the terminal, with the
+            # same column widths as the bars still shown.
+            _console.print(progress.make_tasks_table(tasks))
 
 
 class _RichProgress(object):
     def __init__(self, desc, count, unit, estimates):
-        unit = unit.strip()
-        columns = [TextColumn("[   INFO] {task.description}", markup=False)]
-        if count and unit == "B":
-            columns += [BarColumn(), DownloadColumn(), TransferSpeedColumn()]
-        elif count:
-            columns += [BarColumn(), MofNCompleteColumn(), TextColumn(unit, markup=False)]
-        else:
-            columns += [TextColumn("{task.completed:.0f} " + unit, markup=False)]
-        columns += [TimeElapsedColumn()]
-        if count and estimates:
-            columns += [TimeRemainingColumn()]
-
-        self.progress = Progress(*columns, console=_console, auto_refresh=False)
-        self.task = self.progress.add_task(desc, total=count or None)
+        self._desc = desc
+        self._total = count or None
+        self._unit = unit.strip()
+        self._estimates = estimates
+        self._task = None
 
     def __enter__(self):
-        _ProgressDisplay.add(self)
+        self._task = _ProgressDisplay.add(self._desc, self._total, self._unit, self._estimates)
         return self
 
     def __exit__(self, type, value, tb):
-        _ProgressDisplay.remove(self)
+        _ProgressDisplay.remove(self._task)
         return False
 
     def update(self, n=1):
-        self.progress.advance(self.task, n)
+        if self._task is not None:
+            _ProgressDisplay.progress.advance(self._task, n)
 
     def refresh(self, *args, **kwargs):
         pass
 
     def reset(self, total=None):
-        self.progress.reset(self.task, total=total)
+        if self._task is not None:
+            _ProgressDisplay.progress.reset(self._task, total=total)
 
     def set_description(self, desc=None, refresh=True):
-        self.progress.update(self.task, description=desc)
+        self._desc = desc
+        if self._task is not None:
+            _ProgressDisplay.progress.update(self._task, description=desc)
 
 
 def progress(desc, count, unit, estimates=True, debug=False):
