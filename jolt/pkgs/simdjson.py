@@ -10,7 +10,7 @@ from jolt.tasks import TaskRegistry
 @cxxinfo.publish(libraries=["simdjson"])
 class Simdjson(cmake.CMake):
     name = "simdjson"
-    version = Parameter("4.2.4", help="simdjson version.")
+    version = Parameter("5.0.6", help="simdjson version.")
     shared = BooleanParameter(False, help="Build shared libraries.")
     requires_git = ["git:url=https://github.com/simdjson/simdjson.git,rev=v{version}"]
     srcdir = "{git[simdjson]}"
