@@ -18,7 +18,7 @@ class Protobuf(cmake.CMake):
     """
 
     name = "protobuf"
-    version = Parameter("33.2", help="Protobuf version.")
+    version = Parameter("36.2", help="Protobuf version.")
     pic = BooleanParameter(False, help="Build with position independent code.")
     shared = BooleanParameter(False, help="Build shared libraries")
     requires_abseil = ["abseil:pic={pic},shared={shared}"]
@@ -42,7 +42,7 @@ class ProtobufLib(Task):
     """ Protobuf library """
 
     name = "protobuf/lib"
-    version = Parameter("33.2", help="Protobuf version.")
+    version = Parameter("36.2", help="Protobuf version.")
     shared = BooleanParameter(False, help="Build shared libraries")
     extends = "protobuf:version={version},shared={shared}"
 
@@ -54,7 +54,7 @@ class ProtobufLite(Task):
     """ Protobuf Lite library """
 
     name = "protobuf/lib-lite"
-    version = Parameter("33.2", help="Protobuf version.")
+    version = Parameter("36.2", help="Protobuf version.")
     shared = BooleanParameter(False, help="Build shared libraries")
     extends = "protobuf:version={version},shared={shared}"
 
@@ -66,7 +66,7 @@ class ProtobufLibProtoc(Task):
     """ Protobuf compiler library (libprotoc) """
 
     name = "protobuf/lib-compiler"
-    version = Parameter("33.2", help="Protobuf version.")
+    version = Parameter("36.2", help="Protobuf version.")
     shared = BooleanParameter(False, help="Build shared libraries")
     extends = "protobuf:version={version},shared={shared}"
 

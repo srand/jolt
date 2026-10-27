@@ -18,7 +18,7 @@ from jolt.tasks import TaskRegistry
 @cxxinfo.publish()
 class Grpc(cmake.CMake):
     name = "grpc"
-    version = Parameter("1.76.0", help="Grpc version.")
+    version = Parameter("1.85.0", help="Grpc version.")
     pic = BooleanParameter(False, help="Build with position independent code.")
     shared = BooleanParameter(False, help="Build shared libraries.")
     generator = "Ninja"
