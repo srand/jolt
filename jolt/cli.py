@@ -464,6 +464,7 @@ def build(ctx, task, network, keep_going, default, local,
         except KeyboardInterrupt:
             print()
             log.warning("Interrupted again, exiting")
+            log.restore_terminal()
             os._exit(1)
     finally:
         queue.shutdown()
@@ -815,6 +816,7 @@ def download(ctx, task, deps, copy, copy_all):
         except KeyboardInterrupt:
             print()
             log.warning("Interrupted again, exiting")
+            log.restore_terminal()
             os._exit(1)
 
     except Exception as e:

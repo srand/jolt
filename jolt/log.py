@@ -3,6 +3,7 @@ import atexit
 import glob
 import os
 import re
+import signal
 import sys
 import time
 if os.name == "posix":
@@ -572,12 +573,19 @@ class _TerminalEcho(object):
     Echoed keys, such as enter, move the cursor and break the redraw of
     the bars. Signal keys like Ctrl-C keep working since only echo is
     disabled, and typed input is still passed on to whoever reads it.
+
+    Echo is restored when the bars are closed, at exit and when the
+    process is terminated by SIGTERM or SIGHUP.
     """
 
     fd = None
     attrs = None
+    pid = None
+    handlers = {}
+    signals = [getattr(signal, name) for name in ("SIGTERM", "SIGHUP") if hasattr(signal, name)]
 
     @staticmethod
+    @utils.delay_interrupt
     def disable():
         if os.name != "posix" or _TerminalEcho.attrs is not None:
             return
@@ -589,23 +597,73 @@ class _TerminalEcho(object):
             attrs = termios.tcgetattr(fd)
             noecho = list(attrs)
             noecho[3] &= ~termios.ECHO
+
+            # Record the attributes before changing them so that they are
+            # always restored.
+            _TerminalEcho.fd, _TerminalEcho.attrs, _TerminalEcho.pid = fd, attrs, os.getpid()
+            _TerminalEcho._install_handlers()
             termios.tcsetattr(fd, termios.TCSANOW, noecho)
-            _TerminalEcho.fd, _TerminalEcho.attrs = fd, attrs
         except (AttributeError, ValueError, OSError, termios.error):
             pass
 
     @staticmethod
+    @utils.delay_interrupt
     def restore():
-        if _TerminalEcho.attrs is None:
+        # Forked child processes must not restore the terminal of the parent
+        if _TerminalEcho.attrs is None or _TerminalEcho.pid != os.getpid():
             return
         try:
             termios.tcsetattr(_TerminalEcho.fd, termios.TCSANOW, _TerminalEcho.attrs)
         except (ValueError, OSError, termios.error):
             pass
-        _TerminalEcho.fd, _TerminalEcho.attrs = None, None
+        _TerminalEcho.fd, _TerminalEcho.attrs, _TerminalEcho.pid = None, None, None
+        _TerminalEcho._remove_handlers()
+
+    @staticmethod
+    def _install_handlers():
+        # Signal handlers can only be installed from the main thread
+        if threading.current_thread() is not threading.main_thread():
+            return
+        for signum in _TerminalEcho.signals:
+            try:
+                _TerminalEcho.handlers[signum] = signal.signal(signum, _TerminalEcho._handler)
+            except (ValueError, OSError):
+                pass
+
+    @staticmethod
+    def _remove_handlers():
+        if threading.current_thread() is not threading.main_thread():
+            return
+        for signum, handler in list(_TerminalEcho.handlers.items()):
+            try:
+                if signal.getsignal(signum) is _TerminalEcho._handler:
+                    signal.signal(signum, handler)
+                del _TerminalEcho.handlers[signum]
+            except (ValueError, OSError):
+                pass
+
+    @staticmethod
+    def _handler(signum, frame):
+        handler = _TerminalEcho.handlers.get(signum, signal.SIG_DFL)
+        _TerminalEcho.restore()
+        if callable(handler):
+            handler(signum, frame)
+        elif handler == signal.SIG_DFL:
+            # Terminate the process the way the signal would have
+            signal.signal(signum, signal.SIG_DFL)
+            os.kill(os.getpid(), signum)
 
 
 atexit.register(_TerminalEcho.restore)
+
+
+def restore_terminal():
+    """
+    Restores terminal settings changed while progress bars are shown.
+
+    Call before exiting with os._exit(), which skips exit handlers.
+    """
+    _TerminalEcho.restore()
 
 
 class _ProgressDisplay(object):
@@ -645,6 +703,7 @@ class _ProgressDisplay(object):
         yield Constrain(table, width=max(1, options.max_width - 1))
 
     @staticmethod
+    @utils.delay_interrupt
     def add(desc, total, unit, estimates):
         with _ProgressDisplay.lock:
             task = _ProgressDisplay.progress.add_task(desc, total=total, unit=unit, estimates=estimates)
@@ -664,6 +723,7 @@ class _ProgressDisplay(object):
             return task
 
     @staticmethod
+    @utils.delay_interrupt
     def remove(task_id):
         with _ProgressDisplay.lock:
             progress = _ProgressDisplay.progress
