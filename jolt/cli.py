@@ -186,6 +186,24 @@ def _autocomplete_tasks(ctx, args, incomplete):
     return sorted(tasks)
 
 
+def _interrupted(queue, executors):
+    """
+    Handles an interrupted build by aborting queued tasks and waiting for
+    running tasks to finish. Exits the process.
+    """
+    try:
+        print()
+        log.warning("Interrupted by user")
+        queue.abort()
+        executors.shutdown()
+        sys.exit(1)
+    except KeyboardInterrupt:
+        print()
+        log.warning("Interrupted again, exiting")
+        log.restore_terminal()
+        os._exit(1)
+
+
 @cli.command()
 @click.argument("task", type=str, nargs=-1, shell_complete=_autocomplete_tasks, cls=ArgRequiredUnless, required_unless="worker")
 @click.option("-c", "--copy", type=click.Path(),
@@ -404,45 +422,49 @@ def build(ctx, task, network, keep_going, default, local,
             debug=debug)
 
         with progress:
-            in_progress = set()
+            try:
+                in_progress = set()
 
-            while dag.has_tasks() or not queue.empty():
-                # Find all tasks ready to be executed
-                leafs = dag.select(lambda graph, task: task.is_ready() and task not in in_progress)
+                while dag.has_tasks() or not queue.empty():
+                    # Find all tasks ready to be executed
+                    leafs = dag.select(lambda graph, task: task.is_ready() and task not in in_progress)
 
-                # Order the tasks by their weights to improve build times
-                leafs.sort(key=lambda x: x.weight)
+                    # Order the tasks by their weights to improve build times
+                    leafs.sort(key=lambda x: x.weight)
 
-                while leafs:
-                    task = leafs.pop()
-                    executor = strategy.create_executor(session, task)
-                    queue.submit(executor)
-                    in_progress.add(task)
+                    while leafs:
+                        task = leafs.pop()
+                        executor = strategy.create_executor(session, task)
+                        queue.submit(executor)
+                        in_progress.add(task)
 
-                task, error = queue.wait()
+                    task, error = queue.wait()
 
-                if not task:
-                    dag.debug()
-                    break
-                elif task.is_goal() and task.duration_running:
-                    goal_task_duration += task.duration_running.seconds
+                    if not task:
+                        dag.debug()
+                        break
+                    elif task.is_goal() and task.duration_running:
+                        goal_task_duration += task.duration_running.seconds
 
-                # Unpack tasks with overridden unpack() method
-                if not task.is_resource():
-                    if no_prune and task.task.unpack.__func__ is not Task.unpack:
-                        with acache.get_context(task):
-                            pass
+                    # Unpack tasks with overridden unpack() method
+                    if not task.is_resource():
+                        if no_prune and task.task.unpack.__func__ is not Task.unpack:
+                            with acache.get_context(task):
+                                pass
 
-                    progress.update(1)
+                        progress.update(1)
 
-                if no_prune and task.is_workspace_resource():
-                    task.task.acquire_ws(force=True)
+                    if no_prune and task.is_workspace_resource():
+                        task.task.acquire_ws(force=True)
 
-                if not keep_going and error is not None:
-                    queue.abort()
-                    executors.shutdown()
-                    task.raise_for_status()
-                    raise error
+                    if not keep_going and error is not None:
+                        queue.abort()
+                        executors.shutdown()
+                        task.raise_for_status()
+                        raise error
+            except KeyboardInterrupt:
+                # Keep the progress bar while waiting for tasks to finish
+                _interrupted(queue, executors)
 
         if dag.failed or dag.unstable:
             log.error("List of failed tasks")
@@ -455,16 +477,7 @@ def build(ctx, task, network, keep_going, default, local,
             raise_error("No more tasks could be executed")
 
     except KeyboardInterrupt:
-        print()
-        log.warning("Interrupted by user")
-        try:
-            queue.abort()
-            executors.shutdown()
-            sys.exit(1)
-        except KeyboardInterrupt:
-            print()
-            log.warning("Interrupted again, exiting")
-            os._exit(1)
+        _interrupted(queue, executors)
     finally:
         queue.shutdown()
 
@@ -778,19 +791,23 @@ def download(ctx, task, deps, copy, copy_all):
 
     try:
         with log.progress("Progress", dag.number_of_tasks(), " tasks", estimates=False, debug=False) as p:
-            in_progress = set()
+            try:
+                in_progress = set()
 
-            while dag.has_tasks() or not queue.empty():
-                leafs = dag.select(lambda graph, task: task.is_ready() and task not in in_progress)
+                while dag.has_tasks() or not queue.empty():
+                    leafs = dag.select(lambda graph, task: task.is_ready() and task not in in_progress)
 
-                while leafs:
-                    task = leafs.pop()
-                    executor = strategy.create_executor({}, task)
-                    queue.submit(executor)
-                    in_progress.add(task)
+                    while leafs:
+                        task = leafs.pop()
+                        executor = strategy.create_executor({}, task)
+                        queue.submit(executor)
+                        in_progress.add(task)
 
-                task, error = queue.wait()
-                p.update(1)
+                    task, error = queue.wait()
+                    p.update(1)
+            except KeyboardInterrupt:
+                # Keep the progress bar while waiting for tasks to finish
+                _interrupted(queue, executors)
 
         copy_tasks = goal_tasks if not copy_all else all_tasks
         for goal in copy_tasks:
@@ -806,16 +823,7 @@ def download(ctx, task, deps, copy, copy_all):
                         log.info("Location: {0}", artifact.path)
 
     except KeyboardInterrupt:
-        print()
-        log.warning("Interrupted by user")
-        try:
-            queue.abort()
-            executors.shutdown()
-            sys.exit(1)
-        except KeyboardInterrupt:
-            print()
-            log.warning("Interrupted again, exiting")
-            os._exit(1)
+        _interrupted(queue, executors)
 
     except Exception as e:
         log.set_interactive(True)
