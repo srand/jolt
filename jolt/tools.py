@@ -577,9 +577,11 @@ class _AutoTools(object):
             self.tools.run("make VERBOSE=yes Q= V=1 -j{0}",
                            self.tools.cpu_count(), output=True)
 
-    def install(self, target="install"):
+    def install(self, target="install", threads=None):
+        # -j overrides any jobserver inherited through MAKEFLAGS
+        threading_args = "-j{}".format(threads) if threads else ""
         with self.tools.cwd(self.builddir):
-            self.tools.run("make DESTDIR={} {}", self.installdir, target, output=True)
+            self.tools.run("make {} DESTDIR={} {}", threading_args, self.installdir, target, output=True)
 
     def publish(self, artifact, files='*', symlinks=True, *args, **kwargs):
         with self.tools.cwd(self.installdir, self.prefix):

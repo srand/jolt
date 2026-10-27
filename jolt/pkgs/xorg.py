@@ -162,6 +162,7 @@ class Xproto(autotools.Autotools):
     requires_macros = ["xorg/macros"]
     requires_src = ["fetch:alias=src,url=https://www.x.org/releases/individual/proto/xproto-{version}.tar.gz"]
     srcdir = "{fetch[src]}/xproto-{version}"
+    install_threads = 1  # install-sh races creating doc directories
 
 
 @attributes.requires("requires_macros")

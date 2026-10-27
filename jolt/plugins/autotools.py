@@ -19,6 +19,14 @@ class Autotools(Task):
     Additional options to pass to the `./configure` script.
     """
 
+    install_threads = None
+    """
+    Number of parallel jobs used by `make install`.
+
+    If None, make runs as many jobs as the build. Set to 1 for projects
+    whose install scripts race when directories are created by parallel jobs.
+    """
+
     srcdir = None
     """
     Source directory for the Autotools project.
@@ -36,7 +44,7 @@ class Autotools(Task):
         at = tools.autotools(deps, incremental=self.incremental)
         at.configure(self.srcdir or self.joltdir, *options)
         at.build()
-        at.install()
+        at.install(threads=self.install_threads)
 
     def publish(self, artifact, tools):
         at = tools.autotools(incremental=self.incremental)
