@@ -1,9 +1,9 @@
 from jolt import attributes, Parameter
-from jolt.plugins import autotools, cxxinfo, fetch
+from jolt.plugins import autotools, cxxinfo, git
 from jolt.tasks import TaskRegistry
 
 
-@attributes.requires("requires_src")
+@attributes.requires("requires_git")
 @autotools.requires()
 @cxxinfo.publish(libraries=["tirpc"])
 class Libtirpc(autotools.Autotools):
@@ -11,9 +11,14 @@ class Libtirpc(autotools.Autotools):
     name = "libtirpc"
 
     version = Parameter("1.3.8", help="libtirpc version.")
-    requires_src = ["fetch:alias=src,url=https://downloads.sourceforge.net/project/libtirpc/libtirpc/{version}/libtirpc-{version}.tar.bz2"]
-    srcdir = "{fetch[src]}/libtirpc-{version}"
+    # Release tarballs contain a link to an absolute path, which Python refuses to extract
+    requires_git = ["git:clean=true,url=git://git.linux-nfs.org/projects/steved/libtirpc.git,rev=libtirpc-{_version}"]
+    srcdir = "{git[libtirpc]}"
     options = ["--disable-gssapi"]
+
+    @property
+    def _version(self):
+        return str(self.version).replace(".", "-")
 
 
 TaskRegistry.get().add_task_class(Libtirpc)
