@@ -2,6 +2,7 @@ from jolt import attributes
 from jolt import Alias
 
 from jolt.pkgs import abseil
+from jolt.pkgs import alsa_lib
 from jolt.pkgs import asio
 from jolt.pkgs import autoconf
 from jolt.pkgs import automake
@@ -247,6 +248,7 @@ class Default(Alias):
 
     requires_linux = requires_darwin + [
         # "busybox",
+        "alsa-lib",
         "crun",
         "libdrm",
         "libffi",
