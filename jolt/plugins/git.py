@@ -1,3 +1,4 @@
+import functools
 import os
 import pygit2
 import re
@@ -9,6 +10,7 @@ from jolt.influence import FileInfluence, HashInfluenceRegistry
 from jolt.tools import Tools
 from jolt.loader import JoltLoader, workspace_locked
 from jolt import config
+from jolt import fstree
 from jolt import filesystem as fs
 from jolt import log
 from jolt import utils
@@ -26,6 +28,17 @@ def locked(func):
         with self._lock:
             return func(self, *args, **kwargs)
     return _f
+
+
+def _changes_workspace(func):
+    """ Discards the workspace index after the decorated method has run. """
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        finally:
+            fstree.invalidate_workspace_index(args[0].path)
+    return wrapper
 
 
 class GitRepository(object):
@@ -152,6 +165,7 @@ class GitRepository(object):
                     "Reference repository '{0}' could not provide {1}: {2}",
                     refpath, what, "\n".join(e.stderr))
 
+    @_changes_workspace
     def clone(self, submodules=False, rev=None, shallow=False):
         """ Clone the repository.
 
@@ -235,6 +249,7 @@ class GitRepository(object):
             .format(self.relpath, len(diff), dlim))
         return diff
 
+    @_changes_workspace
     def patch(self, patch):
         if not patch:
             return
@@ -322,10 +337,12 @@ class GitRepository(object):
 
         return value
 
+    @_changes_workspace
     def clean(self):
         with self.tools.cwd(self.path):
             return self.tools.run("git clean -dfx", output_on_error=True, new_session=True)
 
+    @_changes_workspace
     def reset(self):
         with self.tools.cwd(self.path):
             return self.tools.run("git reset --hard", output_on_error=True, new_session=True)
@@ -369,6 +386,7 @@ class GitRepository(object):
                 output_on_error=True,
                 new_session=True)
 
+    @_changes_workspace
     def checkout(self, rev, commit=None, submodules=False):
         if rev == self._last_rev:
             log.debug("Checkout skipped, already @ {}", rev)
@@ -415,65 +433,22 @@ def new_git(url, path, relpath, refspecs=None):
 
 
 class GitInfluenceProvider(FileInfluence):
-    name = "Git"
-
-    def __init__(self, path):
-        super().__init__(path)
-        self.path = path.rstrip(fs.sep)
-        self.name = GitInfluenceProvider.name
-
-    @property
-    def joltdir(self):
-        return JoltLoader.get().joltdir
-
-    def _find_dotgit(self, path):
-        ppath = None
-        while path != ppath:
-            if fs.path.exists(fs.path.join(path, ".git")):
-                return path
-            ppath = path
-            path = fs.path.dirname(path)
-        raise_error("No git repository found at '{}'", self.path)
-
-    @utils.cached.instance
-    def get_influence(self, task):
-        tools = Tools(task, task.joltdir)
-        path = tools.expand_path(self.path)
-        git_abs = self._find_dotgit(path)
-        git_rel = git_abs[len(self.joltdir) + 1:]
-        relpath = path[len(git_abs) + 1:]
-        relpath = fs.as_posix(relpath) if relpath else relpath
-
-        if not fs.path.exists(path):
-            return "{0}/{1}: N/A".format(git_rel, relpath)
-        try:
-            git = new_git(None, git_abs, git_rel)
-            return "{0}/{1}: {2}".format(git_rel, relpath, git.tree_hash(path=relpath or "/"))
-        except KeyError:
-            return "{0}/{1}: N/A".format(git_rel, relpath)
-        except JoltCommandError as e:
-            stderr = "\n".join(e.stderr)
-            if "exists on disk, but not in" in stderr:
-                return "{0}/{1}: N/A".format(git_rel, relpath)
-            raise e
-
-    def is_influenced_by(self, task, path):
-        tools = Tools(task, task.joltdir)
-        gitpath = tools.expand_path(self.path)
-        return fs.is_relative_to(path, gitpath)
+    """ Kept for compatibility, same as :class:`jolt.influence.FileInfluence`. """
 
 
-def global_influence(path, cls=GitInfluenceProvider):
+def global_influence(path, cls=FileInfluence):
+    """ Same as :func:`jolt.influence.global_files`. """
     HashInfluenceRegistry.get().register(cls(path))
 
 
-def influence(path, git_cls=GitInfluenceProvider):
+def influence(path, git_cls=FileInfluence):
+    """ Same as :func:`jolt.influence.files`. """
     def _decorate(cls):
         _old_influence = cls._influence
 
         def _influence(self, *args, **kwargs):
             influence = _old_influence(self, *args, **kwargs)
-            influence.append(git_cls(path=path))
+            influence.append(git_cls(path))
             return influence
 
         cls._influence = _influence

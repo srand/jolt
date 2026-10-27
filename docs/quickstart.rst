@@ -325,8 +325,8 @@ influence the hash of the task. We instead use the ``git.influence`` decorator:
             ac.build()
             ac.install()
 
-The decorator adds the git repository's tree hash as hash influence.
-It will also add the ``git diff`` output as influence to simplify iterative local
+The decorator adds the content of all files in the repository as hash
+influence, including uncommitted changes, to simplify iterative local
 development.
 
 There are a number of other useful influence decorators as well:
@@ -355,10 +355,10 @@ There are a number of other useful influence decorators as well:
             self.report()
 
 Above, the ``git.influence`` decorator has been replaced by
-``influence.files``. The result is virtually the same, the content of all files
-matched by the provided pattern will influence the hash of the task. However,
-the Git tree hash implementation is more effecient and faster, but it obviously
-doesn't work if sources reside in a different type of repository.
+``influence.files``. The result is the same, the content of all files
+matched by the provided pattern will influence the hash of the task.
+Files are hashed with the fstree index of the workspace, so files ignored
+by ``.joltignore`` don't influence the hash.
 
 The ``influence.environ`` decorator is used to influence the hash of
 the task based on the value of the ``CFLAGS`` environment variable. If the

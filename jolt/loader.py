@@ -4,7 +4,6 @@ import json
 import glob
 from importlib.machinery import SourceFileLoader
 import os
-import platform
 import subprocess
 import sys
 from types import ModuleType
@@ -15,6 +14,7 @@ from jolt.error import raise_error_if
 from jolt import common_pb2 as common_pb
 from jolt import config
 from jolt import filesystem as fs
+from jolt.fstree import find_executable as find_fstree, workspace_index_files
 from jolt import log
 from jolt import utils
 from jolt.tools import Tools
@@ -443,12 +443,8 @@ def export_workspace(tasks=None) -> common_pb.Workspace:
 
     fstree_enabled = config.getboolean("jolt", "fstree", True)
     if fstree_enabled:
-        fstree = tools.which("fstree")
+        fstree = find_fstree()
         if not fstree:
-            host = platform.system().lower()
-            arch = platform.machine().lower()
-            fstree = os.path.join(os.path.dirname(__file__), "bin", f"fstree-{host}-{arch}")
-        if not os.path.exists(fstree):
             fstree_enabled = False
             log.warning("fstree executable not found, will not push workspace to remote cache")
 
@@ -463,15 +459,8 @@ def export_workspace(tasks=None) -> common_pb.Workspace:
 
     # Push workspace to remote cache if possible
     if fstree_enabled and fstree and cache_grpc_uri:
-        with tools.cwd(loader.workspace_path):
-            cwd = tools.getcwd()
+        with tools.cwd(loader.workspace_path), workspace_index_files() as (indexfile, ignorefile):
             cachedir = config.get_cachedir()
-            indexhash = utils.hashstring(cwd)
-            indexfile = tools.expand_path(
-                "{cachedir}/indexes/{}/{}",
-                indexhash[:2], indexhash[2:],
-                cwd=fs.posixpath.abspath(cwd),
-                cachedir=cachedir)
 
             jobserver_path = os.getenv("JOLT_JOBSERVER_PATH")
             jobserver_args = ["--jobserver-path", jobserver_path] if jobserver_path else []
@@ -481,7 +470,7 @@ def export_workspace(tasks=None) -> common_pb.Workspace:
                 try:
                     with log.progress("Indexing workspace for the first time", count=None, unit="objects", estimates=False) as progress:
                         process = subprocess.Popen(
-                            [fstree, "write-tree", "--json", "--cache", cachedir, "--ignore", ".joltignore", "--index", indexfile, "--remote", cache_grpc_uri.geturl(), "--threads", str(tools.thread_count())] + jobserver_args,
+                            [fstree, "write-tree", "--json", "--cache", cachedir, "--ignore", ignorefile, "--index", indexfile, "--remote", cache_grpc_uri.geturl(), "--threads", str(tools.thread_count())] + jobserver_args,
                             stdout=subprocess.DEVNULL,
                             stderr=subprocess.PIPE,
                             cwd=tools.getcwd())
@@ -510,7 +499,7 @@ def export_workspace(tasks=None) -> common_pb.Workspace:
             try:
                 with log.progress("Pushing workspace to remote cache", count=None, unit="objects", estimates=False) as progress:
                     process = subprocess.Popen(
-                        [fstree, "write-tree-push", "--json", "--cache", cachedir, "--ignore", ".joltignore", "--index", indexfile, "--remote", cache_grpc_uri.geturl(), "--threads", str(tools.thread_count())] + jobserver_args,
+                        [fstree, "write-tree-push", "--json", "--cache", cachedir, "--ignore", ignorefile, "--index", indexfile, "--remote", cache_grpc_uri.geturl(), "--threads", str(tools.thread_count())] + jobserver_args,
                         stdout=subprocess.DEVNULL,
                         stderr=subprocess.PIPE,
                         cwd=tools.getcwd())
