@@ -9,7 +9,7 @@ import platform
 @attributes.system
 class NodeJS(Download):
     name = "nodejs"
-    version = Parameter("25.2.1", help="NodeJS version.")
+    version = Parameter("26.12.1", help="NodeJS version.")
     url = "https://nodejs.org/dist/v{version}/node-v{version}-{os}-{arch}.{ext}"
     bin = "node-v{version}-{os}-{arch}/bin"
 
