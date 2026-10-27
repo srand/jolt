@@ -597,7 +597,9 @@ class _ProgressDisplay(object):
         # lock, don't take the display lock here.
         # Leave the last column empty. Terminals treat lines that fill the
         # whole width differently when reflowing them on resize.
-        table = _ProgressDisplay.progress.make_tasks_table(_ProgressDisplay.progress.tasks)
+        # Newest bars on top, with the outermost bar at the bottom
+        tasks = list(reversed(_ProgressDisplay.progress.tasks))
+        table = _ProgressDisplay.progress.make_tasks_table(tasks)
         yield Constrain(table, width=max(1, options.max_width - 1))
 
     @staticmethod
