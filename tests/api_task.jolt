@@ -6,6 +6,7 @@ import time
 sys.path.append(".")
 
 from testsupport import JoltTest
+from jolt import utils
 
 
 class TaskApi(JoltTest):
@@ -621,6 +622,76 @@ class TaskApi(JoltTest):
         r = self.build("influence:arg=2 noinfluence:arg=2")
         self.assertBuild(r, "influence:arg=2")
         self.assertNoBuild(r, "noinfluence:arg=2")
+
+    def test_file_influence(self):
+        """
+        --- file: a.txt
+        --- file: dir/b.txt
+        --- file: dir/.hidden
+        --- file: build/gen.txt
+        --- file: ignored.log
+        --- tasks:
+        @influence.files("a.txt")
+        @influence.files("dir")
+        @influence.files("build/gen.txt")
+        @influence.files("*.log")
+        class Files(Task):
+            pass
+
+        @influence.files("link.txt")
+        class Link(Task):
+            pass
+        ---
+        """
+        with self.tools.cwd(self.ws):
+            self.tools.append_file(".joltignore", "*.log\n")
+            self.tools.symlink("a.txt", "link.txt")
+
+        r = self.build("files link")
+        self.assertBuild(r, "files")
+        self.assertBuild(r, "link")
+
+        r = self.build("files link")
+        self.assertNoBuild(r, "files")
+        self.assertNoBuild(r, "link")
+
+        # Ignored, hidden and build directory files don't influence
+        for path in ["ignored.log", "dir/.hidden", "build/gen.txt"]:
+            with self.tools.cwd(self.ws):
+                self.tools.write_file(path, "changed")
+            r = self.build("files")
+            self.assertNoBuild(r, "files")
+
+        with self.tools.cwd(self.ws):
+            self.tools.write_file("dir/b.txt", "changed")
+        r = self.build("files link")
+        self.assertBuild(r, "files")
+        self.assertNoBuild(r, "link")
+
+        # Symlinks influence with the content of their targets
+        with self.tools.cwd(self.ws):
+            self.tools.write_file("a.txt", "changed")
+        r = self.build("files link")
+        self.assertBuild(r, "files")
+        self.assertBuild(r, "link")
+
+    def test_file_influence_value(self):
+        """
+        --- file: a.txt
+        --- file: dir/b.txt
+        --- tasks:
+        @influence.files("a.txt")
+        @influence.files("dir/*.txt")
+        class Files(Task):
+            pass
+        ---
+        """
+        # File influence must not change from when files were hashed
+        # directly, or all task identities would change.
+        r = self.jolt("inspect -i files")
+        for path in ["a.txt", "dir/b.txt"]:
+            expected = "{}: {}".format(utils.hashfile(os.path.join(self.ws, path)), os.path.basename(path))
+            self.assertIn(expected, r)
 
     def test_param_explicit_default(self):
         """

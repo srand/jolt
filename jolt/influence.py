@@ -6,6 +6,7 @@ from jolt import config as jolt_config
 from jolt import inspection
 from jolt import utils
 from jolt import filesystem as fs
+from jolt import fstree
 from jolt import tools
 from jolt import version
 
@@ -519,9 +520,20 @@ def environ(variable):
 
 
 _fi_files = {}
+_fi_index = None
 
 
 class FileInfluence(HashInfluenceProvider):
+    """
+    Influence of files in the workspace.
+
+    Files are matched against and hashed from the fstree index of the
+    workspace. Files outside of the workspace, files ignored by
+    .joltignore, files in the build and cache directories and files in
+    directories excluded by plugins, such as symlinks, are not indexed
+    and never influence the hash.
+    """
+
     def __init__(self, path):
         self.path = path.rstrip(fs.sep)
         self.name = "File"
@@ -531,33 +543,56 @@ class FileInfluence(HashInfluenceProvider):
         return utils.hashfile(str(path))
 
     def get_filelist(self, task):
+        index = fstree.get_workspace_index()
         try:
-            return self._files[task]
+            files_index, filelist = self._files[task]
+            if files_index is index:
+                return filelist
         except KeyError:
-            if fs.path.isdir(task.tools.expand_path(self.path)):
-                path = self.path + fs.sep + "**"
-            else:
-                path = self.path
+            pass
 
-            filelist = task.tools.glob(path, expand=True)
-            filelist.sort()
-            filelist = [Path(fname) for fname in filelist]
-            self._files[task] = filelist
-            return filelist
+        path = task.tools.expand_path(self.path)
+        if index.isdir(path):
+            path = path + fs.sep + "**"
+
+        filelist = [Path(fname) for fname in index.glob(path)]
+        self._files[task] = (index, filelist)
+        return filelist
+
+    def _get_entry_influence(self, index, f):
+        entry = index.get(str(f))
+        if entry is None or entry.is_dir:
+            return None
+        if entry.is_file:
+            return entry.hexdigest + ": " + f.name
+
+        # Symlinks influence with the content of their targets
+        target, targetpath = index.resolve(entry)
+        if target is not None:
+            if target.is_file:
+                return target.hexdigest + ": " + f.name
+            if target.is_dir:
+                return None
+        if fs.path.isdir(targetpath):
+            return None
+        if fs.path.exists(targetpath):
+            return self.get_file_influence(targetpath) + ": " + f.name
+        return "Symlink (broken): " + f.name
 
     def get_influence(self, task):
+        global _fi_index
+        index = fstree.get_workspace_index()
+        if index is not _fi_index:
+            _fi_files.clear()
+            _fi_index = index
+
         result = []
         for f in self.get_filelist(task):
-            if f.is_dir():
-                continue
-            value = _fi_files.get(f)
+            try:
+                value = _fi_files[f]
+            except KeyError:
+                _fi_files[f] = value = self._get_entry_influence(index, f)
             if value:
-                result.append(value)
-            elif f.exists():
-                _fi_files[f] = value = self.get_file_influence(f) + ": " + f.name
-                result.append(value)
-            elif fs.path.lexists(str(f)):
-                _fi_files[f] = value = "Symlink (broken): " + f.name
                 result.append(value)
         return "\n".join(result)
 
@@ -566,7 +601,16 @@ class FileInfluence(HashInfluenceProvider):
         Return True if the path influences the task.
         """
         path = task.tools.expand_path(path)
-        return PurePath(path) in self.get_filelist(task)
+        if PurePath(path) in self.get_filelist(task):
+            return True
+
+        # Files that aren't indexed never influence the hash and are
+        # accepted if they match the pattern.
+        index = fstree.get_workspace_index()
+        if index.get(path) is not None:
+            return False
+        pattern = task.tools.expand_path(self.path)
+        return bool(utils.pathmatch(path, pattern) or utils.pathmatch(path, pattern + fs.sep + "**"))
 
 
 class DirectoryInfluence(FileInfluence):

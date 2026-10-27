@@ -1,6 +1,7 @@
 
 from jolt import config
 from jolt import filesystem as fs
+from jolt import fstree
 from jolt import loader
 from jolt import log
 from jolt import utils
@@ -13,6 +14,19 @@ from contextlib import contextmanager
 log.verbose("[Symlinks] Loaded")
 
 
+def _rootpath():
+    return fs.path.normpath(
+        fs.path.join(
+            fs.path.dirname(loader.JoltLoader.get().build_path),
+            config.get("symlinks", "path", "artifacts")
+        )
+    )
+
+
+# Symlinks to artifacts must not be indexed as workspace files
+fstree.add_ignored_path(_rootpath)
+
+
 class SymlinkTaskHooks(TaskHook):
     def __init__(self):
         self._path = config.get("symlinks", "path", "artifacts")
@@ -20,12 +34,7 @@ class SymlinkTaskHooks(TaskHook):
 
     @property
     def rootpath(self):
-        return fs.path.normpath(
-            fs.path.join(
-                fs.path.dirname(loader.JoltLoader.get().build_path),
-                self._path
-            )
-        )
+        return _rootpath()
 
     def task_finished(self, task):
         if not task.has_artifact():
