@@ -374,7 +374,7 @@ def progress(desc, count, unit, estimates=True, debug=False):
                      if not estimates else None
     else:
         bar_format = '{desc}{n_fmt}{unit} [{elapsed}]'
-    if not debug and is_interactive() and not is_verbose():
+    if not debug and is_interactive() and not is_verbose() and not is_silenced():
         class ProgressTqdm(tqdm.tqdm):
             def __init__(self, *args, **kwargs):
                 super(ProgressTqdm, self).__init__(*args, **kwargs)
@@ -449,6 +449,11 @@ def enable_gdb():
 
 def is_verbose():
     return _stdout.level <= VERBOSE
+
+
+def is_silenced():
+    """ Returns True if informational messages aren't printed to the terminal. """
+    return _stdout.level > INFO
 
 
 _interactive = True
