@@ -651,6 +651,8 @@ class _TerminalEcho(object):
     @staticmethod
     def _handler(signum, frame):
         handler = _TerminalEcho.handlers.get(signum, signal.SIG_DFL)
+        # Don't wait long for the display, another thread may be using it
+        _ProgressDisplay.close(timeout=1)
         _TerminalEcho.restore()
         if callable(handler):
             handler(signum, frame)
@@ -660,16 +662,19 @@ class _TerminalEcho(object):
             os.kill(os.getpid(), signum)
 
 
-atexit.register(_TerminalEcho.restore)
-
-
 def restore_terminal():
     """
-    Restores terminal settings changed while progress bars are shown.
+    Removes all progress bars and restores terminal settings changed
+    while they were shown.
 
-    Call before exiting with os._exit(), which skips exit handlers.
+    Called on interrupts and at exit. Call before exiting with
+    os._exit(), which skips exit handlers.
     """
+    _ProgressDisplay.close()
     _TerminalEcho.restore()
+
+
+atexit.register(restore_terminal)
 
 
 class _ProgressDisplay(object):
@@ -730,6 +735,24 @@ class _ProgressDisplay(object):
 
     @staticmethod
     @utils.delay_interrupt
+    def close(timeout=-1):
+        """ Removes all progress bars from the terminal. """
+        if not _ProgressDisplay.lock.acquire(timeout=timeout):
+            return
+        try:
+            if _ProgressDisplay.live is not None:
+                try:
+                    _ProgressDisplay.live.stop()
+                finally:
+                    _ProgressDisplay.live = None
+                    _TerminalEcho.restore()
+            for task in _ProgressDisplay.progress.tasks:
+                _ProgressDisplay.progress.remove_task(task.id)
+        finally:
+            _ProgressDisplay.lock.release()
+
+    @staticmethod
+    @utils.delay_interrupt
     def remove(task_id):
         with _ProgressDisplay.lock:
             progress = _ProgressDisplay.progress
@@ -770,21 +793,27 @@ class _RichProgress(object):
         _ProgressDisplay.remove(self._task)
         return False
 
+    # Bars may be closed by an interrupt while still in use by other
+    # threads, updates of closed bars are ignored.
+
     def update(self, n=1):
         if self._task is not None:
-            _ProgressDisplay.progress.advance(self._task, n)
+            with utils.ignore_exception(KeyError):
+                _ProgressDisplay.progress.advance(self._task, n)
 
     def refresh(self, *args, **kwargs):
         pass
 
     def reset(self, total=None):
         if self._task is not None:
-            _ProgressDisplay.progress.reset(self._task, total=total)
+            with utils.ignore_exception(KeyError):
+                _ProgressDisplay.progress.reset(self._task, total=total)
 
     def set_description(self, desc=None, refresh=True):
         self._desc = desc
         if self._task is not None:
-            _ProgressDisplay.progress.update(self._task, description=desc)
+            with utils.ignore_exception(KeyError):
+                _ProgressDisplay.progress.update(self._task, description=desc)
 
 
 def progress(desc, count, unit, estimates=True, debug=False):

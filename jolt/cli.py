@@ -455,6 +455,7 @@ def build(ctx, task, network, keep_going, default, local,
             raise_error("No more tasks could be executed")
 
     except KeyboardInterrupt:
+        log.restore_terminal()
         print()
         log.warning("Interrupted by user")
         try:
@@ -807,6 +808,7 @@ def download(ctx, task, deps, copy, copy_all):
                         log.info("Location: {0}", artifact.path)
 
     except KeyboardInterrupt:
+        log.restore_terminal()
         print()
         log.warning("Interrupted by user")
         try:
