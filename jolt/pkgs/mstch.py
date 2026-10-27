@@ -11,7 +11,7 @@ from jolt.tasks import TaskRegistry
 @cxxinfo.publish(libraries=["mstch"])
 class MSTCH(cmake.CMake):
     name = "mstch"
-    version = Parameter("1.0.2", help="MSTCH version.")
+    version = Parameter("1.0.2", help="mstch version.")
     requires_boost = ["boost"]
     requires_src = ["fetch:alias=src,url=https://github.com/no1msd/mstch/archive/refs/tags/{version}.tar.gz"]
     srcdir = "{fetch[src]}/mstch-{version}"

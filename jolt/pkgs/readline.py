@@ -7,7 +7,7 @@ from jolt.tasks import TaskRegistry
 @pkgconfig.to_cxxinfo(["readline"])
 class Readline(autotools.Autotools):
     name = "readline"
-    version = Parameter("8.3", help="Readline version.")
+    version = Parameter("8.3", help="GNU Readline version.")
     requires_src = ["fetch:alias=src,url=https://ftpmirror.gnu.org/gnu/readline/readline-{version}.tar.gz"]
     srcdir = "{fetch[src]}/readline-{version}"
 

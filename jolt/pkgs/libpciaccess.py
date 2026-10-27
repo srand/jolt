@@ -9,7 +9,7 @@ from jolt.tasks import TaskRegistry
 @meson.requires()
 class Libpciaccess(meson.Meson):
     name = "libpciaccess"
-    version = Parameter("0.19", help="pciaccess version.")
+    version = Parameter("0.19", help="libpciaccess version.")
     requires_git = ["git:url=https://gitlab.freedesktop.org/xorg/lib/libpciaccess.git,rev=libpciaccess-{version}"]
     requires_zlib = ["zlib:pic=true"]
     srcdir = "{git[libpciaccess]}"

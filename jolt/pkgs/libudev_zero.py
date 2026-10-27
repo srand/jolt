@@ -14,6 +14,7 @@ class LibudevZero(Task):
     shared = BooleanParameter(False, help="Build shared libraries.")
     requires_git = ["git:clean=true,url=https://github.com/illiliti/libudev-zero.git,rev={version}"]
     srcdir = "{git[libudev-zero]}"
+    """ Source directory. """
 
     def run(self, deps, tools):
         self.installdir = tools.builddir("install")

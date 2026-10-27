@@ -10,11 +10,13 @@ class LibBzip2(ninja.CXXLibrary):
     name = "libbzip2"
     binary = "bzip2"
     version = Parameter("1.0.8", help="bzip2 version.")
-    pic = BooleanParameter(True, help="Build position independent code")
-    shared = BooleanParameter(False, help="Build shared libraries")
+    pic = BooleanParameter(True, help="Build with position independent code.")
+    shared = BooleanParameter(False, help="Build shared libraries.")
     cstd = 90
     cflags_darwin_pic_on = ["-fPIC"]
+    """ Compiler flags on macOS when building with position independent code. """
     cflags_linux_pic_on = ["-fPIC"]
+    """ Compiler flags on Linux when building with position independent code. """
     incremental = False
     requires_src = ["fetch:alias=src,url=https://sourceware.org/pub/bzip2/bzip2-{version}.tar.gz"]
     source_influence = False

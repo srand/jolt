@@ -11,7 +11,7 @@ from jolt.tasks import TaskRegistry
 @cmake.use_ninja()
 class SpirvLLVM(cmake.CMake):
     name = "spirv-llvm-translator"
-    version = Parameter("23.1.2", help="SPIRV-LLVM version.")
+    version = Parameter("23.1.2", help="SPIRV-LLVM-Translator version.")
     requires_git = ["git:url=https://github.com/KhronosGroup/SPIRV-LLVM-Translator.git,rev=v{version}"]
     requires_llvm = ["llvm"]
     requires_spirv_tools = ["spirv-tools"]

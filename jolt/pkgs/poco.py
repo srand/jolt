@@ -13,8 +13,8 @@ import os
 @cxxinfo.publish()
 class Poco(cmake.CMake):
     name = "poco"
-    version = Parameter("1.15.4", help="Poco version")
-    shared = BooleanParameter(False, help="Build shared libraries")
+    version = Parameter("1.15.4", help="POCO version.")
+    shared = BooleanParameter(False, help="Build shared libraries.")
     requires_git = ["git:url=https://github.com/pocoproject/poco.git,rev=poco-{version}-release"]
     requires_ssl = ["virtual/ssl"]
     srcdir = "{git[poco]}"

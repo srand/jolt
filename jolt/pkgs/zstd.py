@@ -11,9 +11,9 @@ from jolt.tasks import TaskRegistry
 @cxxinfo.publish()
 class Zstd(cmake.CMake):
     name = "zstd"
-    version = Parameter("ebc93b0", help="zstd version.")
+    version = Parameter("ebc93b0", help="Zstandard version.")
     pic = BooleanParameter(False, help="Build with position independent code.")
-    shared = BooleanParameter(False, help="Enable shared libraries.")
+    shared = BooleanParameter(False, help="Build shared libraries.")
     requires_git = ["git:url=https://github.com/facebook/zstd.git,rev={version}"]
     srcdir = "{git[zstd]}"
     options = [

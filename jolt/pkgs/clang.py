@@ -28,14 +28,18 @@ class Clang(Task):
 class ClangFormat(llvm.LLVMFromSrc):
     name = "clang-format"
     projects = ["clang", "clang-tools-extra"]
+    """ LLVM projects to build. """
     targets = []
+    """ LLVM targets to build. """
     install = ["install-clang-format"]
 
 
 class ClangTidy(llvm.LLVMFromSrc):
     name = "clang-tidy"
     projects = ["clang", "clang-tools-extra"]
+    """ LLVM projects to build. """
     targets = []
+    """ LLVM targets to build. """
     install = ["install-clang-tidy"]
 
 

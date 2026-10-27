@@ -10,7 +10,7 @@ from jolt.tasks import TaskRegistry
 @cxxinfo.publish(libraries=["lzma"])
 class Xz(cmake.CMake):
     name = "xz"
-    version = Parameter("5.8.4", help="xz version.")
+    version = Parameter("5.8.4", help="XZ Utils version.")
     pic = BooleanParameter(True, help="Build with position independent code.")
     shared = BooleanParameter(False, help="Build shared libraries.")
     requires_git = ["git:url=https://github.com/tukaani-project/xz.git,rev=v{version}"]
@@ -19,6 +19,7 @@ class Xz(cmake.CMake):
         "BUILD_SHARED_LIBS={shared[ON,OFF]}",
         "CMAKE_POSITION_INDEPENDENT_CODE=ON",
     ]
+    """ Options passed to CMake when building with position independent code. """
 
 
 TaskRegistry.get().add_task_class(Xz)

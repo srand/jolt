@@ -18,9 +18,9 @@ class Protobuf(cmake.CMake):
     """
 
     name = "protobuf"
-    version = Parameter("36.2", help="Protobuf version.")
+    version = Parameter("36.2", help="Protocol Buffers version.")
     pic = BooleanParameter(False, help="Build with position independent code.")
-    shared = BooleanParameter(False, help="Build shared libraries")
+    shared = BooleanParameter(False, help="Build shared libraries.")
     requires_abseil = ["abseil:pic={pic},shared={shared}"]
     requires_git = ["git:url=https://github.com/protocolbuffers/protobuf.git,rev=v{version}"]
     srcdir = "{git[protobuf]}"
@@ -42,8 +42,8 @@ class ProtobufLib(Task):
     """ Protobuf library """
 
     name = "protobuf/lib"
-    version = Parameter("36.2", help="Protobuf version.")
-    shared = BooleanParameter(False, help="Build shared libraries")
+    version = Parameter("36.2", help="Protocol Buffers version.")
+    shared = BooleanParameter(False, help="Build shared libraries.")
     extends = "protobuf:version={version},shared={shared}"
 
     def publish(self, artifact, tools):
@@ -54,8 +54,8 @@ class ProtobufLite(Task):
     """ Protobuf Lite library """
 
     name = "protobuf/lib-lite"
-    version = Parameter("36.2", help="Protobuf version.")
-    shared = BooleanParameter(False, help="Build shared libraries")
+    version = Parameter("36.2", help="Protocol Buffers version.")
+    shared = BooleanParameter(False, help="Build shared libraries.")
     extends = "protobuf:version={version},shared={shared}"
 
     def publish(self, artifact, tools):
@@ -66,8 +66,8 @@ class ProtobufLibProtoc(Task):
     """ Protobuf compiler library (libprotoc) """
 
     name = "protobuf/lib-compiler"
-    version = Parameter("36.2", help="Protobuf version.")
-    shared = BooleanParameter(False, help="Build shared libraries")
+    version = Parameter("36.2", help="Protocol Buffers version.")
+    shared = BooleanParameter(False, help="Build shared libraries.")
     extends = "protobuf:version={version},shared={shared}"
 
     def publish(self, artifact, tools):

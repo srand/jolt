@@ -11,7 +11,7 @@ from jolt.tasks import TaskRegistry
 class Libzmq(cmake.CMake):
     name = "libzmq"
     version = Parameter("4.3.5", help="ZeroMQ version.")
-    shared = BooleanParameter(False, help="Build shared libraries")
+    shared = BooleanParameter(False, help="Build shared libraries.")
     requires_git = ["git:url=https://github.com/zeromq/libzmq.git,rev=v{version}"]
     srcdir = "{git[libzmq]}"
     options = [

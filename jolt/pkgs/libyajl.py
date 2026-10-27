@@ -8,7 +8,7 @@ from jolt.tasks import TaskRegistry
 @cmake.requires(version="3.31.1")
 class Libyajl(cmake.CMake):
     name = "libyajl"
-    version = Parameter("2.1.0", help="libyajl version.")
+    version = Parameter("2.1.0", help="YAJL version.")
     requires_git = ["git:url=https://github.com/lloyd/yajl.git,rev={version}"]
     srcdir = "{git[yajl]}"
 

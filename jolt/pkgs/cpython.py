@@ -31,12 +31,12 @@ class CPythonPosix(autotools.Autotools):
 
     name = "cpython/posix"
     version = Parameter("3.15.2", help="CPython version.")
-    libffi = BooleanParameter(True, help="Enable libffi support")
-    sqlite = BooleanParameter(True, help="Enable SQLite support")
-    ssl = BooleanParameter(True, help="Enable SSL support")
-    zlib = BooleanParameter(True, help="Enable zlib support")
-    zstd = BooleanParameter(True, help="Enable zstd support")
-    xz = BooleanParameter(True, help="Enable xz support")
+    libffi = BooleanParameter(True, help="Enable libffi support.")
+    sqlite = BooleanParameter(True, help="Enable SQLite support.")
+    ssl = BooleanParameter(True, help="Enable SSL support.")
+    zlib = BooleanParameter(True, help="Enable zlib support.")
+    zstd = BooleanParameter(True, help="Enable Zstandard support.")
+    xz = BooleanParameter(True, help="Enable XZ Utils support.")
     requires_git = ["git:url=https://github.com/python/cpython.git,rev=v{version}"]
     requires_libffi_on = ["libffi"]
     requires_sqlite_on = ["sqlite"]
@@ -73,10 +73,11 @@ class CPythonWin32(Task):
 
     name = "cpython/win32"
     version = Parameter("3.15.2", help="CPython version.")
-    ssl = BooleanParameter(True, help="Enable SSL support")
+    ssl = BooleanParameter(True, help="Enable SSL support.")
     requires_git = ["git:url=https://github.com/python/cpython.git,rev=v{version}"]
     requires_ssl_on = ["virtual/ssl"]
     srcdir = "{git[cpython]}"
+    """ Source directory. """
 
     @property
     def version_major(self):

@@ -1,4 +1,4 @@
-from jolt import attributes
+from jolt import attributes, Parameter
 from jolt.plugins import autotools, fetch
 from jolt.tasks import TaskRegistry
 
@@ -7,7 +7,7 @@ from jolt.tasks import TaskRegistry
 @attributes.requires("requires_src")
 class GPerf(autotools.Autotools):
     name = "gperf"
-    version = "3.3"
+    version = Parameter("3.3", help="gperf version.")
     requires_src = ["fetch:alias=src,url=http://ftpmirror.gnu.org/gperf/gperf-{version}.tar.gz"]
     srcdir = "{fetch[src]}/gperf-{version}"
 

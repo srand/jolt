@@ -9,7 +9,7 @@ from jolt.tasks import TaskRegistry
 @cmake.use_ninja()
 class Glslang(cmake.CMake):
     name = "glslang"
-    version = Parameter("16.6.0", help="Glslang version.")
+    version = Parameter("16.6.0", help="glslang version.")
     requires_git = ["git:url=https://github.com/KhronosGroup/glslang.git,rev={version}"]
 
     def run(self, deps, tools):

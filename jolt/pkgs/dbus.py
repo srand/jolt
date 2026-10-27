@@ -10,7 +10,7 @@ from jolt.tasks import TaskRegistry
 @pkgconfig.requires()
 class DBus(cmake.CMake):
     name = "dbus"
-    version = Parameter("1.16.2", help="DBus version.")
+    version = Parameter("1.16.2", help="D-Bus version.")
     requires_git = ["git:url=https://gitlab.freedesktop.org/dbus/dbus.git,rev=dbus-{version}"]
     srcdir = "{git[dbus]}"
 

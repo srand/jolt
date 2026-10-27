@@ -12,7 +12,7 @@ from jolt.tasks import TaskRegistry
 class SDL(cmake.CMake):
     name = "sdl"
     version = Parameter("3.4.18", help="SDL version.")
-    shared = BooleanParameter(False, help="Build shared library")
+    shared = BooleanParameter(False, help="Build shared libraries.")
     requires_git = ["git:url=https://github.com/libsdl-org/SDL.git,rev=release-{version}"]
     srcdir = "{git[SDL]}"
     options = [

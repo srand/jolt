@@ -6,7 +6,7 @@ from jolt.error import raise_task_error_if
 
 class StrawberryPerl(Download):
     name = "perl/strawberry"
-    version = Parameter("5.42.3.1", help="poco version.")
+    version = Parameter("5.42.3.1", help="Strawberry Perl version.")
     url = "https://github.com/StrawberryPerl/Perl-Dist-Strawberry/releases/download/SP_{version_compact}_64bit/strawberry-perl-{version}-64bit-portable.zip"
 
     @property

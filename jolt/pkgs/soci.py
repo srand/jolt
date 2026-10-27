@@ -15,12 +15,12 @@ from jolt.tasks import TaskRegistry
 @cxxinfo.publish()
 class Soci(cmake.CMake):
     name = "soci"
-    version = Parameter("4.1.4", help="Soci version")
-    shared = BooleanParameter(False, help="Build shared libraries")
-    boost = BooleanParameter(False, help="Enable boost support")
-    mysql = BooleanParameter(True, help="Enable MySQL support")
-    sqlite = BooleanParameter(True, help="Enable sqlite support")
-    odbc = BooleanParameter(False, help="Enable ODBC support")
+    version = Parameter("4.1.4", help="SOCI version.")
+    shared = BooleanParameter(False, help="Build shared libraries.")
+    boost = BooleanParameter(False, help="Enable Boost support.")
+    mysql = BooleanParameter(True, help="Enable MySQL support.")
+    sqlite = BooleanParameter(True, help="Enable SQLite support.")
+    odbc = BooleanParameter(False, help="Enable ODBC support.")
 
     requires_boost_on = ["boost"]
     requires_fmt = ["fmt:shared={shared}"]

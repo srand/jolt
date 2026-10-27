@@ -10,7 +10,7 @@ from jolt.tasks import TaskRegistry
 @cxxinfo.publish(libraries=["double-conversion"])
 class DoubleConversion(cmake.CMake):
     name = "double-conversion"
-    version = Parameter("3.4.0", help="double_conversion version.")
+    version = Parameter("3.4.0", help="double-conversion version.")
     options = ["BUILD_SHARED_LIBS=ON"]
     requires_git = ["git:url=https://github.com/google/double-conversion.git,rev=v{version}"]
     srcdir = "{git[double-conversion]}"

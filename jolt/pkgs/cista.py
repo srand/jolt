@@ -6,9 +6,10 @@ from jolt.tasks import TaskRegistry
 @attributes.requires("requires_git")
 class Cista(Task):
     name = "cista"
-    version = Parameter("0.16", help="Cista version.")
+    version = Parameter("0.16", help="cista version.")
     requires_git = ["git:url=https://github.com/felixguendling/cista.git,rev=v{version}"]
     srcdir = "{git[cista]}"
+    """ Source directory. """
 
     def publish(self, artifact, tools):
         with tools.cwd(self.srcdir):

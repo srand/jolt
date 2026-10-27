@@ -13,10 +13,14 @@ class Rust(Download):
     url = "https://static.rust-lang.org/dist/rust-{version}-{triple}.tar.xz"
     collect = [{"files": "*", "cwd": "rust-{version}-{triple}"}]
     components = ["cargo", "rustc", "rust-std-{triple}"]
+    """ Components installed from the downloaded archive. """
 
     triple_linux_x86_64 = "x86_64-unknown-linux-gnu"
+    """ Target triple on Linux x86-64. """
     triple_windows_x86_64 = "x86_64-pc-windows-msvc"
+    """ Target triple on Windows x86-64. """
     triple_darwin_x86_64 = "x86_64-apple-darwin"
+    """ Target triple on macOS x86-64. """
 
     def publish(self, artifact, tools):
         self.installdir = tools.builddir("install")
@@ -30,7 +34,7 @@ class Rust(Download):
 @attributes.requires("requires_rust")
 class RustBindgen(rust.Rust):
     name = "rust-bindgen"
-    version = Parameter("0.73.2", help="Rust Bindgen version.")
+    version = Parameter("0.73.2", help="rust-bindgen version.")
 
     requires_git = ["git:url=https://github.com/rust-lang/rust-bindgen.git,rev=v{version}"]
     requires_rust = ["rust"]

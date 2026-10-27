@@ -9,7 +9,7 @@ from jolt.tasks import TaskRegistry
 @cxxinfo.publish(libraries=["fmt"])
 class Fmt(cmake.CMake):
     name = "fmt"
-    version = Parameter("12.2.0", help="Fmt version.")
+    version = Parameter("12.2.0", help="fmt version.")
     shared = BooleanParameter(False, help="Build shared libraries.")
     requires_git = ["git:url=https://github.com/fmtlib/fmt.git,rev={version}"]
     srcdir = "{git[fmt]}"

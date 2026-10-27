@@ -10,6 +10,7 @@ class BusyBox(Task):
     version = Parameter("1.38.0", help="BusyBox version.")
     requires_git = ["git:url=git://busybox.net/busybox.git,rev={version_tag}"]
     srcdir = "{git[busybox]}"
+    """ Source directory. """
 
     @property
     def version_tag(self):

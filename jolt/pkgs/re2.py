@@ -11,7 +11,7 @@ from jolt.tasks import TaskRegistry
 @cxxinfo.publish(libraries=["re2"])
 class RE2(cmake.CMake):
     name = "re2"
-    version = Parameter("2025-11-05", help="re2 version.")
+    version = Parameter("2025-11-05", help="RE2 version.")
     pic = BooleanParameter(False, help="Build with position independent code.")
     shared = BooleanParameter(False, help="Build shared libraries.")
     requires_abseil = ["abseil:shared={shared}"]

@@ -49,7 +49,7 @@ class MySQLBase(cmake.CMake):
 @cxxinfo.publish(libraries=["mysqlclient"])
 class LibMySQLClient(MySQLBase):
     name = "libmysqlclient"
-    shared = BooleanParameter(False, help="Build shared libraries")
+    shared = BooleanParameter(False, help="Build shared libraries.")
     options = [
         "BUILD_SHARED_LIBS={shared[ON,OFF]}",
         "WITH_CURL=system",

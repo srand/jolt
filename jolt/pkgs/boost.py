@@ -13,9 +13,9 @@ from jolt.error import raise_task_error_if
 class Boost(Task):
     name = "boost"
     version = Parameter("1.92.0", help="Boost version.")
-    shared = BooleanParameter(False, help="Build shared libraries")
-    python = BooleanParameter(False, help="Build Boost.Python")
-    bits = IntParameter(64, values=[32, 64], help="Boost address-model")
+    shared = BooleanParameter(False, help="Build shared libraries.")
+    python = BooleanParameter(False, help="Build Boost.Python.")
+    bits = IntParameter(64, values=[32, 64], help="Address model, in bits.")
     requires_git = ["git:url=https://github.com/boostorg/boost.git,path={buildroot}/git-boost,rev=boost-{version},submodules=true"]
     requires_python_on = ["cpython"]
 
