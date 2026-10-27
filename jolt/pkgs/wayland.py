@@ -12,7 +12,7 @@ from jolt.tasks import TaskRegistry
 class Wayland(meson.Meson):
     name = "wayland"
     version = Parameter("1.26.0", help="Wayland version.")
-    requires_expat = ["libexpat"]
+    requires_expat = ["libexpat:pic=true"]
     requires_git = ["git:url=https://gitlab.freedesktop.org/wayland/wayland.git,rev={version}"]
     requires_libffi = ["libffi"]
     requires_libxml2 = ["libxml2"]
