@@ -93,6 +93,7 @@ class Index(object):
         self._entries = {entry.path: entry for entry in entries}
         self._children = None
         self.excluded = []
+        self.root_hash = None
 
     @staticmethod
     def load(root, indexfile):
@@ -179,6 +180,23 @@ class Index(object):
             return True
         entry = self._entries.get(relpath) if relpath else None
         return entry is not None and entry.is_dir
+
+    def tree_hash(self, path):
+        """
+        Returns the fstree hash of the file, symlink or directory tree at
+        the absolute path, or None if the path isn't indexed.
+
+        Directory hashes cover all indexed files below the directory.
+        """
+        relpath = self.relpath(path)
+        if relpath == "":
+            return self.root_hash
+        entry = self._entries.get(relpath) if relpath else None
+        if entry is None:
+            return None
+        if entry.is_symlink:
+            return "symlink:" + entry.target
+        return entry.hash
 
     def resolve(self, entry, depth=40):
         """
@@ -298,7 +316,7 @@ def get_workspace_index():
 
     The index is refreshed with fstree the first time this function is
     called in a process and is then reused. Files ignored by .joltignore,
-    files in the build and cache directories and files in directories
+    .git, files in the build and cache directories and files in directories
     added with :func:`add_ignored_path` are not indexed.
     """
     global _workspace_index
@@ -354,6 +372,8 @@ def _ignore_patterns(root, paths):
     if os.path.exists(joltignore):
         with open(joltignore) as f:
             patterns = f.read().splitlines()
+    # Git metadata changes when jolt inspects repositories
+    patterns.append(".git")
     for path in paths:
         relpath = os.path.relpath(path, root)
         if relpath != os.curdir and not relpath.startswith(os.pardir):
@@ -367,8 +387,8 @@ def workspace_index_files():
     Locks the index of the workspace and yields the paths of the index
     file and the ignore file to pass to fstree.
 
-    The ignore file contains the patterns of .joltignore, the build and
-    cache directories and directories added with :func:`add_ignored_path`.
+    The ignore file contains the patterns of .joltignore, .git, the build
+    and cache directories and directories added with :func:`add_ignored_path`.
     """
     from jolt.loader import JoltLoader
 
@@ -420,7 +440,7 @@ def _refresh_workspace_index():
                 process = subprocess.Popen(
                     [executable, "write-tree", "--json", "--cache", cachedir, "--ignore", ignorefile,
                      "--index", indexfile, "--threads", str(t.thread_count())] + jobserver_args + [root],
-                    stdout=subprocess.DEVNULL,
+                    stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
                     cwd=root)
 
@@ -434,6 +454,9 @@ def _refresh_workspace_index():
                     if event.get("type") in ["cache::add"]:
                         progress.update(1)
 
+                # The tree hash of the workspace root
+                root_hash = process.stdout.read().decode().strip()
+
         except Exception as exc:
             if process:
                 process.terminate()
@@ -441,9 +464,11 @@ def _refresh_workspace_index():
         finally:
             if process:
                 process.wait()
+                process.stdout.close()
                 process.stderr.close()
                 raise_error_if(process.returncode != 0, "Failed to index workspace")
 
         index = Index.load(root, indexfile)
         index.excluded = _excluded_paths(loader)
+        index.root_hash = root_hash
         return index

@@ -433,16 +433,36 @@ def new_git(url, path, relpath, refspecs=None):
 
 
 class GitInfluenceProvider(FileInfluence):
-    """ Kept for compatibility, same as :class:`jolt.influence.FileInfluence`. """
+    """
+    Influence of a file or directory tree in the workspace.
+
+    The fstree hash of the path in the workspace index is used as
+    influence. Files ignored by the index don't influence the hash.
+    """
+
+    name = "Git"
+
+    def __init__(self, path):
+        super().__init__(path)
+        self.name = GitInfluenceProvider.name
+
+    def get_influence(self, task):
+        index = fstree.get_workspace_index()
+        path = task.tools.expand_path(self.path)
+        relpath = index.relpath(path)
+        tree = index.tree_hash(path)
+        return "{0}: {1}".format(relpath or self.path, tree or "N/A")
+
+    def is_influenced_by(self, task, path):
+        gitpath = task.tools.expand_path(self.path)
+        return fs.is_relative_to(task.tools.expand_path(path), gitpath)
 
 
-def global_influence(path, cls=FileInfluence):
-    """ Same as :func:`jolt.influence.global_files`. """
+def global_influence(path, cls=GitInfluenceProvider):
     HashInfluenceRegistry.get().register(cls(path))
 
 
-def influence(path, git_cls=FileInfluence):
-    """ Same as :func:`jolt.influence.files`. """
+def influence(path, git_cls=GitInfluenceProvider):
     def _decorate(cls):
         _old_influence = cls._influence
 
