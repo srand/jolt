@@ -442,22 +442,29 @@ class _BlockBarColumn(ProgressColumn):
 
 class _DescriptionColumn(TextColumn):
     """
-    Description column with a fixed width.
+    Description column as wide as the longest description shown.
 
-    The width, including the log level, shrinks in narrow terminals to
-    leave room for the bar and the other columns.
+    The width, including the log level, is limited in narrow terminals
+    to leave room for the bar and the other columns. Longer descriptions
+    are truncated.
     """
 
-    max_width = 48
+    prefix = "[   INFO] "
     min_width = 24
     reserved_width = 52
 
     def __init__(self):
-        super().__init__("[   INFO] {task.description}", markup=False)
+        super().__init__(self.prefix + "{task.description}", markup=False)
 
     def get_table_column(self):
-        width = max(self.min_width, min(self.max_width, _console.width - self.reserved_width))
-        return Column(width=width, no_wrap=True, overflow="ellipsis")
+        # Also called while the display is created, before it is defined
+        display = globals().get("_ProgressDisplay")
+        tasks = display.progress.tasks if display is not None else []
+        longest = max(
+            (len(self.prefix + task.description) for task in tasks),
+            default=len(self.prefix))
+        available = max(self.min_width, _console.width - self.reserved_width)
+        return Column(width=min(longest, available), no_wrap=True, overflow="ellipsis")
 
 
 class _DetailsColumn(ProgressColumn):
