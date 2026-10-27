@@ -235,6 +235,8 @@ The autoweight plugin automatically collects statistics about task execution tim
 The data is used to assign weights to task, allowing the Jolt scheduler to favor tasks
 along the critical path. This improves overall execution time in a distributed execution
 configuration where many tasks are executed in parallel.
+A task's weight is the median execution time of its most recent samples.
+Downloaded and uploaded artifacts are not sampled.
 
 The plugin is enabled by adding an ``[autoweight]`` section in
 the Jolt configuration.
