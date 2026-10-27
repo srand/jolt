@@ -12,7 +12,7 @@ from jolt.tasks import ListParameter, TaskRegistry
 @cxxinfo.publish(libraries=["ssl", "crypto"])
 class OpenSSL(Task):
     name = "openssl"
-    version = Parameter("3.6.0", help="openssl version.")
+    version = Parameter("4.1.0", help="openssl version.")
     shared = BooleanParameter(False, "Enable shared libraries.")
 
     requires_git = ["git:url=https://github.com/openssl/openssl.git,rev=openssl-{version}"]

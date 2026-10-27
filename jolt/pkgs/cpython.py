@@ -30,7 +30,7 @@ class CPythonPosix(autotools.Autotools):
     """ Builds and publishes CPython libraries and headers. """
 
     name = "cpython/posix"
-    version = Parameter("3.14.2", help="CPython version.")
+    version = Parameter("3.15.2", help="CPython version.")
     libffi = BooleanParameter(True, help="Enable libffi support")
     sqlite = BooleanParameter(True, help="Enable SQLite support")
     ssl = BooleanParameter(True, help="Enable SSL support")
@@ -41,7 +41,7 @@ class CPythonPosix(autotools.Autotools):
     requires_libffi_on = ["libffi"]
     requires_sqlite_on = ["sqlite"]
     requires_ssl_on = ["virtual/ssl"]
-    requires_zlib_on = ["virtual/zlib"]
+    requires_zlib_on = ["virtual/zlib:pic=true"]
     requires_zstd_on = ["zstd"]
     requires_xz_on = ["xz:pic=true"]
     srcdir = "{git[cpython]}"
@@ -72,7 +72,7 @@ class CPythonWin32(Task):
     """ Builds and publishes CPython libraries and headers. """
 
     name = "cpython/win32"
-    version = Parameter("3.14.2", help="CPython version.")
+    version = Parameter("3.15.2", help="CPython version.")
     ssl = BooleanParameter(True, help="Enable SSL support")
     requires_git = ["git:url=https://github.com/python/cpython.git,rev=v{version}"]
     requires_ssl_on = ["virtual/ssl"]
@@ -147,7 +147,7 @@ Cflags: -I${{includedir}}
 class CPython(Alias):
     """ Alias for CPython """
     name = "cpython"
-    version = Parameter("3.14.2", help="CPython version.")
+    version = Parameter("3.15.2", help="CPython version.")
     requires_darwin = ["cpython/posix:version={version}"]
     requires_linux = requires_darwin
     requires_windows = ["cpython/win32:version={version}"]
