@@ -89,6 +89,33 @@ class ToolsInternal(JoltTest):
 
         self.assertEqual(logbuf, [(reader, "tail")])
 
+    def configuration_stamp(self, builddir, configuration_hash):
+        t = MagicMock()
+        t._task = MagicMock()
+        with patch("jolt.influence.configuration_hash", return_value=configuration_hash):
+            return tools._ConfigurationStamp(t, builddir)
+
+    @patch("jolt.config.getboolean", side_effect=lambda section, key, default=None: default)
+    def test_configuration_stamp(self, _):
+        with tools.Tools().tmpdir() as builddir:
+            stamp = self.configuration_stamp(builddir, "a")
+            self.assertTrue(stamp.is_outdated())
+            stamp.update()
+            self.assertFalse(self.configuration_stamp(builddir, "a").is_outdated())
+            self.assertTrue(self.configuration_stamp(builddir, "b").is_outdated())
+
+    @patch("jolt.config.getboolean", return_value=True)
+    def test_configuration_stamp_always_outdated_when_fresh(self, _):
+        with tools.Tools().tmpdir() as builddir:
+            stamp = self.configuration_stamp(builddir, "a")
+            stamp.update()
+            self.assertTrue(self.configuration_stamp(builddir, "a").is_outdated())
+
+    def test_configuration_stamp_without_task(self):
+        t = MagicMock()
+        t._task = None
+        self.assertFalse(tools._ConfigurationStamp(t, "/nonexistent").is_outdated())
+
     def test_close_process_streams_skips_active_reader(self):
         process = self.process()
         reader = MagicMock()

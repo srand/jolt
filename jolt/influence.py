@@ -29,12 +29,35 @@ class HashInfluenceRegistry(object):
         for influence in self.get_strings(task):
             sha.update(influence.encode())
 
-    def get_strings(self, task):
+    def get_strings(self, task, include=None):
         content = []
         for provider in self._providers + task.influence:
+            if include is not None and not include(provider):
+                continue
             for line in str(provider.get_influence(task)).splitlines():
                 content.append("Influence-{0}: {1}".format(provider.name, line))
         return content
+
+
+def _is_configuration_influence(provider):
+    """ Whether an influence is something other than a task's own sources. """
+    if provider.name in ("File", "Git"):
+        return False
+    return not getattr(provider, "is_workspace_resource", False)
+
+
+def configuration_hash(task):
+    """
+    Hash of everything that influences a task, except its own sources.
+
+    Build systems such as CMake and Meson cache their configuration,
+    including the locations of dependencies, in incremental build
+    directories. They regenerate it when their build files change, so the
+    sources are left out, but a change to anything else means that the
+    cached configuration may be outdated.
+    """
+    strings = HashInfluenceRegistry.get().get_strings(task, include=_is_configuration_influence)
+    return utils.hashstring("\n".join(strings))
 
 
 class HashInfluenceProvider(object):
@@ -305,6 +328,7 @@ class TaskRequirementInfluence(HashInfluenceProvider):
     def __init__(self, proxy):
         self._identity = proxy.identity
         self._name = proxy.short_qualified_name
+        self.is_workspace_resource = proxy.is_workspace_resource()
 
     def get_influence(self, task):
         return "{}: {}".format(self._identity, self._name)

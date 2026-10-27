@@ -91,6 +91,16 @@ The ``[jolt]`` config section contains global configuration:
           If disabled, incremental directories are always removed when a task finishes.
         | Default: ``true``
 
+    * - ``fresh_configure``
+      - Boolean
+      - | Discard the configuration cached by CMake and Meson in incremental
+          build directories every time a task is built. By default, the
+          configuration is only discarded when something other than the
+          sources of the task has changed, such as its parameters or
+          requirements. Enable to also pick up changes on the build host,
+          such as newly installed libraries.
+        | Default: ``false``
+
     * - ``logcount``
       - Integer
       - | Number of log files to keep.

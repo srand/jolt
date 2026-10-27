@@ -496,6 +496,39 @@ class _String(object):
         return self._str.startswith(substr)
 
 
+class _ConfigurationStamp(object):
+    """
+    Tells whether the configuration in an incremental build directory is outdated.
+
+    The configuration is outdated when anything but the sources of the task
+    has changed since it was configured, for example its parameters, its
+    recipe or its requirements. Configuration is always outdated if the
+    jolt.fresh_configure option is enabled.
+    """
+
+    def __init__(self, tools, builddir):
+        from jolt.influence import configuration_hash
+
+        self._path = fs.path.join(builddir, ".jolt-configuration")
+        self._hash = configuration_hash(tools._task) if tools._task is not None else None
+
+    def is_outdated(self):
+        if config.getboolean("jolt", "fresh_configure", False):
+            return True
+        if self._hash is None:
+            return False
+        try:
+            with open(self._path) as f:
+                return f.read() != self._hash
+        except FileNotFoundError:
+            return True
+
+    def update(self):
+        if self._hash is not None:
+            with open(self._path, "w") as f:
+                f.write(self._hash)
+
+
 class _CMake(object):
     def __init__(self, deps, tools, incremental=False):
         self.deps = deps
@@ -523,6 +556,12 @@ class _CMake(object):
                        for key, val in kwargs.items()]
         extra_args = " ".join(extra_args)
 
+        stamp = _ConfigurationStamp(self.tools, self.builddir)
+        if stamp.is_outdated():
+            # Same as --fresh, which older versions of CMake don't support
+            fs.unlink(fs.path.join(self.builddir, "CMakeCache.txt"), ignore_errors=True)
+            fs.rmtree(fs.path.join(self.builddir, "CMakeFiles"), ignore_errors=True)
+
         with self.tools.cwd(self.builddir):
             self.tools.run(
                 "cmake {0} {1} -DCMAKE_INSTALL_PREFIX=/jolt-prefix {1} {2} {3}",
@@ -531,6 +570,7 @@ class _CMake(object):
                 utils.option("-G", generator),
                 extra_args,
                 output=True)
+        stamp.update()
 
     def build(self, *args, config="Release", **kwargs):
         threading_args = ' -j {}'.format(kwargs.get("threads", self.tools.thread_count()))
@@ -565,8 +605,21 @@ class _Meson(object):
         sourcedir = self.tools.expand_path(sourcedir)
         options = " ".join([f"-D{arg}" for arg in args]) + " "
         options += " ".join(["-D{0}={1}".format(key, self.tools.expand(val)) for key, val in kwargs.items()])
+
+        # Meson ignores the options of an existing build directory, and even
+        # when reconfigured, it keeps options that are no longer passed as
+        # well as the results of dependency lookups. Its state is removed
+        # instead, which keeps compiled objects.
+        stamp = _ConfigurationStamp(self.tools, self.builddir)
+        if stamp.is_outdated():
+            for name in ["meson-private", "meson-info", "meson-logs"]:
+                fs.rmtree(fs.path.join(self.builddir, name), ignore_errors=True)
+            for name in ["build.ninja", "compile_commands.json"]:
+                fs.unlink(fs.path.join(self.builddir, name), ignore_errors=True)
+
         self.tools.run("meson setup --prefix={0} {1} {2} {3}", self.prefix, sourcedir, self.builddir, options,
                        output=True)
+        stamp.update()
 
     def build(self, *args, **kwargs):
         self.tools.run("ninja -C {0} ", self.builddir, output=True)

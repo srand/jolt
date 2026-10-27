@@ -1,0 +1,50 @@
+import sys
+sys.path.append(".")
+
+from unittest.mock import MagicMock, patch
+
+from testsupport import JoltTest
+from jolt import influence
+
+
+class InfluenceInternal(JoltTest):
+    name = "int/influence"
+
+    def provider(self, name, value, **attrs):
+        attrs.setdefault("is_workspace_resource", False)
+        provider = MagicMock(**attrs)
+        provider.name = name
+        provider.get_influence.return_value = value
+        return provider
+
+    def configuration_hash(self, *providers):
+        task = MagicMock()
+        task.influence = list(providers)
+        with patch.object(influence.HashInfluenceRegistry.get(), "_providers", []):
+            return influence.configuration_hash(task)
+
+    def test_configuration_hash_ignores_sources(self):
+        params = self.provider("Parameters", "a=1")
+        self.assertEqual(
+            self.configuration_hash(params),
+            self.configuration_hash(
+                params,
+                self.provider("File", "changed"),
+                self.provider("Git", "changed"),
+                self.provider("Requirement", "changed: git", is_workspace_resource=True)))
+
+    def test_configuration_hash_includes_configuration(self):
+        before = self.configuration_hash(
+            self.provider("Parameters", "a=1"),
+            self.provider("Requirement", "1: zlib", is_workspace_resource=False))
+        self.assertNotEqual(before, self.configuration_hash(
+            self.provider("Parameters", "a=2"),
+            self.provider("Requirement", "1: zlib", is_workspace_resource=False)))
+        self.assertNotEqual(before, self.configuration_hash(
+            self.provider("Parameters", "a=1"),
+            self.provider("Requirement", "2: zlib", is_workspace_resource=False)))
+
+    def test_configuration_hash_skips_sources_without_computing_them(self):
+        source = self.provider("File", "files")
+        self.configuration_hash(self.provider("Parameters", "a=1"), source)
+        source.get_influence.assert_not_called()
