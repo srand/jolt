@@ -1,9 +1,12 @@
 from __future__ import print_function
+import atexit
 import glob
 import os
 import re
 import sys
 import time
+if os.name == "posix":
+    import termios
 if os.name == "nt":
     os.system("")      # Hack to enable vt100
 import traceback
@@ -522,6 +525,49 @@ class _ReflowLiveRender(LiveRender):
             *((ControlType.CURSOR_UP, 1), (ControlType.ERASE_IN_LINE, 2)) * self._rows())
 
 
+class _TerminalEcho(object):
+    """
+    Disables echo of typed keys while progress bars are shown.
+
+    Echoed keys, such as enter, move the cursor and break the redraw of
+    the bars. Signal keys like Ctrl-C keep working since only echo is
+    disabled, and typed input is still passed on to whoever reads it.
+    """
+
+    fd = None
+    attrs = None
+
+    @staticmethod
+    def disable():
+        if os.name != "posix" or _TerminalEcho.attrs is not None:
+            return
+        try:
+            fd = sys.stdin.fileno()
+            # Changing terminal attributes stops background processes
+            if not os.isatty(fd) or os.tcgetpgrp(fd) != os.getpgrp():
+                return
+            attrs = termios.tcgetattr(fd)
+            noecho = list(attrs)
+            noecho[3] &= ~termios.ECHO
+            termios.tcsetattr(fd, termios.TCSANOW, noecho)
+            _TerminalEcho.fd, _TerminalEcho.attrs = fd, attrs
+        except (AttributeError, ValueError, OSError, termios.error):
+            pass
+
+    @staticmethod
+    def restore():
+        if _TerminalEcho.attrs is None:
+            return
+        try:
+            termios.tcsetattr(_TerminalEcho.fd, termios.TCSANOW, _TerminalEcho.attrs)
+        except (ValueError, OSError, termios.error):
+            pass
+        _TerminalEcho.fd, _TerminalEcho.attrs = None, None
+
+
+atexit.register(_TerminalEcho.restore)
+
+
 class _ProgressDisplay(object):
     """
     Live terminal region that shows all open progress bars.
@@ -569,6 +615,7 @@ class _ProgressDisplay(object):
                 _ProgressDisplay.live._live_render = _ReflowLiveRender(
                     _ProgressDisplay.live.get_renderable(),
                     vertical_overflow=_ProgressDisplay.live.vertical_overflow)
+                _TerminalEcho.disable()
                 _ProgressDisplay.live.start()
             return task
 
@@ -586,8 +633,11 @@ class _ProgressDisplay(object):
             # The live region is erased when stopped, stop it before the
             # last bar is removed so that no empty line is left behind.
             if len(progress.tasks) == 1:
-                _ProgressDisplay.live.stop()
-                _ProgressDisplay.live = None
+                try:
+                    _ProgressDisplay.live.stop()
+                finally:
+                    _ProgressDisplay.live = None
+                    _TerminalEcho.restore()
             progress.remove_task(task_id)
 
         # Replace the bar with a log line
