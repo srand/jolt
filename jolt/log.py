@@ -531,8 +531,7 @@ class _ProgressDisplay(object):
     def remove(task_id):
         with _ProgressDisplay.lock:
             progress = _ProgressDisplay.progress
-            tasks = [task for task in progress.tasks if task.id == task_id]
-            if not tasks:
+            if not any(task.id == task_id for task in progress.tasks):
                 return
 
             # The live region is erased when stopped, stop it before the
@@ -541,10 +540,6 @@ class _ProgressDisplay(object):
                 _ProgressDisplay.live.stop()
                 _ProgressDisplay.live = None
             progress.remove_task(task_id)
-
-            # Leave the final state of the bar in the terminal, with the
-            # same column widths as the bars still shown.
-            _console.print(progress.make_tasks_table(tasks))
 
 
 class _RichProgress(object):
