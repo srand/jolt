@@ -101,6 +101,7 @@ from jolt.pkgs import spirv_tools
 from jolt.pkgs import sqlite
 from jolt.pkgs import texinfo
 from jolt.pkgs import tomlplusplus
+from jolt.pkgs import unixodbc
 from jolt.pkgs import wayland
 from jolt.pkgs import xerces_c
 from jolt.pkgs import x11
@@ -232,6 +233,7 @@ class Default(Alias):
         "ncurses",
         "readline",
         "texinfo",
+        "unixodbc",
     ]
 
     requires_linux = requires_darwin + [
