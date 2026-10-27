@@ -20,6 +20,7 @@ from rich import filesize
 from rich.console import Console
 from rich.constrain import Constrain
 from rich.control import Control, ControlType
+from rich.file_proxy import FileProxy
 from rich.live import Live
 from rich.live_render import LiveRender
 from rich.measure import Measurement
@@ -667,7 +668,7 @@ def restore_terminal():
     Removes all progress bars and restores terminal settings changed
     while they were shown.
 
-    Called on interrupts and at exit. Call before exiting with
+    Called at exit and on termination signals. Call before exiting with
     os._exit(), which skips exit handlers.
     """
     _ProgressDisplay.close()
@@ -675,6 +676,20 @@ def restore_terminal():
 
 
 atexit.register(restore_terminal)
+
+
+class _StreamProxy(FileProxy):
+    """
+    Prints writes to sys.stdout and sys.stderr above progress bars.
+
+    Output written directly to the streams, such as by print(), would
+    otherwise move the cursor and break the redraw of the bars.
+    """
+
+    def isatty(self):
+        # FileProxy inherits isatty() from io.TextIOBase, which is always
+        # False. The streams are still terminals.
+        return self.rich_proxied_file.isatty()
 
 
 class _ProgressDisplay(object):
@@ -689,6 +704,7 @@ class _ProgressDisplay(object):
 
     lock = threading.RLock()
     live = None
+    streams = None
     details = _DetailsColumn()
     elapsed_width = 7
     elapsed = TimeElapsedColumn(table_column=Column(width=elapsed_width, no_wrap=True))
@@ -719,19 +735,46 @@ class _ProgressDisplay(object):
         with _ProgressDisplay.lock:
             task = _ProgressDisplay.progress.add_task(desc, total=total, unit=unit, estimates=estimates)
             if _ProgressDisplay.live is None:
-                _ProgressDisplay.live = Live(
-                    _ProgressDisplay(),
-                    console=_console,
-                    refresh_per_second=4,
-                    transient=True,
-                    redirect_stdout=False,
-                    redirect_stderr=False)
-                _ProgressDisplay.live._live_render = _ReflowLiveRender(
-                    _ProgressDisplay.live.get_renderable(),
-                    vertical_overflow=_ProgressDisplay.live.vertical_overflow)
-                _TerminalEcho.disable()
-                _ProgressDisplay.live.start()
+                _ProgressDisplay._start()
             return task
+
+    @staticmethod
+    def _start():
+        live = Live(
+            _ProgressDisplay(),
+            console=_console,
+            refresh_per_second=4,
+            transient=True,
+            redirect_stdout=False,
+            redirect_stderr=False)
+        live._live_render = _ReflowLiveRender(live.get_renderable(), vertical_overflow=live.vertical_overflow)
+        _ProgressDisplay.live = live
+        _TerminalEcho.disable()
+        live.start()
+
+        # Print direct writes to the standard streams above the bars
+        _ProgressDisplay.streams = (sys.stdout, sys.stderr)
+        sys.stdout = _StreamProxy(_console, sys.stdout)
+        sys.stderr = _StreamProxy(_console, sys.stderr)
+
+    @staticmethod
+    def _stop():
+        try:
+            if _ProgressDisplay.streams is not None:
+                stdout, stderr = _ProgressDisplay.streams
+                for proxy, stream in ((sys.stdout, stdout), (sys.stderr, stderr)):
+                    if isinstance(proxy, _StreamProxy):
+                        proxy.flush()
+                # Leave the streams alone if someone else has replaced them
+                if isinstance(sys.stdout, _StreamProxy):
+                    sys.stdout = stdout
+                if isinstance(sys.stderr, _StreamProxy):
+                    sys.stderr = stderr
+                _ProgressDisplay.streams = None
+            _ProgressDisplay.live.stop()
+        finally:
+            _ProgressDisplay.live = None
+            _TerminalEcho.restore()
 
     @staticmethod
     @utils.delay_interrupt
@@ -741,11 +784,7 @@ class _ProgressDisplay(object):
             return
         try:
             if _ProgressDisplay.live is not None:
-                try:
-                    _ProgressDisplay.live.stop()
-                finally:
-                    _ProgressDisplay.live = None
-                    _TerminalEcho.restore()
+                _ProgressDisplay._stop()
             for task in _ProgressDisplay.progress.tasks:
                 _ProgressDisplay.progress.remove_task(task.id)
         finally:
@@ -766,11 +805,7 @@ class _ProgressDisplay(object):
             # The live region is erased when stopped, stop it before the
             # last bar is removed so that no empty line is left behind.
             if len(progress.tasks) == 1:
-                try:
-                    _ProgressDisplay.live.stop()
-                finally:
-                    _ProgressDisplay.live = None
-                    _TerminalEcho.restore()
+                _ProgressDisplay._stop()
             progress.remove_task(task_id)
 
         # Replace the bar with a log line
