@@ -4,11 +4,7 @@ import os
 import re
 import sys
 import time
-import tqdm
 if os.name == "nt":
-    # FIXME: Workaround to make tqdm behave correctly on Windows
-    import colorama
-    colorama.deinit()  # Undo the work of tqdm
     os.system("")      # Hack to enable vt100
 import traceback
 from datetime import datetime
@@ -16,6 +12,19 @@ import threading
 import logging
 import logging.handlers
 from contextlib import contextmanager
+from rich.console import Console
+from rich.live import Live
+from rich.progress import (
+    BarColumn,
+    DownloadColumn,
+    MofNCompleteColumn,
+    Progress,
+    TextColumn,
+    TimeElapsedColumn,
+    TimeRemainingColumn,
+    TransferSpeedColumn,
+)
+from rich.text import Text
 try:
     from StringIO import StringIO
 except Exception:
@@ -131,13 +140,29 @@ class Filter(logging.Filter):
         return self.filterfn(record)
 
 
-class TqdmStream(object):
+class ConsoleStream(object):
+    """
+    Terminal stream that prints lines above progress bars.
+
+    While progress bars are shown, complete lines are printed through
+    the rich console, which keeps the bars below the output. Otherwise,
+    output is written to the stream directly.
+    """
+
     def __init__(self, stream):
         self.stream = stream
+        self._buffer = ""
+        self._lock = threading.Lock()
 
     def write(self, msg):
-        with tqdm.tqdm.external_write_mode(file=self.stream, nolock=False):
-            self.stream.write(msg)
+        with self._lock:
+            if _ProgressDisplay.live is None and not self._buffer:
+                self.stream.write(msg)
+                return
+            lines = (self._buffer + msg).split("\n")
+            self._buffer = lines.pop()
+        for line in lines:
+            _console.print(Text.from_ansi(line), soft_wrap=True)
 
     def flush(self):
         getattr(self.stream, 'flush', lambda: None)()
@@ -177,8 +202,10 @@ _logger.removeHandler = utils.delay_interrupt(_logger.removeHandler)
 
 _console_formatter = ConsoleFormatter('[{levelname:>7}] {message}', '{message}')
 
+_console = Console(file=sys.stdout, highlight=False, emoji=False, markup=False, soft_wrap=True)
+
 if sys.stdout.isatty() and sys.stderr.isatty():
-    _stdout = logging.StreamHandler(TqdmStream(sys.stdout))
+    _stdout = logging.StreamHandler(ConsoleStream(sys.stdout))
 else:
     _stdout = logging.StreamHandler(sys.stdout)
 _stdout.setFormatter(_console_formatter)
@@ -186,7 +213,7 @@ _stdout.addFilter(Filter(lambda r: r.levelno < ERROR))
 _stdout.addFilter(Filter(lambda r: r.levelno != EXCEPTION))
 
 if sys.stdout.isatty() and sys.stderr.isatty():
-    _stderr = logging.StreamHandler(TqdmStream(sys.stdout))
+    _stderr = logging.StreamHandler(ConsoleStream(sys.stdout))
 else:
     _stderr = logging.StreamHandler(sys.stderr)
 _stderr.setFormatter(_console_formatter)
@@ -368,23 +395,96 @@ def progress_log(desc, count, unit):
     return _Progress(desc)
 
 
+class _ProgressDisplay(object):
+    """
+    Live terminal region that shows all open progress bars.
+
+    The region is redrawn a few times per second and log output is
+    printed above it.
+    """
+
+    lock = threading.RLock()
+    live = None
+    bars = []
+
+    def __rich_console__(self, console, options):
+        # Called by the refresh thread of rich while it holds its own
+        # lock, don't take the display lock here.
+        for bar in list(_ProgressDisplay.bars):
+            yield bar.progress.get_renderable()
+
+    @staticmethod
+    def add(bar):
+        with _ProgressDisplay.lock:
+            _ProgressDisplay.bars.append(bar)
+            if _ProgressDisplay.live is None:
+                _ProgressDisplay.live = Live(
+                    _ProgressDisplay(),
+                    console=_console,
+                    refresh_per_second=4,
+                    transient=True,
+                    redirect_stdout=False,
+                    redirect_stderr=False)
+                _ProgressDisplay.live.start()
+
+    @staticmethod
+    def remove(bar):
+        with _ProgressDisplay.lock:
+            if bar not in _ProgressDisplay.bars:
+                return
+
+            # The live region is erased when stopped, stop it before the
+            # last bar is removed so that no empty line is left behind.
+            if len(_ProgressDisplay.bars) == 1:
+                _ProgressDisplay.live.stop()
+                _ProgressDisplay.live = None
+            _ProgressDisplay.bars.remove(bar)
+
+            # Leave the final state of the bar in the terminal
+            _console.print(bar.progress.get_renderable())
+
+
+class _RichProgress(object):
+    def __init__(self, desc, count, unit, estimates):
+        unit = unit.strip()
+        columns = [TextColumn("[   INFO] {task.description}", markup=False)]
+        if count and unit == "B":
+            columns += [BarColumn(), DownloadColumn(), TransferSpeedColumn()]
+        elif count:
+            columns += [BarColumn(), MofNCompleteColumn(), TextColumn(unit, markup=False)]
+        else:
+            columns += [TextColumn("{task.completed:.0f} " + unit, markup=False)]
+        columns += [TimeElapsedColumn()]
+        if count and estimates:
+            columns += [TimeRemainingColumn()]
+
+        self.progress = Progress(*columns, console=_console, auto_refresh=False)
+        self.task = self.progress.add_task(desc, total=count or None)
+
+    def __enter__(self):
+        _ProgressDisplay.add(self)
+        return self
+
+    def __exit__(self, type, value, tb):
+        _ProgressDisplay.remove(self)
+        return False
+
+    def update(self, n=1):
+        self.progress.advance(self.task, n)
+
+    def refresh(self, *args, **kwargs):
+        pass
+
+    def reset(self, total=None):
+        self.progress.reset(self.task, total=total)
+
+    def set_description(self, desc=None, refresh=True):
+        self.progress.update(self.task, description=desc)
+
+
 def progress(desc, count, unit, estimates=True, debug=False):
-    if count:
-        bar_format = '{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}]' \
-                     if not estimates else None
-    else:
-        bar_format = '{desc}{n_fmt}{unit} [{elapsed}]'
     if not debug and is_interactive() and not is_verbose() and not is_silenced():
-        class ProgressTqdm(tqdm.tqdm):
-            def __init__(self, *args, **kwargs):
-                super(ProgressTqdm, self).__init__(*args, **kwargs)
-
-            def set_description(self, desc=None, refresh=True):
-                return super().set_description("[   INFO] " + desc, refresh)
-
-        p = ProgressTqdm(total=count, unit=unit, unit_scale=True, bar_format=bar_format, dynamic_ncols=True)
-        p.set_description(desc)
-        return p
+        return _RichProgress(desc, count, unit, estimates)
     return progress_log(desc, count, unit)
 
 
