@@ -13,7 +13,7 @@ from jolt.tasks import ListParameter, TaskRegistry
 class OpenSSL(Task):
     name = "openssl"
     version = Parameter("4.1.0", help="openssl version.")
-    shared = BooleanParameter(False, "Enable shared libraries.")
+    shared = BooleanParameter(False, help="Enable shared libraries.")
 
     requires_git = ["git:url=https://github.com/openssl/openssl.git,rev=openssl-{version}"]
     requires_perl = ["virtual/perl"]

@@ -12,7 +12,7 @@ from jolt.tasks import TaskRegistry
 class Libxml2(cmake.CMake):
     name = "libxml2"
     version = Parameter("2.15.4", help="Libxml2 version.")
-    shared = BooleanParameter(False, "Enable shared libraries.")
+    shared = BooleanParameter(False, help="Enable shared libraries.")
     requires_git = ["git:url=https://gitlab.gnome.org/GNOME/libxml2.git,rev=v{version}"]
 
     srcdir = "{git[libxml2]}"

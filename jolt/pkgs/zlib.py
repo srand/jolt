@@ -12,8 +12,8 @@ from jolt.tasks import TaskRegistry
 class Zlib(cmake.CMake):
     name = "zlib"
     version = Parameter("1.3.2", help="Zlib version.")
-    pic = BooleanParameter(False, "Build with position independent code.")
-    shared = BooleanParameter(False, "Enable shared libraries.")
+    pic = BooleanParameter(False, help="Build with position independent code.")
+    shared = BooleanParameter(False, help="Enable shared libraries.")
     requires_git = ["git:clean=true,url=https://github.com/madler/zlib.git,rev=v{version}"]
     srcdir = "{git[zlib]}"
     options = [
@@ -60,8 +60,8 @@ class Zlib(cmake.CMake):
 class ZlibNg(cmake.CMake):
     name = "zlib-ng"
     version = Parameter("2.3.3", help="Zlib version.")
-    pic = BooleanParameter(False, "Build with position independent code.")
-    shared = BooleanParameter(False, "Enable shared libraries.")
+    pic = BooleanParameter(False, help="Build with position independent code.")
+    shared = BooleanParameter(False, help="Enable shared libraries.")
     requires_git = ["git:url=https://github.com/zlib-ng/zlib-ng.git,rev={version}"]
     srcdir = "{git[zlib-ng]}"
     options = [
@@ -81,8 +81,8 @@ class ZlibNg(cmake.CMake):
 
 class VirtualZlib(Alias):
     name = "virtual/zlib"
-    pic = BooleanParameter(False, "Build with position independent code.")
-    shared = BooleanParameter(False, "Enable shared libraries.")
+    pic = BooleanParameter(False, help="Build with position independent code.")
+    shared = BooleanParameter(False, help="Enable shared libraries.")
     requires = ["zlib:pic={pic},shared={shared}"]
 
 
