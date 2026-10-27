@@ -44,6 +44,14 @@ jobs:
           pip install --upgrade -e .[amqp,allure,conan]
           pip install --upgrade flake8
 
+      - name: Install fstree
+        run: |
+          FSTREE_VERSION=$(sed -n 's/^fstree_version = "\(.*\)"$/\1/p' build.jolt)
+          test -n "$FSTREE_VERSION"
+          sudo curl -fsSL -o /usr/local/bin/fstree \
+            https://github.com/srand/fstree/releases/download/${FSTREE_VERSION}/fstree-linux-x86_64
+          sudo chmod 0755 /usr/local/bin/fstree
+
       - name: Configure conan
         run: |
           . ${{ github.workspace }}/venv/bin/activate
