@@ -22,6 +22,7 @@ class Inputproto(autotools.Autotools):
     requires_macros = ["xorg/macros"]
     requires_src = ["fetch:alias=src,url=https://www.x.org/releases/individual/proto/inputproto-{version}.tar.gz"]
     srcdir = "{fetch[src]}/inputproto-{version}"
+    install_threads = 1  # install-sh races creating doc directories
 
 
 @attributes.requires("requires_macros")
@@ -33,6 +34,7 @@ class Glproto(autotools.Autotools):
     requires_macros = ["xorg/macros"]
     requires_src = ["fetch:alias=src,url=https://www.x.org/releases/individual/proto/glproto-{version}.tar.gz"]
     srcdir = "{fetch[src]}/glproto-{version}"
+    install_threads = 1  # install-sh races creating doc directories
 
 
 @attributes.requires("requires_macros")
@@ -44,6 +46,7 @@ class Kbproto(autotools.Autotools):
     requires_macros = ["xorg/macros"]
     requires_src = ["fetch:alias=src,url=https://www.x.org/releases/individual/proto/kbproto-{version}.tar.gz"]
     srcdir = "{fetch[src]}/kbproto-{version}"
+    install_threads = 1  # install-sh races creating doc directories
 
 
 @attributes.requires("requires_macros")
@@ -55,6 +58,7 @@ class Randrproto(autotools.Autotools):
     requires_macros = ["xorg/macros"]
     requires_src = ["fetch:alias=src,url=https://www.x.org/releases/individual/proto/randrproto-{version}.tar.gz"]
     srcdir = "{fetch[src]}/randrproto-{version}"
+    install_threads = 1  # install-sh races creating doc directories
 
 
 @attributes.requires("requires_macros")
@@ -66,6 +70,7 @@ class Renderproto(autotools.Autotools):
     requires_macros = ["xorg/macros"]
     requires_src = ["fetch:alias=src,url=https://www.x.org/releases/individual/proto/renderproto-{version}.tar.gz"]
     srcdir = "{fetch[src]}/renderproto-{version}"
+    install_threads = 1  # install-sh races creating doc directories
 
 
 @attributes.requires("requires_macros")
@@ -151,6 +156,7 @@ class Xextproto(autotools.Autotools):
     requires_macros = ["xorg/macros"]
     requires_src = ["fetch:alias=src,url=https://www.x.org/releases/individual/proto/xextproto-{version}.tar.gz"]
     srcdir = "{fetch[src]}/xextproto-{version}"
+    install_threads = 1  # install-sh races creating doc directories
 
 
 @attributes.requires("requires_macros")
@@ -174,6 +180,7 @@ class Xf86vidmodeproto(autotools.Autotools):
     requires_macros = ["xorg/macros"]
     requires_src = ["fetch:alias=src,url=https://www.x.org/releases/individual/proto/xf86vidmodeproto-{version}.tar.gz"]
     srcdir = "{fetch[src]}/xf86vidmodeproto-{version}"
+    install_threads = 1  # install-sh races creating doc directories
 
 
 @attributes.requires("requires_macros")
