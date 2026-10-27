@@ -1,45 +1,140 @@
+<!DOCTYPE html>
 <html>
 
 <head>
+  <meta charset="utf-8">
+  <title>Jolt - Timeline</title>
   <style>
-    h1 {
-      color: #f44336;
+    body {
+      margin: 0;
+      font-family: Verdana, sans-serif;
+      font-size: 15px;
+      line-height: 1.5;
+    }
+    h2 {
+      font-size: 30px;
+      font-weight: 400;
+      margin: 10px 0;
+      white-space: nowrap;
+    }
+    .chart {
+      padding: 10px;
+    }
+    .chart svg {
+      width: 100%;
+      height: auto;
+      font-family: Verdana, sans-serif;
+      font-size: 11px;
+    }
+    .tick { stroke: #e0e0e0; }
+    .tick-label { fill: #616161; text-anchor: middle; }
+    .group { fill: #f1f1f1; }
+    .group-label { fill: #212121; dominant-baseline: middle; text-anchor: end; }
+    .gap { fill: url(#hatch); }
+    .bar { stroke: #757575; stroke-width: 1; }
+    .critical { stroke: #212121; stroke-width: 2; }
+    .gap-label { fill: #9e9e9e; text-anchor: middle; }
+    .bar-label { fill: white; dominant-baseline: middle; }
+    .download { fill: #2196f3; }
+    .execution { fill: #4caf50; }
+    .upload { fill: #9c27b0; }
+    .failed { fill: #f44336; }
+    .unstable { fill: #ff7e00; }
+    .cancelled { fill: #9e9e9e; }
+    .legend span {
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      margin: 0 4px 0 12px;
+      vertical-align: middle;
     }
   </style>
-  <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
-  <script type="text/javascript">
-    google.charts.load('current', { 'packages': ['timeline'] });
-    google.charts.setOnLoadCallback(drawChart);
-
-    function drawChart() {
-      var container = document.getElementById('chart_div');
-      var chart = new google.visualization.Timeline(container);
-
-      var data = new google.visualization.DataTable();
-      data.addColumn('string', 'Worker');
-      data.addColumn('string', 'Task Name');
-      data.addColumn('date', 'Start');
-      data.addColumn('date', 'End');
-
-      data.addRows([
-        {% for i, task in enumerate(tasks) %}
-        ['{{task.worker}}', '{{task.short_qualified_name}}', new Date(Date.parse('{{task._timeline_started}}')), new Date(Date.parse('{{task._timeline_finished}}'))],
-        {% endfor %}
-	    ]);
-
-      var options = {
-        height: {{ 200 + tasks | length * 30 }},
-	    };
-
-      chart.draw(data, options);
-    }
-  </script>
-  <title>Jolt - Timeline</title>
 </head>
 
-<body onresize="drawChart()">
-  <h1>Jolt - Timeline</h1>
-  <div id="chart_div"></div>
+<body>
+  <table width="100%" bgcolor="#f1f1f1" style="border-bottom: 1px solid #c1c1c1; border-top: 1px solid #c1c1c1;">
+    <tr>
+      <td>
+        <table width="720" cellpadding="10px">
+          <tr>
+            <td width="25%" align="center">
+              {% if passed %}
+              <h2 style="font-size: 50pt; color: green;">PASS</h2>
+              {% else %}
+              <h2 style="font-size: 50pt; color: #f44336;">FAIL</h2>
+              {% endif %}
+            </td>
+            <td width="25%" align="center" style="border-left: 1px solid #c0c0c0">
+              <div>Completed</div>
+              <h2>{{ completed }}</h2>
+            </td>
+            <td width="25%" align="center" style="border-left: 1px solid #c0c0c0">
+              <div>Failed</div>
+              <h2>{{ failed }}</h2>
+            </td>
+            <td width="25%" align="center" style="border-left: 1px solid #c0c0c0">
+              <div>Duration</div>
+              <h2>{{ chart.duration | e }}</h2>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+
+  <div class="chart">
+    <div class="legend">
+      <span style="background: #2196f3; margin-left: 0"></span>Download
+      <span style="background: #4caf50"></span>Execution
+      <span style="background: #9c27b0"></span>Upload
+      <span style="background: #f44336"></span>Failed
+      <span style="background: #ff7e00"></span>Unstable
+      <span style="background: #9e9e9e"></span>Cancelled
+      {% if chart.critical %}
+      <span style="background: white; border: 2px solid #212121; box-sizing: border-box"></span>Critical path ({{ chart.critical_duration | e }} busy)
+      {% endif %}
+      {% if chart.prefix %}
+      &nbsp;&nbsp;Task names are relative to <code>{{ chart.prefix | e }}</code>
+      {% endif %}
+    </div>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {{ chart.width }} {{ chart.height }}" style="font-size: {{ chart.font_size }}px">
+      <defs>
+        <pattern id="hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+          <rect width="6" height="6" fill="white"/>
+          <line x1="0" y1="0" x2="0" y2="6" stroke="#e0e0e0" stroke-width="3"/>
+        </pattern>
+      </defs>
+      {% for group in chart.groups %}
+      <g>
+        <title>Worker {{ group.number }}: {{ group.name | e }}</title>
+        <rect class="group" x="0" y="{{ group.y }}" width="{{ chart.width }}" height="{{ group.height }}" {% if loop.index is even %}style="fill: white"{% endif %}/>
+        <text class="group-label" x="{{ chart.label_width - 10 }}" y="{{ group.y + chart.row_height / 2 }}">{{ group.number }}</text>
+      </g>
+      {% endfor %}
+      {% for tick in chart.ticks %}
+      <line class="tick" x1="{{ tick.x }}" y1="20" x2="{{ tick.x }}" y2="{{ chart.height - 20 }}"/>
+      <text class="tick-label" x="{{ tick.x }}" y="14">{{ tick.label | e }}</text>
+      {% endfor %}
+      {% for gap in chart.gaps %}
+      <g>
+        <title>Idle for {{ gap.duration | e }}</title>
+        <rect class="gap" x="{{ gap.x }}" y="20" width="{{ gap.width }}" height="{{ chart.height - 40 }}"/>
+        <text class="gap-label" x="{{ gap.x + gap.width / 2 }}" y="14">//</text>
+      </g>
+      {% endfor %}
+      {% for bar in chart.bars %}
+      <g>
+        <title>{{ bar.name | e }} ({{ bar.kind }}, {{ bar.status }}{% if bar.critical %}, critical path{% endif %}) {{ bar.duration | e }}</title>
+        <rect class="bar {{ bar.kind if bar.status == 'passed' else bar.status }}{% if bar.critical %} critical{% endif %}" x="{{ bar.x }}" y="{{ bar.y }}" width="{{ bar.width }}" height="{{ chart.bar_height }}" rx="2"/>
+        {% if bar.label %}
+        <svg x="{{ bar.x }}" y="{{ bar.y }}" width="{{ bar.width }}" height="{{ chart.bar_height }}">
+          <text class="bar-label" x="4" y="{{ chart.bar_height / 2 }}">{{ bar.label | e }}</text>
+        </svg>
+        {% endif %}
+      </g>
+      {% endfor %}
+    </svg>
+  </div>
 </body>
 
 </html>
