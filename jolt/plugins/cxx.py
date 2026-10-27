@@ -54,9 +54,9 @@ class GnuToolchain(object):
         for srcfile in utils.as_list(sources):
             srcfile = self.tools.expand_relpath(srcfile, self.joltdir)
             objfile = self.tools.expand_relpath(os.path.join(self.outdir, srcfile + ".o"), self.joltdir)
-            cmd = self.tools.render(cmd, inputs=srcfile, outputs=objfile, **kwargs)
+            rendered = self.tools.render(cmd, inputs=srcfile, outputs=objfile, **kwargs)
             obj = self.command(
-                cmd,
+                rendered,
                 srcfile, objfile,
                 message="{inputs}",
                 **kwargs)
