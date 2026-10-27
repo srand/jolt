@@ -528,7 +528,7 @@ class FileInfluence(HashInfluenceProvider):
     Influence of files in the workspace.
 
     Files are matched against and hashed from the fstree index of the
-    workspace. Files outside of the workspace, files ignored by
+    workspace. Files outside of the workspace, .git, files ignored by
     .joltignore, files in the build and cache directories and files in
     directories excluded by plugins, such as symlinks, are not indexed
     and never influence the hash.
