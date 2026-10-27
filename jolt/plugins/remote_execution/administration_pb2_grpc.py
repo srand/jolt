@@ -8,7 +8,7 @@ from jolt.plugins.remote_execution import scheduler_pb2 as jolt_dot_plugins_dot_
 
 
 class AdministrationStub(object):
-    """This service is not yet implemented.
+    """Scheduler administration and monitoring.
     """
 
     def __init__(self, channel):
@@ -45,7 +45,7 @@ class AdministrationStub(object):
 
 
 class AdministrationServicer(object):
-    """This service is not yet implemented.
+    """Scheduler administration and monitoring.
     """
 
     def CancelBuild(self, request, context):
@@ -74,8 +74,8 @@ class AdministrationServicer(object):
 
     def StreamEvents(self, request, context):
         """Subscribe to scheduler state changes. The first event is a snapshot of
-        all queued and running tasks and all connected workers, followed by
-        incremental updates.
+        all queued and running tasks, connected workers and registered builds,
+        followed by incremental updates. Build parameters are visible to subscribers.
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -117,7 +117,7 @@ def add_AdministrationServicer_to_server(servicer, server):
 
  # This class is part of an EXPERIMENTAL API.
 class Administration(object):
-    """This service is not yet implemented.
+    """Scheduler administration and monitoring.
     """
 
     @staticmethod

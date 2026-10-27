@@ -35,8 +35,11 @@ func postSync(t *testing.T, hub *EventHub, post func()) {
 
 	// The hub processes updates in order, so a completed subscription
 	// implies all previously posted updates have been applied.
-	_, err := hub.Subscribe(context.Background(), &EventFilter{NoSnapshot: true})
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	consumer, err := hub.Subscribe(ctx, &EventFilter{NoSnapshot: true})
 	require.NoError(t, err)
+	consumer.Close()
 }
 
 func recv(t *testing.T, consumer *utils.BroadcastConsumer[*protocol.SchedulerEvent]) *protocol.SchedulerEvent {
@@ -386,6 +389,8 @@ func TestEventFilterDefaultsToEverything(t *testing.T) {
 	filter := NewEventFilter(&protocol.StreamEventsRequest{})
 	assert.True(t, filter.Tasks)
 	assert.True(t, filter.Workers)
+	assert.True(t, filter.Builds)
 	assert.True(t, filter.MatchTask(&protocol.TaskInfo{}))
 	assert.True(t, filter.MatchWorker(&protocol.WorkerInfo{}))
+	assert.True(t, filter.MatchBuild("build"))
 }

@@ -1357,3 +1357,30 @@ class BuildCli(testsupport.JoltTest):
         self.assertExists(a2[0], "a.txt")
         self.assertExists(a2[1], "b.txt")
         self.assertNotExists(a2[0], "stale.txt")
+
+    def test_params_available_to_tasks(self):
+        """
+        --- config:
+        [params]
+        team = build infra
+        --- tasks:
+        from jolt import config
+
+        @influence.config("params", "username")
+        @influence.config("params", "origin")
+        class A(Task):
+            def publish(self, artifact, tools):
+                values = [config.get("params", key) for key in ("username", "origin", "team")]
+                with tools.cwd(artifact.path):
+                    tools.write_file("params.txt", "|".join(values), expand=False)
+        ---
+        """
+        network = "-n " if self.network else ""
+
+        r = self.jolt("-c params.username=alice -c params.origin=https://ci.example/job/42/ -vv build " + network + "a")
+        self.assertBuild(r, "a")
+        self.assertDataInFile("alice|https://ci.example/job/42/|build infra", self.artifacts(r)[0], "params.txt")
+
+        r = self.jolt("-c params.username=bob -c params.origin=https://ci.example/job/43/ -vv build " + network + "a")
+        self.assertBuild(r, "a")
+        self.assertDataInFile("bob|https://ci.example/job/43/|build infra", self.artifacts(r)[0], "params.txt")

@@ -12,6 +12,7 @@ import (
 	"github.com/srand/jolt/scheduler/pkg/log"
 	"github.com/srand/jolt/scheduler/pkg/protocol"
 	"github.com/srand/jolt/scheduler/pkg/utils"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -161,6 +162,10 @@ func (s *priorityScheduler) NewBuild(id string, request *protocol.BuildRequest) 
 		buildObservers: NewBuildUpdateObservers(),
 	}
 
+	for _, param := range request.Environment.GetParameters() {
+		build.parameters = append(build.parameters, proto.Clone(param).(*protocol.Property))
+	}
+
 	for _, task := range request.Environment.Tasks {
 		task := NewTask(build, task)
 		build.tasks[task.Identity()] = task
@@ -184,17 +189,29 @@ func (s *priorityScheduler) ScheduleBuild(b Build) (BuildUpdateObserver, error) 
 	s.Lock()
 	defer s.Unlock()
 
-	if build.IsDone() {
+	// Concurrent identical submissions may have constructed separate candidates.
+	// Reuse the registered build rather than replace its tasks and observers.
+	existing, registered := s.builds[build.Id()]
+	if registered {
+		build = existing
+	}
+
+	build.Lock()
+	defer build.Unlock()
+	if build.status != protocol.BuildStatus_BUILD_ACCEPTED {
 		log.Debugf("exe - task - request denied, build is done - id: %s", build.Id())
 		return nil, utils.GrpcError(utils.ErrTerminalBuild)
 	}
 
-	log.Info("new - build - id:", build.Id())
-
-	s.builds[build.Id()] = build
-
 	// Create a new build update observer
-	observer := build.NewUpdateObserver()
+	observer := build.buildObservers.NewObserver()
+	if !registered {
+		log.Info("new - build - id:", build.Id())
+		s.builds[build.Id()] = build
+		build.statusChanged = s.BuildStatusChanged
+		info := build.infoNoLock()
+		s.BuildScheduled(info)
+	}
 
 	// Send an initial build update that the build has been accepted
 	observer.Updates() <- &protocol.BuildUpdate{
@@ -485,7 +502,9 @@ func (s *priorityScheduler) removeStaleBuilds() {
 
 	s.Lock()
 	for _, build := range stale {
-		s.closeBuildNoLock(build)
+		if s.builds[build.Id()] == build && build.finishIfTerminal() {
+			s.closeBuildNoLock(build)
+		}
 	}
 	s.Unlock()
 }
@@ -507,6 +526,7 @@ func (s *priorityScheduler) closeBuildNoLock(build *priorityBuild) {
 	s.dequeueBuildNoLock(build)
 	delete(s.builds, build.Id())
 	build.Close()
+	s.BuildRemoved(build.Id())
 
 	// Update statistics
 	atomic.AddInt64(&s.numCompletedBuilds, 1)
@@ -599,6 +619,24 @@ func (s *priorityScheduler) AddObserver(receiver SchedulerObserver) {
 	defer s.Unlock()
 
 	s.observers = append(s.observers, receiver)
+}
+
+func (s *priorityScheduler) BuildScheduled(info *protocol.BuildInfo) {
+	for _, receiver := range s.observers {
+		receiver.BuildScheduled(info)
+	}
+}
+
+func (s *priorityScheduler) BuildStatusChanged(info *protocol.BuildInfo) {
+	for _, receiver := range s.observers {
+		receiver.BuildStatusChanged(info)
+	}
+}
+
+func (s *priorityScheduler) BuildRemoved(id string) {
+	for _, receiver := range s.observers {
+		receiver.BuildRemoved(id)
+	}
 }
 
 // Implementation of SchedulerObserver interface

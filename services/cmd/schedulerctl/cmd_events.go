@@ -21,6 +21,7 @@ import (
 var (
 	eventTasks      bool
 	eventWorkers    bool
+	eventBuilds     bool
 	eventBuildId    string
 	eventStatuses   []string
 	eventLabels     []string
@@ -34,7 +35,8 @@ var eventCmd = &cobra.Command{
 	Short: "Stream scheduler state changes",
 	Long: "Subscribes to the scheduler event stream. Unless --no-snapshot is given, " +
 		"the current state of all queued and running tasks and all connected " +
-		"workers is printed first, followed by incremental updates.",
+		"workers and registered builds is printed first, followed by incremental updates. " +
+		"Select --tasks, --workers and/or --builds to limit event kinds.",
 	Run: func(cmd *cobra.Command, args []string) {
 		statuses, err := parseTaskStatuses(eventStatuses)
 		if err != nil {
@@ -44,6 +46,7 @@ var eventCmd = &cobra.Command{
 		request := &protocol.StreamEventsRequest{
 			Tasks:      eventTasks,
 			Workers:    eventWorkers,
+			Builds:     eventBuilds,
 			BuildId:    eventBuildId,
 			TaskStatus: statuses,
 			Labels:     eventLabels,
@@ -117,16 +120,20 @@ func printEvent(event *protocol.SchedulerEvent) {
 	switch e := event.GetEvent().(type) {
 	case *protocol.SchedulerEvent_Snapshot:
 		snapshot := e.Snapshot
-		fmt.Printf("snapshot   %s tasks: %d, workers: %d\n",
+		fmt.Printf("snapshot   %s tasks: %d, workers: %d, builds: %d\n",
 			snapshot.GetTimestamp().AsTime().Format("15:04:05.000"),
 			len(snapshot.GetTasks()),
 			len(snapshot.GetWorkers()),
+			len(snapshot.GetBuilds()),
 		)
 		for _, task := range snapshot.GetTasks() {
 			printTask("task      ", task)
 		}
 		for _, worker := range snapshot.GetWorkers() {
 			printWorker("worker    ", worker)
+		}
+		for _, build := range snapshot.GetBuilds() {
+			printBuild(build)
 		}
 
 	case *protocol.SchedulerEvent_Task:
@@ -140,7 +147,21 @@ func printEvent(event *protocol.SchedulerEvent) {
 
 	case *protocol.SchedulerEvent_Heartbeat:
 		fmt.Printf("heartbeat  %s\n", e.Heartbeat.AsTime().Format("15:04:05.000"))
+	case *protocol.SchedulerEvent_Build:
+		printBuild(e.Build)
+	case *protocol.SchedulerEvent_BuildRemoved:
+		fmt.Printf("removed    build %s\n", e.BuildRemoved.GetId())
 	}
+}
+
+func printBuild(build *protocol.BuildInfo) {
+	fmt.Printf("build      %-14s %s scheduled: %s",
+		strings.TrimPrefix(build.GetStatus().String(), "BUILD_"), build.GetId(),
+		build.GetScheduledAt().AsTime().Format("15:04:05.000"))
+	for _, param := range build.GetParameters() {
+		fmt.Printf(" %s=%q", param.GetKey(), param.GetValue())
+	}
+	fmt.Println()
 }
 
 func printTask(prefix string, task *protocol.TaskInfo) {
@@ -181,8 +202,9 @@ func printWorker(prefix string, worker *protocol.WorkerInfo) {
 }
 
 func init() {
-	eventCmd.Flags().BoolVar(&eventTasks, "tasks", false, "Only stream task events")
-	eventCmd.Flags().BoolVar(&eventWorkers, "workers", false, "Only stream worker events")
+	eventCmd.Flags().BoolVar(&eventTasks, "tasks", false, "Only stream task events (all kinds if none selected)")
+	eventCmd.Flags().BoolVar(&eventWorkers, "workers", false, "Only stream worker events (all kinds if none selected)")
+	eventCmd.Flags().BoolVar(&eventBuilds, "builds", false, "Only stream build events (all kinds if none selected)")
 	eventCmd.Flags().StringVarP(&eventBuildId, "build", "b", "", "Only stream events for this build")
 	eventCmd.Flags().StringSliceVar(&eventStatuses, "status", nil, "Only stream tasks with these statuses, e.g. queued,running")
 	eventCmd.Flags().StringSliceVarP(&eventLabels, "label", "L", nil, "Only stream tasks and workers with all of these labels")

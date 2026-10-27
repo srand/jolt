@@ -13,7 +13,10 @@ type EventFilter struct {
 	// Include worker events.
 	Workers bool
 
-	// Only include tasks belonging to this build.
+	// Include build events.
+	Builds bool
+
+	// Only include this build, its tasks and workers assigned to those tasks.
 	BuildId string
 
 	// Only include tasks with one of these statuses.
@@ -33,6 +36,7 @@ func NewEventFilter(request *protocol.StreamEventsRequest) *EventFilter {
 	filter := &EventFilter{
 		Tasks:      request.GetTasks(),
 		Workers:    request.GetWorkers(),
+		Builds:     request.GetBuilds(),
 		BuildId:    request.GetBuildId(),
 		TaskStatus: request.GetTaskStatus(),
 		Labels:     request.GetLabels(),
@@ -40,13 +44,19 @@ func NewEventFilter(request *protocol.StreamEventsRequest) *EventFilter {
 		NoSnapshot: request.GetNoSnapshot(),
 	}
 
-	// Selecting neither kind selects both.
-	if !filter.Tasks && !filter.Workers {
+	// Selecting no event kinds selects all three.
+	if !filter.Tasks && !filter.Workers && !filter.Builds {
 		filter.Tasks = true
 		filter.Workers = true
+		filter.Builds = true
 	}
 
 	return filter
+}
+
+// Task status, labels and hostname do not apply to build metadata or removals.
+func (f *EventFilter) MatchBuild(id string) bool {
+	return f == nil || (f.Builds && (f.BuildId == "" || f.BuildId == id))
 }
 
 func (f *EventFilter) MatchTask(task *protocol.TaskInfo) bool {
@@ -111,6 +121,10 @@ func (f *EventFilter) MatchEvent(event *protocol.SchedulerEvent) bool {
 		// Removals carry no attributes to filter on. Subscribers that never saw
 		// the worker simply ignore them.
 		return f == nil || f.Workers
+	case *protocol.SchedulerEvent_Build:
+		return f.MatchBuild(e.Build.GetId())
+	case *protocol.SchedulerEvent_BuildRemoved:
+		return f.MatchBuild(e.BuildRemoved.GetId())
 	default:
 		return true
 	}

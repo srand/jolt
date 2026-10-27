@@ -42,6 +42,9 @@ type EventHub struct {
 
 	// Connected workers, by worker id.
 	workers map[string]*protocol.WorkerInfo
+
+	// Registered builds, including terminal builds until explicit removal.
+	builds map[string]*protocol.BuildInfo
 }
 
 // An update to apply to the mirror. Exactly one field is set.
@@ -51,6 +54,8 @@ type eventUpdate struct {
 	task          *protocol.TaskInfo
 	worker        *protocol.WorkerInfo
 	workerRemoved string
+	build         *protocol.BuildInfo
+	buildRemoved  string
 	subscribe     *subscribeRequest
 }
 
@@ -67,6 +72,7 @@ func NewEventHub(logstashUri string) *EventHub {
 		done:        make(chan struct{}),
 		tasks:       map[string]*protocol.TaskInfo{},
 		workers:     map[string]*protocol.WorkerInfo{},
+		builds:      map[string]*protocol.BuildInfo{},
 	}
 }
 
@@ -138,6 +144,11 @@ func (h *EventHub) subscribe(filter *EventFilter) *utils.BroadcastConsumer[*prot
 				snapshot.Workers = append(snapshot.Workers, worker)
 			}
 		}
+		for _, build := range h.builds {
+			if filter.MatchBuild(build.Id) {
+				snapshot.Builds = append(snapshot.Builds, build)
+			}
+		}
 
 		consumer.Chan <- &protocol.SchedulerEvent{
 			Event: &protocol.SchedulerEvent_Snapshot{Snapshot: snapshot},
@@ -156,6 +167,20 @@ func (h *EventHub) apply(update *eventUpdate, now time.Time) {
 		h.applyWorker(update.worker)
 	case update.workerRemoved != "":
 		h.removeWorker(update.workerRemoved)
+	case update.build != nil:
+		h.builds[update.build.Id] = update.build
+		h.broadcast.Send(&protocol.SchedulerEvent{
+			Event: &protocol.SchedulerEvent_Build{Build: update.build},
+		})
+	case update.buildRemoved != "":
+		if _, ok := h.builds[update.buildRemoved]; ok {
+			delete(h.builds, update.buildRemoved)
+			h.broadcast.Send(&protocol.SchedulerEvent{
+				Event: &protocol.SchedulerEvent_BuildRemoved{
+					BuildRemoved: &protocol.BuildRemoved{Id: update.buildRemoved},
+				},
+			})
+		}
 	case update.subscribe != nil:
 		update.subscribe.result <- h.subscribe(update.subscribe.filter)
 	}
@@ -350,4 +375,16 @@ func (h *EventHub) WorkerEnlisted(worker Worker) {
 // Implementation of SchedulerObserver interface.
 func (h *EventHub) WorkerDelisted(worker Worker) {
 	h.post(&eventUpdate{workerRemoved: worker.Id()})
+}
+
+func (h *EventHub) BuildScheduled(info *protocol.BuildInfo) {
+	h.post(&eventUpdate{build: info})
+}
+
+func (h *EventHub) BuildStatusChanged(info *protocol.BuildInfo) {
+	h.post(&eventUpdate{build: info})
+}
+
+func (h *EventHub) BuildRemoved(id string) {
+	h.post(&eventUpdate{buildRemoved: id})
 }
