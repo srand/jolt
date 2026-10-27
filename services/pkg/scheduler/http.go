@@ -5,14 +5,12 @@ import (
 	"net/http"
 	"slices"
 	"strings"
-
-	"github.com/labstack/echo/v4"
 )
 
 var prometheusLabelEscaper = strings.NewReplacer("\\", "\\\\", "\"", "\\\"", "\n", "\\n")
 
-func NewHttpHandler(scheduler Scheduler, r *echo.Echo) {
-	r.GET("/metrics", func(c echo.Context) error {
+func NewHttpHandler(scheduler Scheduler, r *http.ServeMux) {
+	r.HandleFunc("GET /metrics", func(w http.ResponseWriter, req *http.Request) {
 		stats := scheduler.Statistics()
 
 		var metrics strings.Builder
@@ -82,6 +80,8 @@ func NewHttpHandler(scheduler Scheduler, r *echo.Echo) {
 			fmt.Fprintf(&metrics, "jolt_scheduler_workers_active_by_platform%s %d\n", platformLabels[i], stats.WorkersByPlatform[platform].ActiveWorkers)
 		}
 
-		return c.String(http.StatusOK, metrics.String())
+		w.Header().Set("Content-Type", "text/plain; charset=UTF-8")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(metrics.String()))
 	})
 }

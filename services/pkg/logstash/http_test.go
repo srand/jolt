@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/labstack/echo/v4"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 )
@@ -25,7 +24,7 @@ func newTestHttpServer(t *testing.T) (*httptest.Server, LogStash) {
 	config.On("MaxSize").Return(0x100000)
 	stash := NewLogStash(config, afero.NewMemMapFs())
 
-	e := echo.New()
+	e := http.NewServeMux()
 	NewHttpHandler(stash, e)
 	server := httptest.NewServer(e)
 	t.Cleanup(server.Close)

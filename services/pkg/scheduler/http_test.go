@@ -7,7 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/labstack/echo/v4"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -31,14 +30,14 @@ func TestWorkerMetrics(t *testing.T) {
 			{OS: "custom\\os\"\n", Arch: "custom\tarch", Label: "custom\\label\"\n"}: {Workers: 1, ActiveWorkers: 1},
 		},
 	}
-	router := echo.New()
+	router := http.NewServeMux()
 	NewHttpHandler(metricsScheduler{stats: stats}, router)
 
 	for range 5 {
 		response := httptest.NewRecorder()
 		router.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/metrics", nil))
 		assert.Equal(t, http.StatusOK, response.Code)
-		assert.Equal(t, echo.MIMETextPlainCharsetUTF8, response.Header().Get("Content-Type"))
+		assert.Equal(t, "text/plain; charset=UTF-8", response.Header().Get("Content-Type"))
 		body := response.Body.String()
 		assert.NotContains(t, body, "jolt_scheduler_workers_available_by_platform")
 		assert.Contains(t, body, "# TYPE jolt_scheduler_workers gauge\n")
@@ -87,7 +86,7 @@ func TestWorkerMetricsWithMultipleLabels(t *testing.T) {
 		{OS: "linux", Arch: "amd64", Label: "signing,tiny"}:   {Workers: 2},
 		{OS: "linux", Arch: "amd64", Label: "tiny,toolsctrl"}: {Workers: 1},
 	}, scheduler.Statistics().WorkersByPlatform)
-	router := echo.New()
+	router := http.NewServeMux()
 	NewHttpHandler(scheduler, router)
 	for range 10 {
 		response := httptest.NewRecorder()
@@ -111,7 +110,7 @@ func TestWorkerMetricsWithMultipleLabels(t *testing.T) {
 }
 
 func TestWorkerMetricsWithoutWorkers(t *testing.T) {
-	router := echo.New()
+	router := http.NewServeMux()
 	NewHttpHandler(NewPriorityScheduler(), router)
 	response := httptest.NewRecorder()
 	router.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/metrics", nil))

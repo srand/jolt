@@ -1,13 +1,13 @@
 package cache
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
 
-	"github.com/labstack/echo/v4"
 	"github.com/srand/jolt/scheduler/pkg/log"
 	"github.com/srand/jolt/scheduler/pkg/utils"
 )
@@ -17,18 +17,35 @@ type Error struct {
 	Message string `json:"message"`
 }
 
-// newError creates a new error response.
-func newError(c echo.Context, err error) error {
+// writeJSON writes a JSON response.
+func writeJSON(w http.ResponseWriter, status int, value any) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	json.NewEncoder(w).Encode(value)
+}
+
+// newError writes an error response.
+func newError(w http.ResponseWriter, r *http.Request, err error) {
 	if errors.Is(err, utils.ErrNotFound) {
-		return c.JSON(http.StatusNotFound, &Error{Message: err.Error()})
+		writeJSON(w, http.StatusNotFound, &Error{Message: err.Error()})
+		return
 	}
 
 	if errors.Is(err, utils.ErrBadRequest) {
-		return c.JSON(http.StatusBadRequest, &Error{Message: err.Error()})
+		writeJSON(w, http.StatusBadRequest, &Error{Message: err.Error()})
+		return
 	}
 
-	log.Error(c.Request().URL, err)
-	return c.JSON(http.StatusInternalServerError, &Error{Message: err.Error()})
+	log.Error(r.URL, err)
+	writeJSON(w, http.StatusInternalServerError, &Error{Message: err.Error()})
+}
+
+// bindJSON decodes a JSON request body. An empty body leaves value unchanged.
+func bindJSON(r *http.Request, value any) error {
+	if err := json.NewDecoder(r.Body).Decode(value); err != nil && err != io.EOF {
+		return err
+	}
+	return nil
 }
 
 // FindFilesRequest represents a request to find files.
@@ -65,59 +82,59 @@ type FindBlobsResponse struct {
 // clients can show the progress of the download. The size is taken from the
 // open file instead of looking up the cache entry again, which would count
 // as another cache hit.
-func setContentLength(c echo.Context, reader io.Reader) {
+func setContentLength(w http.ResponseWriter, reader io.Reader) {
 	file, ok := reader.(interface{ Stat() (os.FileInfo, error) })
 	if !ok {
 		return
 	}
 	if info, err := file.Stat(); err == nil && info.Mode().IsRegular() {
-		c.Response().Header().Set(echo.HeaderContentLength, fmt.Sprint(info.Size()))
+		w.Header().Set("Content-Length", fmt.Sprint(info.Size()))
 	}
 }
 
 func NewHttpHandler(cache Cache, service CacheGrpcService) http.Handler {
-	r := echo.New()
-	r.HideBanner = true
-	r.Use(utils.HttpLogger)
+	mux := http.NewServeMux()
 
-	r.HEAD("/objects/:digest", func(c echo.Context) error {
-		digest, err := utils.ParseDigest(c.Param("digest"))
+	mux.HandleFunc("HEAD /objects/{digest}", func(w http.ResponseWriter, r *http.Request) {
+		digest, err := utils.ParseDigest(r.PathValue("digest"))
 		if err != nil {
-			return newError(c, fmt.Errorf("%v: %v", utils.ErrBadRequest, err))
+			newError(w, r, fmt.Errorf("%v: %v", utils.ErrBadRequest, err))
+			return
 		}
 
 		if info := cache.HasObject(digest); info != nil {
-			c.Response().Header().Set(echo.HeaderContentLength, fmt.Sprint(info.Size()))
-			return c.JSON(http.StatusOK, nil)
+			w.Header().Set("Content-Length", fmt.Sprint(info.Size()))
+			writeJSON(w, http.StatusOK, nil)
+			return
 		}
 
-		return newError(c, utils.ErrNotFound)
+		newError(w, r, utils.ErrNotFound)
 	})
 
-	r.GET("/objects/:digest", func(c echo.Context) error {
-		digest, err := utils.ParseDigest(c.Param("digest"))
+	mux.HandleFunc("GET /objects/{digest}", func(w http.ResponseWriter, r *http.Request) {
+		digest, err := utils.ParseDigest(r.PathValue("digest"))
 		if err != nil {
-			return newError(c, fmt.Errorf("%v: %v", utils.ErrBadRequest, err))
+			newError(w, r, fmt.Errorf("%v: %v", utils.ErrBadRequest, err))
+			return
 		}
 
 		reader, err := cache.ReadObject(digest)
 		if err != nil {
-			return newError(c, err)
+			newError(w, r, err)
+			return
 		}
 		defer reader.Close()
 
-		setContentLength(c, reader)
+		setContentLength(w, reader)
 
-		if _, err := io.Copy(c.Response().Writer, reader); err != nil {
-			return newError(c, err)
+		if _, err := io.Copy(w, reader); err != nil {
+			log.Error(r.URL, err)
 		}
-
-		return nil
 	})
 
-	r.POST("/objects", func(c echo.Context) error {
-		missing := c.QueryParams().Has("missing")
-		present := c.QueryParams().Has("present")
+	mux.HandleFunc("POST /objects", func(w http.ResponseWriter, r *http.Request) {
+		missing := r.URL.Query().Has("missing")
+		present := r.URL.Query().Has("present")
 		if !missing && !present {
 			missing = true
 			present = true
@@ -126,8 +143,9 @@ func NewHttpHandler(cache Cache, service CacheGrpcService) http.Handler {
 		request := FindBlobsRequest{}
 		response := FindBlobsResponse{}
 
-		if err := c.Bind(&request); err != nil {
-			return newError(c, fmt.Errorf("%v: %v", utils.ErrBadRequest, err))
+		if err := bindJSON(r, &request); err != nil {
+			newError(w, r, fmt.Errorf("%v: %v", utils.ErrBadRequest, err))
+			return
 		}
 
 		for _, digest := range request.Blobs {
@@ -142,60 +160,64 @@ func NewHttpHandler(cache Cache, service CacheGrpcService) http.Handler {
 			}
 		}
 
-		return c.JSON(http.StatusOK, response)
+		writeJSON(w, http.StatusOK, response)
 	})
 
-	r.PUT("/objects/:digest", func(c echo.Context) error {
-		digest, err := utils.ParseDigest(c.Param("digest"))
+	mux.HandleFunc("PUT /objects/{digest}", func(w http.ResponseWriter, r *http.Request) {
+		digest, err := utils.ParseDigest(r.PathValue("digest"))
 		if err != nil {
-			return newError(c, fmt.Errorf("%v: %v", utils.ErrBadRequest, err))
+			newError(w, r, fmt.Errorf("%v: %v", utils.ErrBadRequest, err))
+			return
 		}
 
 		writer, err := cache.WriteObject(digest)
 		if err != nil {
-			return newError(c, err)
+			newError(w, r, err)
+			return
 		}
 
-		if _, err := io.Copy(writer, c.Request().Body); err != nil {
+		if _, err := io.Copy(writer, r.Body); err != nil {
 			writer.Discard()
-			return newError(c, err)
+			newError(w, r, err)
+			return
 		}
 
 		if err := writer.Close(); err != nil {
-			return newError(c, err)
+			newError(w, r, err)
+			return
 		}
 
-		return c.JSON(http.StatusCreated, nil)
+		writeJSON(w, http.StatusCreated, nil)
 	})
 
-	r.HEAD("/files/:path", func(c echo.Context) error {
-		if info := cache.HasFile(c.Param("path")); info != nil {
-			c.Response().Header().Set(echo.HeaderContentLength, fmt.Sprint(info.Size()))
-			return c.JSON(http.StatusOK, nil)
+	mux.HandleFunc("HEAD /files/{path}", func(w http.ResponseWriter, r *http.Request) {
+		if info := cache.HasFile(r.PathValue("path")); info != nil {
+			w.Header().Set("Content-Length", fmt.Sprint(info.Size()))
+			writeJSON(w, http.StatusOK, nil)
+			return
 		}
 
-		return newError(c, utils.ErrNotFound)
+		newError(w, r, utils.ErrNotFound)
 	})
 
-	r.GET("/files/:path", func(c echo.Context) error {
-		reader, err := cache.ReadFile(c.Param("path"))
+	mux.HandleFunc("GET /files/{path}", func(w http.ResponseWriter, r *http.Request) {
+		reader, err := cache.ReadFile(r.PathValue("path"))
 		if err != nil {
-			return newError(c, err)
+			newError(w, r, err)
+			return
 		}
 		defer reader.Close()
 
-		setContentLength(c, reader)
+		setContentLength(w, reader)
 
-		if _, err := io.Copy(c.Response().Writer, reader); err != nil {
-			return newError(c, err)
+		if _, err := io.Copy(w, reader); err != nil {
+			log.Error(r.URL, err)
 		}
-
-		return nil
 	})
 
-	r.POST("/files", func(c echo.Context) error {
-		missing := c.QueryParams().Has("missing")
-		present := c.QueryParams().Has("present")
+	mux.HandleFunc("POST /files", func(w http.ResponseWriter, r *http.Request) {
+		missing := r.URL.Query().Has("missing")
+		present := r.URL.Query().Has("present")
 		if !missing && !present {
 			missing = true
 			present = true
@@ -204,8 +226,9 @@ func NewHttpHandler(cache Cache, service CacheGrpcService) http.Handler {
 		request := FindFilesRequest{}
 		response := FindFilesResponse{}
 
-		if err := c.Bind(&request); err != nil {
-			return newError(c, fmt.Errorf("%v: %v", utils.ErrBadRequest, err))
+		if err := bindJSON(r, &request); err != nil {
+			newError(w, r, fmt.Errorf("%v: %v", utils.ErrBadRequest, err))
+			return
 		}
 
 		for _, path := range request.Files {
@@ -220,25 +243,27 @@ func NewHttpHandler(cache Cache, service CacheGrpcService) http.Handler {
 			}
 		}
 
-		return c.JSON(http.StatusOK, response)
+		writeJSON(w, http.StatusOK, response)
 	})
 
-	r.PUT("/files/:path", func(c echo.Context) error {
-		writer, err := cache.WriteFile(c.Param("path"))
+	mux.HandleFunc("PUT /files/{path}", func(w http.ResponseWriter, r *http.Request) {
+		writer, err := cache.WriteFile(r.PathValue("path"))
 		if err != nil {
-			return newError(c, err)
+			newError(w, r, err)
+			return
 		}
 
-		if _, err := io.Copy(writer, c.Request().Body); err != nil {
+		if _, err := io.Copy(writer, r.Body); err != nil {
 			writer.Discard()
-			return newError(c, err)
+			newError(w, r, err)
+			return
 		}
 		writer.Close()
 
-		return c.JSON(http.StatusCreated, nil)
+		writeJSON(w, http.StatusCreated, nil)
 	})
 
-	r.GET("/metrics", func(c echo.Context) error {
+	mux.HandleFunc("GET /metrics", func(w http.ResponseWriter, r *http.Request) {
 		stats := cache.Statistics()
 
 		metrics := ""
@@ -266,10 +291,12 @@ func NewHttpHandler(cache Cache, service CacheGrpcService) http.Handler {
 			metrics += treeMetrics(service.TreeStatistics())
 		}
 
-		return c.String(http.StatusOK, metrics)
+		w.Header().Set("Content-Type", "text/plain; charset=UTF-8")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(metrics))
 	})
 
-	return r
+	return utils.HttpLogger(mux)
 }
 
 // Formats statistics of HasTree requests as metrics.

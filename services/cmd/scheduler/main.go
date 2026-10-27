@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/labstack/echo/v4"
 	"github.com/srand/jolt/scheduler/pkg/log"
 	"github.com/srand/jolt/scheduler/pkg/logstash"
 	"github.com/srand/jolt/scheduler/pkg/scheduler"
@@ -94,15 +93,13 @@ var rootCmd = &cobra.Command{
 
 			log.Info("Listening on http", host)
 
-			r := echo.New()
-			r.HideBanner = true
-			r.Use(utils.HttpLogger)
-			r.Add(echo.GET, "/debug/pprof/*", echo.WrapHandler(http.DefaultServeMux))
+			r := http.NewServeMux()
+			r.Handle("GET /debug/pprof/", http.DefaultServeMux)
 
 			logstash.NewHttpHandler(stash, r)
 			scheduler.NewHttpHandler(sched, r)
 
-			go http.ListenAndServe(host, r)
+			go http.ListenAndServe(host, utils.HttpLogger(r))
 		}
 
 		// Ready to run the scheduler
