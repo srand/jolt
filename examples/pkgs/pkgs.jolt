@@ -27,6 +27,7 @@ from jolt.pkgs import double_conversion
 from jolt.pkgs import fastfloat
 from jolt.pkgs import ffmpeg
 from jolt.pkgs import flatbuffers
+from jolt.pkgs import flex
 from jolt.pkgs import fmt
 from jolt.pkgs import fstree
 from jolt.pkgs import gflags
@@ -229,6 +230,7 @@ class Default(Alias):
         "bison",
         "dbus",
         "ffmpeg",
+        "flex",
         "gperf",
         "libfastjson",
         "libtool",
