@@ -1,14 +1,14 @@
 from __future__ import print_function
+import atexit
 import glob
 import os
 import re
+import signal
 import sys
 import time
-import tqdm
+if os.name == "posix":
+    import termios
 if os.name == "nt":
-    # FIXME: Workaround to make tqdm behave correctly on Windows
-    import colorama
-    colorama.deinit()  # Undo the work of tqdm
     os.system("")      # Hack to enable vt100
 import traceback
 from datetime import datetime
@@ -16,6 +16,27 @@ import threading
 import logging
 import logging.handlers
 from contextlib import contextmanager
+from rich import filesize
+from rich.console import Console
+from rich.constrain import Constrain
+from rich.control import Control, ControlType
+from rich.file_proxy import FileProxy
+from rich.live import Live
+from rich.live_render import LiveRender
+from rich.measure import Measurement
+from rich.progress import (
+    DownloadColumn,
+    MofNCompleteColumn,
+    Progress,
+    ProgressColumn,
+    TextColumn,
+    TimeElapsedColumn,
+    TimeRemainingColumn,
+    TransferSpeedColumn,
+)
+from rich.style import Style
+from rich.table import Column
+from rich.text import Text
 try:
     from StringIO import StringIO
 except Exception:
@@ -131,13 +152,29 @@ class Filter(logging.Filter):
         return self.filterfn(record)
 
 
-class TqdmStream(object):
+class ConsoleStream(object):
+    """
+    Terminal stream that prints lines above progress bars.
+
+    While progress bars are shown, complete lines are printed through
+    the rich console, which keeps the bars below the output. Otherwise,
+    output is written to the stream directly.
+    """
+
     def __init__(self, stream):
         self.stream = stream
+        self._buffer = ""
+        self._lock = threading.Lock()
 
     def write(self, msg):
-        with tqdm.tqdm.external_write_mode(file=self.stream, nolock=False):
-            self.stream.write(msg)
+        with self._lock:
+            if _ProgressDisplay.live is None and not self._buffer:
+                self.stream.write(msg)
+                return
+            lines = (self._buffer + msg).split("\n")
+            self._buffer = lines.pop()
+        for line in lines:
+            _console.print(Text.from_ansi(line), soft_wrap=True)
 
     def flush(self):
         getattr(self.stream, 'flush', lambda: None)()
@@ -177,8 +214,10 @@ _logger.removeHandler = utils.delay_interrupt(_logger.removeHandler)
 
 _console_formatter = ConsoleFormatter('[{levelname:>7}] {message}', '{message}')
 
+_console = Console(file=sys.stdout, highlight=False, emoji=False, markup=False, soft_wrap=True)
+
 if sys.stdout.isatty() and sys.stderr.isatty():
-    _stdout = logging.StreamHandler(TqdmStream(sys.stdout))
+    _stdout = logging.StreamHandler(ConsoleStream(sys.stdout))
 else:
     _stdout = logging.StreamHandler(sys.stdout)
 _stdout.setFormatter(_console_formatter)
@@ -186,7 +225,7 @@ _stdout.addFilter(Filter(lambda r: r.levelno < ERROR))
 _stdout.addFilter(Filter(lambda r: r.levelno != EXCEPTION))
 
 if sys.stdout.isatty() and sys.stderr.isatty():
-    _stderr = logging.StreamHandler(TqdmStream(sys.stdout))
+    _stderr = logging.StreamHandler(ConsoleStream(sys.stdout))
 else:
     _stderr = logging.StreamHandler(sys.stderr)
 _stderr.setFormatter(_console_formatter)
@@ -368,23 +407,512 @@ def progress_log(desc, count, unit):
     return _Progress(desc)
 
 
+class _BlockBar(object):
+    """ Progress bar drawn with block characters across the available width. """
+
+    _partial = " ▏▎▍▌▋▊▉"
+
+    def __init__(self, completed, total, finished):
+        self.completed = completed
+        self.total = total
+        self.finished = finished
+
+    def __rich_console__(self, console, options):
+        width = options.max_width
+        ratio = min(1.0, self.completed / self.total) if self.total else 0.0
+        full, eighths = divmod(int(ratio * width * 8), 8)
+        bar = "█" * full
+        if eighths and full < width:
+            bar += self._partial[eighths]
+        color = console.get_style("bar.finished" if self.finished else "bar.complete").color
+        yield Text(bar.ljust(width), style=Style(color=color, bgcolor="grey23"), end="")
+
+    def __rich_measure__(self, console, options):
+        return Measurement(1, options.max_width)
+
+
+class _BlockBarColumn(ProgressColumn):
+    """ Column with a block progress bar that fills the remaining width. """
+
+    def __init__(self):
+        super().__init__(table_column=Column(ratio=1, no_wrap=True))
+
+    def render(self, task):
+        if task.total is None:
+            return Text("")
+        return _BlockBar(task.completed, task.total, task.finished)
+
+
+def _progress_tasks():
+    """ Returns the progress bars shown, also while the display is created. """
+    display = globals().get("_ProgressDisplay")
+    return display.progress.tasks if display is not None else []
+
+
+class _DescriptionColumn(TextColumn):
+    """
+    Description column as wide as the longest description shown.
+
+    The width, including the log level, is limited in narrow terminals
+    to leave room for the bar and the other columns. Longer descriptions
+    are truncated.
+    """
+
+    prefix = "[   INFO] "
+    min_width = 24
+    min_bar_width = 10
+
+    def __init__(self):
+        super().__init__(self.prefix + "{task.description}", markup=False)
+
+    def get_table_column(self):
+        tasks = _progress_tasks()
+        longest = max((len(self.prefix + task.description) for task in tasks), default=len(self.prefix))
+
+        # Room left by the bar, the other columns, the space between
+        # columns and the empty last column of the terminal
+        display = globals().get("_ProgressDisplay")
+        reserved = self.min_bar_width + 5
+        if display is not None:
+            reserved += display.details.width(tasks) + display.elapsed_width + display.remaining.width(tasks)
+        available = max(self.min_width, _console.width - reserved)
+        return Column(width=min(longest, available), no_wrap=True, overflow="ellipsis")
+
+
+class _DetailsColumn(ProgressColumn):
+    """
+    Counters of a progress bar, in a format depending on the unit.
+
+    The column is as wide as the longest counters shown.
+    """
+
+    def __init__(self):
+        super().__init__()
+        self._download = DownloadColumn()
+        self._speed = TransferSpeedColumn()
+        self._count = MofNCompleteColumn()
+
+    def width(self, tasks):
+        return max((self.render(task).cell_len for task in tasks), default=0)
+
+    def get_table_column(self):
+        return Column(width=self.width(_progress_tasks()), justify="right", no_wrap=True)
+
+    def render(self, task):
+        unit = task.fields.get("unit", "")
+        if unit == "B":
+            # The size of a download is unknown without a Content-Length
+            if task.total is None:
+                size = Text(filesize.decimal(int(task.completed)), style="progress.download")
+            else:
+                size = self._download.render(task)
+            if (task.finished_speed or task.speed) is None:
+                return size
+            return Text.assemble(size, " ", self._speed.render(task))
+        if task.total is None:
+            return Text("{:.0f} {}".format(task.completed, unit))
+        return Text.assemble(self._count.render(task), " ", unit)
+
+
+class _RemainingColumn(ProgressColumn):
+    """
+    Estimated time remaining, for bars with estimates only.
+
+    The column is empty unless a bar with estimates is shown.
+    """
+
+    def __init__(self):
+        super().__init__()
+        self._remaining = TimeRemainingColumn()
+
+    @staticmethod
+    def _has_estimate(task):
+        return task.total is not None and task.fields.get("estimates")
+
+    def width(self, tasks):
+        return 7 if any(self._has_estimate(task) for task in tasks) else 0
+
+    def get_table_column(self):
+        return Column(width=self.width(_progress_tasks()), no_wrap=True)
+
+    def render(self, task):
+        if not self._has_estimate(task):
+            return Text("")
+        return self._remaining.render(task)
+
+
+class _ReflowLiveRender(LiveRender):
+    """
+    Live render that handles terminals reflowing lines when resized.
+
+    When a terminal is made narrower, many terminals wrap the lines that
+    were already drawn onto several rows. The cursor must then be moved
+    up past all of those rows to erase the previous render.
+    """
+
+    def _rows(self):
+        width, height = self._shape
+        new_width = max(1, _console.width)
+        if width > new_width:
+            return height * -(-width // new_width)
+        return height
+
+    def position_cursor(self):
+        if self._shape is None:
+            return Control()
+        return Control(
+            ControlType.CARRIAGE_RETURN,
+            (ControlType.ERASE_IN_LINE, 2),
+            *(((ControlType.CURSOR_UP, 1), (ControlType.ERASE_IN_LINE, 2)) * (self._rows() - 1)))
+
+    def restore_cursor(self):
+        if self._shape is None:
+            return Control()
+        return Control(
+            ControlType.CARRIAGE_RETURN,
+            *((ControlType.CURSOR_UP, 1), (ControlType.ERASE_IN_LINE, 2)) * self._rows())
+
+
+class _TerminalEcho(object):
+    """
+    Disables echo of typed keys while progress bars are shown.
+
+    Echoed keys, such as enter, move the cursor and break the redraw of
+    the bars. Signal keys like Ctrl-C keep working since only echo is
+    disabled, and typed input is still passed on to whoever reads it.
+
+    Echo is restored when the bars are closed, at exit and when the
+    process is terminated by SIGTERM or SIGHUP.
+    """
+
+    lock = threading.RLock()
+    fd = None
+    attrs = None
+    pid = None
+    handlers = {}
+    signals = [getattr(signal, name) for name in ("SIGTERM", "SIGHUP") if hasattr(signal, name)]
+
+    @staticmethod
+    @utils.delay_interrupt
+    def disable():
+        with _TerminalEcho.lock:
+            _TerminalEcho._disable()
+
+    @staticmethod
+    def _disable():
+        if os.name != "posix" or _TerminalEcho.attrs is not None:
+            return
+        try:
+            fd = sys.stdin.fileno()
+            # Changing terminal attributes stops background processes
+            if not os.isatty(fd) or os.tcgetpgrp(fd) != os.getpgrp():
+                return
+            attrs = termios.tcgetattr(fd)
+            noecho = list(attrs)
+            noecho[3] &= ~termios.ECHO
+
+            # Record the attributes before changing them so that they are
+            # always restored.
+            _TerminalEcho.fd, _TerminalEcho.attrs, _TerminalEcho.pid = fd, attrs, os.getpid()
+            _TerminalEcho._install_handlers()
+            termios.tcsetattr(fd, termios.TCSANOW, noecho)
+        except (AttributeError, ValueError, OSError, termios.error):
+            pass
+
+    @staticmethod
+    @utils.delay_interrupt
+    def restore():
+        with _TerminalEcho.lock:
+            _TerminalEcho._restore()
+
+    @staticmethod
+    def _restore():
+        # Forked child processes must not restore the terminal of the parent
+        if _TerminalEcho.attrs is None or _TerminalEcho.pid != os.getpid():
+            return
+        try:
+            termios.tcsetattr(_TerminalEcho.fd, termios.TCSANOW, _TerminalEcho.attrs)
+        except (ValueError, OSError, termios.error):
+            pass
+        _TerminalEcho.fd, _TerminalEcho.attrs, _TerminalEcho.pid = None, None, None
+        _TerminalEcho._remove_handlers()
+
+    @staticmethod
+    def _is_disabled_for(fd):
+        """ Returns True if echo is disabled for the terminal of the fd. """
+        if _TerminalEcho.attrs is None or _TerminalEcho.pid != os.getpid():
+            return False
+        try:
+            return os.path.samestat(os.fstat(fd), os.fstat(_TerminalEcho.fd))
+        except OSError:
+            return False
+
+    @staticmethod
+    def get_attrs(fd):
+        with _TerminalEcho.lock:
+            # Report the attributes from before echo was disabled, so that
+            # restoring them later doesn't disable echo again.
+            if _TerminalEcho._is_disabled_for(fd):
+                return list(_TerminalEcho.attrs)
+            return termios.tcgetattr(fd)
+
+    @staticmethod
+    def set_attrs(fd, attrs):
+        with _TerminalEcho.lock:
+            # Keep echo disabled while progress bars are shown
+            if _TerminalEcho._is_disabled_for(fd):
+                attrs = list(attrs)
+                attrs[3] &= ~termios.ECHO
+            termios.tcsetattr(fd, termios.TCSANOW, attrs)
+
+    @staticmethod
+    def _install_handlers():
+        # Signal handlers can only be installed from the main thread
+        if threading.current_thread() is not threading.main_thread():
+            return
+        for signum in _TerminalEcho.signals:
+            try:
+                _TerminalEcho.handlers[signum] = signal.signal(signum, _TerminalEcho._handler)
+            except (ValueError, OSError):
+                pass
+
+    @staticmethod
+    def _remove_handlers():
+        if threading.current_thread() is not threading.main_thread():
+            return
+        for signum, handler in list(_TerminalEcho.handlers.items()):
+            try:
+                if signal.getsignal(signum) is _TerminalEcho._handler:
+                    signal.signal(signum, handler)
+                del _TerminalEcho.handlers[signum]
+            except (ValueError, OSError):
+                pass
+
+    @staticmethod
+    def _handler(signum, frame):
+        handler = _TerminalEcho.handlers.get(signum, signal.SIG_DFL)
+        # Don't wait long for the display, another thread may be using it
+        _ProgressDisplay.close(timeout=1)
+        _TerminalEcho.restore()
+        if callable(handler):
+            handler(signum, frame)
+        elif handler == signal.SIG_DFL:
+            # Terminate the process the way the signal would have
+            signal.signal(signum, signal.SIG_DFL)
+            os.kill(os.getpid(), signum)
+
+
+def terminal_state(fd):
+    """
+    Returns the attributes of the terminal of a file descriptor.
+
+    Use with :func:`set_terminal_state` to restore the terminal after
+    running a command that may change it. Echo of typed keys disabled
+    while progress bars are shown is not included.
+    """
+    return _TerminalEcho.get_attrs(fd)
+
+
+def set_terminal_state(fd, attrs):
+    """
+    Restores attributes of the terminal of a file descriptor returned by
+    :func:`terminal_state`, keeping echo disabled while progress bars are
+    shown.
+    """
+    _TerminalEcho.set_attrs(fd, attrs)
+
+
+def restore_terminal():
+    """
+    Removes all progress bars and restores terminal settings changed
+    while they were shown.
+
+    Called at exit and on termination signals. Call before exiting with
+    os._exit(), which skips exit handlers.
+    """
+    _ProgressDisplay.close()
+    _TerminalEcho.restore()
+
+
+atexit.register(restore_terminal)
+
+
+class _StreamProxy(FileProxy):
+    """
+    Prints writes to sys.stdout and sys.stderr above progress bars.
+
+    Output written directly to the streams, such as by print(), would
+    otherwise move the cursor and break the redraw of the bars.
+    """
+
+    def isatty(self):
+        # FileProxy inherits isatty() from io.TextIOBase, which is always
+        # False. The streams are still terminals.
+        return self.rich_proxied_file.isatty()
+
+
+class _ProgressDisplay(object):
+    """
+    Live terminal region that shows all open progress bars.
+
+    All bars are rows of one table with fixed width columns, except for
+    the bar itself, so that bars shown at the same time line up. The
+    region is redrawn a few times per second and log output is printed
+    above it.
+    """
+
+    lock = threading.RLock()
+    live = None
+    streams = None
+    details = _DetailsColumn()
+    elapsed_width = 7
+    elapsed = TimeElapsedColumn(table_column=Column(width=elapsed_width, no_wrap=True))
+    remaining = _RemainingColumn()
+    progress = Progress(
+        _DescriptionColumn(),
+        _BlockBarColumn(),
+        details,
+        elapsed,
+        remaining,
+        console=_console,
+        auto_refresh=False,
+        expand=True)
+
+    def __rich_console__(self, console, options):
+        # Called by the refresh thread of rich while it holds its own
+        # lock, don't take the display lock here.
+        # Leave the last column empty. Terminals treat lines that fill the
+        # whole width differently when reflowing them on resize.
+        # Newest bars on top, with the outermost bar at the bottom
+        tasks = list(reversed(_ProgressDisplay.progress.tasks))
+        table = _ProgressDisplay.progress.make_tasks_table(tasks)
+        yield Constrain(table, width=max(1, options.max_width - 1))
+
+    @staticmethod
+    @utils.delay_interrupt
+    def add(desc, total, unit, estimates):
+        with _ProgressDisplay.lock:
+            task = _ProgressDisplay.progress.add_task(desc, total=total, unit=unit, estimates=estimates)
+            if _ProgressDisplay.live is None:
+                _ProgressDisplay._start()
+            return task
+
+    @staticmethod
+    def _start():
+        live = Live(
+            _ProgressDisplay(),
+            console=_console,
+            refresh_per_second=4,
+            transient=True,
+            redirect_stdout=False,
+            redirect_stderr=False)
+        live._live_render = _ReflowLiveRender(live.get_renderable(), vertical_overflow=live.vertical_overflow)
+        _ProgressDisplay.live = live
+        _TerminalEcho.disable()
+        live.start()
+
+        # Print direct writes to the standard streams above the bars
+        _ProgressDisplay.streams = (sys.stdout, sys.stderr)
+        sys.stdout = _StreamProxy(_console, sys.stdout)
+        sys.stderr = _StreamProxy(_console, sys.stderr)
+
+    @staticmethod
+    def _stop():
+        try:
+            if _ProgressDisplay.streams is not None:
+                stdout, stderr = _ProgressDisplay.streams
+                for proxy, stream in ((sys.stdout, stdout), (sys.stderr, stderr)):
+                    if isinstance(proxy, _StreamProxy):
+                        proxy.flush()
+                # Leave the streams alone if someone else has replaced them
+                if isinstance(sys.stdout, _StreamProxy):
+                    sys.stdout = stdout
+                if isinstance(sys.stderr, _StreamProxy):
+                    sys.stderr = stderr
+                _ProgressDisplay.streams = None
+            _ProgressDisplay.live.stop()
+        finally:
+            _ProgressDisplay.live = None
+            _TerminalEcho.restore()
+
+    @staticmethod
+    @utils.delay_interrupt
+    def close(timeout=-1):
+        """ Removes all progress bars from the terminal. """
+        if not _ProgressDisplay.lock.acquire(timeout=timeout):
+            return
+        try:
+            if _ProgressDisplay.live is not None:
+                _ProgressDisplay._stop()
+            for task in _ProgressDisplay.progress.tasks:
+                _ProgressDisplay.progress.remove_task(task.id)
+        finally:
+            _ProgressDisplay.lock.release()
+
+    @staticmethod
+    @utils.delay_interrupt
+    def remove(task_id):
+        with _ProgressDisplay.lock:
+            progress = _ProgressDisplay.progress
+            tasks = [task for task in progress.tasks if task.id == task_id]
+            if not tasks:
+                return
+            task = tasks[0]
+            details = _ProgressDisplay.details.render(task).plain.strip()
+            elapsed = _ProgressDisplay.elapsed.render(task).plain
+
+            # The live region is erased when stopped, stop it before the
+            # last bar is removed so that no empty line is left behind.
+            if len(progress.tasks) == 1:
+                _ProgressDisplay._stop()
+            progress.remove_task(task_id)
+
+        # Replace the bar with a log line
+        info("{} ({}, {})", task.description, details, elapsed)
+
+
+class _RichProgress(object):
+    def __init__(self, desc, count, unit, estimates):
+        self._desc = desc
+        self._total = count or None
+        self._unit = unit.strip()
+        self._estimates = estimates
+        self._task = None
+
+    def __enter__(self):
+        self._task = _ProgressDisplay.add(self._desc, self._total, self._unit, self._estimates)
+        return self
+
+    def __exit__(self, type, value, tb):
+        _ProgressDisplay.remove(self._task)
+        return False
+
+    # Bars may be closed by an interrupt while still in use by other
+    # threads, updates of closed bars are ignored.
+
+    def update(self, n=1):
+        if self._task is not None:
+            with utils.ignore_exception(KeyError):
+                _ProgressDisplay.progress.advance(self._task, n)
+
+    def refresh(self, *args, **kwargs):
+        pass
+
+    def reset(self, total=None):
+        if self._task is not None:
+            with utils.ignore_exception(KeyError):
+                _ProgressDisplay.progress.reset(self._task, total=total)
+
+    def set_description(self, desc=None, refresh=True):
+        self._desc = desc
+        if self._task is not None:
+            with utils.ignore_exception(KeyError):
+                _ProgressDisplay.progress.update(self._task, description=desc)
+
+
 def progress(desc, count, unit, estimates=True, debug=False):
-    if count:
-        bar_format = '{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}]' \
-                     if not estimates else None
-    else:
-        bar_format = '{desc}{n_fmt}{unit} [{elapsed}]'
     if not debug and is_interactive() and not is_verbose() and not is_silenced():
-        class ProgressTqdm(tqdm.tqdm):
-            def __init__(self, *args, **kwargs):
-                super(ProgressTqdm, self).__init__(*args, **kwargs)
-
-            def set_description(self, desc=None, refresh=True):
-                return super().set_description("[   INFO] " + desc, refresh)
-
-        p = ProgressTqdm(total=count, unit=unit, unit_scale=True, bar_format=bar_format, dynamic_ncols=True)
-        p.set_description(desc)
-        return p
+        return _RichProgress(desc, count, unit, estimates)
     return progress_log(desc, count, unit)
 
 
