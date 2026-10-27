@@ -16,6 +16,7 @@ import threading
 import logging
 import logging.handlers
 from contextlib import contextmanager
+from rich import filesize
 from rich.console import Console
 from rich.constrain import Constrain
 from rich.control import Control, ControlType
@@ -498,12 +499,17 @@ class _DetailsColumn(ProgressColumn):
 
     def render(self, task):
         unit = task.fields.get("unit", "")
+        if unit == "B":
+            # The size of a download is unknown without a Content-Length
+            if task.total is None:
+                size = Text(filesize.decimal(int(task.completed)), style="progress.download")
+            else:
+                size = self._download.render(task)
+            if (task.finished_speed or task.speed) is None:
+                return size
+            return Text.assemble(size, " ", self._speed.render(task))
         if task.total is None:
             return Text("{:.0f} {}".format(task.completed, unit))
-        if unit == "B":
-            if (task.finished_speed or task.speed) is None:
-                return self._download.render(task)
-            return Text.assemble(self._download.render(task), " ", self._speed.render(task))
         return Text.assemble(self._count.render(task), " ", unit)
 
 
