@@ -195,14 +195,6 @@ class JoltManifest(ElementTree):
     def format(self):
         return minidom.parseString(ET.tostring(self.getroot())).toprettyxml(indent="  ")
 
-    def transform(self, xsltfile):
-        from lxml import etree as lxmlET
-        manifest = lxmlET.fromstring(self.format())
-        xslt = lxmlET.parse(xsltfile)
-        transform = lxmlET.XSLT(xslt)
-        document = transform(manifest)
-        return minidom.parseString(lxmlET.tostring(document)).toprettyxml(indent="  ")
-
     def write(self, filename):
         with open(filename, 'w') as f:
             f.write(self.format())

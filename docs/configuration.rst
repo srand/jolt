@@ -345,10 +345,12 @@ These configuration keys exist:
       - String
       - Blind carbon copy recipients.
 
-    * - ``stylesheet``
+    * - ``template``
       - String
-      - An optional custom XSLT stylesheet used to transform the
-        Jolt result manifest into an HTML email.
+      - An optional custom Jinja template used to render the
+        Jolt result manifest into an HTML email. The template is
+        rendered with the manifest as ``report`` and the process
+        environment as ``environ``.
 
     * - ``on_success``
       - Boolean

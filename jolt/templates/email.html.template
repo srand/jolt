@@ -1,0 +1,137 @@
+{% set failures = report.tasks | selectattr("result", "eq", "FAILED") | list %}
+{% set unstable = report.tasks | selectattr("result", "eq", "UNSTABLE") | list %}
+{% set executed = report.tasks | rejectattr("result", "in", ["CANCELLED", "SKIPPED"]) | list %}
+{% set duration = report.duration | int %}
+{% set hours = duration // 3600 %}
+{% set minutes = (duration % 3600) // 60 %}
+{% set seconds = duration % 60 %}
+{% macro links() %}
+{% if environ.get("BUILD_URL") %}
+  See <a href="{{ environ["BUILD_URL"] }}">full build log</a> for details.
+{% endif %}
+{% if environ.get("GERRIT_URL") %}
+  This <a href="{{ environ["GERRIT_URL"] }}">Gerrit change</a> was built.
+{% endif %}
+{% endmacro %}
+{% macro task_report(task) %}
+<table width="100%" cellspacing="0" cellpadding="0" bgcolor="#f1f1f1">
+  <tr bgcolor="{{ "#f44336" if task.result == "FAILED" else "#FF7E00" }}">
+    <td style="padding: 10px">
+      <table cellpadding="0" cellspacing="0">
+        <tr>
+          <td width="100%" style="font-size: 16pt; color: white;">{{ task.name }}</td>
+          <td>
+{% if task.logstash %}
+            <a class="log" href="{{ task.logstash }}">Log</a>
+{% endif %}
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+{% for error in task.errors %}
+  <tr>
+    <td>
+      <table width="100%">
+        <tr>
+          <td width="10%" style="padding: 5px; border-bottom: 1px solid #c1c1c1;">{{ error.type }}</td>
+          <td width="90%" style="padding: 5px; border-left: 1px solid #c1c1c1; border-bottom: 1px solid #c1c1c1;">{{ error.location }}</td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+  <tr>
+    <td style="padding: 5px; border-bottom: 1px solid #c1c1c1;">
+      <pre>{{ error.message }}</pre>
+    </td>
+  </tr>
+{% if error.details %}
+  <tr>
+    <td style="padding: 5px;">
+      <pre>{{ error.details }}</pre>
+    </td>
+  </tr>
+{% endif %}
+  <tr>
+    <td style="padding: 0px; border-bottom: 2px solid #f44336;"></td>
+  </tr>
+{% endfor %}
+</table>
+<br />
+{% endmacro %}
+<html>
+  <head>
+    <link rel="stylesheet" href="https://www.w3schools.com/w3css/4/w3.css" />
+    <style type="text/css">
+      pre {
+        margin-bottom: 0px;
+        margin-top: 0px;
+        overflow-x: auto;
+        white-space: pre-wrap;
+        white-space: -moz-pre-wrap;
+        white-space: -pre-wrap;
+        white-space: -o-pre-wrap;
+        word-wrap: break-word;
+      }
+      a {
+        color: #f44336;
+      }
+      a.log {
+        color: white;
+      }
+    </style>
+  </head>
+  <body>
+    <table width="100%" bgcolor="#f1f1f1" style="border-bottom: 1px solid #c1c1c1; border-top: 1px solid #c1c1c1;">
+      <tr>
+        <td>
+          <table width="720" cellpadding="10px">
+            <tr>
+              <td width="25%" align="center">
+{% if failures %}
+                <h2 style="font-size: 50pt; color:#f44336;">FAIL</h2>
+{% else %}
+                <h2 style="font-size: 50pt; color:green;">PASS</h2>
+{% endif %}
+              </td>
+              <td width="25%" align="center" style="border-left: 1px solid #c0c0c0">
+                <table>
+                  <tr><td width="100%" align="center">Completed</td></tr>
+                  <tr><td align="center"><h2>{{ executed | length }}</h2></td></tr>
+                </table>
+              </td>
+              <td width="25%" align="center" style="border-left: 1px solid #c0c0c0">
+                <table>
+                  <tr><td width="100%" align="center">Failed</td></tr>
+                  <tr><td align="center"><h2>{{ (failures + unstable) | length }}</h2></td></tr>
+                </table>
+              </td>
+              <td width="25%" align="center" style="border-left: 1px solid #c0c0c0">
+                <table>
+                  <tr><td width="100%" align="center">Duration</td></tr>
+                  <tr><td align="center"><h2>{% if hours %}{{ hours }}h {% endif %}{% if minutes %}{{ minutes }}min {% endif %}{{ seconds }}s</h2></td></tr>
+                </table>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+
+    <p>
+      This is an automated build report from Jolt.
+{% if failures %}
+      The build failed.
+{% elif unstable %}
+      The build was successful, but unstable task failures were ignored.
+{% else %}
+      The build was successful.
+{% endif %}
+      {{ links() }}
+    </p>
+
+{% for task in failures + unstable %}
+    {{ task_report(task) }}
+{% endfor %}
+  </body>
+</html>

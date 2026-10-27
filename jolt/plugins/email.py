@@ -21,21 +21,27 @@ class EmailHooks(CliHook):
         self._bcc = config.get("email", "bcc")
         self._from = config.get("email", "from", "jolt@localhost")
         self._subject = config.get("email", "subject", "Jolt Build Report")
-        self._stylesheet = config.get(
-            "email", "stylesheet",
-            fs.path.join(fs.path.dirname(__file__), "email.xslt"))
+        self._template = config.get(
+            "email", "template",
+            fs.path.join(fs.path.dirname(__file__), "..", "templates", "email.html.template"))
         self._artifact = config.get("email", "artifact")
         self._failure = config.getboolean("email", "on_failure", True)
         self._success = config.getboolean("email", "on_success", True)
         raise_error_if(not self._server, "email.server not configured")
         raise_error_if(not self._server, "email.to not configured")
+        raise_error_if(
+            config.get("email", "stylesheet"),
+            "email.stylesheet is no longer supported, use email.template with a Jinja template")
 
-    def annotate_report(self, report):
-        # Make environment variables available to stylesheet
-        for key, value in os.environ.items():
-            param = report.create_parameter()
-            param.key = key
-            param.value = value
+    def render_report(self, report):
+        from jinja2 import Environment, FileSystemLoader
+        env = Environment(
+            loader=FileSystemLoader(fs.path.dirname(self._template)),
+            autoescape=True,
+            trim_blocks=True,
+            lstrip_blocks=True)
+        template = env.get_template(fs.path.basename(self._template))
+        return template.render(report=report, environ=os.environ)
 
     def shorten_task_names(self, report):
         # Use the short qualified task names in the report
@@ -46,15 +52,15 @@ class EmailHooks(CliHook):
                 mtask.name = task.short_qualified_name
 
     def send_report(self, report):
-        self.annotate_report(report)
         self.shorten_task_names(report)
+        html = self.render_report(report)
 
         if self._artifact:
             dirname = fs.path.dirname(self._artifact)
             if dirname:
                 fs.makedirs(dirname)
             with open(self._artifact, "w") as f:
-                f.write(report.transform(self._stylesheet))
+                f.write(html)
 
         if report.has_failure() or report.has_unstable():
             if not self._failure:
@@ -72,7 +78,7 @@ class EmailHooks(CliHook):
         if self._bcc:
             msg['Bcc'] = ", ".join(utils.unique_list(self._bcc.split()))
         msg.set_content("Your e-mail client cannot display HTML formatted e-mails.")
-        msg.add_alternative(report.transform(self._stylesheet), subtype='html')
+        msg.add_alternative(html, subtype='html')
 
         with smtplib.SMTP(self._server) as server:
             log.info("Sending email report to {}", self._to)

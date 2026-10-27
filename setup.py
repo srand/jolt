@@ -28,7 +28,6 @@ except FileNotFoundError:
         "keyring",
         "keyrings.alt",
         "importlib_metadata",
-        "lxml",
         "multi_key_dict",
         "ninja",
         "protobuf",
@@ -100,7 +99,7 @@ setup(
         "test": ["coverage"],
     },
     package_data={
-        "jolt": ["**/*.sh", "**/*.xslt", "**/*.template", "**/fstree-*-x86_64"],
+        "jolt": ["**/*.sh", "**/*.template", "**/fstree-*-x86_64"],
     },
     entry_points={
         "console_scripts": [
