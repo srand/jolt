@@ -957,7 +957,6 @@ def set_level_pb(level):
 
 
 def get_level():
-    global _level
     return _level
 
 
@@ -988,7 +987,6 @@ _interactive = True
 
 
 def is_interactive():
-    global _interactive
     return _interactive and sys.stdout.isatty() and sys.stderr.isatty()
 
 

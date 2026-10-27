@@ -18,7 +18,6 @@ _modules = {}
 
 
 def _populate_cache(module):
-    global _modules
 
     class _ClassFinder(ast.NodeVisitor):
         """ Collects all classes and functions in an Abstract Syntax Tree. """
@@ -78,7 +77,6 @@ def getlineno(cls_or_func):
 
 def getclassast(cls):
     """ Returns the Abstract Syntax Tree of a class """
-    global _modules
     module = getmodule(cls)
     module_ast = _modules.get(module)
     if not module_ast:
@@ -88,7 +86,6 @@ def getclassast(cls):
 
 def getfuncast(func):
     """ Returns the Abstract Syntax Tree of a function """
-    global _modules
     module = getmodule(func)
     module_ast = _modules.get(module)
     if not module_ast:

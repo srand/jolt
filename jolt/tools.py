@@ -13,8 +13,6 @@ import platform
 import sys
 import threading
 import time
-if os.name != "nt":
-    import termios
 import glob
 import multiprocessing
 import re
@@ -22,7 +20,6 @@ import shutil
 import tarfile
 import zipfile
 import bz2file
-import hashlib
 try:
     from compression import zstd as zstandard
 

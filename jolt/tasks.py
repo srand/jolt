@@ -5,7 +5,6 @@ from contextlib import contextmanager, ExitStack
 import copy
 import fnmatch
 import functools
-import hashlib
 import platform
 from threading import RLock
 import subprocess

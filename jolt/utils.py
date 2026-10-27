@@ -11,7 +11,6 @@ from functools import partial, wraps
 from threading import RLock
 from string import Formatter
 import os
-import hashlib
 from fasteners import lock, process_lock
 import json
 import platform

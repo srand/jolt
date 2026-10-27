@@ -1,6 +1,5 @@
 from contextlib import contextmanager, ExitStack, nullcontext
 import copy
-import hashlib
 from os import getenv
 from threading import RLock
 from collections import OrderedDict
@@ -16,7 +15,7 @@ from jolt import utils
 from jolt import colors
 from jolt import hooks
 from jolt import filesystem as fs
-from jolt.error import raise_error, raise_error_if
+from jolt.error import raise_error
 from jolt.error import raise_task_error_if
 from jolt.influence import HashInfluenceRegistry, TaskRequirementInfluence
 from jolt.options import JoltOptions

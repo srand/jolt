@@ -1,5 +1,4 @@
-import functools
-from jolt import attributes, include
+from jolt import attributes
 from jolt import influence
 from jolt import Task
 from jolt import utils
