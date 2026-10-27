@@ -15,7 +15,7 @@ from jolt.tasks import TaskRegistry
 @cxxinfo.publish()
 class Curl(cmake.CMake):
     name = "curl"
-    version = Parameter("8.17.0", help="Curl version.")
+    version = Parameter("8.23.0", help="Curl version.")
     pic = BooleanParameter(False, help="Build with position independent code.")
     shared = BooleanParameter(False, help="Build shared libraries.")
     requires_brotli = ["brotli:pic={pic},shared={shared}"]

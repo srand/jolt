@@ -10,7 +10,7 @@ from jolt.tasks import TaskRegistry
 @attributes.requires("requires_texinfo")
 class Autoconf(autotools.Autotools):
     name = "autoconf"
-    version = Parameter("2.72", help="Autoconf version.")
+    version = Parameter("2.73", help="Autoconf version.")
     requires_git = ["fetch:alias=src,url=https://ftpmirror.gnu.org/gnu/autoconf/autoconf-{version}.tar.gz"]
     requires_help2man = ["help2man"]
     requires_m4 = ["m4"]

@@ -11,7 +11,7 @@ from jolt.tasks import TaskRegistry
 @cxxinfo.publish()
 class PahoMQTT_C(cmake.CMake):
     name = "paho/mqtt-c"
-    version = Parameter("1.3.15", help="Paho MQTT C version.")
+    version = Parameter("1.3.16", help="Paho MQTT C version.")
     shared = BooleanParameter(False, help="Build shared libraries")
     ssl = BooleanParameter(True, help="Enable SSL support")
     requires_git = ["git:url=https://github.com/eclipse/paho.mqtt.c.git,rev=v{version}"]
@@ -38,7 +38,7 @@ class PahoMQTT_C(cmake.CMake):
 @cxxinfo.publish()
 class PahoMQTT_CXX(cmake.CMake):
     name = "paho/mqtt-cxx"
-    version = Parameter("1.5.2", help="Paho MQTT C++ version.")
+    version = Parameter("1.6.0", help="Paho MQTT C++ version.")
     shared = BooleanParameter(False, help="Build shared libraries")
     ssl = BooleanParameter(True, help="Enable SSL support")
     requires_git = ["git:url=https://github.com/eclipse/paho.mqtt.cpp.git,rev=v{version}"]

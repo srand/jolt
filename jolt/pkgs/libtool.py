@@ -10,7 +10,7 @@ from jolt.tasks import TaskRegistry
 @autotools.requires(libtool=False)
 class Libtool(autotools.Autotools):
     name = "libtool"
-    version = Parameter("2.6.0", help="Libtool version.")
+    version = Parameter("2.6.2", help="Libtool version.")
 
     requires_git = ["git:url=git://git.git.savannah.gnu.org/libtool.git,rev=v{version}"]
     requires_help2man = ["help2man"]

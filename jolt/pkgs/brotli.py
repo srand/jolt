@@ -8,7 +8,7 @@ from jolt.tasks import TaskRegistry
 @cmake.use_ninja()
 class Brotli(cmake.CMake):
     name = "brotli"
-    version = Parameter("1.2.0", help="Brotli version.")
+    version = Parameter("1.2.1", help="Brotli version.")
     pic = BooleanParameter(False, help="Build with position independent code.")
     shared = BooleanParameter(False, help="Build shared libraries.")
     requires_git = ["git:url=https://github.com/google/brotli.git,rev=v{version},submodules=true"]

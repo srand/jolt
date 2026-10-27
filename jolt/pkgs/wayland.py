@@ -11,7 +11,7 @@ from jolt.tasks import TaskRegistry
 @meson.requires()
 class Wayland(meson.Meson):
     name = "wayland"
-    version = Parameter("1.24.0", help="Wayland version.")
+    version = Parameter("1.26.0", help="Wayland version.")
     requires_expat = ["libexpat"]
     requires_git = ["git:url=https://gitlab.freedesktop.org/wayland/wayland.git,rev={version}"]
     requires_libffi = ["libffi"]

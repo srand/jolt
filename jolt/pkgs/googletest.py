@@ -10,9 +10,9 @@ from jolt.tasks import TaskRegistry
 @cxxinfo.publish(libraries=["gmock", "gtest"])
 class GoogleTest(cmake.CMake):
     name = "google/test"
-    version = Parameter("1.12.1", help="GoogleTest version.")
+    version = Parameter("1.18.0", help="GoogleTest version.")
     shared = BooleanParameter(False, help="Build shared libraries.")
-    requires_git = ["git:url=https://github.com/google/googletest.git,rev=release-{version}"]
+    requires_git = ["git:url=https://github.com/google/googletest.git,rev=v{version}"]
     srcdir = "{git[googletest]}"
     options = [
         "BUILD_SHARED_LIBS={shared[ON,OFF]}",

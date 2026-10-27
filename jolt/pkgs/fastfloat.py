@@ -9,7 +9,7 @@ from jolt.tasks import TaskRegistry
 @cmake.use_ninja()
 class FastFloat(cmake.CMake):
     name = "fastfloat"
-    version = Parameter("8.1.0", help="fastfloat version.")
+    version = Parameter("8.3.2", help="fastfloat version.")
     requires_git = ["git:url=https://github.com/fastfloat/fast_float.git,rev=v{version}"]
     srcdir = "{git[fast_float]}"
 

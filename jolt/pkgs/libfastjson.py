@@ -13,7 +13,7 @@ class Libfastjson(autotools.Autotools):
     """ Builds and publishes liblibraries and headers. """
 
     name = "libfastjson"
-    version = Parameter("1.2304.0", help="Libfastjson version.")
+    version = Parameter("1.2609.0", help="Libfastjson version.")
     requires_git = ["git:url=https://github.com/rsyslog/libfastjson.git,rev=v{version}"]
     srcdir = "{git[libfastjson]}"
 

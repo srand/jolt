@@ -9,7 +9,7 @@ from jolt.tasks import TaskRegistry
 @meson.requires()
 class GLib(meson.Meson):
     name = "glib"
-    version = Parameter("2.86.3", help="glib version.")
+    version = Parameter("2.90.1", help="glib version.")
     requires_git = ["git:url=https://gitlab.gnome.org/GNOME/glib.git,rev={version},submodules=true"]
     requires_zlib = ["zlib"]
     srcdir = "{git[glib]}"

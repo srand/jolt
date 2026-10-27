@@ -9,7 +9,7 @@ from jolt.tasks import TaskRegistry
 @meson.requires()
 class Libdrm(meson.Meson):
     name = "libdrm"
-    version = Parameter("2.4.131", help="Libdrm version.")
+    version = Parameter("2.4.134", help="Libdrm version.")
 
     amdgpu = BooleanParameter(True, help="Enable AMD GPU support.")
     etnaviv = BooleanParameter(True, help="Enable Etnaviv support.")

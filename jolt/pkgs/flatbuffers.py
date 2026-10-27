@@ -10,7 +10,7 @@ from jolt.tasks import TaskRegistry
 @cxxinfo.publish(libraries=["flatbuffers"])
 class Flatbuffers(cmake.CMake):
     name = "flatbuffers"
-    version = Parameter("25.9.23", help="Flatbuffers version.")
+    version = Parameter("25.12.19", help="Flatbuffers version.")
     shared = BooleanParameter(False, help="Build shared libraries.")
     requires_git = ["git:url=https://github.com/google/flatbuffers.git,rev=v{version}"]
     srcdir = "{git[flatbuffers]}"

@@ -10,8 +10,8 @@ class Libtirpc(autotools.Autotools):
     """Libtirpc package"""
     name = "libtirpc"
 
-    version = Parameter("1.3.7", help="libtirpc version.")
-    requires_src = ["fetch:alias=src,url=https://downloads.sourceforge.net/project/libtirpc/libtirpc/1.3.7/libtirpc-1.3.7.tar.bz2"]
+    version = Parameter("1.3.8", help="libtirpc version.")
+    requires_src = ["fetch:alias=src,url=https://downloads.sourceforge.net/project/libtirpc/libtirpc/{version}/libtirpc-{version}.tar.bz2"]
     srcdir = "{fetch[src]}/libtirpc-{version}"
     options = ["--disable-gssapi"]
 

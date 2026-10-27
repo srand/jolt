@@ -11,9 +11,9 @@ from jolt.tasks import TaskRegistry
 @cxxinfo.publish(libraries=["yaml-cpp"])
 class YamlCPP(cmake.CMake):
     name = "yaml-cpp"
-    version = Parameter("bbf8bdb", help="yaml-cpp version.")
+    version = Parameter("0.9.0", help="yaml-cpp version.")
     shared = BooleanParameter(False, help="Build shared libraries.")
-    requires_git = ["git:url=https://github.com/jbeder/yaml-cpp.git,rev={version}"]
+    requires_git = ["git:url=https://github.com/jbeder/yaml-cpp.git,rev=yaml-cpp-{version}"]
     srcdir = "{git[yaml-cpp]}"
     options = [
         "CMAKE_POLICY_VERSION_MINIMUM=3.5",

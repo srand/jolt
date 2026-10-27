@@ -9,7 +9,7 @@ from jolt.tasks import TaskRegistry
 @cmake.use_ninja()
 class Re2c(cmake.CMake):
     name = "re2c"
-    version = Parameter("4.4", help="re2c version.")
+    version = Parameter("4.6", help="re2c version.")
     requires_git = ["git:url=https://github.com/skvadrik/re2c.git,rev={version}"]
     srcdir = "{git[re2c]}"
 

@@ -10,7 +10,7 @@ from jolt.tasks import TaskRegistry
 @pkgconfig.requires()
 class CRun(autotools.Autotools):
     name = "crun"
-    version = Parameter("1.26", help="crun version.")
+    version = Parameter("1.30.1", help="crun version.")
     caps = BooleanParameter(False, help="Enable capabilities support.")
     systemd = BooleanParameter(False, help="Enable systemd support.")
     requires_git = ["git:url=https://github.com/containers/crun.git,rev={version},submodules=true"]

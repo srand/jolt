@@ -7,7 +7,7 @@ from jolt.tasks import TaskRegistry
 class BusyBox(Task):
     name = "busybox"
     defconfig = Parameter(required=False, help="BusyBox defconfig file.")
-    version = Parameter("1.37.0", help="BusyBox version.")
+    version = Parameter("1.38.0", help="BusyBox version.")
     requires_git = ["git:url=git://busybox.net/busybox.git,rev={version_tag}"]
     srcdir = "{git[busybox]}"
 

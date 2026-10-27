@@ -9,7 +9,7 @@ from jolt.tasks import TaskRegistry
 @attributes.system
 class Rust(Download):
     name = "rust"
-    version = Parameter("1.92.0", help="Rust version.")
+    version = Parameter("1.99.1", help="Rust version.")
     url = "https://static.rust-lang.org/dist/rust-{version}-{triple}.tar.xz"
     collect = [{"files": "*", "cwd": "rust-{version}-{triple}"}]
     components = ["cargo", "rustc", "rust-std-{triple}"]
@@ -30,7 +30,7 @@ class Rust(Download):
 @attributes.requires("requires_rust")
 class RustBindgen(rust.Rust):
     name = "rust-bindgen"
-    version = Parameter("0.72.1", help="Rust Bindgen version.")
+    version = Parameter("0.73.2", help="Rust Bindgen version.")
 
     requires_git = ["git:url=https://github.com/rust-lang/rust-bindgen.git,rev=v{version}"]
     requires_rust = ["rust"]

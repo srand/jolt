@@ -15,7 +15,7 @@ from jolt.tasks import TaskRegistry
 @cmake.use_ninja()
 class Qt(cmake.CMake):
     name = "qt"
-    version = Parameter("6.10.1", help="Qt version.")
+    version = Parameter("6.12.0", help="Qt version.")
     gl = BooleanParameter(True, help="Enable OpenGL support.")
     webengine = BooleanParameter(False, help="Enable WebEngine module.")
 

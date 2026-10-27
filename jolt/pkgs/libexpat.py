@@ -9,7 +9,7 @@ from jolt.tasks import TaskRegistry
 @cxxinfo.publish(libraries=["expat"])
 class Libexpat(cmake.CMake):
     name = "libexpat"
-    version = Parameter("2.7.3", help="Expat version.")
+    version = Parameter("2.9.0", help="Expat version.")
     shared = BooleanParameter(False, help="Build shared libraries")
     version_tag = property(lambda self: str(self.version).replace('.', '_'))
     requires_src = ["fetch:alias=src,url=https://github.com/libexpat/libexpat/releases/download/R_{version_tag}/expat-{version}.tar.gz"]

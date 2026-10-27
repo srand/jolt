@@ -17,7 +17,7 @@ from jolt.pkgs import bzip2, libexpat, lz4, openssl, xz, zlib, zstd
 @cxxinfo.publish(libraries=["archive"])
 class Libarchive(cmake.CMake):
     name = "libarchive"
-    version = Parameter("3.8.5", help="libarchive version.")
+    version = Parameter("3.8.10", help="libarchive version.")
     shared = BooleanParameter(False, help="Build shared libraries")
     requires_bzip2 = ["libbzip2"]
     requires_git = ["git:url=https://github.com/libarchive/libarchive.git,rev=v{version}"]

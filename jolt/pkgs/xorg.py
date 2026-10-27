@@ -133,7 +133,7 @@ class LibXdmcp(autotools.Autotools):
 @pkgconfig.requires()
 class Xext(autotools.Autotools):
     name = "xorg/libxext"
-    version = Parameter("1.3.6", help="Xext version.")
+    version = Parameter("1.3.7", help="Xext version.")
     requires_macros = ["xorg/macros"]
     requires_src = ["fetch:alias=src,url=https://www.x.org/releases/individual/lib/libXext-{version}.tar.gz"]
     requires_x11 = ["xorg/libx11"]
@@ -194,7 +194,7 @@ class Xtrans(autotools.Autotools):
 @libtool.relocate()
 class Xrandr(autotools.Autotools):
     name = "xorg/libxrandr"
-    version = Parameter("1.5.4", help="Xrandr version.")
+    version = Parameter("1.5.5", help="Xrandr version.")
     requires_randrproto = ["xorg/randrproto"]
     requires_src = ["fetch:alias=src,url=https://www.x.org/releases/individual/lib/libXrandr-{version}.tar.gz"]
     requires_xext = ["xorg/libxext"]
@@ -211,7 +211,7 @@ class Xrandr(autotools.Autotools):
 @pkgconfig.requires()
 class Xrender(autotools.Autotools):
     name = "xorg/libxrender"
-    version = Parameter("0.9.12", help="Xrender version.")
+    version = Parameter("0.9.13", help="Xrender version.")
     requiers_macros = ["xorg/macros"]
     requires_renderproto = ["xorg/renderproto"]
     requires_src = ["fetch:alias=src,url=https://www.x.org/releases/individual/lib/libXrender-{version}.tar.gz"]
@@ -250,7 +250,7 @@ class Libxshmfence(autotools.Autotools):
 @libtool.relocate()
 class Libxxf86vm(autotools.Autotools):
     name = "xorg/libxxf86vm"
-    version = "1.1.6"
+    version = "1.1.7"
     requires_src = ["fetch:alias=src,url=https://www.x.org/releases/individual/lib/libXxf86vm-{version}.tar.gz"]
     srcdir = "{fetch[src]}/libXxf86vm-{version}"
     requires_libx11 = ["xorg/libx11"]
@@ -295,7 +295,7 @@ class Libxcb(autotools.Autotools):
 @libtool.relocate()
 class Libx11(autotools.Autotools):
     name = "xorg/libx11"
-    version = Parameter("1.8.12", help="Libx11 version.")
+    version = Parameter("1.8.14", help="Libx11 version.")
 
     requires_inputproto = ["xorg/inputproto"]
     requires_kbproto = ["xorg/kbproto"]

@@ -11,7 +11,7 @@ from jolt.tasks import TaskRegistry
 @attributes.system
 class NASM(Task):
     name = "nasm"
-    version = Parameter("3.01", help="nasm version.")
+    version = Parameter("3.02", help="nasm version.")
     requires_autotools_darwin = ["autoconf", "automake"]
     requires_autotools_linux = requires_autotools_darwin
     requires_git = ["git:url=https://github.com/netwide-assembler/nasm.git,rev=nasm-{version}"]
