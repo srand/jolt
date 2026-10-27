@@ -440,6 +440,12 @@ class _BlockBarColumn(ProgressColumn):
         return _BlockBar(task.completed, task.total, task.finished)
 
 
+def _progress_tasks():
+    """ Returns the progress bars shown, also while the display is created. """
+    display = globals().get("_ProgressDisplay")
+    return display.progress.tasks if display is not None else []
+
+
 class _DescriptionColumn(TextColumn):
     """
     Description column as wide as the longest description shown.
@@ -451,30 +457,43 @@ class _DescriptionColumn(TextColumn):
 
     prefix = "[   INFO] "
     min_width = 24
-    reserved_width = 52
+    min_bar_width = 10
 
     def __init__(self):
         super().__init__(self.prefix + "{task.description}", markup=False)
 
     def get_table_column(self):
-        # Also called while the display is created, before it is defined
+        tasks = _progress_tasks()
+        longest = max((len(self.prefix + task.description) for task in tasks), default=len(self.prefix))
+
+        # Room left by the bar, the other columns, the space between
+        # columns and the empty last column of the terminal
         display = globals().get("_ProgressDisplay")
-        tasks = display.progress.tasks if display is not None else []
-        longest = max(
-            (len(self.prefix + task.description) for task in tasks),
-            default=len(self.prefix))
-        available = max(self.min_width, _console.width - self.reserved_width)
+        reserved = self.min_bar_width + 5
+        if display is not None:
+            reserved += display.details.width(tasks) + display.elapsed_width + display.remaining.width(tasks)
+        available = max(self.min_width, _console.width - reserved)
         return Column(width=min(longest, available), no_wrap=True, overflow="ellipsis")
 
 
 class _DetailsColumn(ProgressColumn):
-    """ Counters of a progress bar, in a format depending on the unit. """
+    """
+    Counters of a progress bar, in a format depending on the unit.
+
+    The column is as wide as the longest counters shown.
+    """
 
     def __init__(self):
-        super().__init__(table_column=Column(width=24, justify="right", no_wrap=True, overflow="ellipsis"))
+        super().__init__()
         self._download = DownloadColumn()
         self._speed = TransferSpeedColumn()
         self._count = MofNCompleteColumn()
+
+    def width(self, tasks):
+        return max((self.render(task).cell_len for task in tasks), default=0)
+
+    def get_table_column(self):
+        return Column(width=self.width(_progress_tasks()), justify="right", no_wrap=True)
 
     def render(self, task):
         unit = task.fields.get("unit", "")
@@ -488,14 +507,28 @@ class _DetailsColumn(ProgressColumn):
 
 
 class _RemainingColumn(ProgressColumn):
-    """ Estimated time remaining, for bars with estimates only. """
+    """
+    Estimated time remaining, for bars with estimates only.
+
+    The column is empty unless a bar with estimates is shown.
+    """
 
     def __init__(self):
-        super().__init__(table_column=Column(width=7, no_wrap=True))
+        super().__init__()
         self._remaining = TimeRemainingColumn()
 
+    @staticmethod
+    def _has_estimate(task):
+        return task.total is not None and task.fields.get("estimates")
+
+    def width(self, tasks):
+        return 7 if any(self._has_estimate(task) for task in tasks) else 0
+
+    def get_table_column(self):
+        return Column(width=self.width(_progress_tasks()), no_wrap=True)
+
     def render(self, task):
-        if task.total is None or not task.fields.get("estimates"):
+        if not self._has_estimate(task):
             return Text("")
         return self._remaining.render(task)
 
@@ -588,13 +621,15 @@ class _ProgressDisplay(object):
     lock = threading.RLock()
     live = None
     details = _DetailsColumn()
-    elapsed = TimeElapsedColumn(table_column=Column(width=7, no_wrap=True))
+    elapsed_width = 7
+    elapsed = TimeElapsedColumn(table_column=Column(width=elapsed_width, no_wrap=True))
+    remaining = _RemainingColumn()
     progress = Progress(
         _DescriptionColumn(),
         _BlockBarColumn(),
         details,
         elapsed,
-        _RemainingColumn(),
+        remaining,
         console=_console,
         auto_refresh=False,
         expand=True)
