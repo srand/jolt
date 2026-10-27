@@ -7,7 +7,6 @@ from jolt import inspection
 from jolt import utils
 from jolt import filesystem as fs
 from jolt import fstree
-from jolt import tools
 from jolt import version
 
 
@@ -59,7 +58,7 @@ class TaskAttributeInfluence(HashInfluenceProvider):
         self.name = attrib.title()
 
     def get_influence(self, task):
-        value = getattr(task, tools.Tools(task).expand(self._attrib), "N/A")
+        value = getattr(task, task.tools.expand(self._attrib), "N/A")
         try:
             value = value.__get__(task)
             if type(value) is list and self._sort:
