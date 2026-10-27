@@ -25,7 +25,7 @@ class WeightHooks(TaskHook):
 
     @contextlib.contextmanager
     def _db(self):
-        db = sqlite3.connect(self._db_path, detect_types=sqlite3.PARSE_DECLTYPES)
+        db = sqlite3.connect(self._db_path)
         try:
             db.execute("PRAGMA busy_timeout = 5000")
             db.execute("PRAGMA journal_mode = WAL")
@@ -44,7 +44,7 @@ class WeightHooks(TaskHook):
 
     def _db_insert_sample(self, db, name, duration):
         cur = db.cursor()
-        cur.execute("INSERT INTO samples VALUES (?,?,?)", (name, duration, datetime.now()))
+        cur.execute("INSERT INTO samples VALUES (?,?,?)", (name, duration, datetime.now().isoformat(" ")))
 
         # Evict samples in FIFO order, committed together with the insert
         cur.execute("DELETE FROM samples WHERE name = ? AND rowid NOT IN "
