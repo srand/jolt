@@ -18,4 +18,5 @@ plugins.
    guides
    configuration
    cli
+   packages
    reference

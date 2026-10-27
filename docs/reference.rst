@@ -36,7 +36,7 @@ Autotools
 .. reference-autotools-start
 
 .. autoclass:: jolt.plugins.autotools.Autotools
-   :members: incremental, options, srcdir
+   :members: incremental, install_threads, options, srcdir
 
 .. reference-autotools-end
 
@@ -537,5 +537,17 @@ PkgConfig
    :members: from_cxxinfo, to_cxxinfo
 
 .. reference-pkgconfig-end
+
+
+Packages
+--------
+
+The package tasks in ``jolt.pkgs``, see :doc:`packages`.
+
+.. reference-packages-start
+
+.. jolt-packages-reference::
+
+.. reference-packages-end
 
 .. reference-end
