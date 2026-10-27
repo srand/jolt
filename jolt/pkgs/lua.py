@@ -9,7 +9,7 @@ from jolt.tasks import TaskRegistry
 @attributes.requires("requires_ninja")
 class Lua(CXXLibrary):
     name = "lua"
-    version = Parameter("5.4.8", help="Lua version.")
+    version = Parameter("5.5.1", help="Lua version.")
     shared = BooleanParameter(False, help="Build shared libraries.")
 
     requires_git = ["git:url=https://github.com/lua/lua.git,rev=v{version},hash=true"]
