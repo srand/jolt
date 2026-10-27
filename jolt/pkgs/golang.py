@@ -10,7 +10,7 @@ import platform
 @jolt_attributes.system
 class Golang(Download):
     name = "golang"
-    version = Parameter("1.25.5", help="Go version.")
+    version = Parameter("1.27.3", help="Go version.")
     url = "https://go.dev/dl/go{version}.{system}-{go_arch}{go_ext}"
 
     @property
