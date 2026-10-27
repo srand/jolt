@@ -5,6 +5,7 @@ from jolt.pkgs import abseil
 from jolt.pkgs import asio
 from jolt.pkgs import autoconf
 from jolt.pkgs import automake
+from jolt.pkgs import bison
 from jolt.pkgs import blake3
 from jolt.pkgs import boost
 from jolt.pkgs import boringssl
@@ -225,6 +226,7 @@ class Default(Alias):
         "asio",
         "autoconf",
         "automake",
+        "bison",
         "dbus",
         "ffmpeg",
         "gperf",
