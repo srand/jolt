@@ -127,8 +127,8 @@ class JoltPackagesReference(_GeneratedDirective):
         lines = [
             ".. _{}:".format(_label(cls.name)),
             "",
-            cls.name,
-            "~" * len(cls.name),
+            cls.__name__,
+            "~" * len(cls.__name__),
             "",
         ]
         doc = cls.__dict__.get("__doc__")
