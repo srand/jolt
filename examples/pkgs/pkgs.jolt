@@ -48,6 +48,7 @@ from jolt.pkgs import libexpat
 from jolt.pkgs import libfastjson
 from jolt.pkgs import libffi
 from jolt.pkgs import libglvnd
+from jolt.pkgs import libjpeg_turbo
 from jolt.pkgs import libpciaccess
 from jolt.pkgs import libpng
 from jolt.pkgs import libseccomp
@@ -158,6 +159,7 @@ class Default(Alias):
         "libbzip2",
         "libevent",
         "libexpat",
+        "libjpeg-turbo",
         "libmysqlclient",
         "libpng",
         "libva",
