@@ -2086,7 +2086,7 @@ class CXXProject(Task):
     """
 
     binary = None
-    """ Name of the target binary (defaults to canonical task name) """
+    """ Name of the target binary. Defaults to the canonical task name. """
 
     coverage = False
     """Enable code coverage instrumentation.

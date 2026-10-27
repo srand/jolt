@@ -9,22 +9,13 @@ class Meson(Task):
     """ This is an abstract base class that should be inherited by concrete tasks. """
 
     incremental = True
-    """
-    Whether to use incremental builds.
-    If True, the build directories are preserved between runs.
-    """
+    """ Keep build directories between builds, so that builds are incremental. """
 
     options = []
-    """
-    Additional options to pass to the `meson` command.
-    """
+    """ Options passed to Meson, as ``option=value``. """
 
     srcdir = None
-    """
-    Source directory for the Meson project.
-
-    If None, defaults to the task work directory (joltdir).
-    """
+    """ Source directory. If not set, the working directory of the task is used. """
 
     def clean(self, tools):
         at = tools.meson(incremental=self.incremental)

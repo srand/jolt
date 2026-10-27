@@ -65,22 +65,22 @@ class CMake(Task):
     """ Path to CMakeLists.txt or directory containing CMakelists.txt """
 
     config = "Release"
-    """ The default build configuration to use """
+    """ Build configuration, such as ``Release`` or ``Debug``. """
 
     generator = None
-    """ The build file generator that CMake should use """
+    """ Build file generator used by CMake, such as ``Ninja``. If not set, the default of CMake is used. """
 
     incremental = True
-    """ Keep build directories between Jolt invocations """
+    """ Keep build directories between builds, so that builds are incremental. """
 
     options = []
-    """ List of options and their values (``option[:type]=value``) """
+    """ Options passed to CMake, as ``option[:type]=value``. """
 
     srcdir = None
-    """ Source directory. If not specified, the task working directory is used. """
+    """ Source directory. If not set, the working directory of the task is used. """
 
     install = ["install"]
-    """ List of install build targets. If empty, the default install target is used. """
+    """ Targets built to install the project. If empty, ``install`` is built. """
 
     def clean(self, tools):
         cmake = tools.cmake(incremental=self.incremental)

@@ -9,30 +9,21 @@ class Autotools(Task):
     """ This is an abstract base class that should be inherited by concrete tasks. """
 
     incremental = True
-    """
-    Whether to use incremental builds.
-    If True, the build directories are preserved between runs.
-    """
+    """ Keep build directories between builds, so that builds are incremental. """
 
     options = []
-    """
-    Additional options to pass to the `./configure` script.
-    """
+    """ Options passed to the ``configure`` script. """
 
     install_threads = None
     """
-    Number of parallel jobs used by `make install`.
+    Number of parallel jobs used by ``make install``.
 
-    If None, make runs as many jobs as the build. Set to 1 for projects
+    If not set, make runs as many jobs as the build. Set to 1 for projects
     whose install scripts race when directories are created by parallel jobs.
     """
 
     srcdir = None
-    """
-    Source directory for the Autotools project.
-
-    If None, defaults to the task work directory (joltdir).
-    """
+    """ Source directory. If not set, the working directory of the task is used. """
 
     def clean(self, tools):
         at = tools.autotools(incremental=self.incremental)
