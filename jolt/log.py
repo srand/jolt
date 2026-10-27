@@ -13,7 +13,10 @@ import logging
 import logging.handlers
 from contextlib import contextmanager
 from rich.console import Console
+from rich.constrain import Constrain
+from rich.control import Control, ControlType
 from rich.live import Live
+from rich.live_render import LiveRender
 from rich.measure import Measurement
 from rich.progress import (
     DownloadColumn,
@@ -487,6 +490,38 @@ class _RemainingColumn(ProgressColumn):
         return self._remaining.render(task)
 
 
+class _ReflowLiveRender(LiveRender):
+    """
+    Live render that handles terminals reflowing lines when resized.
+
+    When a terminal is made narrower, many terminals wrap the lines that
+    were already drawn onto several rows. The cursor must then be moved
+    up past all of those rows to erase the previous render.
+    """
+
+    def _rows(self):
+        width, height = self._shape
+        new_width = max(1, _console.width)
+        if width > new_width:
+            return height * -(-width // new_width)
+        return height
+
+    def position_cursor(self):
+        if self._shape is None:
+            return Control()
+        return Control(
+            ControlType.CARRIAGE_RETURN,
+            (ControlType.ERASE_IN_LINE, 2),
+            *(((ControlType.CURSOR_UP, 1), (ControlType.ERASE_IN_LINE, 2)) * (self._rows() - 1)))
+
+    def restore_cursor(self):
+        if self._shape is None:
+            return Control()
+        return Control(
+            ControlType.CARRIAGE_RETURN,
+            *((ControlType.CURSOR_UP, 1), (ControlType.ERASE_IN_LINE, 2)) * self._rows())
+
+
 class _ProgressDisplay(object):
     """
     Live terminal region that shows all open progress bars.
@@ -514,7 +549,10 @@ class _ProgressDisplay(object):
     def __rich_console__(self, console, options):
         # Called by the refresh thread of rich while it holds its own
         # lock, don't take the display lock here.
-        yield _ProgressDisplay.progress.make_tasks_table(_ProgressDisplay.progress.tasks)
+        # Leave the last column empty. Terminals treat lines that fill the
+        # whole width differently when reflowing them on resize.
+        table = _ProgressDisplay.progress.make_tasks_table(_ProgressDisplay.progress.tasks)
+        yield Constrain(table, width=max(1, options.max_width - 1))
 
     @staticmethod
     def add(desc, total, unit, estimates):
@@ -528,6 +566,9 @@ class _ProgressDisplay(object):
                     transient=True,
                     redirect_stdout=False,
                     redirect_stderr=False)
+                _ProgressDisplay.live._live_render = _ReflowLiveRender(
+                    _ProgressDisplay.live.get_renderable(),
+                    vertical_overflow=_ProgressDisplay.live.vertical_overflow)
                 _ProgressDisplay.live.start()
             return task
 
@@ -539,7 +580,7 @@ class _ProgressDisplay(object):
             if not tasks:
                 return
             task = tasks[0]
-            details = _ProgressDisplay.details.render(task).plain
+            details = _ProgressDisplay.details.render(task).plain.strip()
             elapsed = _ProgressDisplay.elapsed.render(task).plain
 
             # The live region is erased when stopped, stop it before the
