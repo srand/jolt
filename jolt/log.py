@@ -468,6 +468,8 @@ class _DetailsColumn(ProgressColumn):
         if task.total is None:
             return Text("{:.0f} {}".format(task.completed, unit))
         if unit == "B":
+            if (task.finished_speed or task.speed) is None:
+                return self._download.render(task)
             return Text.assemble(self._download.render(task), " ", self._speed.render(task))
         return Text.assemble(self._count.render(task), " ", unit)
 
@@ -497,11 +499,13 @@ class _ProgressDisplay(object):
 
     lock = threading.RLock()
     live = None
+    details = _DetailsColumn()
+    elapsed = TimeElapsedColumn(table_column=Column(width=7, no_wrap=True))
     progress = Progress(
         _DescriptionColumn(),
         _BlockBarColumn(),
-        _DetailsColumn(),
-        TimeElapsedColumn(table_column=Column(width=7, no_wrap=True)),
+        details,
+        elapsed,
         _RemainingColumn(),
         console=_console,
         auto_refresh=False,
@@ -531,8 +535,12 @@ class _ProgressDisplay(object):
     def remove(task_id):
         with _ProgressDisplay.lock:
             progress = _ProgressDisplay.progress
-            if not any(task.id == task_id for task in progress.tasks):
+            tasks = [task for task in progress.tasks if task.id == task_id]
+            if not tasks:
                 return
+            task = tasks[0]
+            details = _ProgressDisplay.details.render(task).plain
+            elapsed = _ProgressDisplay.elapsed.render(task).plain
 
             # The live region is erased when stopped, stop it before the
             # last bar is removed so that no empty line is left behind.
@@ -540,6 +548,9 @@ class _ProgressDisplay(object):
                 _ProgressDisplay.live.stop()
                 _ProgressDisplay.live = None
             progress.remove_task(task_id)
+
+        # Replace the bar with a log line
+        info("{} ({}, {})", task.description, details, elapsed)
 
 
 class _RichProgress(object):
