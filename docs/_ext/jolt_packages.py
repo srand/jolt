@@ -28,6 +28,10 @@ def _label(name):
     return "pkg-" + re.sub(r"[^a-z0-9]+", "-", name)
 
 
+def _module_label(module):
+    return "pkgmodule-" + module.rsplit(".", 1)[-1].replace("_", "-")
+
+
 def _parameters(cls):
     params = {}
     for mro in reversed(cls.__mro__):
@@ -97,8 +101,8 @@ class JoltPackages(_GeneratedDirective):
         for cls in tasks:
             lines += [
                 "   * - :ref:`{} <{}>`".format(cls.name, _label(cls.name)),
-                "     - {}".format(_version(cls) or "-"),
-                "     - ``{}``".format(cls.__module__),
+                "     - {}".format(_version(cls) or "\u2014"),
+                "     - :ref:`{} <{}>`".format(cls.__module__, _module_label(cls.__module__)),
             ]
         return lines
 
@@ -106,8 +110,17 @@ class JoltPackages(_GeneratedDirective):
 class JoltPackagesReference(_GeneratedDirective):
     def lines(self, tasks):
         lines = []
-        for cls in tasks:
-            lines += self._reference(cls)
+        for module in sorted({cls.__module__ for cls in tasks}):
+            lines += [
+                ".. _{}:".format(_module_label(module)),
+                "",
+                module,
+                "^" * len(module),
+                "",
+            ]
+            for cls in tasks:
+                if cls.__module__ == module:
+                    lines += self._reference(cls)
         return lines
 
     def _reference(self, cls):
@@ -115,7 +128,7 @@ class JoltPackagesReference(_GeneratedDirective):
             ".. _{}:".format(_label(cls.name)),
             "",
             cls.name,
-            "^" * len(cls.name),
+            "~" * len(cls.name),
             "",
         ]
         doc = cls.__dict__.get("__doc__")
@@ -152,8 +165,8 @@ class JoltPackagesReference(_GeneratedDirective):
                     description = "{} Values: {}".format(description, values).strip()
                 lines += [
                     "   * - ``{}``".format(name),
-                    "     - {}".format("``{}``".format(default) if default not in (None, "") else "-"),
-                    "     - {}".format(description or "-"),
+                    "     - {}".format("``{}``".format(default) if default not in (None, "") else "\u2014"),
+                    "     - {}".format(description or "\u2014"),
                 ]
             lines += [""]
         return lines
