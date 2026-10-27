@@ -16,7 +16,7 @@ from jolt import utils
 from jolt import colors
 from jolt import hooks
 from jolt import filesystem as fs
-from jolt.error import raise_error_if
+from jolt.error import raise_error, raise_error_if
 from jolt.error import raise_task_error_if
 from jolt.influence import HashInfluenceRegistry, TaskRequirementInfluence
 from jolt.options import JoltOptions
@@ -1040,19 +1040,26 @@ class Graph(object):
     @property
     def topological_nodes(self):
         with self._mutex:
-            G = self.clone()
-            S = G.roots
+            # Kahn's algorithm, emitting one level at a time in node insertion order
+            order = {n: i for i, n in enumerate(self._children)}
+            indegree = {n: len(p) for n, p in self._parents.items()}
+            S = [n for n in self._children if indegree[n] == 0]
             L = []
             while S:
+                L.extend(S)
+                R = []
                 for n in S:
-                    L.append(n)
-                    G.remove_node(n)
-                S = G.roots
-            if len(G.nodes) > 0:
+                    for child in self._children[n]:
+                        indegree[child] -= 1
+                        if indegree[child] == 0:
+                            R.append(child)
+                S = sorted(R, key=order.get)
+            if len(L) < len(order):
                 log.debug("[GRAPH] Graph has cycles between these nodes:")
-                for node in G.nodes:
-                    log.debug("[GRAPH]   " + node.short_qualified_name)
-                raise_error_if(len(G.nodes) > 0, "graph has cycles")
+                for node in self._children:
+                    if indegree[node] > 0:
+                        log.debug("[GRAPH]   " + node.short_qualified_name)
+                raise_error("graph has cycles")
             return L
 
     def clone(self):
