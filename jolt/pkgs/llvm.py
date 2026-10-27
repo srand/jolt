@@ -1,16 +1,22 @@
 from jolt import Alias, BooleanParameter, Download, ListParameter, Parameter, Task, attributes
+from jolt.error import raise_task_error_if
 from jolt.pkgs import cmake, ninja
 from jolt.plugins import git, cmake
 from jolt.tasks import TaskRegistry
 
 
-VERSION = "21.1.8"
+VERSION = "23.1.4"
+
+# Target triples that libclc is built for, by LLVM target
+LIBCLC_TRIPLES = {
+    "AMDGPU": "amdgcn-amd-amdhsa-llvm",
+}
 
 
 @attributes.common_metadata()
 class LLVMFromBin(Download):
     name = "llvm/bin"
-    version = Parameter("21.1.0", help="LLVM version.")
+    version = Parameter("23.1.4", help="LLVM version.")
     url = [
         "https://github.com/llvm/llvm-project/releases/download/llvmorg-{version}/LLVM-{version}-Linux-X64.tar.xz"
     ]
@@ -20,6 +26,7 @@ class LLVMFromBin(Download):
 
 @attributes.requires("requires_git")
 @attributes.requires("requires_ninja")
+@cmake.options("_libclc_options")
 @cmake.requires()
 @cmake.use_ninja()
 class LLVMFromSrc(cmake.CMake):
@@ -62,7 +69,25 @@ class LLVMFromSrc(cmake.CMake):
     srcdir = "{git[llvm-project]}/llvm"
 
     @property
+    def _libclc_runtime(self):
+        """ Since LLVM 23, libclc is built as a runtime for GPU targets. """
+        return "libclc" in self.projects and int(str(self.version).split(".")[0]) >= 23
+
+    @property
+    def _libclc_options(self):
+        if not self._libclc_runtime:
+            return []
+        triples = [LIBCLC_TRIPLES[target] for target in self.targets if target in LIBCLC_TRIPLES]
+        raise_task_error_if(
+            not triples, self,
+            "libclc requires one of these targets: {}", ", ".join(LIBCLC_TRIPLES))
+        return ["LLVM_RUNTIME_TARGETS='{}'".format(";".join(triples))] + [
+            "RUNTIMES_{}_LLVM_ENABLE_RUNTIMES=libclc".format(triple) for triple in triples]
+
+    @property
     def _projects_str(self):
+        if self._libclc_runtime:
+            return ";".join(project for project in self.projects if project != "libclc")
         return ";".join(self.projects)
 
     @property
