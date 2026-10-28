@@ -133,6 +133,7 @@ from jolt.pkgs import xorg
 from jolt.pkgs import xz
 from jolt.pkgs import yamlcpp
 from jolt.pkgs import zeromq
+from jolt.pkgs import zig
 from jolt.pkgs import zlib
 from jolt.pkgs import zstd
 
@@ -249,6 +250,7 @@ class Default(Alias):
         "xerces-c",
         "xz",
         "yaml-cpp",
+        "zig",
         "zlib",
         "zstd",
     ]
