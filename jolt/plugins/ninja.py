@@ -2464,7 +2464,8 @@ if __name__ == "__main__":
         self._writer = self._write_ninja_file(self.outdir, deps, tools)
         verbose = " -v" if log.is_verbose() else ""
         threads = config.getint("jolt", "threads", tools.getenv("JOLT_THREADS") or None)
-        threads = " -j{}".format(tools.cpu_count() if threads == 0 else threads) if threads is not None else ""
+        jobs = tools.make_jobs()
+        threads = " " + jobs if threads is not None and jobs else ""
         keep_going = " -k 0" if config.get_keep_going() else ""
         depsfile = self._get_keepdepfile(tools)
         try:

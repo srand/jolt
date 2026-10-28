@@ -30,7 +30,7 @@ class NASM(Task):
 
             with tools.cwd(self.builddir):
                 tools.run("{srcdir}/configure")
-                tools.run("make -j{}", tools.thread_count())
+                tools.run("make {}", tools.make_jobs())
         else:
             with tools.cwd(self.srcdir):
                 tools.run("nmake -f Mkfiles/msvc.mak")

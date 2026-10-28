@@ -386,7 +386,7 @@ class _KernelBase(Task):
             for target in self.targets:
                 fn = getattr(self, f"run_{target}", None)
                 assert fn, f"Dont know how to build {target}"
-                with tools.runprefix("{} make {} O={objdir} -j{}", arch, verbose, tools.thread_count()):
+                with tools.runprefix("{} make {} O={objdir} {}", arch, verbose, tools.make_jobs()):
                     fn(deps, tools)
 
     def run_find_defconfig_configs(self, deps, tools):

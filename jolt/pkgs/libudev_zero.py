@@ -19,8 +19,8 @@ class LibudevZero(Task):
     def run(self, deps, tools):
         self.installdir = tools.builddir("install")
         with tools.cwd(self.srcdir):
-            tools.run("make -j{} {shared[libudev.so.1,libudev.a]} libudev.pc PREFIX=/jolt-prefix "
-                      "USB_IDS_PATH=/usr/share/hwdata/usb.ids", tools.cpu_count())
+            tools.run("make {} {shared[libudev.so.1,libudev.a]} libudev.pc PREFIX=/jolt-prefix "
+                      "USB_IDS_PATH=/usr/share/hwdata/usb.ids", tools.make_jobs())
             tools.run("make {shared[install-shared,install-static]} PREFIX=/jolt-prefix DESTDIR={}", self.installdir)
 
         with tools.cwd(self.installdir, "jolt-prefix"):

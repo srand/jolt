@@ -183,8 +183,7 @@ class Gcc(autotools.Autotools):
         self.deps = deps
         at = tools.autotools(deps, incremental=self.incremental)
         at.configure(self.srcdir, *tools.expand(self._options()))
-        with tools.cwd(at.builddir):
-            tools.run("make -j{} all-gcc all-target-libgcc", tools.cpu_count())
+        at.build("all-gcc", "all-target-libgcc")
         at.install("install-gcc install-target-libgcc")
         self._install_binutils(deps, tools)
 

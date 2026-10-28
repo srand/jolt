@@ -38,7 +38,7 @@ class Musl(Task):
         srcdir = tools.expand_path(self.srcdir)
         with tools.cwd(builddir):
             tools.run("{}/configure --prefix=/usr --syslibdir=/lib {}", srcdir, target)
-            tools.run("make -j{}", tools.cpu_count())
+            tools.run("make {}", tools.make_jobs())
             tools.run("make DESTDIR={installdir} install")
         # The dynamic linker is installed as an absolute link to the library
         with tools.cwd(self.installdir, "lib"):

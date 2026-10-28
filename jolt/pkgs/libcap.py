@@ -17,7 +17,7 @@ class Libcap(Task):
     def run(self, deps, tools):
         self.installdir = tools.builddir("install")
         with tools.cwd(self.srcdir):
-            tools.run("make -j {}", tools.cpu_count())
+            tools.run("make {}", tools.make_jobs())
             tools.run("make install DESTDIR={}", self.installdir)
 
         # Patch pkgconfig files

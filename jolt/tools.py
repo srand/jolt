@@ -573,7 +573,8 @@ class _CMake(object):
         stamp.update()
 
     def build(self, *args, config="Release", **kwargs):
-        threading_args = ' -j {}'.format(kwargs.get("threads", self.tools.thread_count()))
+        threads = kwargs.get("threads")
+        threading_args = "-j{}".format(threads) if threads else self.tools.make_jobs()
         verbose_args = ' --verbose' if log.is_verbose() else ''
         with self.tools.cwd(self.builddir):
             self.tools.run("cmake --build . --config {0} {1}{2}", config, threading_args, verbose_args, output=True)
@@ -678,10 +679,10 @@ class _AutoTools(object):
                            output=True)
         stamp.update()
 
-    def build(self, *args, **kwargs):
+    def build(self, *targets):
         with self.tools.cwd(self.builddir), self.tools.environ(DESTDIR=self.installdir):
-            self.tools.run("make VERBOSE=yes Q= V=1 -j{0}",
-                           self.tools.cpu_count(), output=True)
+            self.tools.run("make VERBOSE=yes Q= V=1 {} {}",
+                           self.tools.make_jobs(), " ".join(targets), output=True)
 
     def install(self, target="install", threads=None):
         # -j overrides any jobserver inherited through MAKEFLAGS
@@ -1203,6 +1204,31 @@ class Tools(object):
         """
         threads = config.getint("jolt", "threads", self.getenv("JOLT_THREADS") or None)
         return threads if threads else self.cpu_count()
+
+    def make_jobs(self, threads=None):
+        """ The option that sets the number of parallel jobs of make or Ninja.
+
+        Make and Ninja ignore the jobserver that they inherit through
+        ``MAKEFLAGS`` when they are given a number of jobs, so the option is
+        empty when there is a jobserver.
+
+        Args:
+            threads (int, optional): Number of jobs to run without a jobserver.
+                The default is :func:`thread_count`.
+
+        Returns:
+            str: An option such as ``-j8``, or an empty string.
+
+        Example:
+
+            .. code-block:: python
+
+                tools.run("make {}", tools.make_jobs())
+
+        """
+        if "--jobserver-" in (self.getenv("MAKEFLAGS") or ""):
+            return ""
+        return "-j{}".format(threads or self.thread_count())
 
     @contextmanager
     def cwd(self, pathname, *args):

@@ -46,7 +46,7 @@ class Glibc(Task):
                 "{}/configure --prefix=/usr {} --with-headers={}/usr/include "
                 "--disable-werror --enable-kernel=4.4 --without-selinux libc_cv_slibdir=/usr/lib",
                 srcdir, host, headers)
-            tools.run("make -j{}", tools.cpu_count())
+            tools.run("make {}", tools.make_jobs())
             tools.run("make DESTDIR={installdir} install")
         # The kernel headers are part of the system root
         tools.run("cp -a {}/usr/include/. {installdir}/usr/include/", headers)

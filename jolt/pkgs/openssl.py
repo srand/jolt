@@ -248,7 +248,7 @@ class OpenSSL(Task):
                 # Use the system's CA certificates and configuration. Only
                 # the software is installed, not the system directories.
                 tools.run("{srcdir}/config --prefix={installdir} --openssldir=/etc/ssl no-tests {shared[,no-shared]} {target}")
-                tools.run("make -j{}", tools.cpu_count())
+                tools.run("make {}", tools.make_jobs())
                 tools.run("make install_sw")
 
     def publish(self, artifact, tools):

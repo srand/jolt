@@ -28,7 +28,7 @@ class BusyBox(Task):
 
         with tools.cwd(self.srcdir):
             tools.run("make O={outdir} {defconfig_arg}")
-            tools.run("make O={outdir} -j{}", tools.cpu_count())
+            tools.run("make O={outdir} {}", tools.make_jobs())
             tools.run("make O={outdir} install DESTDIR={installdir}")
 
     def publish(self, artifact, tools):
