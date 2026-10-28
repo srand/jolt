@@ -33,6 +33,7 @@ from jolt.pkgs import ffmpeg
 from jolt.pkgs import flatbuffers
 from jolt.pkgs import flex
 from jolt.pkgs import fmt
+from jolt.pkgs import fontconfig
 from jolt.pkgs import freetype
 from jolt.pkgs import fstree
 from jolt.pkgs import gflags
@@ -254,6 +255,7 @@ class Default(Alias):
         "dbus",
         "ffmpeg",
         "flex",
+        "fontconfig",
         "gperf",
         "krb5",
         "libfastjson",
