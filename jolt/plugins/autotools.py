@@ -11,6 +11,17 @@ class Autotools(Task):
     incremental = True
     """ Keep build directories between builds, so that builds are incremental. """
 
+    libtool = False
+    """
+    Publish libtool archives (.la).
+
+    The archives refer to the installation prefix and to the archives of
+    other libraries by absolute paths, which are invalid once the artifact
+    is relocated. They are removed by default, since libraries are found
+    without them. Keep them for projects that load modules with libltdl,
+    and relocate them with :func:`jolt.plugins.libtool.relocate`.
+    """
+
     options = []
     """ Options passed to the ``configure`` script. """
 
@@ -40,6 +51,10 @@ class Autotools(Task):
     def publish(self, artifact, tools):
         at = tools.autotools(incremental=self.incremental)
         at.publish(artifact)
+        if not self.libtool:
+            with tools.cwd(artifact.path):
+                for archive in tools.glob("**/*.la"):
+                    tools.unlink(archive)
 
     def _options(self):
         return self.options

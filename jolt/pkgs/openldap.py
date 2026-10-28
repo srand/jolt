@@ -1,6 +1,6 @@
 from jolt import attributes, BooleanParameter, Parameter
 from jolt.pkgs import cyrus_sasl, openssl
-from jolt.plugins import autotools, cxxinfo, fetch, libtool, pkgconfig
+from jolt.plugins import autotools, cxxinfo, fetch, pkgconfig
 from jolt.tasks import TaskRegistry
 
 
@@ -8,7 +8,6 @@ from jolt.tasks import TaskRegistry
 @attributes.requires("requires_src")
 @autotools.requires()
 @pkgconfig.requires()
-@libtool.relocate()
 @cxxinfo.publish(libraries=["ldap", "lber"])
 class OpenLDAP(autotools.Autotools):
     """ Lightweight Directory Access Protocol client libraries """

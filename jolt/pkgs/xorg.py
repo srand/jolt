@@ -1,5 +1,5 @@
 from jolt import attributes, Parameter, Task
-from jolt.plugins import fetch, autotools, libtool, meson, pkgconfig
+from jolt.plugins import fetch, autotools, meson, pkgconfig
 from jolt.tasks import TaskRegistry
 
 
@@ -78,7 +78,6 @@ class Renderproto(autotools.Autotools):
 @attributes.requires("requires_xcb")
 @autotools.requires()
 @pkgconfig.requires()
-@libtool.relocate()
 class XcbKeysyms(autotools.Autotools):
     name = "xorg/xcb-keysyms"
     version = Parameter("0.4.1", help="xcb-util-keysyms version.")
@@ -104,7 +103,6 @@ class XcbProto(autotools.Autotools):
 @attributes.requires("requires_src")
 @attributes.requires("requires_xproto")
 @autotools.requires()
-@libtool.relocate()
 @pkgconfig.requires()
 class Xau(autotools.Autotools):
     name = "xorg/libxau"
@@ -119,7 +117,6 @@ class Xau(autotools.Autotools):
 @attributes.requires("requires_src")
 @attributes.requires("requires_xproto")
 @autotools.requires()
-@libtool.relocate()
 @pkgconfig.requires()
 class LibXdmcp(autotools.Autotools):
     name = "xorg/libxdmcp"
@@ -137,7 +134,6 @@ class LibXdmcp(autotools.Autotools):
 @attributes.requires("requires_xproto")
 @autotools.requires()
 @pkgconfig.requires()
-@libtool.relocate()
 class Xext(autotools.Autotools):
     name = "xorg/libxext"
     version = Parameter("1.3.7", help="libXext version.")
@@ -201,7 +197,6 @@ class Xtrans(autotools.Autotools):
 @attributes.requires("requires_xext")
 @attributes.requires("requires_xrender")
 @autotools.requires()
-@libtool.relocate()
 class Xrandr(autotools.Autotools):
     name = "xorg/libxrandr"
     version = Parameter("1.5.5", help="libXrandr version.")
@@ -217,7 +212,6 @@ class Xrandr(autotools.Autotools):
 @attributes.requires("requires_src")
 @attributes.requires("requires_x11")
 @autotools.requires()
-@libtool.relocate()
 @pkgconfig.requires()
 class Xrender(autotools.Autotools):
     name = "xorg/libxrender"
@@ -235,8 +229,6 @@ class Xrender(autotools.Autotools):
 @pkgconfig.to_cxxinfo(["xshmfence"])
 @pkgconfig.requires()
 @autotools.requires()
-@libtool.relocate()
-@libtool.relocate()
 class Libxshmfence(autotools.Autotools):
     name = "xorg/libxshmfence"
     version = Parameter("1.3.3", help="libxshmfence version.")
@@ -257,7 +249,6 @@ class Libxshmfence(autotools.Autotools):
 @attributes.requires("requires_xproto")
 @autotools.requires()
 @pkgconfig.requires()
-@libtool.relocate()
 class Libxxf86vm(autotools.Autotools):
     name = "xorg/libxxf86vm"
     version = Parameter("1.1.7", help="libXxf86vm version.")
@@ -277,7 +268,6 @@ class Libxxf86vm(autotools.Autotools):
 @attributes.requires("requires_xcb_proto")
 @pkgconfig.to_cxxinfo(["xcb"])
 @autotools.requires()
-@libtool.relocate()
 class Libxcb(autotools.Autotools):
     name = "xorg/libxcb"
     version = Parameter("1.17.0", help="libxcb version.")
@@ -302,7 +292,6 @@ class Libxcb(autotools.Autotools):
 @autotools.requires()
 @pkgconfig.requires()
 @pkgconfig.to_cxxinfo(["x11", "x11-xcb"])
-@libtool.relocate()
 class Libx11(autotools.Autotools):
     name = "xorg/libx11"
     version = Parameter("1.8.14", help="libX11 version.")
@@ -323,7 +312,6 @@ class Libx11(autotools.Autotools):
 @attributes.requires("requires_libx11")
 @attributes.requires("requires_libxcb")
 @attributes.common_metadata()
-@libtool.relocate()
 class LibX11Xcb(Task):
     """
     Republishes libx11 and libxcb as libx11-xcb for compatibility.
@@ -363,7 +351,6 @@ class Xorgproto(meson.Meson):
 @attributes.requires("requires_xorgproto")
 @autotools.requires()
 @pkgconfig.requires()
-@libtool.relocate()
 class Libxfixes(autotools.Autotools):
     name = "xorg/libxfixes"
     version = Parameter("6.0.2", help="libXfixes version.")
@@ -386,7 +373,6 @@ class Libxfixes(autotools.Autotools):
 @attributes.requires("requires_xorgproto")
 @autotools.requires()
 @pkgconfig.requires()
-@libtool.relocate()
 class Libxi(autotools.Autotools):
     name = "xorg/libxi"
     version = Parameter("1.8.4", help="libXi version.")
@@ -411,7 +397,6 @@ class Libxi(autotools.Autotools):
 @attributes.requires("requires_xorgproto")
 @autotools.requires()
 @pkgconfig.requires()
-@libtool.relocate()
 class Libxtst(autotools.Autotools):
     name = "xorg/libxtst"
     version = Parameter("1.2.6", help="libXtst version.")

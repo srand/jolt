@@ -1,12 +1,11 @@
 from jolt import attributes, Parameter
 from jolt.pkgs import gmp
-from jolt.plugins import autotools, cxxinfo, fetch, libtool
+from jolt.plugins import autotools, cxxinfo, fetch
 from jolt.tasks import TaskRegistry
 
 
 @attributes.requires("requires_gmp")
 @attributes.requires("requires_src")
-@libtool.relocate()
 @cxxinfo.publish(libraries=["mpfr"])
 class Mpfr(autotools.Autotools):
     """ GNU multiple precision floating-point library """

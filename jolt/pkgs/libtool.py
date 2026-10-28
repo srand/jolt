@@ -33,10 +33,6 @@ class Libtool(autotools.Autotools):
                 "bin/libtoolize",
                 artifact.strings.install_prefix,
                 artifact.path)
-            tools.replace_in_file(
-                "lib/libltdl.la",
-                artifact.strings.install_prefix,
-                artifact.path)
 
 
 TaskRegistry.get().add_task_class(Libtool)

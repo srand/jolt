@@ -1,6 +1,6 @@
 from jolt import attributes, Parameter
 from jolt.pkgs import krb5, openssl
-from jolt.plugins import autotools, cxxinfo, fetch, libtool, pkgconfig
+from jolt.plugins import autotools, cxxinfo, fetch, pkgconfig
 from jolt.tasks import TaskRegistry
 
 
@@ -8,7 +8,6 @@ from jolt.tasks import TaskRegistry
 @attributes.requires("requires_src")
 @autotools.requires()
 @pkgconfig.requires()
-@libtool.relocate()
 @cxxinfo.publish(libraries=["sasl2"])
 class CyrusSasl(autotools.Autotools):
     """

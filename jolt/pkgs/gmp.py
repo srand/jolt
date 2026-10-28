@@ -1,12 +1,11 @@
 from jolt import attributes, Parameter
 from jolt.pkgs import m4
-from jolt.plugins import autotools, cxxinfo, fetch, libtool
+from jolt.plugins import autotools, cxxinfo, fetch
 from jolt.tasks import TaskRegistry
 
 
 @attributes.requires("requires_m4")
 @attributes.requires("requires_src")
-@libtool.relocate()
 @cxxinfo.publish(libraries=["gmp"])
 class Gmp(autotools.Autotools):
     """ GNU multiple precision arithmetic library """
