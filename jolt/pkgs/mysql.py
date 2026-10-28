@@ -1,10 +1,11 @@
 from jolt import attributes, BooleanParameter, Parameter
-from jolt.pkgs import boost, curl, libedit, libtirpc, libudev_zero, lz4, openssl, rapidjson, zlib, zstd
+from jolt.pkgs import boost, curl, krb5, libedit, libtirpc, libudev_zero, lz4, openssl, rapidjson, zlib, zstd
 from jolt.plugins import cmake, cxxinfo, git, pkgconfig
 from jolt.tasks import TaskRegistry
 
 
 @attributes.requires("requires_curl")
+@attributes.requires("requires_{system}_krb5")
 @attributes.requires("requires_{system}_libedit")
 @attributes.requires("requires_{system}_libtirpc")
 @attributes.requires("requires_{system}_libudev")
@@ -24,6 +25,7 @@ class MySQLBase(cmake.CMake):
     version = Parameter("26.10.0", help="MySQL version.")
     requires_curl = ["curl"]
     requires_darwin_libedit = ["libedit:shared=true"]
+    requires_linux_krb5 = ["krb5"]
     requires_linux_libedit = requires_darwin_libedit
     requires_linux_libtirpc = ["libtirpc"]
     # Required by libfido2 for WebAuthn authentication
