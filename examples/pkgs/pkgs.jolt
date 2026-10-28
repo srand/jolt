@@ -113,6 +113,7 @@ from jolt.pkgs import re2
 from jolt.pkgs import re2c
 from jolt.pkgs import readline
 from jolt.pkgs import rust
+from jolt.pkgs import sccache
 from jolt.pkgs import sdl
 from jolt.pkgs import simdjson
 from jolt.pkgs import soci
@@ -236,6 +237,7 @@ class Default(Alias):
         "re2",
         "re2c",
         "rust",
+        "sccache",
         "sdl",
         "simdjson",
         "soci",
