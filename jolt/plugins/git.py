@@ -479,6 +479,10 @@ class GitRepository(object):
 
     def _update_submodules(self):
         with self.tools.cwd(self.path), self._progress("Updating submodules of " + self._name) as (progress_option, progress):
+            # Relative submodule URLs are resolved against the URL of the origin
+            # remote, which repositories initialized and fetched by URL don't have
+            self.tools.run("git config remote.origin.url {0}", self.url, output_on_error=True, new_session=True)
+            self.tools.run("git submodule sync --recursive", output_on_error=True, new_session=True)
             self.tools.run("git submodule update --init --recursive {0}", progress_option, output_on_error=True, progress=progress, new_session=True)
 
 

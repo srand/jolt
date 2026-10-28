@@ -694,6 +694,40 @@ class GitApi(testsupport.JoltTest):
         self.build("without_submodules")
         self.assertNotExists("without_submodules/sub/README.md")
 
+    def test_submodule_relative_url(self):
+        """
+        --- tasks:
+        class A(Task):
+            requires = ["git:url={ws}/parent.git,path=deep/relative_submodule,shallow=true,submodules=true"]
+        ---
+        """
+        if self.network:
+            self.skipTest("network build not supported")
+
+        # Submodules in the local file system are only cloned when allowed
+        allow_file = dict(GIT_CONFIG_COUNT="1", GIT_CONFIG_KEY_0="protocol.file.allow", GIT_CONFIG_VALUE_0="always")
+        git = "git -c user.email='e@mail' -c user.name='Name'"
+
+        with self.tools.cwd(self.ws), self.tools.environ(**allow_file):
+            self.tools.run("git init sub_work")
+            with self.tools.cwd("sub_work"):
+                self.tools.write_file("README.md", "sub")
+                self.tools.run(git + " add .")
+                self.tools.run(git + " commit -m 'Add README'")
+            self.tools.run("git clone --bare sub_work sub.git")
+
+            # The submodule URL is relative to the URL of the parent. The
+            # checkout is in a subdirectory, so that the URL doesn't resolve
+            # to the submodule when resolved against the checkout instead.
+            self.tools.run("git init parent_work")
+            with self.tools.cwd("parent_work"):
+                self.tools.run(git + " submodule add ../sub.git sub")
+                self.tools.run(git + " commit -m 'Add submodule'")
+            self.tools.run("git clone --bare parent_work parent.git")
+
+            self.build("a")
+        self.assertExists("deep/relative_submodule/sub/README.md")
+
     def test_shallow_true(self):
         """
         --- tasks:
