@@ -1,19 +1,19 @@
 from jolt import attributes, BooleanParameter, Parameter
-from jolt.pkgs import xorg
+from jolt.pkgs import bison, xorg
 from jolt.plugins import cxxinfo, git, meson
 from jolt.tasks import TaskRegistry
 
 
+@attributes.requires("requires_bison")
 @attributes.requires("requires_git")
 @attributes.requires("requires_x11_{x11[on,off]}")
 @meson.requires()
 @cxxinfo.publish(libraries=["xkbcommon"])
 class Libxkbcommon(meson.Meson):
-    """ Requires bison on the host. """
-
     name = "libxkbcommon"
     version = Parameter("1.13.2", help="libxkbcommon version.")
     x11 = BooleanParameter(False, help="Build the libxkbcommon-x11 library.")
+    requires_bison = ["bison"]
     requires_git = ["git:url=https://github.com/xkbcommon/libxkbcommon.git,rev=xkbcommon-{version}"]
     requires_x11_on = ["xorg/libxcb"]
     srcdir = "{git[libxkbcommon]}"
