@@ -23,6 +23,7 @@ from jolt.pkgs import cmake
 from jolt.pkgs import cpython
 from jolt.pkgs import crun
 from jolt.pkgs import curl
+from jolt.pkgs import cxxopts
 from jolt.pkgs import dbus
 from jolt.pkgs import double_conversion
 from jolt.pkgs import fastfloat
@@ -144,6 +145,7 @@ class Default(Alias):
         "cpython/embed",
         "cpython/extend",
         "curl",
+        "cxxopts",
         "double-conversion",
         "fastfloat",
         "flatbuffers",
