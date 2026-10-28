@@ -28,7 +28,7 @@ class Mesa(Task):
 
     requires_cbindgen = ["cbindgen"]
     requires_expat = ["libexpat:pic=true"]
-    requires_git =["git:url=https://gitlab.freedesktop.org/mesa/mesa.git,rev=mesa-{version}"]
+    requires_git = ["git:url=https://gitlab.freedesktop.org/mesa/mesa.git,rev=mesa-{version}"]
     requires_glslang = ["glslang"]
     requires_libdrm = ["libdrm"]
     requires_libglvnd = ["libglvnd"]
