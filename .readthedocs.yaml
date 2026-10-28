@@ -10,4 +10,7 @@ sphinx:
 
 python:
    install:
+   # Jolt and its dependencies, which the documentation imports
+   - method: pip
+     path: .
    - requirements: docs/requirements.txt
