@@ -81,6 +81,7 @@ from jolt.pkgs import libxkbcommon
 from jolt.pkgs import libxml2
 from jolt.pkgs import libxslt
 from jolt.pkgs import libyajl
+from jolt.pkgs import linux_headers
 from jolt.pkgs import llvm
 from jolt.pkgs import lua
 from jolt.pkgs import lz4
@@ -305,6 +306,7 @@ class Default(Alias):
         "libudev-zero",
         "libusb",
         "libxkbcommon",
+        "linux-headers",
         "mesa",
         "numactl",
         "vulkan-loader",
