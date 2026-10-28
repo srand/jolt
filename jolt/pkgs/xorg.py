@@ -78,6 +78,7 @@ class Renderproto(autotools.Autotools):
 @attributes.requires("requires_xcb")
 @autotools.requires()
 @pkgconfig.requires()
+@libtool.relocate()
 class XcbKeysyms(autotools.Autotools):
     name = "xorg/xcb-keysyms"
     version = Parameter("0.4.1", help="xcb-util-keysyms version.")
@@ -136,6 +137,7 @@ class LibXdmcp(autotools.Autotools):
 @attributes.requires("requires_xproto")
 @autotools.requires()
 @pkgconfig.requires()
+@libtool.relocate()
 class Xext(autotools.Autotools):
     name = "xorg/libxext"
     version = Parameter("1.3.7", help="libXext version.")
