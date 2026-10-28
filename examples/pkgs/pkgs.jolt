@@ -87,6 +87,7 @@ from jolt.pkgs import m4
 from jolt.pkgs import magic_enum
 from jolt.pkgs import make
 from jolt.pkgs import mesa
+from jolt.pkgs import mpfr
 from jolt.pkgs import mstch
 from jolt.pkgs import mysql
 from jolt.pkgs import nasm
@@ -280,6 +281,7 @@ class Default(Alias):
         "libunwind",
         "m4",
         "make",
+        "mpfr",
         "ncurses",
         "openldap",
         "readline",
