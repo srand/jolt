@@ -25,6 +25,7 @@ from jolt.pkgs import crun
 from jolt.pkgs import curl
 from jolt.pkgs import cxxopts
 from jolt.pkgs import dbus
+from jolt.pkgs import doctest
 from jolt.pkgs import double_conversion
 from jolt.pkgs import fastfloat
 from jolt.pkgs import ffmpeg
@@ -146,6 +147,7 @@ class Default(Alias):
         "cpython/extend",
         "curl",
         "cxxopts",
+        "doctest",
         "double-conversion",
         "fastfloat",
         "flatbuffers",
