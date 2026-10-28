@@ -33,6 +33,7 @@ from jolt.pkgs import ffmpeg
 from jolt.pkgs import flatbuffers
 from jolt.pkgs import flex
 from jolt.pkgs import fmt
+from jolt.pkgs import freetype
 from jolt.pkgs import fstree
 from jolt.pkgs import gflags
 from jolt.pkgs import glib
@@ -159,6 +160,7 @@ class Default(Alias):
         "fastfloat",
         "flatbuffers",
         "fmt",
+        "freetype",
         "fstree",
         "gflags",
         "glib",
