@@ -60,6 +60,7 @@ from jolt.pkgs import libpciaccess
 from jolt.pkgs import libpng
 from jolt.pkgs import libseccomp
 from jolt.pkgs import libsodium
+from jolt.pkgs import libtiff
 from jolt.pkgs import libtool
 from jolt.pkgs import libudev_zero
 from jolt.pkgs import libunwind
@@ -183,6 +184,7 @@ class Default(Alias):
         "libmysqlclient",
         "libpng",
         "libsodium",
+        "libtiff",
         "libuv",
         "libva",
         "libvorbis",
