@@ -1,11 +1,12 @@
 from jolt import attributes, BooleanParameter, Parameter
-from jolt.pkgs import boost, curl, krb5, libedit, libtirpc, libudev_zero, lz4, openssl, rapidjson, zlib, zstd
+from jolt.pkgs import boost, curl, cyrus_sasl, krb5, libedit, libtirpc, libudev_zero, lz4, openldap, openssl, rapidjson, zlib, zstd
 from jolt.plugins import cmake, cxxinfo, git, pkgconfig
 from jolt.tasks import TaskRegistry
 
 
 @attributes.requires("requires_curl")
 @attributes.requires("requires_{system}_krb5")
+@attributes.requires("requires_{system}_ldap")
 @attributes.requires("requires_{system}_libedit")
 @attributes.requires("requires_{system}_libtirpc")
 @attributes.requires("requires_{system}_libudev")
@@ -17,6 +18,7 @@ from jolt.tasks import TaskRegistry
 @attributes.requires("requires_zlib")
 @attributes.requires("requires_zstd")
 @attributes.system
+@cmake.options("_options_{system}")
 @cmake.requires()
 @cmake.use_ninja()
 @pkgconfig.requires()
@@ -26,6 +28,8 @@ class MySQLBase(cmake.CMake):
     requires_curl = ["curl"]
     requires_darwin_libedit = ["libedit:shared=true"]
     requires_linux_krb5 = ["krb5"]
+    # Required by the LDAP authentication plugins
+    requires_linux_ldap = ["cyrus-sasl", "openldap"]
     requires_linux_libedit = requires_darwin_libedit
     requires_linux_libtirpc = ["libtirpc"]
     # Required by libfido2 for WebAuthn authentication
@@ -38,12 +42,27 @@ class MySQLBase(cmake.CMake):
     requires_zstd = ["zstd"]
     srcdir = "{git[mysql-server]}"
 
+    @property
+    def _options_linux(self):
+        """
+        LDAP from its package, which the search of the system would miss, and the
+        libraries of the static SASL library, which MySQL doesn't link with.
+        """
+        sasl_libs = self.tools.run("pkg-config --libs libsasl2", output=False).strip()
+        return [
+            "CMAKE_C_STANDARD_LIBRARIES='{}'".format(sasl_libs),
+            "CMAKE_CXX_STANDARD_LIBRARIES='{}'".format(sasl_libs),
+            "WITH_LDAP=" + self.tools.run("pkg-config --variable=prefix ldap", output=False).strip(),
+        ]
+
     def run(self, deps, tools):
         if self.system != "linux":
             return super().run(deps, tools)
-        # libudev.h is looked for with check_include_file, which ignores pkg-config
+        # libudev.h and sasl/sasl.h are looked for with check_include_file, which ignores pkg-config
+        cflags = tools.run("pkg-config --cflags libudev libsasl2").strip()
         with tools.environ(
-            CFLAGS=tools.run("pkg-config --cflags libudev").strip() + " " + tools.getenv("CFLAGS", ""),
+            CFLAGS=cflags + " " + tools.getenv("CFLAGS", ""),
+            CXXFLAGS=cflags + " " + tools.getenv("CXXFLAGS", ""),
         ):
             super().run(deps, tools)
 
