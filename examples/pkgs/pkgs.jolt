@@ -67,6 +67,7 @@ from jolt.pkgs import libusb
 from jolt.pkgs import libuv
 from jolt.pkgs import libva
 from jolt.pkgs import libvorbis
+from jolt.pkgs import libwebp
 from jolt.pkgs import libxkbcommon
 from jolt.pkgs import libxml2
 from jolt.pkgs import libxslt
@@ -185,6 +186,7 @@ class Default(Alias):
         "libuv",
         "libva",
         "libvorbis",
+        "libwebp",
         "libxml2",
         "libxslt",
         "libyajl",
