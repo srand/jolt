@@ -300,6 +300,8 @@ class Default(Alias):
         "alsa-lib",
         "crun",
         "gcc",
+        "gcc/glibc:target=aarch64-linux-gnu",
+        "gcc/musl:target=aarch64-linux-musl",
         "glibc",
         "libdrm",
         "libffi",
