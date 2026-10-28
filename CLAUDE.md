@@ -14,6 +14,8 @@ cache shared between users and build workers.
   example `int/tools`, `api/git` or `flake8` (the linter). Run a single test case
   with a wildcard on the method name: `python3 -m jolt build "int/tools:filter=test_reader*"`.
   `tests/all.jolt` lists the tests that CI runs; register new test files there.
+  Test results are cached by the identity of the test task, which doesn't include
+  the Jolt code under test: after changing Jolt itself, rerun with `build -f`.
 - Test classes derive from `testsupport.JoltTest`. API tests (`api_*.jolt`) describe
   the workspace files of each test case in its docstring with `--- file: <name>`
   sections; internal tests (`int_*.jolt`) are plain unit tests with mocks.
