@@ -88,6 +88,7 @@ from jolt.pkgs import libxkbcommon
 from jolt.pkgs import libxml2
 from jolt.pkgs import libxslt
 from jolt.pkgs import libyajl
+from jolt.pkgs import libyaml
 from jolt.pkgs import linux_headers
 from jolt.pkgs import llvm
 from jolt.pkgs import lua
@@ -302,6 +303,7 @@ class Default(Alias):
         "libfastjson",
         "libtool",
         "libunwind",
+        "libyaml",
         "m4",
         "make",
         "mpc",
