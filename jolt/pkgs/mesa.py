@@ -24,7 +24,7 @@ from jolt.tasks import TaskRegistry
 @attributes.common_metadata()
 class Mesa(Task):
     name = "mesa"
-    version = Parameter("26.2.5", help="Mesa version.")
+    version = Parameter("26.2.6", help="Mesa version.")
 
     requires_cbindgen = ["cbindgen"]
     requires_expat = ["libexpat:pic=true"]
