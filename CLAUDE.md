@@ -119,6 +119,13 @@ cache shared between users and build workers.
   `find_library`/`find_path` find the package, and `LD_LIBRARY_PATH` for shared
   libraries. CMake's `check_include_file` ignores pkg-config; pass
   `pkg-config --cflags` through `CFLAGS` (see `mysql.py`).
+- pkg-config files must name the packages of dependencies (`Requires:`) instead of
+  bare `-l` flags, or consumers can't find them. Static libraries need their
+  dependencies in `Requires`, not `Requires.private`, since many consumers don't
+  pass `--static` (see `libusb.py`, `openldap.py`).
+- `find_library` with several names searches every directory for the first name
+  before the next, so a host library with another name can win (MySQL found the
+  host's `libldap_r` before Jolt's `libldap`). Point such searches at the package.
 - Artifacts are relocated from `/jolt-prefix`. pkg-config files are fixed
   automatically, but scripts such as `krb5-config` must be patched, and tools with
   data files must be built relocatable (`bison --enable-relocatable`).
