@@ -19,6 +19,8 @@ class Krb5(autotools.Autotools):
         # The C23 versions of string functions in glibc return const pointers,
         # which krb5 treats as an error
         "krb5_cv_cc_flag__dash_Werror_eq_discarded_dash_qualifiers=no",
+        # The libraries would find each other in the installation prefix
+        "--disable-rpath",
         "--localstatedir=/var",
         "--sysconfdir=/etc",
         "--with-crypto-impl=builtin",
