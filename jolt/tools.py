@@ -653,6 +653,20 @@ class _AutoTools(object):
             with self.tools.cwd(sourcedir):
                 self.tools.run("autoreconf -visf", output=True)
 
+        # Make doesn't relink when the libraries of requirements change, so
+        # the build starts over when anything but the sources has changed.
+        stamp = _ConfigurationStamp(self.tools, self.builddir)
+        if stamp.is_outdated():
+            for name in os.listdir(self.builddir):
+                # Keep the metadata that identifies the build directory
+                if name in (".task", ".taint"):
+                    continue
+                path = fs.path.join(self.builddir, name)
+                if fs.path.isdir(path) and not fs.path.islink(path):
+                    fs.rmtree(path, ignore_errors=True)
+                else:
+                    fs.unlink(path, ignore_errors=True)
+
         with self.tools.cwd(self.builddir), self.tools.environ(DESTDIR=self.installdir):
             self.tools.run("{0}/configure --prefix=/{1} {2} {3}",
                            sourcedir,
@@ -660,6 +674,7 @@ class _AutoTools(object):
                            self.tools.getenv("CONFIGURE_FLAGS", ""),
                            " ".join(args),
                            output=True)
+        stamp.update()
 
     def build(self, *args, **kwargs):
         with self.tools.cwd(self.builddir), self.tools.environ(DESTDIR=self.installdir):
