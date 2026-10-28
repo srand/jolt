@@ -1,7 +1,95 @@
+import re
+
 from jolt import attributes, ListParameter, Parameter
 from jolt.pkgs import binutils, glibc, gmp, mpc, mpfr, musl
 from jolt.plugins import autotools, fetch
 from jolt.tasks import TaskRegistry
+
+
+BAREMETAL_TARGETS = {
+    r"aarch64(_be)?": ["elf"],
+    r"arc\w*": ["elf"],
+    r"arm\w*": ["eabi", "eabihf"],
+    r"avr": ["elf"],
+    r"i[3-7]86": ["elf"],
+    r"loongarch64": ["elf"],
+    r"m68k": ["elf"],
+    r"microblaze(el)?": ["elf"],
+    r"mips(el|64|64el|isa\w*)?": ["elf"],
+    r"msp430": ["elf"],
+    r"or1k": ["elf"],
+    r"powerpc(le)?": ["eabi", "elf"],
+    r"riscv(32|64)": ["elf"],
+    r"rl78": ["elf"],
+    r"rx": ["elf"],
+    r"sh\w*": ["elf"],
+    r"sparc(64)?": ["elf"],
+    r"v850\w*": ["elf"],
+    r"x86_64": ["elf"],
+    r"xtensa\w*": ["elf"],
+}
+""" Machines supported by bare-metal compilers, and their systems. """
+
+GLIBC_TARGETS = {
+    r"aarch64(_be)?": ["linux-gnu"],
+    r"alpha\w*": ["linux-gnu"],
+    r"arc\w*": ["linux-gnu"],
+    r"arm\w*": ["linux-gnueabi", "linux-gnueabihf"],
+    r"csky": ["linux-gnuabiv2"],
+    r"hppa": ["linux-gnu"],
+    r"i[4-7]86": ["linux-gnu"],
+    r"loongarch64": ["linux-gnu"],
+    r"m68k": ["linux-gnu"],
+    r"microblaze(el)?": ["linux-gnu"],
+    r"mips(el|isa32\w*)?": ["linux-gnu"],
+    r"mips64(el)?|mipsisa64\w*": ["linux-gnu", "linux-gnuabi64", "linux-gnuabin32"],
+    r"or1k": ["linux-gnu"],
+    r"powerpc": ["linux-gnu"],
+    r"powerpc64(le)?": ["linux-gnu"],
+    r"riscv(32|64)": ["linux-gnu"],
+    r"s390x": ["linux-gnu"],
+    r"sh[34]\w*": ["linux-gnu"],
+    r"sparc\w*": ["linux-gnu"],
+    r"x86_64": ["linux-gnu", "linux-gnux32"],
+}
+""" Machines supported by glibc, and their systems. """
+
+MUSL_TARGETS = {
+    r"aarch64(_be)?": ["linux-musl"],
+    r"arm\w*": ["linux-musleabi", "linux-musleabihf"],
+    r"i[3-6]86": ["linux-musl"],
+    r"loongarch64": ["linux-musl"],
+    r"m68k": ["linux-musl"],
+    r"microblaze(el)?": ["linux-musl"],
+    r"mips(el|isa32\w*)?": ["linux-musl"],
+    r"mips64(el)?|mipsisa64\w*": ["linux-musl", "linux-muslabi64", "linux-musln32"],
+    r"or1k": ["linux-musl"],
+    r"powerpc": ["linux-musl"],
+    r"powerpc64(le)?": ["linux-musl"],
+    r"riscv(32|64)": ["linux-musl"],
+    r"s390x": ["linux-musl"],
+    r"sh\w*": ["linux-musl"],
+    r"x86_64": ["linux-musl", "linux-muslx32"],
+}
+""" Machines supported by musl, and their systems. """
+
+
+def targets(*tables):
+    """ Returns a function that accepts targets of the machines and systems in tables. """
+
+    def accepts(target):
+        # The vendor is optional: aarch64-linux-gnu, x86_64-pc-linux-gnu, arm-none-eabi
+        match = re.fullmatch(r"(\w+)(-(?!linux-)\w+)?-((linux-)?\w+)", target)
+        if not match:
+            return False
+        machine, _, system, _ = match.groups()
+        return any(
+            re.fullmatch(pattern, machine) and system in systems
+            for table in tables
+            for pattern, systems in table.items()
+        )
+
+    return accepts
 
 
 @attributes.requires("requires_libs")
@@ -28,7 +116,11 @@ class Gcc(autotools.Autotools):
         values=["c", "cxx", "fortran", "go", "m2", "objc", "objcxx"],
         help="Languages to build compilers for.",
     )
-    target = Parameter(required=False, help="Target of a cross compiler, such as arm-none-eabi. Native compilers if not set.")
+    target = Parameter(
+        required=False,
+        help="Target of a cross compiler, such as arm-none-eabi. Native compilers if not set.",
+        valuesfn=targets(BAREMETAL_TARGETS, GLIBC_TARGETS, MUSL_TARGETS),
+    )
     requires_cross = ["binutils:target={target}"]
     """ Assembler and linker of the target, included in the cross compiler. """
     requires_libs = ["gmp", "mpc", "mpfr"]
@@ -172,6 +264,7 @@ class GccGlibc(GccSysroot):
 
     name = "gcc/glibc"
     libc = "glibc"
+    target = Parameter(help="Target of the compilers, such as aarch64-linux-gnu.", valuesfn=targets(GLIBC_TARGETS))
 
 
 class GccMusl(GccSysroot):
@@ -179,7 +272,7 @@ class GccMusl(GccSysroot):
 
     name = "gcc/musl"
     libc = "musl"
-    target = Parameter(help="Target of the compilers, such as aarch64-linux-musl.")
+    target = Parameter(help="Target of the compilers, such as aarch64-linux-musl.", valuesfn=targets(MUSL_TARGETS))
     options_sysroot = GccSysroot.options_sysroot + [
         # The sanitizers require glibc
         "--disable-libsanitizer",
