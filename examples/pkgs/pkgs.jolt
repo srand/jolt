@@ -24,6 +24,7 @@ from jolt.pkgs import cpython
 from jolt.pkgs import crun
 from jolt.pkgs import curl
 from jolt.pkgs import cxxopts
+from jolt.pkgs import cyrus_sasl
 from jolt.pkgs import dbus
 from jolt.pkgs import doctest
 from jolt.pkgs import double_conversion
@@ -256,6 +257,7 @@ class Default(Alias):
         "autoconf",
         "automake",
         "bison",
+        "cyrus-sasl",
         "dbus",
         "ffmpeg",
         "flex",
