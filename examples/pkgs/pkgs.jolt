@@ -92,6 +92,7 @@ from jolt.pkgs import nghttp2
 from jolt.pkgs import ninja
 from jolt.pkgs import nlohmann_json
 from jolt.pkgs import nodejs
+from jolt.pkgs import numactl
 from jolt.pkgs import opencv
 from jolt.pkgs import openjdk
 from jolt.pkgs import openssl
@@ -282,6 +283,7 @@ class Default(Alias):
         "libusb",
         "libxkbcommon",
         "mesa",
+        "numactl",
         "wayland",
         "wayland-protocols",
         "xorg/glproto",
