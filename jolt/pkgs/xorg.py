@@ -373,6 +373,10 @@ class Libxfixes(autotools.Autotools):
     requires_xorgproto = ["xorg/xorgproto"]
     srcdir = "{fetch[src]}/libXfixes-{version}"
 
+    def publish(self, artifact, tools):
+        super().publish(artifact, tools)
+        artifact.environ.CMAKE_PREFIX_PATH.append(".")
+
 
 @attributes.requires("requires_macros")
 @attributes.requires("requires_src")
@@ -394,6 +398,10 @@ class Libxi(autotools.Autotools):
     requires_xorgproto = ["xorg/xorgproto"]
     srcdir = "{fetch[src]}/libXi-{version}"
 
+    def publish(self, artifact, tools):
+        super().publish(artifact, tools)
+        artifact.environ.CMAKE_PREFIX_PATH.append(".")
+
 
 @attributes.requires("requires_macros")
 @attributes.requires("requires_src")
@@ -414,6 +422,10 @@ class Libxtst(autotools.Autotools):
     requires_xi = ["xorg/libxi"]
     requires_xorgproto = ["xorg/xorgproto"]
     srcdir = "{fetch[src]}/libXtst-{version}"
+
+    def publish(self, artifact, tools):
+        super().publish(artifact, tools)
+        artifact.environ.CMAKE_PREFIX_PATH.append(".")
 
 
 TaskRegistry.get().add_task_class(Glproto)

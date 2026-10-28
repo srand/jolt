@@ -21,6 +21,7 @@ class AlsaLib(autotools.Autotools):
 
     def publish(self, artifact, tools):
         super().publish(artifact, tools)
+        artifact.environ.CMAKE_PREFIX_PATH.append(".")
         artifact.environ.LD_LIBRARY_PATH.append("lib")
 
 
