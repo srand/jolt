@@ -7,7 +7,7 @@ from jolt.tasks import TaskRegistry
 @attributes.common_metadata()
 class CMakeBin(Download):
     name = "cmake/bin"
-    version = Parameter("4.4.4", help="CMake version.")
+    version = Parameter("4.4.5", help="CMake version.")
     url = ["https://github.com/Kitware/CMake/releases/download/v{version}/cmake-{version}-{cmake_system}-{cmake_arch}{cmake_ext}"]
     collect = [{"files": "*", "cwd": "cmake-{version}-{cmake_system}-{cmake_arch}{cmake_contents}"}]
 
@@ -40,7 +40,7 @@ class CMakeBin(Download):
 
 class CMake(Alias):
     name = "cmake"
-    version = Parameter("4.4.4", help="CMake version.")
+    version = Parameter("4.4.5", help="CMake version.")
     requires = ["cmake/bin:version={version}"]
 
 
