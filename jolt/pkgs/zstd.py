@@ -18,6 +18,8 @@ class Zstd(cmake.CMake):
     srcdir = "{git[zstd]}"
     options = [
         "CMAKE_POSITION_INDEPENDENT_CODE={pic[ON,OFF]}",
+        # The programs require the static library
+        "ZSTD_BUILD_PROGRAMS={shared[OFF,ON]}",
         "ZSTD_BUILD_SHARED={shared[ON,OFF]}",
         "ZSTD_BUILD_STATIC={shared[OFF,ON]}",
         "ZSTD_BUILD_TESTS=OFF",
