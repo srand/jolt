@@ -92,6 +92,7 @@ from jolt.pkgs import mesa
 from jolt.pkgs import mpc
 from jolt.pkgs import mpfr
 from jolt.pkgs import mstch
+from jolt.pkgs import musl
 from jolt.pkgs import mysql
 from jolt.pkgs import nasm
 from jolt.pkgs import ncurses
@@ -308,6 +309,7 @@ class Default(Alias):
         "libxkbcommon",
         "linux-headers",
         "mesa",
+        "musl",
         "numactl",
         "vulkan-loader",
         "wayland",
