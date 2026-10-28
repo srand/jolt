@@ -30,9 +30,11 @@ class Libusb(autotools.Autotools):
             LDFLAGS=tools.run("pkg-config --libs-only-L libudev").strip() + " " + tools.getenv("LDFLAGS", ""),
         ):
             super().run(deps, tools)
-        # Let pkg-config find libudev, which is not installed on the system
+        # Let pkg-config find libudev, which is not installed on the system.
+        # A static library is useless without it, also without --static.
+        requires = "Requires.private" if self.shared else "Requires"
         with tools.cwd(tools.autotools().installdir, "jolt-prefix", "lib", "pkgconfig"):
-            tools.replace_in_file("libusb-1.0.pc", "Libs.private: -ludev", "Requires.private: libudev\nLibs.private:")
+            tools.replace_in_file("libusb-1.0.pc", "Libs.private: -ludev", requires + ": libudev\nLibs.private:")
 
     def publish(self, artifact, tools):
         super().publish(artifact, tools)
