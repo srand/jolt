@@ -12,7 +12,7 @@ from jolt.tasks import TaskRegistry
 @cxxinfo.publish()
 class LibjpegTurbo(cmake.CMake):
     name = "libjpeg-turbo"
-    version = Parameter("3.2.0", help="libjpeg-turbo version.")
+    version = Parameter("3.2.1", help="libjpeg-turbo version.")
     pic = BooleanParameter(False, help="Build with position independent code.")
     shared = BooleanParameter(False, help="Build shared libraries.")
     requires_git = ["git:url=https://github.com/libjpeg-turbo/libjpeg-turbo.git,rev={version}"]
