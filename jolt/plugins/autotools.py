@@ -1,4 +1,4 @@
-from jolt import Task, attributes
+from jolt import Task, attributes, utils
 
 
 @attributes.common_metadata()
@@ -31,7 +31,7 @@ class Autotools(Task):
 
     def run(self, deps, tools):
         self.deps = deps
-        options = tools.expand(self.options)
+        options = tools.expand(self._options())
         at = tools.autotools(deps, incremental=self.incremental)
         at.configure(self.srcdir or self.joltdir, *options)
         at.build()
@@ -40,6 +40,23 @@ class Autotools(Task):
     def publish(self, artifact, tools):
         at = tools.autotools(incremental=self.incremental)
         at.publish(artifact)
+
+    def _options(self):
+        return self.options
+
+
+def options(attrib):
+    """
+    Decorates an Autotools task with an alternative ``options`` attribute.
+
+    The new attribute will be concatenated with the regular
+    ``options`` attribute.
+
+    Args:
+        attrib (str): Name of alternative attribute.
+            Keywords are expanded.
+    """
+    return utils.concat_attributes("options", attrib)
 
 
 def requires(autoconf=True, automake=True, libtool=True):
