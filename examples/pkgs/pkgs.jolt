@@ -6,6 +6,7 @@ from jolt.pkgs import alsa_lib
 from jolt.pkgs import asio
 from jolt.pkgs import autoconf
 from jolt.pkgs import automake
+from jolt.pkgs import binutils
 from jolt.pkgs import bison
 from jolt.pkgs import blake3
 from jolt.pkgs import boost
@@ -263,6 +264,7 @@ class Default(Alias):
         "asio",
         "autoconf",
         "automake",
+        "binutils",
         "bison",
         "cyrus-sasl",
         "dbus",
