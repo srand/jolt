@@ -27,6 +27,8 @@ class Glibc(Task):
     requires_tools = ["bison"]
     """ Tools used to build the library. """
     srcdir = "{fetch[src]}/glibc-{version}"
+    selfsustained = True
+    """ Consumers of the library don't need the compiler that built it. """
 
     @property
     def _variant(self):
@@ -48,6 +50,8 @@ class Glibc(Task):
             tools.run("make DESTDIR={installdir} install")
         # The kernel headers are part of the system root
         tools.run("cp -a {}/usr/include/. {installdir}/usr/include/", headers)
+        # Programs look for the dynamic linker in /lib
+        tools.symlink("usr/lib", "{installdir}/lib")
 
     def publish(self, artifact, tools):
         with tools.cwd(self.installdir):
