@@ -26,6 +26,8 @@ class Curl(cmake.CMake):
     srcdir = "{git[curl]}"
     options = [
         "BUILD_SHARED_LIBS={shared[ON,OFF]}",
+        # LDAP would be found on the build host
+        "CURL_DISABLE_LDAP=ON",
         "CURL_USE_LIBPSL=OFF",
         "USE_LIBIDN2=OFF",
         "OPENSSL_USE_STATIC_LIBS={shared[OFF,ON]}",
