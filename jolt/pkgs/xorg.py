@@ -1,5 +1,5 @@
 from jolt import attributes, Parameter, Task
-from jolt.plugins import fetch, autotools, libtool, pkgconfig
+from jolt.plugins import fetch, autotools, libtool, meson, pkgconfig
 from jolt.tasks import TaskRegistry
 
 
@@ -346,6 +346,76 @@ class LibX11Xcb(Task):
             artifact.collect("*", symlinks=True)
 
 
+@attributes.requires("requires_src")
+@meson.requires()
+class Xorgproto(meson.Meson):
+    """ Combined X.Org X11 protocol headers """
+
+    name = "xorg/xorgproto"
+    version = Parameter("2026.1", help="xorgproto version.")
+    requires_src = ["fetch:alias=src,url=https://www.x.org/releases/individual/proto/xorgproto-{version}.tar.xz"]
+    srcdir = "{fetch[src]}/xorgproto-{version}"
+
+
+@attributes.requires("requires_macros")
+@attributes.requires("requires_src")
+@attributes.requires("requires_x11")
+@attributes.requires("requires_xorgproto")
+@autotools.requires()
+@pkgconfig.requires()
+@libtool.relocate()
+class Libxfixes(autotools.Autotools):
+    name = "xorg/libxfixes"
+    version = Parameter("6.0.2", help="libXfixes version.")
+    requires_macros = ["xorg/macros"]
+    requires_src = ["fetch:alias=src,url=https://www.x.org/releases/individual/lib/libXfixes-{version}.tar.xz"]
+    requires_x11 = ["xorg/libx11"]
+    requires_xorgproto = ["xorg/xorgproto"]
+    srcdir = "{fetch[src]}/libXfixes-{version}"
+
+
+@attributes.requires("requires_macros")
+@attributes.requires("requires_src")
+@attributes.requires("requires_x11")
+@attributes.requires("requires_xext")
+@attributes.requires("requires_xfixes")
+@attributes.requires("requires_xorgproto")
+@autotools.requires()
+@pkgconfig.requires()
+@libtool.relocate()
+class Libxi(autotools.Autotools):
+    name = "xorg/libxi"
+    version = Parameter("1.8.4", help="libXi version.")
+    requires_macros = ["xorg/macros"]
+    requires_src = ["fetch:alias=src,url=https://www.x.org/releases/individual/lib/libXi-{version}.tar.xz"]
+    requires_x11 = ["xorg/libx11"]
+    requires_xext = ["xorg/libxext"]
+    requires_xfixes = ["xorg/libxfixes"]
+    requires_xorgproto = ["xorg/xorgproto"]
+    srcdir = "{fetch[src]}/libXi-{version}"
+
+
+@attributes.requires("requires_macros")
+@attributes.requires("requires_src")
+@attributes.requires("requires_x11")
+@attributes.requires("requires_xext")
+@attributes.requires("requires_xi")
+@attributes.requires("requires_xorgproto")
+@autotools.requires()
+@pkgconfig.requires()
+@libtool.relocate()
+class Libxtst(autotools.Autotools):
+    name = "xorg/libxtst"
+    version = Parameter("1.2.6", help="libXtst version.")
+    requires_macros = ["xorg/macros"]
+    requires_src = ["fetch:alias=src,url=https://www.x.org/releases/individual/lib/libXtst-{version}.tar.xz"]
+    requires_x11 = ["xorg/libx11"]
+    requires_xext = ["xorg/libxext"]
+    requires_xi = ["xorg/libxi"]
+    requires_xorgproto = ["xorg/xorgproto"]
+    srcdir = "{fetch[src]}/libXtst-{version}"
+
+
 TaskRegistry.get().add_task_class(Glproto)
 TaskRegistry.get().add_task_class(Inputproto)
 TaskRegistry.get().add_task_class(Kbproto)
@@ -368,3 +438,7 @@ TaskRegistry.get().add_task_class(Xrandr)
 TaskRegistry.get().add_task_class(Xrender)
 TaskRegistry.get().add_task_class(Xtrans)
 TaskRegistry.get().add_task_class(Libxshmfence)
+TaskRegistry.get().add_task_class(Libxfixes)
+TaskRegistry.get().add_task_class(Libxi)
+TaskRegistry.get().add_task_class(Libxtst)
+TaskRegistry.get().add_task_class(Xorgproto)
