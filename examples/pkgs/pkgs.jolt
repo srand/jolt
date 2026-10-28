@@ -6,6 +6,7 @@ from jolt.pkgs import alsa_lib
 from jolt.pkgs import asio
 from jolt.pkgs import autoconf
 from jolt.pkgs import automake
+from jolt.pkgs import b2
 from jolt.pkgs import binutils
 from jolt.pkgs import bison
 from jolt.pkgs import blake3
@@ -58,18 +59,22 @@ from jolt.pkgs import inja
 from jolt.pkgs import jsoncpp
 from jolt.pkgs import krb5
 from jolt.pkgs import libarchive
+from jolt.pkgs import libcap
 from jolt.pkgs import libdrm
+from jolt.pkgs import libedit
 from jolt.pkgs import libevent
 from jolt.pkgs import libexpat
 from jolt.pkgs import libfastjson
 from jolt.pkgs import libffi
 from jolt.pkgs import libglvnd
 from jolt.pkgs import libjpeg_turbo
+from jolt.pkgs import libogg
 from jolt.pkgs import libpciaccess
 from jolt.pkgs import libpng
 from jolt.pkgs import libseccomp
 from jolt.pkgs import libsodium
 from jolt.pkgs import libtiff
+from jolt.pkgs import libtirpc
 from jolt.pkgs import libtool
 from jolt.pkgs import libudev_zero
 from jolt.pkgs import libunwind
@@ -90,6 +95,7 @@ from jolt.pkgs import m4
 from jolt.pkgs import magic_enum
 from jolt.pkgs import make
 from jolt.pkgs import mesa
+from jolt.pkgs import meson
 from jolt.pkgs import mpc
 from jolt.pkgs import mpfr
 from jolt.pkgs import mstch
@@ -153,6 +159,7 @@ from jolt.pkgs import zstd
 class Default(Alias):
     requires = [
         "abseil",
+        "b2",
         "blake3",
         "boost",
         "boringssl",
@@ -204,6 +211,7 @@ class Default(Alias):
         "libexpat",
         "libjpeg-turbo",
         "libmysqlclient",
+        "libogg",
         "libpng",
         "libsodium",
         "libtiff",
@@ -219,6 +227,7 @@ class Default(Alias):
         "lua",
         "lz4",
         "magic_enum",
+        "meson",
         "mstch",
         "nasm",
         "ng-log",
@@ -281,6 +290,7 @@ class Default(Alias):
         "gmp",
         "gperf",
         "krb5",
+        "libedit",
         "libfastjson",
         "libtool",
         "libunwind",
@@ -303,11 +313,13 @@ class Default(Alias):
         "gcc/glibc:target=aarch64-linux-gnu",
         "gcc/musl:target=aarch64-linux-musl",
         "glibc",
+        "libcap",
         "libdrm",
         "libffi",
         "libglvnd",
         "libpciaccess",
         "libseccomp",
+        "libtirpc",
         "libudev-zero",
         "libusb",
         "libxkbcommon",
