@@ -44,6 +44,50 @@ class ToolsInternal(JoltTest):
         with t.environ(JOLT_THREADS="5"):
             self.assertEqual(t.thread_count(), 5)
 
+    @patch("jolt.config.get", return_value="3")
+    def test_make_jobs_without_jobserver(self, _):
+        t = tools.Tools()
+        with t.environ(MAKEFLAGS=None):
+            self.assertEqual(t.make_jobs(), "-j3")
+            self.assertEqual(t.make_jobs(5), "-j5")
+        with t.environ(MAKEFLAGS="-k"):
+            self.assertEqual(t.make_jobs(), "-j3")
+
+    def test_make_jobs_with_jobserver(self):
+        t = tools.Tools()
+        with t.environ(MAKEFLAGS="--jobserver-auth=fifo:/dev/jobserver"):
+            self.assertEqual(t.make_jobs(), "")
+            self.assertEqual(t.make_jobs(5), "")
+        # Make before 4.2
+        with t.environ(MAKEFLAGS=" -j --jobserver-fds=3,4"):
+            self.assertEqual(t.make_jobs(), "")
+
+    def build_helper(self, cls, make_jobs):
+        t = MagicMock()
+        t.make_jobs.return_value = make_jobs
+        return cls(None, t), t
+
+    @patch("jolt.log.is_verbose", return_value=False)
+    def test_autotools_build_jobs(self, _):
+        at, t = self.build_helper(tools._AutoTools, "-j4")
+        at.build()
+        self.assertEqual(t.run.call_args.args[1:3], ("-j4", ""))
+        at, t = self.build_helper(tools._AutoTools, "")
+        at.build("all-gcc", "all-target-libgcc")
+        self.assertEqual(t.run.call_args.args[1:3], ("", "all-gcc all-target-libgcc"))
+
+    @patch("jolt.log.is_verbose", return_value=False)
+    def test_cmake_build_jobs(self, _):
+        cm, t = self.build_helper(tools._CMake, "")
+        cm.build()
+        self.assertEqual(t.run.call_args.args[2], "")
+        cm, t = self.build_helper(tools._CMake, "-j4")
+        cm.build()
+        self.assertEqual(t.run.call_args.args[2], "-j4")
+        # An explicit number of threads wins over the jobserver
+        cm.build(threads=2)
+        self.assertEqual(t.run.call_args.args[2], "-j2")
+
     def test_reader_is_daemon(self):
         stream = MagicMock()
         stream.readline.side_effect = [b"output\n", b""]

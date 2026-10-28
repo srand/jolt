@@ -1,0 +1,104 @@
+import copy
+import sys
+sys.path.append(".")
+
+from testsupport import JoltTest
+from jolt.pkgs import gcc
+from jolt.tasks import ParameterValueError
+
+
+class PkgsInternal(JoltTest):
+    name = "int/pkgs"
+
+    def assertTargets(self, accepts, targets):
+        for target in targets:
+            with self.subTest(target=target):
+                self.assertTrue(accepts(target), target)
+
+    def assertNotTargets(self, accepts, targets):
+        for target in targets:
+            with self.subTest(target=target):
+                self.assertFalse(accepts(target), target)
+
+    def test_gcc_glibc_targets(self):
+        accepts = gcc.targets(gcc.GLIBC_TARGETS)
+        self.assertTargets(accepts, [
+            "aarch64-linux-gnu",
+            "arm-linux-gnueabihf",
+            "armv7l-unknown-linux-gnueabi",
+            "csky-linux-gnuabiv2",
+            "mips64el-linux-gnuabi64",
+            "powerpc64le-linux-gnu",
+            "riscv64-unknown-linux-gnu",
+            "x86_64-linux-gnux32",
+            "x86_64-pc-linux-gnu",
+        ])
+        self.assertNotTargets(accepts, [
+            "aarch64-linux",
+            "aarch64-linux-gnueabihf",
+            "aarch64-linux-musl",
+            "aarch64-a-b-linux-gnu",
+            "arm-linux-gnu",
+            "arm-none-eabi",
+            "csky-linux-gnu",
+            "i386-linux-gnu",
+            "mips-linux-gnuabi64",
+            "x86_64-linux-android",
+        ])
+
+    def test_gcc_musl_targets(self):
+        accepts = gcc.targets(gcc.MUSL_TARGETS)
+        self.assertTargets(accepts, [
+            "aarch64-linux-musl",
+            "arm-linux-musleabihf",
+            "i386-linux-musl",
+            "mips64-linux-muslabi64",
+            "x86_64-linux-muslx32",
+            "x86_64-pc-linux-musl",
+        ])
+        self.assertNotTargets(accepts, [
+            "aarch64-linux-gnu",
+            "arm-linux-musl",
+            "arm-none-eabi",
+            "sparc-linux-musl",
+        ])
+
+    def test_gcc_baremetal_targets(self):
+        accepts = gcc.targets(gcc.BAREMETAL_TARGETS)
+        self.assertTargets(accepts, [
+            "aarch64-none-elf",
+            "arm-none-eabi",
+            "arm-none-eabihf",
+            "msp430-elf",
+            "powerpc-eabi",
+            "riscv64-unknown-elf",
+            "xtensa-esp32-elf",
+        ])
+        self.assertNotTargets(accepts, [
+            "aarch64-linux-gnu",
+            "aarch64-none-eabi",
+            "arm-none-elf",
+            "avr",
+            "foo-none-elf",
+            "riscv64-linux-elf",
+            "x86_64-w64-mingw32",
+        ])
+
+    def assertTargetParameter(self, cls, target, valid=True):
+        # A copy, since the parameter is shared by all instances of the class
+        parameter = copy.deepcopy(cls.target)
+        if valid:
+            parameter.set_value(target)
+        else:
+            with self.assertRaises(ParameterValueError):
+                parameter.set_value(target)
+
+    def test_gcc_target_parameters(self):
+        # The compilers of C libraries accept only targets of their library
+        self.assertTargetParameter(gcc.Gcc, "arm-none-eabi")
+        self.assertTargetParameter(gcc.Gcc, "aarch64-linux-musl")
+        self.assertTargetParameter(gcc.GccGlibc, "aarch64-linux-gnu")
+        self.assertTargetParameter(gcc.GccMusl, "aarch64-linux-musl")
+        self.assertTargetParameter(gcc.Gcc, "aarch64-none-eabi", valid=False)
+        self.assertTargetParameter(gcc.GccGlibc, "aarch64-linux-musl", valid=False)
+        self.assertTargetParameter(gcc.GccMusl, "aarch64-linux-gnu", valid=False)

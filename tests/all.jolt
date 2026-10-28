@@ -35,6 +35,7 @@ class All(Alias):
         "int/influence",
         "int/loader",
         "int/log",
+        "int/pkgs",
         "int/tools",
         "int/utils",
         "nfr",
