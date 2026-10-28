@@ -44,6 +44,7 @@ from jolt.pkgs import googlebenchmark
 from jolt.pkgs import googletest
 from jolt.pkgs import gperf
 from jolt.pkgs import grpc
+from jolt.pkgs import harfbuzz
 from jolt.pkgs import hdf5
 from jolt.pkgs import help2man
 from jolt.pkgs import inja
@@ -174,6 +175,7 @@ class Default(Alias):
         "grpc",
         "grpc/c",
         "grpc/c++",
+        "harfbuzz",
         "hdf5",
         "help2man",
         "inja",
