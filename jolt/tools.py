@@ -617,7 +617,9 @@ class _Meson(object):
             for name in ["build.ninja", "compile_commands.json"]:
                 fs.unlink(fs.path.join(self.builddir, name), ignore_errors=True)
 
-        self.tools.run("meson setup --prefix={0} {1} {2} {3}", self.prefix, sourcedir, self.builddir, options,
+        # Install libraries in lib, like other build systems, rather than in a
+        # directory named after the platform on some Linux distributions
+        self.tools.run("meson setup --prefix={0} --libdir=lib {1} {2} {3}", self.prefix, sourcedir, self.builddir, options,
                        output=True)
         stamp.update()
 

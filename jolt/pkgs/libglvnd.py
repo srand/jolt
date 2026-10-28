@@ -24,7 +24,7 @@ class Libglvnd(meson.Meson):
     def publish(self, artifact, tools):
         super().publish(artifact, tools)
         artifact.environ.CMAKE_PREFIX_PATH.append(".")
-        artifact.environ.LD_LIBRARY_PATH.append("lib/{arch}-linux-gnu")
+        artifact.environ.LD_LIBRARY_PATH.append("lib")
 
 
 TaskRegistry.get().add_task_class(Libglvnd)
