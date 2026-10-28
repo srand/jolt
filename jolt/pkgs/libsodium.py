@@ -6,7 +6,7 @@ from jolt.tasks import TaskRegistry
 @attributes.requires("requires_src")
 @cxxinfo.publish(libraries=["sodium"])
 class Libsodium(autotools.Autotools):
-    """ Library for encryption, decryption, signatures and password hashing """
+    """ Library for encryption, decryption, signatures and password hashing, including Argon2 """
 
     name = "libsodium"
     version = Parameter("1.0.22", help="libsodium version.")
