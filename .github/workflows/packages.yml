@@ -1,0 +1,136 @@
+name: Packages
+
+# Builds all packages of examples/pkgs on Linux, macOS and Windows. The build
+# keeps going past failures, so that every package that can be built is built.
+# The Jolt cache is saved after every run, also when the build fails or times
+# out, so that the next run continues where the previous one stopped.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [master]
+    paths:
+      - "jolt/pkgs/**"
+      - "examples/pkgs/**"
+      - ".github/workflows/packages.yml"
+
+concurrency:
+  group: packages-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 360
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            fstree: fstree-linux-x86_64
+          - os: macos-latest
+            fstree: fstree-darwin-x86_64
+          - os: windows-latest
+            fstree: fstree-windows-x86_64.exe
+    defaults:
+      run:
+        shell: bash
+    env:
+      JOLT_CACHE: ${{ github.workspace }}/cache
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Free disk space
+        if: runner.os == 'Linux'
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          df -h /
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install build tools
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential \
+            cmake \
+            git \
+            make \
+            ninja-build
+
+      - name: Install Rosetta
+        if: runner.os == 'macOS'
+        run: softwareupdate --install-rosetta --agree-to-license
+
+      - name: Set up MSVC
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Install Jolt
+        run: pip install --upgrade -e .
+
+      - name: Install fstree
+        run: |
+          FSTREE_VERSION=$(sed -n 's/^fstree_version = "\(.*\)"$/\1/p' build.jolt)
+          test -n "$FSTREE_VERSION"
+          mkdir -p "$RUNNER_TEMP/bin"
+          out="$RUNNER_TEMP/bin/fstree"
+          if [ "$RUNNER_OS" = "Windows" ]; then out="$out.exe"; fi
+          curl -fsSL -o "$out" \
+            "https://github.com/srand/fstree/releases/download/${FSTREE_VERSION}/${{ matrix.fstree }}"
+          chmod 0755 "$out"
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+
+      - name: Restore Jolt cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ env.JOLT_CACHE }}
+          key: jolt-packages-${{ runner.os }}-${{ github.run_id }}
+          restore-keys: jolt-packages-${{ runner.os }}-
+
+      - name: Build packages
+        working-directory: examples/pkgs
+        # Leaves time to save the cache before the job is stopped
+        timeout-minutes: 330
+        run: |
+          set -o pipefail
+          jolt -c jolt.cachedir="$JOLT_CACHE" -c jolt.cachesize=1T build -k default 2>&1 | tee "$RUNNER_TEMP/jolt.log"
+
+      - name: Summarize
+        if: always()
+        run: |
+          {
+            echo "## Packages on ${{ matrix.os }}"
+            if grep -q "List of failed tasks" "$RUNNER_TEMP/jolt.log" 2>/dev/null; then
+              echo "Failed tasks:"
+              echo '```'
+              sed -n '/List of failed tasks/,$p' "$RUNNER_TEMP/jolt.log" | grep -E "^\[ *ERROR\] - " | sed 's/^\[ *ERROR\] - //'
+              echo '```'
+            elif grep -q "Total execution time" "$RUNNER_TEMP/jolt.log" 2>/dev/null; then
+              echo "All packages were built."
+            else
+              echo "The build didn't finish, see the log."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jolt-log-${{ runner.os }}
+          path: ${{ runner.temp }}/jolt.log
+          if-no-files-found: ignore
+
+      - name: Save Jolt cache
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ env.JOLT_CACHE }}
+          key: jolt-packages-${{ runner.os }}-${{ github.run_id }}
