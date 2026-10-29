@@ -1,9 +1,11 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
 	"runtime"
 
+	"github.com/srand/jolt/scheduler/pkg/auth"
 	"github.com/srand/jolt/scheduler/pkg/cache"
 	"github.com/srand/jolt/scheduler/pkg/log"
 	"github.com/srand/jolt/scheduler/pkg/utils"
@@ -69,6 +71,11 @@ var rootCmd = &cobra.Command{
 			log.Fatal(err)
 		}
 
+		authenticator, err := auth.New(config.Auth, cache.Permissions...)
+		if err != nil {
+			log.Fatal(err)
+		}
+
 		if config.ListenGrpc == nil || len(config.ListenGrpc) == 0 {
 			config.ListenGrpc = []string{"tcp://:9090"}
 		}
@@ -77,10 +84,10 @@ var rootCmd = &cobra.Command{
 		// the parsed trees it keeps in memory.
 		service := cache.NewCacheService(lru, config.TreeCacheSize())
 		for _, address := range config.ListenGrpc {
-			go serveGrpc(service, address)
+			go serveGrpc(service, authenticator, address)
 		}
 
-		handler := cache.NewHttpHandler(lru, service)
+		handler := authenticator.HttpHandler(cache.NewHttpHandler(lru, service), cache.HttpPermission)
 
 		if config.Listen == nil || len(config.Listen) == 0 {
 			if config.Insecure {
@@ -116,7 +123,37 @@ var rootCmd = &cobra.Command{
 	},
 }
 
+var tokenCmd = &cobra.Command{
+	Use:   "token [name]",
+	Short: "Create a token for a client",
+	Long: `Create a random token for a client and print the entry that grants
+it permissions in the configuration. Only the hash of the token is
+stored in the configuration.`,
+	Args: cobra.MaximumNArgs(1),
+	// The configuration of the server isn't needed
+	PersistentPreRun: func(cmd *cobra.Command, args []string) {},
+	Run: func(cmd *cobra.Command, args []string) {
+		name := "client"
+		if len(args) > 0 {
+			name = args[0]
+		}
+		token, err := auth.NewToken()
+		if err != nil {
+			log.Fatal(err)
+		}
+		fmt.Printf("Token: %s\n\n", token)
+		fmt.Println("Add the token to the auth section of cache.yaml:")
+		fmt.Println()
+		fmt.Println("auth:")
+		fmt.Println("  tokens:")
+		fmt.Printf("    - name: %s\n", name)
+		fmt.Printf("      sha256: %s\n", auth.HashToken(token))
+		fmt.Println("      permissions: [read, write]")
+	},
+}
+
 func init() {
+	rootCmd.AddCommand(tokenCmd)
 	rootCmd.Flags().StringP("cert", "c", "", "TLS server certificate file")
 	rootCmd.Flags().StringP("cert-key", "k", "", "TLS private key file")
 	rootCmd.Flags().StringP("expiration", "e", "0", "Artifact expiration timeout (e.g., 72h, 30m)")

@@ -5,6 +5,7 @@ import (
 	"net"
 	"net/url"
 
+	"github.com/srand/jolt/scheduler/pkg/auth"
 	"github.com/srand/jolt/scheduler/pkg/cache"
 	"github.com/srand/jolt/scheduler/pkg/log"
 	"google.golang.org/grpc"
@@ -12,7 +13,7 @@ import (
 )
 
 // Sets up a gRPC server on a specific listening address and starts it.
-func serveGrpc(service cache.CacheServiceServer, address string) {
+func serveGrpc(service cache.CacheServiceServer, authenticator *auth.Authenticator, address string) {
 	// Parse URI
 	uri, err := url.Parse(address)
 	if err != nil {
@@ -49,6 +50,7 @@ func serveGrpc(service cache.CacheServiceServer, address string) {
 
 	// Setup gRPC options
 	opts := config.GRPCOptions.ToServerOptions()
+	opts = append(opts, authenticator.ServerOptions(cache.GrpcPermission)...)
 
 	// Setup gRPC server
 	server := grpc.NewServer(opts...)

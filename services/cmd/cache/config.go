@@ -3,12 +3,16 @@ package main
 import (
 	"time"
 
+	"github.com/srand/jolt/scheduler/pkg/auth"
 	"github.com/srand/jolt/scheduler/pkg/log"
 	"github.com/srand/jolt/scheduler/pkg/utils"
 )
 
 type Config struct {
 	utils.GRPCOptions `mapstructure:"grpc"`
+
+	// Tokens of clients and their permissions.
+	Auth auth.Config `mapstructure:"auth"`
 
 	// Path to server certificate
 	Certificate string `mapstructure:"cert"`
@@ -73,6 +77,7 @@ func (c *Config) ExpirationTime() time.Duration {
 
 func (c *Config) Log() {
 	log.Info("Cache configuration:")
+	log.Infof("  auth = %s", c.Auth.String())
 	log.Infof("  cert = %s", c.Certificate)
 	log.Infof("  cert_key = %s", c.PrivateKey)
 	log.Infof("  expiration = %s", c.ExpirationTime())

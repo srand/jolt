@@ -1072,6 +1072,57 @@ Example:
       keepalive_time: "2h"
       keepalive_timeout: "20s"
 
+.. _configuration-services-cache-auth:
+
+Authentication
+""""""""""""""
+
+Clients authenticate with tokens, which grant ``read`` and ``write``
+permissions. Reading is required to download and look up artifacts, writing
+to upload them. Without tokens in the configuration, all clients may read and
+write. With tokens, clients without a token have no permissions unless
+``auth.anonymous`` grants them some.
+
+The ``jolt-cache token <name>`` command creates a random token and prints the
+entry for the configuration. Only the SHA-256 hash of the token is stored in
+the configuration. Clients send the token as a bearer token, or as the
+password of basic authentication. Use HTTPS, since the token authenticates
+anyone who sees it.
+
+  .. list-table::
+    :widths: 30 10 60
+    :header-rows: 1
+    :class: tight-table
+
+    * - Config File Key
+      - Type
+      - Description
+
+    * - ``auth.anonymous``
+      - List
+      - | Permissions of clients without a token.
+        | Default: ``[read, write]`` without tokens, ``[]`` with tokens.
+
+    * - ``auth.tokens``
+      - List
+      - | Tokens accepted from clients. Each token has a ``name``, used in logs,
+          the ``sha256`` hash of the token and a list of ``permissions``.
+
+Example, where anyone may download artifacts but only CI may upload them:
+
+  .. code:: yaml
+
+    # /etc/jolt/cache.yaml
+    auth:
+      anonymous: [read]
+      tokens:
+        - name: ci
+          sha256: 31f69e6b9c24b00832b59b38a340b5346185c93eb9bb6bb54b2ef985aafdcb8f
+          permissions: [read, write]
+
+CI then configures the token with the ``JOLT_CACHE_TOKEN`` environment
+variable, or with ``token`` in the ``cache`` section of the Jolt configuration.
+
 
 Dashboard
 ^^^^^^^^^
