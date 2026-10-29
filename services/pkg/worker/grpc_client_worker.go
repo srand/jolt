@@ -3,25 +3,22 @@ package worker
 import (
 	"github.com/srand/jolt/scheduler/pkg/auth"
 	"github.com/srand/jolt/scheduler/pkg/protocol"
-	"github.com/srand/jolt/scheduler/pkg/utils"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 )
 
 func NewWorkerClient(workerConfig *WorkerConfig) (protocol.WorkerClient, error) {
-	dialOptions := []grpc.DialOption{
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-	}
-
-	dialOptions = append(dialOptions, workerConfig.Grpc.ToDialOptions()...)
-	dialOptions = append(dialOptions, auth.DialOptions(workerConfig.SchedulerToken)...)
-
-	grpcUri, err := utils.ParseGrpcUrl(workerConfig.SchedulerGrpcUri)
+	target, dialOptions, err := auth.DialOptions(workerConfig.SchedulerGrpcUri, auth.ClientOptions{
+		CACert:             workerConfig.CACert,
+		Token:              workerConfig.SchedulerToken,
+		AllowInsecureToken: workerConfig.AllowInsecureToken,
+	})
 	if err != nil {
 		return nil, err
 	}
 
-	conn, err := grpc.Dial(grpcUri, dialOptions...)
+	dialOptions = append(dialOptions, workerConfig.Grpc.ToDialOptions()...)
+
+	conn, err := grpc.Dial(target, dialOptions...)
 	if err != nil {
 		return nil, err
 	}

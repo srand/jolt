@@ -16,6 +16,7 @@ import (
 
 	"github.com/klauspost/compress/gzip"
 	"github.com/klauspost/compress/zstd"
+	"github.com/srand/jolt/scheduler/pkg/auth"
 	"github.com/srand/jolt/scheduler/pkg/log"
 	"github.com/srand/jolt/scheduler/pkg/protocol"
 	"github.com/srand/jolt/scheduler/pkg/scheduler"
@@ -384,7 +385,7 @@ func (w *worker) deployClient(client *protocol.Client, workspace *protocol.Works
 
 		log.Info("Deploying client from URL:", url)
 
-		response, err := http.Get(url)
+		response, err := w.httpGet(url)
 		if err != nil {
 			os.RemoveAll(deployPath)
 			return "", err
@@ -575,6 +576,30 @@ func (w *worker) nsWrapperCmd(clientWs, clientCache string) ([]string, []string)
 	os.MkdirAll(clientWs, 0777)
 
 	return cmd, config
+}
+
+// Downloads a file, from the cache with its token if there is one.
+func (w *worker) httpGet(url string) (*http.Response, error) {
+	tlsConfig, err := auth.TLSConfig(w.config.CACert)
+	if err != nil {
+		return nil, err
+	}
+	client := &http.Client{Transport: &http.Transport{Proxy: http.ProxyFromEnvironment, TLSClientConfig: tlsConfig}}
+
+	request, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	if w.config.CacheToken != "" && w.config.CacheHttpUri != "" && strings.HasPrefix(url, w.config.CacheHttpUri) {
+		if strings.HasPrefix(url, "https://") || w.config.AllowInsecureToken {
+			request.Header.Set("Authorization", "Bearer "+w.config.CacheToken)
+		} else {
+			log.Warn("Not sending the cache token without TLS to", url)
+		}
+	}
+
+	return client.Do(request)
 }
 
 func (w *worker) runCmd(workdir string, args ...string) error {

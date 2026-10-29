@@ -53,6 +53,14 @@ func serveGrpc(sched scheduler.Scheduler, events *scheduler.EventHub, stash logs
 	opts := config.GRPCOptions.ToServerOptions()
 	opts = append(opts, authenticator.ServerOptions(scheduler.GrpcPermission)...)
 
+	if config.Secure() {
+		creds, err := auth.ServerCredentials(config.Certificate, config.PrivateKey)
+		if err != nil {
+			log.Fatal(err)
+		}
+		opts = append(opts, creds)
+	}
+
 	// Setup gRPC server
 	server := grpc.NewServer(opts...)
 	protocol.RegisterSchedulerServer(server, scheduler.NewSchedulerService(sched))

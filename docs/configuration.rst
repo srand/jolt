@@ -962,6 +962,22 @@ All Jolt services can be deployed using container images. The following
 sections detail how to configure the services using environment variables
 and/or configuration files.
 
+.. _configuration-services-tls:
+
+TLS
+^^^
+
+The cache and the scheduler serve TLS on both HTTP and gRPC when they are
+configured with a certificate and private key. Clients connect with TLS to
+``https://`` and ``tls://`` URIs, and verify the certificates of services
+with the authorities of the system, or with those in a PEM file configured
+with ``ca_cert`` or ``JOLT_CA_CERT``, such as a private authority. The tokens
+of services are only sent over TLS, unless ``allow_insecure_token`` or
+``JOLT_ALLOW_INSECURE_TOKEN`` explicitly allows sending them without it.
+
+Jolt, its workers, ``schedulerctl``, fstree and the dashboard all use these
+settings.
+
 .. _configuration-services-cache:
 
 Cache
@@ -1013,8 +1029,8 @@ The cache service can be configured using environment variables and/or a configu
     * - ``JOLT_CACHE_INSECURE``
       - ``insecure``
       - Boolean
-      - | If set to ``true``, the cache will not use HTTPS, even if a certificate
-          and key are provided.
+      - | If set to ``true``, the cache will not use TLS for HTTP or gRPC, even if a
+          certificate and key are provided. Otherwise, both use the certificate.
         | Default: ``false``
 
     * - ``JOLT_CACHE_LISTEN_GRPC``
@@ -1267,6 +1283,16 @@ The scheduler can be configured using environment variables and/or a configurati
       - Config File Key
       - Description
 
+    * - ``-``
+      - ``cert``
+      - | The path to the server certificate file, also set with ``--cert``.
+          gRPC and HTTP use TLS when a certificate and private key are configured.
+
+    * - ``-``
+      - ``cert_key``
+      - | The path to the private key of the server certificate, also set with
+          ``--cert-key``.
+
     * - ``JOLT_SCHEDULER_LISTEN_GRPC``
       - ``listen_grpc``
       - | The address and port on which the scheduler will listen for gRPC requests.
@@ -1368,9 +1394,8 @@ of the :ref:`cache <configuration-services-cache-auth>`, configured in the
 Logs are opened in a browser, which asks for a user name and password.
 The token is the password, and the user name is ignored.
 
-Create tokens with ``jolt-cache token <name>``. The scheduler doesn't use TLS
-for gRPC, so tokens are only protected on trusted networks or behind a
-proxy that terminates TLS.
+Create tokens with ``jolt-cache token <name>``. Clients only send tokens over
+TLS, see :ref:`configuration-services-tls`.
 
 Example:
 
@@ -1469,6 +1494,7 @@ The worker can be configured using environment variables and/or a configuration 
 
         | The format is ``<scheme>://<host>:<port>`` where accepted schemes are:
 
+        - ``tls`` for connections secured with TLS
         - ``tcp`` for either IPv4 or IPv6 connections
         - ``tcp4`` for IPv4 connections
         - ``tcp6`` for IPv6 connections
@@ -1540,6 +1566,18 @@ The worker can be configured using environment variables and/or a configuration 
           ``worker`` permission. See :ref:`configuration-services-scheduler-auth`.
 
         | The worker passes the token on to the executors it starts.
+
+    * - ``JOLT_CA_CERT``
+      - ``ca_cert``
+      - | PEM file with the certificates of the authorities that the certificates
+          of the services are verified with. The worker passes it on to the
+          executors it starts. See :ref:`configuration-services-tls`.
+
+    * - ``JOLT_ALLOW_INSECURE_TOKEN``
+      - ``allow_insecure_token``
+      - | Send tokens to services without TLS. The worker passes it on to the
+          executors it starts.
+        | Default: ``false``
 
     * - ``JOLT_CACHE_TOKEN``
       - ``cache_token``

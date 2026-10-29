@@ -57,10 +57,16 @@ var rootCmd = &cobra.Command{
 		}
 		workerConfig.Log()
 
-		// Executors inherit the tokens from the environment
+		// Executors inherit the tokens and TLS settings from the environment
+		allowInsecureToken := ""
+		if workerConfig.AllowInsecureToken {
+			allowInsecureToken = "true"
+		}
 		for name, value := range map[string]string{
-			"JOLT_CACHE_TOKEN":     workerConfig.CacheToken,
-			"JOLT_SCHEDULER_TOKEN": workerConfig.SchedulerToken,
+			"JOLT_ALLOW_INSECURE_TOKEN": allowInsecureToken,
+			"JOLT_CA_CERT":              workerConfig.CACert,
+			"JOLT_CACHE_TOKEN":          workerConfig.CacheToken,
+			"JOLT_SCHEDULER_TOKEN":      workerConfig.SchedulerToken,
 		} {
 			if value != "" {
 				os.Setenv(name, value)
@@ -101,6 +107,8 @@ func main() {
 	viper.SetEnvPrefix("jolt")
 	viper.AutomaticEnv()
 	// Settings only read from the environment or the configuration file
+	viper.BindEnv("allow_insecure_token")
+	viper.BindEnv("ca_cert")
 	viper.BindEnv("cache_token")
 	viper.BindEnv("scheduler_token")
 

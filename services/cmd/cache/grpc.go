@@ -52,6 +52,18 @@ func serveGrpc(service cache.CacheServiceServer, authenticator *auth.Authenticat
 	opts := config.GRPCOptions.ToServerOptions()
 	opts = append(opts, authenticator.ServerOptions(cache.GrpcPermission)...)
 
+	// gRPC uses TLS like HTTP, with the same certificate
+	if !config.Insecure {
+		if config.Certificate == "" || config.PrivateKey == "" {
+			log.Fatal("A TLS certificate and private key must be configured")
+		}
+		creds, err := auth.ServerCredentials(config.Certificate, config.PrivateKey)
+		if err != nil {
+			log.Fatal(err)
+		}
+		opts = append(opts, creds)
+	}
+
 	// Setup gRPC server
 	server := grpc.NewServer(opts...)
 	cache.RegisterCacheServiceServer(server, service)

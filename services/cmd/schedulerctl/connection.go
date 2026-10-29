@@ -6,21 +6,20 @@ import (
 	"time"
 
 	"github.com/srand/jolt/scheduler/pkg/auth"
-	"github.com/srand/jolt/scheduler/pkg/utils"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 )
 
 func NewSchedulerConn() *grpc.ClientConn {
-	opts := []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())}
-	opts = append(opts, auth.DialOptions(configData.SchedulerToken)...)
-
-	grpcHost, err := utils.ParseGrpcUrl(configData.SchedulerUri)
+	target, opts, err := auth.DialOptions(configData.SchedulerUri, auth.ClientOptions{
+		CACert:             configData.CACert,
+		Token:              configData.SchedulerToken,
+		AllowInsecureToken: configData.AllowInsecureToken,
+	})
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	conn, err := grpc.Dial(grpcHost, opts...)
+	conn, err := grpc.Dial(target, opts...)
 	if err != nil {
 		log.Fatal(err)
 	}

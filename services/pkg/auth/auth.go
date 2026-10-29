@@ -6,16 +6,22 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/base64"
 	"encoding/hex"
 	"errors"
 	"fmt"
 	"net/http"
+	"os"
 	"slices"
 	"strings"
 
+	"github.com/srand/jolt/scheduler/pkg/utils"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 )
@@ -216,24 +222,91 @@ func (a *Authenticator) ServerOptions(permission func(method string) Permission)
 	}
 }
 
-type tokenCredentials string
+type tokenCredentials struct {
+	token  string
+	secure bool
+}
 
 func (t tokenCredentials) GetRequestMetadata(ctx context.Context, uri ...string) (map[string]string, error) {
-	return map[string]string{"authorization": "Bearer " + string(t)}, nil
+	return map[string]string{"authorization": "Bearer " + t.token}, nil
 }
 
 func (t tokenCredentials) RequireTransportSecurity() bool {
-	// The services don't use TLS for gRPC yet
-	return false
+	return t.secure
 }
 
-// DialOptions returns gRPC dial options that send the token with each call,
-// or none if the token is empty.
-func DialOptions(token string) []grpc.DialOption {
-	if token == "" {
-		return nil
+// Options of clients that connect to a service.
+type ClientOptions struct {
+	// PEM file with the certificates of the authorities that the
+	// certificates of services are verified with, in addition to those of
+	// the system.
+	CACert string
+	// Token that authenticates the client.
+	Token string
+	// Send the token over connections without TLS.
+	AllowInsecureToken bool
+}
+
+// DialOptions returns the target and gRPC dial options for a connection to
+// a service with a tcp:// or tls:// URI. The token is sent with each call,
+// but only over TLS unless that is explicitly allowed.
+func DialOptions(uri string, options ClientOptions) (string, []grpc.DialOption, error) {
+	target, err := utils.ParseGrpcUrl(uri)
+	if err != nil {
+		return "", nil, err
 	}
-	return []grpc.DialOption{grpc.WithPerRPCCredentials(tokenCredentials(token))}
+
+	secure := strings.HasPrefix(uri, "tls://")
+	opts := []grpc.DialOption{}
+
+	if secure {
+		config, err := TLSConfig(options.CACert)
+		if err != nil {
+			return "", nil, err
+		}
+		opts = append(opts, grpc.WithTransportCredentials(credentials.NewTLS(config)))
+	} else {
+		opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	}
+
+	if options.Token != "" {
+		if !secure && !options.AllowInsecureToken {
+			return "", nil, fmt.Errorf("refusing to send a token to %s without TLS, use a tls:// URI", uri)
+		}
+		opts = append(opts, grpc.WithPerRPCCredentials(tokenCredentials{token: options.Token, secure: secure}))
+	}
+
+	return target, opts, nil
+}
+
+// TLSConfig returns the TLS configuration of clients, which verify the
+// certificates of services with the authorities of the system and those in
+// the PEM file, if any.
+func TLSConfig(caCert string) (*tls.Config, error) {
+	pool, err := x509.SystemCertPool()
+	if err != nil {
+		pool = x509.NewCertPool()
+	}
+	if caCert != "" {
+		data, err := os.ReadFile(caCert)
+		if err != nil {
+			return nil, err
+		}
+		if !pool.AppendCertsFromPEM(data) {
+			return nil, fmt.Errorf("no certificates in %s", caCert)
+		}
+	}
+	return &tls.Config{RootCAs: pool, MinVersion: tls.VersionTLS12}, nil
+}
+
+// ServerCredentials returns the gRPC server option that serves TLS with
+// the certificate and private key.
+func ServerCredentials(cert, key string) (grpc.ServerOption, error) {
+	creds, err := credentials.NewServerTLSFromFile(cert, key)
+	if err != nil {
+		return nil, err
+	}
+	return grpc.Creds(creds), nil
 }
 
 // NewToken returns a random token.

@@ -2,15 +2,29 @@ package auth
 
 import (
 	"context"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	"crypto/x509"
+	"crypto/x509/pkix"
 	"encoding/base64"
+	"encoding/pem"
+	"fmt"
+	"math/big"
+	"net"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 func permissions(p ...Permission) *[]Permission {
@@ -135,13 +149,98 @@ func TestAuthorizeContext(t *testing.T) {
 }
 
 func TestDialOptions(t *testing.T) {
-	assert.Empty(t, DialOptions(""))
-	assert.Len(t, DialOptions("token"), 1)
+	target, opts, err := DialOptions("tcp://scheduler", ClientOptions{})
+	assert.NoError(t, err)
+	assert.Equal(t, "scheduler:9090", target)
+	assert.Len(t, opts, 1)
 
-	md, err := tokenCredentials("token").GetRequestMetadata(context.Background())
+	_, _, err = DialOptions("tcp://scheduler:9090", ClientOptions{Token: "token"})
+	assert.ErrorContains(t, err, "without TLS")
+
+	_, opts, err = DialOptions("tcp://scheduler:9090", ClientOptions{Token: "token", AllowInsecureToken: true})
+	assert.NoError(t, err)
+	assert.Len(t, opts, 2)
+
+	_, opts, err = DialOptions("tls://scheduler:9090", ClientOptions{Token: "token"})
+	assert.NoError(t, err)
+	assert.Len(t, opts, 2)
+
+	_, _, err = DialOptions("tls://scheduler:9090", ClientOptions{CACert: "/nonexistent.pem"})
+	assert.Error(t, err)
+
+	_, _, err = DialOptions("http://scheduler:9090", ClientOptions{})
+	assert.Error(t, err)
+
+	md, err := tokenCredentials{token: "token"}.GetRequestMetadata(context.Background())
 	assert.NoError(t, err)
 	assert.Equal(t, "Bearer token", md["authorization"])
 	assert.Equal(t, "token", TokenFromHeader(md["authorization"]))
+}
+
+// Writes a self-signed certificate for localhost and its key to files.
+func writeCertificate(t *testing.T) (string, string) {
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	assert.NoError(t, err)
+	template := &x509.Certificate{
+		SerialNumber:          big.NewInt(1),
+		Subject:               pkix.Name{CommonName: "localhost"},
+		DNSNames:              []string{"localhost"},
+		NotBefore:             time.Now().Add(-time.Hour),
+		NotAfter:              time.Now().Add(time.Hour),
+		IsCA:                  true,
+		BasicConstraintsValid: true,
+		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+	}
+	der, err := x509.CreateCertificate(rand.Reader, template, template, &key.PublicKey, key)
+	assert.NoError(t, err)
+	keyDer, err := x509.MarshalECPrivateKey(key)
+	assert.NoError(t, err)
+
+	dir := t.TempDir()
+	cert := filepath.Join(dir, "cert.pem")
+	keyFile := filepath.Join(dir, "key.pem")
+	assert.NoError(t, os.WriteFile(cert, pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der}), 0600))
+	assert.NoError(t, os.WriteFile(keyFile, pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: keyDer}), 0600))
+	return cert, keyFile
+}
+
+func TestTLSWithToken(t *testing.T) {
+	cert, key := writeCertificate(t)
+	a := newTestAuthenticator(t, nil)
+
+	creds, err := ServerCredentials(cert, key)
+	assert.NoError(t, err)
+	// Any method is answered, and authorized by the interceptors
+	echo := grpc.UnknownServiceHandler(func(srv any, stream grpc.ServerStream) error {
+		if err := stream.RecvMsg(&emptypb.Empty{}); err != nil {
+			return err
+		}
+		return stream.SendMsg(&emptypb.Empty{})
+	})
+	server := grpc.NewServer(append([]grpc.ServerOption{creds, echo}, a.ServerOptions(func(string) Permission { return Write })...)...)
+	listener, err := net.Listen("tcp", "localhost:0")
+	assert.NoError(t, err)
+	go server.Serve(listener)
+	defer server.Stop()
+
+	check := func(options ClientOptions) error {
+		port := listener.Addr().(*net.TCPAddr).Port
+		target, opts, err := DialOptions(fmt.Sprintf("tls://localhost:%d", port), options)
+		assert.NoError(t, err)
+		conn, err := grpc.NewClient(target, opts...)
+		assert.NoError(t, err)
+		defer conn.Close()
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		return conn.Invoke(ctx, "/test.Service/Method", &emptypb.Empty{}, &emptypb.Empty{})
+	}
+
+	// The certificate isn't trusted without the authority
+	assert.Equal(t, codes.Unavailable, status.Code(check(ClientOptions{Token: "ci-token"})))
+	assert.Equal(t, codes.Unauthenticated, status.Code(check(ClientOptions{CACert: cert})))
+	assert.Equal(t, codes.PermissionDenied, status.Code(check(ClientOptions{CACert: cert, Token: "reader-token"})))
+	assert.NoError(t, check(ClientOptions{CACert: cert, Token: "ci-token"}))
 }
 
 func TestNewToken(t *testing.T) {

@@ -31,7 +31,7 @@ func ParseHttpUrl(urlstr string) (string, error) {
 // Parses a string of the form <scheme>://<host>:<port> and returns the
 // host and port as a string, or an error if the string is not a valid URL.
 // If the port is not specified, it defaults to 9090.
-// The scheme must be "tcp".
+// The scheme must be "tcp", or "tls" for connections secured with TLS.
 func ParseGrpcUrl(urlstr string) (string, error) {
 	uri, err := url.Parse(urlstr)
 	if err != nil {
@@ -45,7 +45,7 @@ func ParseGrpcUrl(urlstr string) (string, error) {
 
 	var grpcUri string
 	switch uri.Scheme {
-	case "tcp":
+	case "tcp", "tls":
 		grpcUri = uri.Host
 
 	// These are not yet supported by the Go implementation of gRPC,

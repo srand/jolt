@@ -83,6 +83,10 @@ var rootCmd = &cobra.Command{
 			log.Fatal(err)
 		}
 
+		if !config.Secure() {
+			log.Warn("No TLS certificate and private key configured, clients connect without TLS")
+		}
+
 		// Start listening for Grpc connections on all configured addresses
 		schedulerUris := viper.GetStringSlice("listen_grpc")
 		for _, uri := range schedulerUris {
@@ -105,7 +109,14 @@ var rootCmd = &cobra.Command{
 			logstash.NewHttpHandler(stash, r)
 			scheduler.NewHttpHandler(sched, r)
 
-			go http.ListenAndServe(host, utils.HttpLogger(authenticator.HttpHandler(r, scheduler.HttpPermission)))
+			handler := utils.HttpLogger(authenticator.HttpHandler(r, scheduler.HttpPermission))
+			if config.Secure() {
+				go func() {
+					log.Fatal(http.ListenAndServeTLS(host, config.Certificate, config.PrivateKey, handler))
+				}()
+			} else {
+				go http.ListenAndServe(host, handler)
+			}
 		}
 
 		// Ready to run the scheduler
@@ -116,8 +127,12 @@ var rootCmd = &cobra.Command{
 func init() {
 	rootCmd.Flags().StringSliceP("listen-http", "l", []string{"tcp://:8080"}, "Addresses to listen on for HTTP connections")
 	rootCmd.Flags().StringSliceP("listen-grpc", "g", []string{"tcp://:9090"}, "Addresses to listen on for GRPC connections")
+	rootCmd.Flags().StringP("cert", "c", "", "TLS server certificate file")
+	rootCmd.Flags().StringP("cert-key", "k", "", "TLS private key file")
 	rootCmd.Flags().CountP("verbose", "v", "Verbosity (repeatable)")
 
+	viper.BindPFlag("cert", rootCmd.Flags().Lookup("cert"))
+	viper.BindPFlag("cert_key", rootCmd.Flags().Lookup("cert-key"))
 	viper.BindPFlag("listen_grpc", rootCmd.Flags().Lookup("listen-grpc"))
 	viper.BindPFlag("listen_http", rootCmd.Flags().Lookup("listen-http"))
 }

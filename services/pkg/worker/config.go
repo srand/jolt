@@ -12,6 +12,13 @@ import (
 type WorkerConfig struct {
 	Grpc utils.GRPCOptions `mapstructure:"grpc"`
 
+	// Send tokens to services without TLS.
+	AllowInsecureToken bool `mapstructure:"allow_insecure_token"`
+
+	// PEM file with the certificates of the authorities that the
+	// certificates of the services are verified with.
+	CACert string `mapstructure:"ca_cert"`
+
 	// Base URL to the cache service.
 	CacheHttpUri string `mapstructure:"cache_http_uri"`
 
@@ -81,6 +88,8 @@ func (c *WorkerConfig) Validate() error {
 
 func (c *WorkerConfig) Log() {
 	log.Info("Worker configuration:")
+	log.Infof("  allow_insecure_token = %v", c.AllowInsecureToken)
+	log.Infof("  ca_cert = %s", c.CACert)
 	log.Infof("  cache_dir = %s", c.CacheDir)
 	log.Infof("  cache_http_uri = %s", c.CacheHttpUri)
 	log.Infof("  cache_grpc_uri = %s", c.CacheGrpcUri)
