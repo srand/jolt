@@ -31,8 +31,15 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.14t'
+          # Keeps the wheels built from source, such as grpcio
+          cache: 'pip'
 
       - name: Install Jolt
+        # There are no free-threaded wheels of grpcio, and GCC 15 doesn't
+        # compile the copies of libraries that it includes
+        env:
+          CC: clang
+          CXX: clang++
         run: pip install --upgrade -e .[allure]
 
       - name: Install fstree
