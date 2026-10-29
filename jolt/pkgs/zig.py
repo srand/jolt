@@ -9,10 +9,10 @@ class Zig(Download):
 
     name = "zig"
     version = Parameter("0.17.0", help="Zig version.")
-    url = "https://ziglang.org/download/{version}/zig-{_arch}-{_os}-{version}.{_ext}"
+    url = "https://ziglang.org/download/{version}/zig-{zig_arch}-{_os}-{version}.{_ext}"
 
     @property
-    def _arch(self):
+    def zig_arch(self):
         if self.arch in ["amd64", "x86_64"]:
             return "x86_64"
         if self.arch in ["arm64", "aarch64"]:
@@ -29,7 +29,7 @@ class Zig(Download):
 
     def publish(self, artifact, tools):
         super().publish(artifact, tools)
-        artifact.environ.PATH.append(tools.expand("zig-{_arch}-{_os}-{version}"))
+        artifact.environ.PATH.append(tools.expand("zig-{zig_arch}-{_os}-{version}"))
 
 
 TaskRegistry.get().add_task_class(Zig)
