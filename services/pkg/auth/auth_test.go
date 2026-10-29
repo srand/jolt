@@ -27,6 +27,8 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
+var ctx = context.Background()
+
 func permissions(p ...Permission) *[]Permission {
 	return &p
 }
@@ -47,41 +49,41 @@ func TestWithoutTokensAnonymousHasAllPermissions(t *testing.T) {
 	a, err := New(Config{}, Read, Write)
 	assert.NoError(t, err)
 
-	identity, err := a.Authorize("", Write)
+	identity, err := a.Authorize(ctx, "", Write)
 	assert.NoError(t, err)
 	assert.Equal(t, "anonymous", identity.Name)
 
-	_, err = a.Authorize("unknown", Read)
+	_, err = a.Authorize(ctx, "unknown", Read)
 	assert.ErrorIs(t, err, ErrUnauthenticated)
 }
 
 func TestWithTokensAnonymousHasNoPermissions(t *testing.T) {
 	a := newTestAuthenticator(t, nil)
 
-	_, err := a.Authorize("", Read)
+	_, err := a.Authorize(ctx, "", Read)
 	assert.ErrorIs(t, err, ErrUnauthenticated)
 
-	identity, err := a.Authorize("ci-token", Write)
+	identity, err := a.Authorize(ctx, "ci-token", Write)
 	assert.NoError(t, err)
 	assert.Equal(t, "ci", identity.Name)
 
-	_, err = a.Authorize("reader-token", Read)
+	_, err = a.Authorize(ctx, "reader-token", Read)
 	assert.NoError(t, err)
-	_, err = a.Authorize("reader-token", Write)
+	_, err = a.Authorize(ctx, "reader-token", Write)
 	assert.ErrorIs(t, err, ErrPermissionDenied)
 
-	_, err = a.Authorize("wrong-token", Read)
+	_, err = a.Authorize(ctx, "wrong-token", Read)
 	assert.ErrorIs(t, err, ErrUnauthenticated)
 }
 
 func TestConfiguredAnonymousPermissions(t *testing.T) {
 	a := newTestAuthenticator(t, permissions(Read))
 
-	_, err := a.Authorize("", Read)
+	_, err := a.Authorize(ctx, "", Read)
 	assert.NoError(t, err)
-	_, err = a.Authorize("", Write)
+	_, err = a.Authorize(ctx, "", Write)
 	assert.ErrorIs(t, err, ErrUnauthenticated)
-	_, err = a.Authorize("ci-token", Write)
+	_, err = a.Authorize(ctx, "ci-token", Write)
 	assert.NoError(t, err)
 }
 

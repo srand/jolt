@@ -57,6 +57,9 @@ type Config struct {
 	Anonymous *[]Permission `mapstructure:"anonymous"`
 	// Tokens accepted from clients.
 	Tokens []Token `mapstructure:"tokens"`
+	// Tokens issued by an OpenID Connect provider, accepted in addition to
+	// the tokens above.
+	OIDC *OIDCConfig `mapstructure:"oidc"`
 }
 
 // An authenticated client.
@@ -73,6 +76,7 @@ func (i *Identity) Allows(permission Permission) bool {
 type Authenticator struct {
 	anonymous Identity
 	tokens    map[[sha256.Size]byte]Identity
+	oidc      *oidcVerifier
 }
 
 // New creates an authenticator from the configuration. Permissions are
@@ -85,8 +89,16 @@ func New(config Config, permissions ...Permission) (*Authenticator, error) {
 
 	if config.Anonymous != nil {
 		a.anonymous.Permissions = *config.Anonymous
-	} else if len(config.Tokens) > 0 {
+	} else if len(config.Tokens) > 0 || config.OIDC != nil {
 		a.anonymous.Permissions = nil
+	}
+
+	if config.OIDC != nil {
+		verifier, err := newOIDCVerifier(*config.OIDC)
+		if err != nil {
+			return nil, err
+		}
+		a.oidc = verifier
 	}
 
 	for _, token := range config.Tokens {
@@ -113,25 +125,31 @@ func (a *Authenticator) identities() []Identity {
 	for _, identity := range a.tokens {
 		identities = append(identities, identity)
 	}
+	if a.oidc != nil {
+		identities = append(identities, a.oidc.identities()...)
+	}
 	return identities
 }
 
 // Authenticate returns the client with the token. Clients without a token
-// are anonymous.
-func (a *Authenticator) Authenticate(token string) (*Identity, error) {
+// are anonymous. Tokens that aren't configured are verified as tokens of the
+// OpenID Connect provider, if there is one.
+func (a *Authenticator) Authenticate(ctx context.Context, token string) (*Identity, error) {
 	if token == "" {
 		return &a.anonymous, nil
 	}
-	identity, ok := a.tokens[sha256.Sum256([]byte(token))]
-	if !ok {
-		return nil, ErrUnauthenticated
+	if identity, ok := a.tokens[sha256.Sum256([]byte(token))]; ok {
+		return &identity, nil
 	}
-	return &identity, nil
+	if a.oidc != nil && strings.Count(token, ".") == 2 {
+		return a.oidc.Verify(ctx, token)
+	}
+	return nil, ErrUnauthenticated
 }
 
 // Authorize returns the client with the token if it has the permission.
-func (a *Authenticator) Authorize(token string, permission Permission) (*Identity, error) {
-	identity, err := a.Authenticate(token)
+func (a *Authenticator) Authorize(ctx context.Context, token string, permission Permission) (*Identity, error) {
+	identity, err := a.Authenticate(ctx, token)
 	if err != nil {
 		return nil, err
 	}
@@ -170,7 +188,7 @@ func TokenFromHeader(header string) string {
 // returns for them before passing them on to the handler.
 func (a *Authenticator) HttpHandler(handler http.Handler, permission func(*http.Request) Permission) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, err := a.Authorize(TokenFromHeader(r.Header.Get("Authorization")), permission(r))
+		_, err := a.Authorize(r.Context(), TokenFromHeader(r.Header.Get("Authorization")), permission(r))
 		switch {
 		case errors.Is(err, ErrUnauthenticated):
 			// Browsers ask for the password of basic authentication,
@@ -193,7 +211,7 @@ func (a *Authenticator) authorizeContext(ctx context.Context, permission Permiss
 			token = TokenFromHeader(values[0])
 		}
 	}
-	_, err := a.Authorize(token, permission)
+	_, err := a.Authorize(ctx, token, permission)
 	switch {
 	case errors.Is(err, ErrUnauthenticated):
 		return status.Error(codes.Unauthenticated, err.Error())
@@ -333,6 +351,9 @@ func (c *Config) String() string {
 	names := []string{}
 	for _, token := range c.Tokens {
 		names = append(names, fmt.Sprintf("%s%v", token.Name, token.Permissions))
+	}
+	if c.OIDC != nil {
+		return fmt.Sprintf("anonymous=%s tokens=%v oidc={%s}", anonymous, names, c.OIDC)
 	}
 	return fmt.Sprintf("anonymous=%s tokens=%v", anonymous, names)
 }
