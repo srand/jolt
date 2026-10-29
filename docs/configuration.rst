@@ -165,6 +165,8 @@ The ``[jolt]`` config section contains global configuration:
       - | Used to limit the number of threads used by third party tools such as Ninja.
           The environment variable ``JOLT_THREADS`` can also be used.
           A value of ``0`` selects the number of CPUs available.
+          Tools that use a :ref:`jobserver <configuration-plugins-jobserver>` ignore it;
+          the slots of the jobserver limit them instead.
         | The default value is the number of CPUs available.
 
   The following environment variables can be used to override the configuration:
@@ -605,7 +607,8 @@ These configuration keys exist:
       - Integer
       - | The number of slots to use when launching the jobserver helper process.
         | This is used to limit the number of parallel jobs launched by compatible build tools.
-        | Default: the number of CPUs available, or ``jolt.threads`` / ``JOLT_THREADS`` if set.
+        | Default: the number of CPUs available. ``jolt.threads`` and ``JOLT_THREADS`` don't
+          limit tools that use the jobserver.
 
     * - ``path``
       - String
@@ -1267,6 +1270,12 @@ improve execution time and reduce resource contention.
 The server is a FUSE filesystem implementation that exposes a character device file.
 It automatically reclaims tokens if a client worker process dies while holding them,
 ensuring that the number of available tokens is always accurate.
+
+.. note::
+
+   With a jobserver, its slots limit the parallelism of Make and Ninja, not
+   ``jolt.threads`` or ``JOLT_THREADS``: Jolt doesn't pass them a number of
+   jobs, since that would make them ignore the jobserver.
 
 Requirements:
 
