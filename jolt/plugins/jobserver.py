@@ -7,6 +7,7 @@ from jolt.hooks import TaskHook, TaskHookFactory
 from jolt.plugins.jobserver_main import launch_jobserver
 from jolt.plugins.jobserver_main import find_jobserver
 from jolt.plugins.jobserver_pressure import PressureMonitor, RESOURCES, parse_limits
+from jolt.plugins.jobserver_pressure import DEFAULT_INTERVAL, DEFAULT_RAMP_TIME
 
 import click
 
@@ -33,7 +34,10 @@ def _pressure_limits():
 def jobserver_cmd(ctx, slots, path):
     """Launch a background jobserver and print environment variables to connect."""
 
-    jobserver = launch_jobserver(slots, path=path, pressure=_pressure_limits())
+    jobserver = launch_jobserver(
+        slots, path=path, pressure=_pressure_limits(),
+        interval=config.getfloat("jobserver", "pressure_interval", DEFAULT_INTERVAL),
+        ramp_time=config.getfloat("jobserver", "ramp_time", DEFAULT_RAMP_TIME))
 
     env = jobserver.get_env()
     for key, value in env.items():
@@ -45,7 +49,10 @@ path = config.get("jobserver", "path")
 if config.getboolean("jobserver", "launch", False):
     tools = tools.Tools()
     slots = config.getint("jobserver", "slots", tools.cpu_count())
-    jobserver = launch_jobserver(slots, path=path, new_session=False, pressure=_pressure_limits())
+    jobserver = launch_jobserver(
+        slots, path=path, new_session=False, pressure=_pressure_limits(),
+        interval=config.getfloat("jobserver", "pressure_interval", DEFAULT_INTERVAL),
+        ramp_time=config.getfloat("jobserver", "ramp_time", DEFAULT_RAMP_TIME))
 elif path:
     jobserver = find_jobserver(path=path)
 else:

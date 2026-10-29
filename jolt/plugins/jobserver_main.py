@@ -15,9 +15,9 @@ from setproctitle import setproctitle
 
 # Also runs as a standalone script, see launch_jobserver().
 if __package__:
-    from .jobserver_pressure import PressureMonitor
+    from .jobserver_pressure import PressureMonitor, TokenRamp, DEFAULT_INTERVAL, DEFAULT_RAMP_TIME
 else:
-    from jobserver_pressure import PressureMonitor
+    from jobserver_pressure import PressureMonitor, TokenRamp, DEFAULT_INTERVAL, DEFAULT_RAMP_TIME
 
 
 def _build_process_title(name):
@@ -25,10 +25,12 @@ def _build_process_title(name):
 
 
 class Jobserver:
-    def __init__(self, path=None, slots=1, pressure=None, psi_path=None, interval=1.0):
+    def __init__(self, path=None, slots=1, pressure=None, psi_path=None,
+                 interval=DEFAULT_INTERVAL, ramp_time=DEFAULT_RAMP_TIME):
         # The pool size is N, but we put N-1 tokens in the pipe
         # because the parent process itself occupies one slot.
         self.slots = slots
+        self.pool = max(0, slots - 1)
         self.path = path or tempfile.mkdtemp(prefix="jolt-jobserver-")
         self.fifo_fd = None
         self.remove_path = path is None
@@ -44,69 +46,95 @@ class Jobserver:
         # Open RDWR so the server doesn't block while opening
         self.fifo_fd = os.open(self.fifo_path, os.O_RDWR)
 
-        # Seed the pipe with tokens (arbitrary byte, usually '+')
-        if slots > 1:
-            os.write(self.fifo_fd, b'+' * (slots - 1))
-
-        # Tokens taken out of circulation while the system is under pressure
+        # Tokens taken out of circulation, up to the target, to limit the
+        # tokens that clients can take
         self.withheld = b""
-        self._withheld_lock = threading.Lock()
-        self._throttled = threading.Event()
+        self._target = 0
+        self._withheld_changed = threading.Condition()
         self._regulator = None
         self._regulator_stop = threading.Event()
         monitor = PressureMonitor(pressure, path=psi_path)
-        if monitor.start():
+        ramp = None
+        if self.pool and monitor.start():
+            ramp = TokenRamp(self.pool, ramp_time, interval)
+            self._target = self.pool - ramp.available
+            self.withheld = b'+' * self._target
+
+        # Seed the pipe with tokens (arbitrary byte, usually '+')
+        if self.pool > self._target:
+            os.write(self.fifo_fd, b'+' * (self.pool - self._target))
+
+        if ramp is not None:
             self._regulator = threading.Thread(
-                target=self._regulate, args=(monitor, interval), daemon=True)
+                target=self._regulate, args=(monitor, ramp, interval), daemon=True)
             self._regulator.start()
             # One reader per token increases the share of returned tokens
             # that are withheld. They may block in read() until the process
             # exits, so they share a file descriptor that is never closed.
             withhold_fd = os.open(self.fifo_path, os.O_RDWR)
-            for _ in range(max(1, slots - 1)):
+            for _ in range(self.pool):
                 threading.Thread(target=self._withhold, args=(withhold_fd,), daemon=True).start()
 
-    def _regulate(self, monitor, interval):
-        """ Withhold tokens while the system is under pressure. """
+    def _in_pipe(self):
+        """ The number of tokens in the pipe. """
+        # POSIX only, like the jobserver
+        import array
+        import fcntl
+        import termios
+        size = array.array("i", [0])
+        fcntl.ioctl(self.fifo_fd, termios.FIONREAD, size)
+        return size[0]
+
+    def _regulate(self, monitor, ramp, interval):
+        """ Limit the tokens that clients can take, with the ramp. """
         try:
             while not self._regulator_stop.wait(interval):
-                if monitor.update():
-                    self._throttled.set()
-                else:
-                    self._release()
+                pressured = monitor.update()
+                with self._withheld_changed:
+                    in_pipe = self._in_pipe()
+                    in_use = self.pool - len(self.withheld) - in_pipe
+                    # Clients have taken all tokens that they may
+                    limit = ramp.update(in_use, in_pipe == 0, pressured)
+                    self._set_target(self.pool - limit)
         except (OSError, ValueError):
             # Pressure information is gone. Stop regulating.
-            self._release()
+            with self._withheld_changed:
+                self._set_target(0)
 
     def _withhold(self, fd):
         """
-        Take returned tokens out of circulation while throttled.
+        Take returned tokens out of circulation while above the target.
 
         Clients take tokens straight from the pipe and usually read a new
         token right after returning one, so tokens rarely stay in the pipe.
         A blocking read puts this thread in line with the clients waiting
-        for tokens. It gets its share of the returned tokens and the pool
-        drains for as long as the pressure persists. Clients always keep
-        their implicit token, so builds still make progress.
+        for tokens. It gets its share of the returned tokens, and the
+        tokens in circulation fall to the target over time. Clients always
+        keep their implicit token, so builds still make progress.
         """
         while True:
-            self._throttled.wait()
+            with self._withheld_changed:
+                self._withheld_changed.wait_for(lambda: len(self.withheld) < self._target)
             token = os.read(fd, 1)
-            with self._withheld_lock:
-                if self._throttled.is_set():
+            with self._withheld_changed:
+                if len(self.withheld) < self._target:
                     self.withheld += token
                     continue
-            # Pressure dropped while waiting for the token
+            # The target fell while waiting for the token
             os.write(fd, token)
 
-    def _release(self):
-        with self._withheld_lock:
-            self._throttled.clear()
-            if self._regulator_stop.is_set():
-                return
-            while self.withheld:
-                written = os.write(self.fifo_fd, self.withheld)
-                self.withheld = self.withheld[written:]
+    def _set_target(self, target):
+        """ Withhold this many tokens, releasing those above it. Hold the lock. """
+        self._target = target
+        if self._regulator_stop.is_set():
+            return
+        excess = len(self.withheld) - target
+        if excess > 0:
+            released, self.withheld = self.withheld[:excess], self.withheld[excess:]
+            while released:
+                written = os.write(self.fifo_fd, released)
+                released = released[written:]
+        self._withheld_changed.notify_all()
 
     def get_env(self):
         """Returns the environment variables required for children to connect."""
@@ -306,12 +334,14 @@ def _start_parent_liveness_monitor(parent_sentinel_fd=None, parent_pid=None):
 
 
 def launch_jobserver(slots, path=None, python_executable=None, new_session=True,
-                     pressure=None, psi_path=None):
+                     pressure=None, psi_path=None, interval=None, ramp_time=None):
     """Launch a jobserver in the background and return a shareable handle.
 
     ``pressure`` maps 'cpu', 'io' and 'memory' to the maximum allowed
     pressure, in microseconds of stall per second. No tokens are handed
-    out while any of them is exceeded.
+    out while any of them is exceeded, and tokens are handed out gradually,
+    reaching all slots after ``ramp_time`` seconds. Pressure is sampled
+    every ``interval`` seconds.
     """
     jobserver_path = path or tempfile.mkdtemp(prefix="jolt-jobserver-")
     command = [
@@ -325,6 +355,10 @@ def launch_jobserver(slots, path=None, python_executable=None, new_session=True,
             command.extend(["--pressure-max-" + resource, str(limit)])
     if psi_path:
         command.extend(["--psi-path", psi_path])
+    if interval is not None:
+        command.extend(["--pressure-interval", str(interval)])
+    if ramp_time is not None:
+        command.extend(["--ramp-time", str(ramp_time)])
     preexec_fn = None
     parent_sentinel = None
     popen_kwargs = {}
@@ -374,7 +408,7 @@ def launch_jobserver(slots, path=None, python_executable=None, new_session=True,
 
 
 def _serve_jobserver(path, slots, parent_sentinel_fd=None, parent_pid=None,
-                     pressure=None, psi_path=None):
+                     pressure=None, psi_path=None, interval=DEFAULT_INTERVAL, ramp_time=DEFAULT_RAMP_TIME):
     stopping = False
 
     def _shutdown(*_args):
@@ -398,7 +432,8 @@ def _serve_jobserver(path, slots, parent_sentinel_fd=None, parent_pid=None,
     for signum in handled_signals:
         signal.signal(signum, _shutdown)
 
-    jobserver = Jobserver(path=path, slots=slots, pressure=pressure, psi_path=psi_path)
+    jobserver = Jobserver(path=path, slots=slots, pressure=pressure, psi_path=psi_path,
+                          interval=interval, ramp_time=ramp_time)
 
     # Belt-and-braces: ensure the FIFO and directory are removed even if the
     # helper exits via an unexpected path (e.g. an uncaught exception before
@@ -432,6 +467,10 @@ def _parse_args(argv=None):
     parser.add_argument("--pressure-max-io", type=float, help="Maximum IO pressure (us stall/s)")
     parser.add_argument("--pressure-max-memory", type=float, help="Maximum memory pressure (us stall/s)")
     parser.add_argument("--psi-path", help=argparse.SUPPRESS)
+    parser.add_argument("--pressure-interval", type=float, default=DEFAULT_INTERVAL,
+                        help="Seconds between samples of pressure")
+    parser.add_argument("--ramp-time", type=float, default=DEFAULT_RAMP_TIME,
+                        help="Seconds to hand out all slots under pressure limits, 0 for no ramp")
     return parser.parse_args(argv)
 
 
@@ -450,6 +489,8 @@ def main(argv=None):
             "memory": args.pressure_max_memory,
         },
         psi_path=args.psi_path,
+        interval=args.pressure_interval,
+        ramp_time=args.ramp_time,
     )
 
 

@@ -42,6 +42,26 @@ class JobserverCuseInternal(JoltTest):
         server.lib.fuse_reply_poll.assert_called_once_with(req, 0)
         self.assertEqual([jobserver_cuse.Poller(ph=1234)], server.pollers)
 
+    def test_ramp_limits_tokens_handed_out(self):
+        """ Under pressure limits, only the tokens that the ramp allows are handed out. """
+        from jolt.plugins.jobserver_pressure import TokenRamp
+        server = self.server(tokens=10)
+        server.ramp = TokenRamp(10, ramp_time=10, interval=1)
+        self.assertEqual(server.available(), 1)
+
+        client = jobserver_cuse.Client(pid=1)
+        server.clients[1] = client
+        client.balance, server.tokens = 1, 9
+        self.assertEqual(server.available(), 0)
+
+        # A waiting client is demand, so the ramp grows by a step
+        server.ramp.update(server.in_use(), True, False)
+        self.assertEqual(server.available(), 1)
+
+        # Without pressure regulation, all idle tokens may be handed out
+        server.ramp = None
+        self.assertEqual(server.available(), 9)
+
     def test_poll_with_tokens_is_readable(self):
         server = self.server(tokens=1)
         req = self.poll(server, POLLIN | POLLOUT, None)

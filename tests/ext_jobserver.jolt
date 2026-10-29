@@ -21,6 +21,7 @@ from jolt.plugins.jobserver_main import launch_jobserver
 from jolt.plugins.jobserver_main import stat_is_fifo
 from jolt.plugins.jobserver_pressure import PressureMonitor
 from jolt.plugins.jobserver_pressure import parse_limits
+from jolt.plugins.jobserver_pressure import TokenRamp
 
 
 class JobserverExtension(JoltTest):
@@ -313,6 +314,63 @@ class JobserverExtension(JoltTest):
         self.assertFalse(monitor.update())
         self.assertEqual(monitor.rates["memory"], 0)
 
+    def test_token_ramp(self):
+        # 100 tokens over 10 seconds, adjusted every second: 10 tokens per step
+        ramp = TokenRamp(100, ramp_time=10, interval=1)
+        self.assertEqual(ramp.available, 10)
+
+        # Grows while all tokens are taken
+        for expected in (20, 30, 40):
+            self.assertEqual(ramp.update(ramp.available, True, False), expected)
+
+        # Without demand, falls back to the tokens in use plus a step
+        self.assertEqual(ramp.update(15, False, False), 25)
+
+        # Pressure first holds at the tokens in use, then shrinks every second
+        self.assertEqual(ramp.update(25, True, True), 25)
+        self.assertEqual(ramp.update(24, True, True), 18)
+        self.assertEqual(ramp.update(18, True, True), 13)
+
+        # Never more than all tokens, nor less than none
+        ramp = TokenRamp(4, ramp_time=0, interval=1)
+        self.assertEqual(ramp.available, 4)
+        self.assertEqual(ramp.update(4, True, False), 4)
+        self.assertEqual(ramp.update(0, True, True), 0)
+        self.assertEqual(ramp.update(0, True, True), 0)
+
+    def test_pressure_ramps_up_tokens(self):
+        """ Under pressure limits, tokens are handed out gradually while clients take them. """
+        self._require_jobserver_support()
+
+        psi_path = os.path.join(self.ws, "psi")
+        self._write_psi(psi_path, {})
+        jobserver = launch_jobserver(
+            9,
+            path=os.path.join(self.ws, "jobserver-ramp"),
+            pressure={"memory": 1000},
+            psi_path=psi_path,
+            interval=0.1,
+            ramp_time=2,
+        )
+        fd = os.open(jobserver.fifo_path, os.O_RDWR)
+        held = []
+        try:
+            # 8 tokens over 2 seconds: none to start with
+            self.assertLess(self._pending_tokens(fd), 8)
+            started = time.monotonic()
+            while len(held) < 8:
+                self.assertLess(time.monotonic() - started, 10, "tokens were never all handed out")
+                if self._pending_tokens(fd):
+                    held.append(os.read(fd, 1))
+                time.sleep(0.01)
+            # All tokens took about the ramp time
+            self.assertGreater(time.monotonic() - started, 1)
+        finally:
+            for token in held:
+                os.write(fd, token)
+            os.close(fd)
+            jobserver.cleanup()
+
     def test_pressure_withholds_tokens(self):
         self._require_jobserver_support()
 
@@ -323,6 +381,7 @@ class JobserverExtension(JoltTest):
             path=os.path.join(self.ws, "jobserver-pressure"),
             pressure={"memory": 1000},
             psi_path=psi_path,
+            ramp_time=0,
         )
         stop = threading.Event()
 
@@ -374,6 +433,7 @@ class JobserverExtension(JoltTest):
             path=os.path.join(self.ws, "jobserver-busy"),
             pressure={"memory": 1000},
             psi_path=psi_path,
+            ramp_time=0,
         )
         worker_script = textwrap.dedent("""
             import os

@@ -635,6 +635,18 @@ These configuration keys exist:
         | See :ref:`Pressure regulation <configuration-plugins-jobserver-pressure>` below.
         | Default: not set
 
+    * - ``pressure_interval``
+      - Float
+      - | Seconds between samples of the pressure.
+        | Default: ``0.25``
+
+    * - ``ramp_time``
+      - Float
+      - | Seconds that the jobserver takes to hand out all slots, when pressure limits are
+          set. ``0`` hands them out at once.
+        | See :ref:`Pressure regulation <configuration-plugins-jobserver-pressure>` below.
+        | Default: ``30``
+
 .. _configuration-plugins-jobserver-pressure:
 
 **Pressure regulation**
@@ -646,11 +658,24 @@ are compiled or linked at the same time.
 
 The pressure is measured as the number of microseconds per second that at least one
 task was stalled waiting for the resource, so limits range from 1 to 1000000. The
-values are sampled once per second. While any limit is exceeded, the jobserver hands
-out no tokens. Jobs that are already running are not affected, and each build tool
-can always run one job using its implicit token, so builds keep making progress.
-This is the same algorithm as BitBake's ``BB_PRESSURE_MAX_CPU``, ``BB_PRESSURE_MAX_IO``
-and ``BB_PRESSURE_MAX_MEMORY``, so the same limits can be used.
+values are sampled every ``pressure_interval``. While any limit is exceeded, the
+jobserver hands out no tokens, and if the pressure lasts for more than a second, it
+takes back a quarter of the tokens in use as they are returned, every second. Jobs that
+are already running are not affected, and each build tool can always run one job using
+its implicit token, so builds keep making progress. The limits are measured like
+BitBake's ``BB_PRESSURE_MAX_CPU``, ``BB_PRESSURE_MAX_IO`` and ``BB_PRESSURE_MAX_MEMORY``,
+so the same limits can be used. Memory stalls hurt quickly, so a low memory limit,
+such as 100000, works well, while a busy build machine always has tasks waiting for
+the CPU, so a CPU limit should be high, such as 500000 or more.
+
+The pressure of new jobs only shows a second or two after they start, and tokens can't
+be taken back from running jobs. The jobserver therefore hands out tokens gradually: the
+number of tokens that may be in use grows while build tools take all that they may, and
+reaches all slots after ``ramp_time``. A build that starts on an idle machine can't take
+all slots before its pressure shows. Without demand, the number falls back to the tokens
+in use, so idle time doesn't let the next build take all slots at once either. Set a
+shorter ramp time for faster startup, or a longer one for builds whose jobs take long to
+reach their full memory use, such as links.
 
 Build tools take tokens directly from the jobserver FIFO, so the jobserver withholds
 tokens by taking them out of the FIFO as they are returned, competing with the build
@@ -1325,6 +1350,17 @@ The following configuration environment variables are available:
       - Integer
       - | The maximum memory pressure allowed before the jobserver stops handing out tokens.
         | Default: not set
+
+    * - ``JOLT_JOBSERVER_PRESSURE_INTERVAL``
+      - Float
+      - | Seconds between samples of the pressure.
+        | Default: ``0.25``
+
+    * - ``JOLT_JOBSERVER_RAMP_TIME``
+      - Float
+      - | Seconds that the jobserver takes to hand out all tokens, when pressure limits
+          are set. ``0`` hands them out at once.
+        | Default: ``30``
 
 The pressure limits work as described for the
 :ref:`Jobserver <configuration-plugins-jobserver>` plugin, except that tokens are

@@ -6,7 +6,9 @@ It provides /dev/jobserver, tracks checked-out job server tokens per open file d
 and returns leaked tokens when a client closes its file descriptor.
 
 No tokens are handed out while system pressure exceeds the limits set with
-JOLT_JOBSERVER_PRESSURE_MAX_{CPU,IO,MEMORY}.
+JOLT_JOBSERVER_PRESSURE_MAX_{CPU,IO,MEMORY}. With limits, tokens are handed
+out gradually, over JOLT_JOBSERVER_RAMP_TIME seconds, so that the pressure
+of new jobs shows before more tokens are handed out.
 """
 
 from __future__ import annotations
@@ -25,9 +27,9 @@ from typing import Any, Callable, Optional
 
 # Deployed as a standalone script next to jobserver_pressure.py
 if __package__:
-    from .jobserver_pressure import PressureMonitor, RESOURCES
+    from .jobserver_pressure import PressureMonitor, RESOURCES, TokenRamp, DEFAULT_INTERVAL, DEFAULT_RAMP_TIME
 else:
-    from jobserver_pressure import PressureMonitor, RESOURCES
+    from jobserver_pressure import PressureMonitor, RESOURCES, TokenRamp, DEFAULT_INTERVAL, DEFAULT_RAMP_TIME
 
 
 POLLIN = 0x001
@@ -147,10 +149,16 @@ class JobServer:
         devname: str = "jobserver",
         pressure: Optional[dict] = None,
         psi_path: Optional[str] = None,
+        ramp_time: float = DEFAULT_RAMP_TIME,
+        interval: float = DEFAULT_INTERVAL,
     ) -> None:
         self.tokens = tokens if tokens is not None else (os.cpu_count() or 1) + 1
         self.devname = devname
         self.monitor = PressureMonitor(pressure, path=psi_path)
+        self.ramp_time = ramp_time
+        self.interval = interval
+        # Limits the tokens handed out while pressure is monitored
+        self.ramp: Optional[TokenRamp] = None
         self.throttled = False
         # Serializes FUSE callbacks with the pressure monitor thread
         self.lock = threading.RLock()
@@ -188,30 +196,40 @@ class JobServer:
                 func(*args)
         return wrapper
 
+    def in_use(self) -> int:
+        """Number of tokens handed out."""
+        return sum(client.balance for client in self.clients.values())
+
     def available(self) -> int:
         """Number of tokens that may be handed out right now."""
-        return 0 if self.throttled else self.tokens
+        if self.ramp is None:
+            return self.tokens
+        return max(0, min(self.tokens, self.ramp.available - self.in_use()))
 
-    def regulate(self, stop: threading.Event, interval: float = 1.0) -> None:
-        """Stop handing out tokens while the system is under pressure."""
-        while not stop.wait(interval):
+    def regulate(self, stop: threading.Event) -> None:
+        """Hand out tokens gradually, and stop while the system is under pressure."""
+        while not stop.wait(self.interval):
             try:
                 throttled = self.monitor.update()
             except (OSError, ValueError) as exc:
                 self.log("[PRESSURE] cannot read pressure, regulation disabled: %s\n", exc)
-                throttled = False
+                with self.lock:
+                    self.ramp = None
+                    self.wake_readers()
                 stop.set()
+                return
             with self.lock:
-                if throttled == self.throttled:
-                    continue
-                self.throttled = throttled
-                self.log(
-                    "[PRESSURE] %s handing out tokens (%s), %d of %d tokens idle\n",
-                    "stopped" if throttled else "resumed",
-                    self.monitor.describe(),
-                    self.tokens,
-                    self.tokens + sum(client.balance for client in self.clients.values()),
-                )
+                in_use = self.in_use()
+                self.ramp.update(in_use, bool(self.readers or self.pollers), throttled)
+                if throttled != self.throttled:
+                    self.throttled = throttled
+                    self.log(
+                        "[PRESSURE] %s handing out tokens (%s), %d of %d tokens in use\n",
+                        "stopped" if throttled else "resumed",
+                        self.monitor.describe(),
+                        in_use,
+                        self.tokens + in_use,
+                    )
                 self.wake_readers()
 
     @staticmethod
@@ -452,7 +470,9 @@ class JobServer:
 
         stop = threading.Event()
         if self.monitor.start():
-            self.log("Limiting pressure to %s\n", self.monitor.describe())
+            self.log("Limiting pressure to %s, ramping up over %gs\n", self.monitor.describe(), self.ramp_time)
+            with self.lock:
+                self.ramp = TokenRamp(self.tokens, self.ramp_time, self.interval)
             threading.Thread(target=self.regulate, args=(stop,), daemon=True).start()
         elif self.monitor.limits:
             self.log("Pressure information is unavailable, continuing without pressure limits\n")
@@ -501,7 +521,11 @@ def main(argv: list[str]) -> int:
             resource: os.getenv(f"JOLT_JOBSERVER_PRESSURE_MAX_{resource.upper()}")
             for resource in RESOURCES
         }
-        jobserver = JobServer(tokens, devname, pressure)
+        jobserver = JobServer(
+            tokens, devname, pressure,
+            ramp_time=float(os.getenv("JOLT_JOBSERVER_RAMP_TIME", DEFAULT_RAMP_TIME)),
+            interval=float(os.getenv("JOLT_JOBSERVER_PRESSURE_INTERVAL", DEFAULT_INTERVAL)),
+        )
         print(f"Starting jobserver with {tokens} tokens on /dev/{devname}", file=sys.stderr)
         return jobserver.run(fuse_argv)
     except OSError as exc:
