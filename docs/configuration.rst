@@ -316,7 +316,8 @@ Available configuration keys:
     * - ``token``
       - String
       - | Token that authenticates Jolt with the cache service, sent as a bearer
-          token by the :ref:`HTTP <configuration-plugins-http>` storage provider.
+          token by this storage provider and by the
+          :ref:`HTTP <configuration-plugins-http>` storage provider.
           The ``JOLT_CACHE_TOKEN`` environment variable takes precedence.
           Without a token, the token of :ref:`jolt login <configuration-login>`
           is sent. See :ref:`configuration-services-cache-auth`.

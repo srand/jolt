@@ -8,6 +8,7 @@ from jolt import config
 from jolt import filesystem as fs
 from jolt import tools
 from jolt.error import raise_error_if, JoltError
+from jolt.tools import BearerAuth
 
 
 NAME = "cache"
@@ -27,6 +28,15 @@ class Cache(cache.StorageProvider):
         self._upload = config.getboolean(NAME, "upload", True)
         self._download = config.getboolean(NAME, "download", True)
         self._disabled = False
+        # Certificates of private authorities replace those of the system
+        self._verify = config.get_ca_cert() or True
+        raise_error_if(
+            config.get_cache_token() and not self._uri.startswith("https://") and not config.get_allow_insecure_token(),
+            "Refusing to send the cache token without TLS to {}, use an https:// URI", self._uri)
+
+    def _get_auth(self):
+        token = config.get_cache_token()
+        return BearerAuth(token) if token else None
 
     def _get_path(self, artifact):
         return artifact.tools.expand(
@@ -52,7 +62,9 @@ class Cache(cache.StorageProvider):
             url,
             artifact.get_archive_path(),
             exceptions=False,
-            timeout=TIMEOUT)
+            auth=self._get_auth(),
+            timeout=TIMEOUT,
+            verify=self._verify)
 
     def download_enabled(self):
         return not self._disabled and self._download
@@ -68,7 +80,9 @@ class Cache(cache.StorageProvider):
         return artifact.tools.upload(
             archive, url,
             exceptions=False,
-            timeout=TIMEOUT)
+            auth=self._get_auth(),
+            timeout=TIMEOUT,
+            verify=self._verify)
 
     def upload_enabled(self):
         return not self._disabled and self._upload
@@ -81,7 +95,9 @@ class Cache(cache.StorageProvider):
         file_map = {self._get_path(artifact): artifact for artifact in artifacts}
         try:
             data = {"files": list(file_map.keys())}
-            response = tools.http_session.post(self._file_uri, json=data, stream=True, timeout=TIMEOUT_HEAD)
+            response = tools.http_session.post(
+                self._file_uri, json=data, stream=True, timeout=TIMEOUT_HEAD,
+                auth=self._get_auth(), verify=self._verify)
         except ConnectTimeout:
             self._disabled = True
             log.warning(NAME_LOG + " failed to establish server connection, disabled")
@@ -110,7 +126,8 @@ class Cache(cache.StorageProvider):
 
         url = self._get_url(artifact)
         try:
-            response = tools.http_session.head(url, stream=True, timeout=TIMEOUT_HEAD)
+            response = tools.http_session.head(
+                url, stream=True, timeout=TIMEOUT_HEAD, auth=self._get_auth(), verify=self._verify)
 
         except ConnectTimeout:
             self._disabled = True

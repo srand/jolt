@@ -1,4 +1,4 @@
-from requests.auth import AuthBase, HTTPBasicAuth
+from requests.auth import HTTPBasicAuth
 from requests.exceptions import ConnectTimeout, RequestException
 from urllib.parse import urlparse, urlunparse
 import keyring
@@ -12,22 +12,12 @@ from jolt import config
 from jolt import filesystem as fs
 from jolt import tools
 from jolt.error import raise_error_if, JoltError
+from jolt.tools import BearerAuth
 
 
 NAME = "http"
 TIMEOUT = (3.5, 27)
 TIMEOUT_HEAD = (27, 27)
-
-
-class BearerAuth(AuthBase):
-    """ Authenticates requests with a bearer token. """
-
-    def __init__(self, token):
-        self.token = token
-
-    def __call__(self, request):
-        request.headers["Authorization"] = "Bearer " + self.token
-        return request
 
 
 class Http(cache.StorageProvider):

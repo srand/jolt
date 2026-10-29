@@ -53,7 +53,7 @@ from jinja2.exceptions import TemplateError
 from jinja2.runtime import Context
 from jinja2.utils import missing
 from requests import Session
-from requests.auth import HTTPBasicAuth
+from requests.auth import AuthBase, HTTPBasicAuth
 from urllib.parse import urlparse, urlunparse
 
 
@@ -72,6 +72,17 @@ READER_JOIN_TIMEOUT = 1
 
 
 http_session = Session()
+
+
+class BearerAuth(AuthBase):
+    """ Authenticates requests with a bearer token. """
+
+    def __init__(self, token):
+        self.token = token
+
+    def __call__(self, request):
+        request.headers["Authorization"] = "Bearer " + self.token
+        return request
 
 
 def stdout_write(line):
