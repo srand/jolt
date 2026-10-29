@@ -57,6 +57,7 @@ from jolt.pkgs import hdf5
 from jolt.pkgs import help2man
 from jolt.pkgs import icu
 from jolt.pkgs import inja
+from jolt.pkgs import json_c
 from jolt.pkgs import jsoncpp
 from jolt.pkgs import krb5
 from jolt.pkgs import libarchive
@@ -208,6 +209,7 @@ class Default(Alias):
         "harfbuzz",
         "hdf5",
         "inja",
+        "json-c",
         "jsoncpp",
         "libarchive",
         "libbzip2",
