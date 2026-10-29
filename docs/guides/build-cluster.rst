@@ -43,13 +43,21 @@ of the same tool are required.
 Build Parameters
 ~~~~~~~~~~~~~~~~
 
-Build submissions carry the ``[params]`` configuration section as
-``config.*`` entries in ``BuildEnvironment.parameters``. They can be used to
-attribute builds, for example to a user and a CI job:
+Build submissions carry the ``[params]`` section of the configuration to the
+scheduler and the workers. The parameters can be used to attribute builds, for
+example to a user and a CI job:
 
   .. code:: bash
 
     $ jolt -c params.username=alice -c params.origin="$BUILD_URL" build -n my-task
+
+They can also be set in the configuration file. Values are expanded on the
+client before the build is submitted, so they may refer to its environment:
+
+  .. code:: ini
+
+    [params]
+    username = {environ[USER]}
 
 The scheduler forwards the parameters unchanged in administration events.
 They are supplied by the client and are not verified.

@@ -390,6 +390,6 @@ def import_params(params: dict):
 def export_params():
     """ Get user-defined parameters (-c params.key=value). """
     parameters = []
-    for key, value in options("params"):
-        parameters.append(common_pb.Property(key="config." + key, value=value))
+    for key, _ in options("params"):
+        parameters.append(common_pb.Property(key="config." + key, value=get("params", key)))
     return parameters
