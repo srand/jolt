@@ -1,0 +1,25 @@
+# Cache configuration for the docker compose deployment, used when the
+# cache.yaml config is enabled in jolt.yaml.
+#
+# Authentication: once tokens are configured, clients without a token have
+# no permissions. Create tokens with `jolt token <name>`, which prints
+# the entries below with the hashes of the tokens.
+
+# auth:
+#   # Allow anyone to download artifacts:
+#   # anonymous: [read]
+#   tokens:
+#     # Workers, and the executors they start, download and upload artifacts.
+#     - name: workers
+#       sha256: <hash of the workers token>
+#       permissions: [read, write]
+#     # Users download artifacts.
+#     - name: users
+#       sha256: <hash of the users token>
+#       permissions: [read]
+#   # Users may instead sign in with an OpenID Connect provider, see
+#   # https://jolt.readthedocs.io/en/latest/guides/build-cluster.html#authentication
+#   # oidc:
+#   #   issuer: https://keycloak.example.com/realms/jolt
+#   #   audience: jolt
+#   #   permissions: [read]

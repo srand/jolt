@@ -1,8 +1,43 @@
+# Authentication between the services is commented out below. To enable it:
+#
+#  1. Create a token for each kind of client with `jolt token <name>`, for
+#     example `jolt token workers -p read -p write` for the cache.
+#  2. Add their hashes to cache.yaml and scheduler.yaml in the ConfigMap.
+#  3. Add the tokens to the jolt-tokens Secret, which the workers and the
+#     dashboard read, and give users theirs in client.conf.
+#
+# Tokens are only sent over TLS. Either give the cache and the scheduler a
+# certificate, or allow sending tokens without TLS inside the cluster with
+# JOLT_ALLOW_INSECURE_TOKEN. With authentication, the metrics endpoints also
+# require a token with the read permission.
+#
+# apiVersion: v1
+# kind: Secret
+# metadata:
+#   name: jolt-tokens
+# type: Opaque
+# stringData:
+#   # Worker permission of the scheduler, read and write of the cache.
+#   workers: <workers token>
+#   # Read permission of the scheduler.
+#   dashboard: <dashboard token>
+# ---
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: jolt-config
 data:
+  # Add "anonymous: [read]" to auth to allow anyone to download artifacts.
+  # cache.yaml:
+  #   |-
+  #     auth:
+  #       tokens:
+  #         - name: workers
+  #           sha256: <hash of the workers token>
+  #           permissions: [read, write]
+  #         - name: users
+  #           sha256: <hash of the users token>
+  #           permissions: [read]
   scheduler.yaml:
     |-
       listen_grpc:
@@ -17,6 +52,17 @@ data:
         size: 10GB
         storage: disk
         path: /root/logstash
+      # auth:
+      #   tokens:
+      #     - name: workers
+      #       sha256: <hash of the workers token>
+      #       permissions: [worker]
+      #     - name: dashboard
+      #       sha256: <hash of the dashboard token>
+      #       permissions: [read]
+      #     - name: users
+      #       sha256: <hash of the users token>
+      #       permissions: [build, read]
   worker.conf:
     |-
       # This configuration is used by the Jolt application
@@ -75,7 +121,15 @@ spec:
           volumeMounts:
             - name: jolt-cache
               mountPath: /data
+            # - name: jolt-config
+            #   mountPath: /etc/jolt
       volumes:
+      # - name: jolt-config
+      #   configMap:
+      #     name: jolt-config
+      #     items:
+      #       - key: cache.yaml
+      #         path: cache.yaml
       - name: jolt-cache
         # FIXME: Replace with an actual persistent volume claim.
         #
@@ -106,6 +160,13 @@ spec:
             # The dashboard subscribes to the scheduler's event stream.
             - name: JOLT_SCHEDULER_URI
               value: tcp://jolt-scheduler:9090
+            # - name: JOLT_SCHEDULER_TOKEN
+            #   valueFrom:
+            #     secretKeyRef:
+            #       name: jolt-tokens
+            #       key: dashboard
+            # - name: JOLT_ALLOW_INSECURE_TOKEN
+            #   value: "true"
           ports:
             - containerPort: 80
 ---
@@ -169,6 +230,19 @@ spec:
               value: "http://jolt-cache:8080"
             - name: JOLT_SCHEDULER_GRPC_URI
               value: "tcp://jolt-scheduler:9090"
+            # The worker passes the tokens on to the executors it starts.
+            # - name: JOLT_SCHEDULER_TOKEN
+            #   valueFrom:
+            #     secretKeyRef:
+            #       name: jolt-tokens
+            #       key: workers
+            # - name: JOLT_CACHE_TOKEN
+            #   valueFrom:
+            #     secretKeyRef:
+            #       name: jolt-tokens
+            #       key: workers
+            # - name: JOLT_ALLOW_INSECURE_TOKEN
+            #   value: "true"
           image: robrt/jolt-worker:latest
           volumeMounts:
             - name: jolt-cache

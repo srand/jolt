@@ -262,10 +262,11 @@ A token is a random string that grants permissions. Create one with:
 
   .. code:: bash
 
-    $ jolt-cache token ci
+    $ jolt token ci --permission read --permission write
 
 The command prints the token and the entry for the ``auth`` section of
-``cache.yaml`` or ``scheduler.yaml``. The configuration only contains the
+``cache.yaml`` or ``scheduler.yaml``, which is the same for both services
+except for the permissions. The configuration only contains the
 SHA-256 hash of the token. Once any token is configured, clients without a
 token have no permissions, unless ``auth.anonymous`` grants them some.
 

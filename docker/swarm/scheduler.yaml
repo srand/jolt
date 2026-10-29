@@ -24,3 +24,29 @@ public_http:
 # Storage here is in memory (the default), so this is RAM, not disk.
 logstash:
   size: 1GB
+
+# Authentication: once tokens are configured, clients without a token have
+# no permissions. Create tokens with `jolt token <name>`, which prints
+# the entries below with the hashes of the tokens. The worker token can be
+# the same as the one the workers use with the cache.
+#
+# With authentication, metrics and task logs also require the read
+# permission. Browsers ask for a password, which is the token.
+
+# auth:
+#   tokens:
+#     - name: workers
+#       sha256: <hash of the workers token>
+#       permissions: [worker]
+#     - name: dashboard
+#       sha256: <hash of the dashboard token>
+#       permissions: [read]
+#     - name: users
+#       sha256: <hash of the users token>
+#       permissions: [build, read]
+#   # Users may instead sign in with an OpenID Connect provider, see
+#   # https://jolt.readthedocs.io/en/latest/guides/build-cluster.html#authentication
+#   # oidc:
+#   #   issuer: https://keycloak.example.com/realms/jolt
+#   #   audience: jolt
+#   #   permissions: [build, read]

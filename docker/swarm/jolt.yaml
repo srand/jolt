@@ -1,4 +1,18 @@
 version: "3.5"
+
+# Authentication between the services is commented out below. To enable it:
+#
+#  1. Create a token for each kind of client with `jolt token <name>`, for
+#     example `jolt token workers -p read -p write` for the cache.
+#  2. Add their hashes to cache.yaml and scheduler.yaml.
+#  3. Give the tokens to the workers and the dashboard below, and to users
+#     in client.conf.
+#
+# Tokens are only sent over TLS. Either give the cache and the scheduler a
+# certificate, or allow sending tokens without TLS on a trusted network with
+# JOLT_ALLOW_INSECURE_TOKEN. Keep the tokens out of this file in production,
+# for example in an env_file that isn't checked in.
+
 services:
   cache:
     image: robrt/jolt-cache:latest
@@ -6,6 +20,15 @@ services:
       - JOLT_CACHE_INSECURE=true
       - JOLT_CACHE_MAX_SIZE=100GB
       - JOLT_CACHE_VERBOSITY=2
+      # TLS, instead of JOLT_CACHE_INSECURE:
+      # - JOLT_CACHE_CERT=/run/secrets/cert.pem
+      # - JOLT_CACHE_CERT_KEY=/run/secrets/key.pem
+    # configs:
+    #   - source: cache.yaml
+    #     target: /etc/jolt/cache.yaml
+    # secrets:
+    #   - cert.pem
+    #   - key.pem
     ports:
       - "8081:8080"
       - "9091:9090"
@@ -15,10 +38,20 @@ services:
     image: robrt/jolt-dashboard:latest
     environment:
       - JOLT_SCHEDULER_URI=tcp://scheduler:9090
+      # Token with the read permission of the scheduler:
+      # - JOLT_SCHEDULER_TOKEN=<dashboard token>
+      # - JOLT_ALLOW_INSECURE_TOKEN=true
     ports:
       - "80:80"
   scheduler:
     image: robrt/jolt-scheduler:latest
+    # TLS:
+    # environment:
+    #   - JOLT_CERT=/run/secrets/cert.pem
+    #   - JOLT_CERT_KEY=/run/secrets/key.pem
+    # secrets:
+    #   - cert.pem
+    #   - key.pem
     configs:
       - source: scheduler.yaml
         target: /etc/jolt/scheduler.yaml
@@ -30,6 +63,14 @@ services:
       - "JOLT_CACHE_DIR=/data/cache"
       - "JOLT_CACHE_GRPC_URI=tcp://cache:9090"
       - "JOLT_CACHE_HTTP_URI=http://cache:8080"
+      # Tokens with the worker permission of the scheduler, and the read and
+      # write permissions of the cache. The worker passes them on to the
+      # executors it starts.
+      # - "JOLT_SCHEDULER_TOKEN=<workers token>"
+      # - "JOLT_CACHE_TOKEN=<workers token>"
+      # - "JOLT_ALLOW_INSECURE_TOKEN=true"
+      # With TLS, use tls:// and https:// URIs, and give the certificate of
+      # a private authority with JOLT_CA_CERT.
     image: robrt/jolt-worker:latest
     deploy:
       replicas: 2
@@ -40,10 +81,17 @@ services:
       - cache-node:/data/cache
       - /etc/machine-id:/etc/machine-id
 configs:
+  # cache.yaml:
+  #   file: ./cache.yaml
   scheduler.yaml:
     file: ./scheduler.yaml
   worker.conf:
     file: ./worker.conf
+# secrets:
+#   cert.pem:
+#     file: ./cert.pem
+#   key.pem:
+#     file: ./key.pem
 volumes:
   cache-node:
   cache-http:
