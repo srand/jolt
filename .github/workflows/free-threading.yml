@@ -1,0 +1,54 @@
+name: Free-threading
+
+# Runs the internal tests on free-threaded Python with the GIL disabled. Some
+# dependencies don't declare that they can run without the GIL yet (brotli,
+# and py7zr's extension modules), so it is disabled explicitly.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [master]
+    paths:
+      - "jolt/**"
+      - "tests/**"
+      - "setup.py"
+      - ".github/workflows/free-threading.yml"
+  pull_request:
+    paths:
+      - "jolt/**"
+      - "tests/**"
+      - "setup.py"
+      - ".github/workflows/free-threading.yml"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.14t'
+
+      - name: Install Jolt
+        run: pip install --upgrade -e .[allure]
+
+      - name: Install fstree
+        run: |
+          FSTREE_VERSION=$(sed -n 's/^fstree_version = "\(.*\)"$/\1/p' build.jolt)
+          test -n "$FSTREE_VERSION"
+          sudo curl -fsSL -o /usr/local/bin/fstree \
+            https://github.com/srand/fstree/releases/download/${FSTREE_VERSION}/fstree-linux-x86_64
+          sudo chmod 0755 /usr/local/bin/fstree
+
+      - name: Run tests
+        working-directory: tests
+        env:
+          PYTHON_GIL: "0"
+          JOLT_NO_NETWORK_TESTS: "1"
+        run: |
+          python -c "import sys; assert not sys._is_gil_enabled()"
+          jolt -c jolt.cachedir=${{ github.workspace }}/cache build \
+            int/git int/influence int/loader int/log int/pkgs int/tools int/utils
