@@ -11,7 +11,7 @@ class Asio(autotools.Autotools):
     name = "asio"
     version = Parameter("1.38.2", help="Asio version.")
     requires_git = ["git:url=https://github.com/chriskohlhoff/asio.git,rev=asio-{_version}"]
-    srcdir = "{git[asio]}/asio"
+    srcdir = "{git[asio]}"
 
     @property
     def _version(self):
