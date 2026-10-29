@@ -1,4 +1,4 @@
-from requests.auth import HTTPBasicAuth
+from requests.auth import AuthBase, HTTPBasicAuth
 from requests.exceptions import ConnectTimeout, RequestException
 from urllib.parse import urlparse, urlunparse
 import keyring
@@ -19,6 +19,17 @@ TIMEOUT = (3.5, 27)
 TIMEOUT_HEAD = (27, 27)
 
 
+class BearerAuth(AuthBase):
+    """ Authenticates requests with a bearer token. """
+
+    def __init__(self, token):
+        self.token = token
+
+    def __call__(self, request):
+        request.headers["Authorization"] = "Bearer " + self.token
+        return request
+
+
 class Http(cache.StorageProvider):
     def __init__(self, cache):
         super(Http, self).__init__()
@@ -31,6 +42,10 @@ class Http(cache.StorageProvider):
         self._disabled = False
 
     def _get_auth(self):
+        token = config.get_cache_token()
+        if token:
+            return BearerAuth(token)
+
         service = config.get(NAME, "keyring.service")
         if not service:
             return None
@@ -42,7 +57,7 @@ class Http(cache.StorageProvider):
             config.set(NAME, "keyring.username", username)
             config.save()
 
-        password = config.get(NAME, "keyring.password") or keyring.get_password(NAME, username)
+        password = config.get(NAME, "keyring.password") or keyring.get_password(service, username)
         if not password:
             password = getpass.getpass(NAME + " password: ")
             raise_error_if(not password, "no password in keyring for " + NAME)
@@ -68,6 +83,7 @@ class Http(cache.StorageProvider):
             url,
             artifact.get_archive_path(),
             exceptions=False,
+            auth=self._get_auth(),
             timeout=TIMEOUT)
 
     def download_enabled(self):

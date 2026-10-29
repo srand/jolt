@@ -298,6 +298,13 @@ Available configuration keys:
           synchronize workspaces between workers in distributed execution.
         | Default: ``tcp://cache:9090``
 
+    * - ``token``
+      - String
+      - | Token that authenticates Jolt with the cache service, sent as a bearer
+          token by the :ref:`HTTP <configuration-plugins-http>` storage provider.
+          The ``JOLT_CACHE_TOKEN`` environment variable takes precedence.
+          See :ref:`configuration-services-cache-auth`.
+
     * - ``http_uri``
       - String
       - | The HTTP URI of the remote artifact cache. The targeted service is expected
@@ -423,6 +430,8 @@ the Jolt configuration. These configuration keys exist:
         | Default: ``false``
 
 
+.. _configuration-plugins-http:
+
 HTTP
 ^^^^
 
@@ -475,8 +484,9 @@ These configuration keys exist:
 
     * - ``keyring.service``
       - String
-      - Keyring service identifier. Currently, only basic authentication is
-        supported. Authentication is disabled if left unset.
+      - Keyring service identifier for basic authentication. Authentication is
+        disabled if left unset. A token configured with ``cache.token`` or
+        ``JOLT_CACHE_TOKEN`` is used instead when set.
 
     * - ``keyring.username``
       - String

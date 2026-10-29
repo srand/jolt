@@ -248,6 +248,11 @@ def get_cachedir():
     return get("jolt", "cachedir", default)
 
 
+def get_cache_token():
+    """ Token that authenticates Jolt with the cache service, if any. """
+    return os.environ.get("JOLT_CACHE_TOKEN") or get("cache", "token")
+
+
 def get_workdir():
     return _workdir
 
