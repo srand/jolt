@@ -125,8 +125,10 @@ These configuration keys can also be set from command line:
 
   .. code:: bash
 
-    $ jolt config scheduler.uri tcp://127.0.0.1
-    $ jolt config http.uri http://127.0.0.1
+    $ jolt config scheduler.grpc_uri tcp://127.0.0.1:9090
+    $ jolt config scheduler.http_uri http://127.0.0.1:8080
+    $ jolt config cache.grpc_uri tcp://127.0.0.1:9091
+    $ jolt config cache.http_uri http://127.0.0.1:8081
 
 If your local machine is not part of the swarm you will need to replace
 ``127.0.0.1`` with the IP-address of one of the nodes in the swarm or,
@@ -193,8 +195,10 @@ The client configuration keys can also be set from command line:
 
     .. code:: bash
 
-      $ jolt config scheduler.uri tcp://<scheduler-service-name-or-ip>:<port>
-      $ jolt config http.uri http://<cache-service-name-or-ip>:<port>
+      $ jolt config scheduler.grpc_uri tcp://<scheduler-host>:9090
+      $ jolt config scheduler.http_uri http://<scheduler-host>:8080
+      $ jolt config cache.grpc_uri tcp://<cache-host>:9090
+      $ jolt config cache.http_uri http://<cache-host>:8080
 
 To execute a task in the cluster, pass the ``-n/--network`` flag to the build command:
 
@@ -237,7 +241,8 @@ Clients then connect with ``https://`` and ``tls://`` URIs:
     grpc_uri = tls://cache.example.com:9090
 
     [scheduler]
-    uri = tls://scheduler.example.com:9090
+    grpc_uri = tls://scheduler.example.com:9090
+    http_uri = https://scheduler.example.com:8080
 
 Clients verify the certificates of services with the authorities of the
 system. For a private authority, point ``jolt.ca_cert`` or ``JOLT_CA_CERT``

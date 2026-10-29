@@ -9,6 +9,8 @@ data:
        - tcp://:9090
       listen_http:
        - tcp://:8080
+      # FIXME: Replace with an address of the scheduler that the browsers
+      # of users can reach. The dashboard links to task logs with it.
       public_http:
        - http://jolt-scheduler:8080
       logstash:
@@ -36,10 +38,10 @@ data:
       [scheduler]
       # URI of the Jolt scheduler inside the build cluster:
       grpc_uri = tcp://jolt-scheduler:9090
-      http_uri = tcp://jolt-scheduler:8080
+      http_uri = http://jolt-scheduler:8080
 ---
 apiVersion: apps/v1
-kind: Deployment8080
+kind: Deployment
 metadata:
   name: jolt-cache
 spec:
@@ -105,7 +107,7 @@ spec:
             - name: JOLT_SCHEDULER_URI
               value: tcp://jolt-scheduler:9090
           ports:
-            - containerPort: 8080
+            - containerPort: 80
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -161,10 +163,12 @@ spec:
           env:
             - name: JOLT_CACHE_DIR
               value: /data/cache
+            - name: JOLT_CACHE_GRPC_URI
+              value: "tcp://jolt-cache:9090"
+            - name: JOLT_CACHE_HTTP_URI
+              value: "http://jolt-cache:8080"
             - name: JOLT_SCHEDULER_GRPC_URI
               value: "tcp://jolt-scheduler:9090"
-            - name: JOLT_SCHEDULER_HTTP_URI
-              value: "http://jolt-scheduler:8080"
           image: robrt/jolt-worker:latest
           volumeMounts:
             - name: jolt-cache
@@ -211,7 +215,7 @@ spec:
     - name: "http"
       port: 8080
       targetPort: 8080
-    - name: "http"
+    - name: "grpc"
       port: 9090
       targetPort: 9090
   type: LoadBalancer
@@ -225,8 +229,8 @@ spec:
     app: jolt-dashboard
   ports:
     - name: "http"
-      port: 8080
-      targetPort: 8080
+      port: 80
+      targetPort: 80
   type: LoadBalancer
 ---
 apiVersion: v1
@@ -281,5 +285,5 @@ spec:
               service:
                 name: jolt-dashboard
                 port:
-                  number: 8080
+                  number: 80
 ---
