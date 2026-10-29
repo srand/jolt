@@ -4,6 +4,8 @@ name: Packages
 # keeps going past failures, so that every package that can be built is built.
 # The Jolt cache is saved after every run, also when the build fails or times
 # out, so that the next run continues where the previous one stopped.
+# Artifacts are also shared through the remote cache, which needs the token of
+# the production environment.
 
 on:
   workflow_dispatch:
@@ -22,6 +24,7 @@ jobs:
   build:
     name: ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
+    environment: production
     timeout-minutes: 360
     strategy:
       fail-fast: false
@@ -38,6 +41,8 @@ jobs:
         shell: bash
     env:
       JOLT_CACHE: ${{ github.workspace }}/cache
+      JOLT_CACHE_URI: https://kaffekanna.asuscomm.com:8888/files
+      JOLT_CACHE_TOKEN: ${{ secrets.JOLT_CACHE_TOKEN }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -101,7 +106,7 @@ jobs:
         timeout-minutes: 330
         run: |
           set -o pipefail
-          jolt -c jolt.cachedir="$JOLT_CACHE" -c jolt.cachesize=1T build -k default 2>&1 | tee "$RUNNER_TEMP/jolt.log"
+          jolt -c jolt.cachedir="$JOLT_CACHE" -c jolt.cachesize=1T -c http.uri="$JOLT_CACHE_URI" build -k default 2>&1 | tee "$RUNNER_TEMP/jolt.log"
 
       - name: Summarize
         if: always()
