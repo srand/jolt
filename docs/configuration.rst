@@ -43,7 +43,7 @@ The ``[jolt]`` config section contains global configuration:
       - Boolean
       - | Send the tokens of services without TLS. Jolt refuses to by default.
           The ``JOLT_ALLOW_INSECURE_TOKEN`` environment variable takes precedence.
-          See :ref:`configuration-services-tls`.
+          See :ref:`build-cluster-tls`.
         | Default: ``false``
 
     * - ``ca_cert``
@@ -51,7 +51,7 @@ The ``[jolt]`` config section contains global configuration:
       - | PEM file with the certificates of the authorities that the certificates
           of services are verified with, such as a private authority. The
           ``JOLT_CA_CERT`` environment variable takes precedence.
-          See :ref:`configuration-services-tls`.
+          See :ref:`build-cluster-tls`.
 
     * - ``cachedir``
       - String
@@ -258,24 +258,9 @@ Auth
 ^^^^
 
 The ``[auth]`` section configures the OpenID Connect provider that
-``jolt login`` signs in with, such as Keycloak, Dex or Authentik in front of
-an LDAP directory. ``jolt login`` signs in in one of two ways:
-
-- With your user name and password in the terminal, with the OAuth password
-  grant, if the provider allows it for the client. In Keycloak, enable
-  *Direct access grants* for the client. This doesn't work with providers
-  that require a second factor or send you on to another provider.
-- With the browser otherwise, with the OAuth device authorization grant.
-  Jolt opens the browser if there is a display, and prints the URL and a
-  code to enter there, and waits until you have signed in.
-
-The tokens are stored in the system keyring. Jolt sends the ID token to the
-cache and scheduler services, unless tokens are configured for them, and
-refreshes it with the refresh token when it is about to expire. Request the
-``offline_access`` scope to get a refresh token, or the login only lasts as
-long as the ID token. ``jolt logout`` removes the tokens. The services must
-be configured to accept the tokens, see
-:ref:`configuration-services-cache-oidc`.
+``jolt login`` signs in with. Jolt sends the ID token of the login to the
+cache and scheduler services, unless tokens are configured for them. See
+:ref:`build-cluster-oidc`.
 
   .. list-table::
     :widths: 20 10 70
@@ -315,14 +300,6 @@ be configured to accept the tokens, see
       - String
       - | User name suggested when signing in with a password.
         | Default: the name of the user on the computer.
-
-Example:
-
-  .. code:: text
-
-    [auth]
-    issuer = https://keycloak.example.com/realms/jolt
-
 
 Autoweight
 ^^^^^^^^^^
@@ -392,7 +369,7 @@ Available configuration keys:
           :ref:`HTTP <configuration-plugins-http>` storage provider.
           The ``JOLT_CACHE_TOKEN`` environment variable takes precedence.
           Without a token, the token of :ref:`jolt login <configuration-auth>`
-          is sent. See :ref:`configuration-services-cache-auth`.
+          is sent. See :ref:`build-cluster-tokens`.
 
     * - ``http_uri``
       - String
@@ -859,7 +836,7 @@ Available configuration keys:
       - | Token that authenticates Jolt with the scheduler service. The
           ``JOLT_SCHEDULER_TOKEN`` environment variable takes precedence.
           Without a token, the token of :ref:`jolt login <configuration-auth>`
-          is sent. See :ref:`configuration-services-scheduler-auth`.
+          is sent. See :ref:`build-cluster-tokens`.
 
 Configuration variables for the scheduler service itself can be found here:
 :ref:`Scheduler <configuration-services-scheduler>`
@@ -1052,22 +1029,7 @@ Services
 All Jolt services can be deployed using container images. The following
 sections detail how to configure the services using environment variables
 and/or configuration files.
-
-.. _configuration-services-tls:
-
-TLS
-^^^
-
-The cache and the scheduler serve TLS on both HTTP and gRPC when they are
-configured with a certificate and private key. Clients connect with TLS to
-``https://`` and ``tls://`` URIs, and verify the certificates of services
-with the authorities of the system, or with those in a PEM file configured
-with ``ca_cert`` or ``JOLT_CA_CERT``, such as a private authority. The tokens
-of services are only sent over TLS, unless ``allow_insecure_token`` or
-``JOLT_ALLOW_INSECURE_TOKEN`` explicitly allows sending them without it.
-
-Jolt, its workers, ``schedulerctl``, fstree and the dashboard all use these
-settings.
+To secure them with TLS and authentication, see :ref:`build-cluster-auth`.
 
 .. _configuration-services-cache:
 
@@ -1199,6 +1161,57 @@ The cache service can be configured using environment variables and/or a configu
           on the gRPC channel from client to scheduler.
         | Default: ``5m``.
 
+    * - ``-``
+      - ``auth.anonymous``
+      - List
+      - | Permissions of clients without a token: ``read`` and ``write``.
+        | Default: ``[read, write]`` without tokens or ``auth.oidc``, ``[]`` with them.
+
+    * - ``-``
+      - ``auth.tokens``
+      - List
+      - | Tokens accepted from clients. Each token has a ``name``, used in logs,
+          the ``sha256`` hash of the token and a list of ``permissions``.
+          See :ref:`build-cluster-tokens`.
+
+    * - ``-``
+      - ``auth.oidc.issuer``
+      - String
+      - | URL of the OpenID Connect provider whose ID tokens are accepted, the
+          ``iss`` claim of its tokens. See :ref:`build-cluster-oidc`.
+
+    * - ``-``
+      - ``auth.oidc.audience``
+      - String
+      - | Client ID that the tokens must be issued to, ``auth.client_id`` of
+          the Jolt configuration.
+
+    * - ``-``
+      - ``auth.oidc.permissions``
+      - List
+      - | Permissions of all users of the provider.
+        | Default: ``[]``
+
+    * - ``-``
+      - ``auth.oidc.groups``
+      - List
+      - | Permissions of the members of groups. Each group has a ``name`` and
+          a list of ``permissions``.
+
+    * - ``-``
+      - ``auth.oidc.groups_claim``
+      - String
+      - | Claim with the groups of the user. Nested claims are separated by
+          dots, such as ``realm_access.roles``.
+        | Default: ``groups``
+
+    * - ``-``
+      - ``auth.oidc.name_claim``
+      - String
+      - | Claim with the name of the user, used in logs. The subject is used
+          if the claim is missing.
+        | Default: ``preferred_username``
+
 Example:
 
   .. code:: yaml
@@ -1210,122 +1223,6 @@ Example:
     grpc:
       keep_alive_time: "2h"
       keep_alive_timeout: "20s"
-
-.. _configuration-services-cache-auth:
-
-Authentication
-""""""""""""""
-
-Clients authenticate with tokens, which grant ``read`` and ``write``
-permissions. Reading is required to download and look up artifacts, writing
-to upload them. Without tokens in the configuration, all clients may read and
-write. With tokens, clients without a token have no permissions unless
-``auth.anonymous`` grants them some.
-
-The ``jolt-cache token <name>`` command creates a random token and prints the
-entry for the configuration. Only the SHA-256 hash of the token is stored in
-the configuration. Clients send the token as a bearer token, or as the
-password of basic authentication. Use HTTPS, since the token authenticates
-anyone who sees it.
-
-  .. list-table::
-    :widths: 30 10 60
-    :header-rows: 1
-    :class: tight-table
-
-    * - Config File Key
-      - Type
-      - Description
-
-    * - ``auth.anonymous``
-      - List
-      - | Permissions of clients without a token.
-        | Default: ``[read, write]`` without tokens, ``[]`` with tokens.
-
-    * - ``auth.tokens``
-      - List
-      - | Tokens accepted from clients. Each token has a ``name``, used in logs,
-          the ``sha256`` hash of the token and a list of ``permissions``.
-
-Example, where anyone may download artifacts but only CI may upload them:
-
-  .. code:: yaml
-
-    # /etc/jolt/cache.yaml
-    auth:
-      anonymous: [read]
-      tokens:
-        - name: ci
-          sha256: 31f69e6b9c24b00832b59b38a340b5346185c93eb9bb6bb54b2ef985aafdcb8f
-          permissions: [read, write]
-
-CI then configures the token with the ``JOLT_CACHE_TOKEN`` environment
-variable, or with ``token`` in the ``cache`` section of the Jolt configuration.
-
-.. _configuration-services-cache-oidc:
-
-OpenID Connect
-""""""""""""""
-
-The services also accept ID tokens issued by an OpenID Connect provider, such
-as Keycloak, Dex or Authentik in front of an LDAP directory. Users sign in
-with :ref:`jolt login <configuration-auth>`, and every service verifies
-their tokens with the public keys of the provider, so one login works for all
-of them. The provider is configured in ``auth.oidc``, and its permissions are
-granted in addition to those of static tokens. Static tokens remain useful
-for CI and workers.
-
-  .. list-table::
-    :widths: 30 10 60
-    :header-rows: 1
-    :class: tight-table
-
-    * - Config File Key
-      - Type
-      - Description
-
-    * - ``auth.oidc.issuer``
-      - String
-      - | URL of the provider, the ``iss`` claim of its tokens.
-    * - ``auth.oidc.audience``
-      - String
-      - | Client ID that tokens must be issued to, the ``client_id`` of the
-          ``auth`` section of the Jolt configuration.
-    * - ``auth.oidc.permissions``
-      - List
-      - | Permissions of all users of the provider.
-        | Default: ``[]``
-    * - ``auth.oidc.groups``
-      - List
-      - | Permissions of the members of groups. Each group has a ``name`` and
-          a list of ``permissions``.
-    * - ``auth.oidc.groups_claim``
-      - String
-      - | Claim with the groups of the user. Nested claims are separated by
-          dots, such as ``realm_access.roles`` for the roles of Keycloak.
-        | Default: ``groups``
-    * - ``auth.oidc.name_claim``
-      - String
-      - | Claim with the name of the user, used in logs. The subject is used
-          if the claim is missing.
-        | Default: ``preferred_username``
-
-The provider is contacted when the first token is verified, so services start
-even when it is unavailable. Example, where all users may download artifacts
-and members of the ``jolt-ci`` group may also upload them:
-
-  .. code:: yaml
-
-    # /etc/jolt/cache.yaml
-    auth:
-      oidc:
-        issuer: https://keycloak.example.com/realms/jolt
-        audience: jolt
-        permissions: [read]
-        groups:
-          - name: jolt-ci
-            permissions: [write]
-
 
 Dashboard
 ^^^^^^^^^
@@ -1522,6 +1419,49 @@ The scheduler can be configured using environment variables and/or a configurati
           on the gRPC channel from client to scheduler.
         | Default: ``5m``.
 
+    * - ``-``
+      - ``auth.anonymous``
+      - | Permissions of clients without a token: ``build``, ``worker``, ``read`` and ``admin``.
+        | Default: ``[read, write]`` without tokens or ``auth.oidc``, ``[]`` with them.
+
+    * - ``-``
+      - ``auth.tokens``
+      - | Tokens accepted from clients. Each token has a ``name``, used in logs,
+          the ``sha256`` hash of the token and a list of ``permissions``.
+          See :ref:`build-cluster-tokens`.
+
+    * - ``-``
+      - ``auth.oidc.issuer``
+      - | URL of the OpenID Connect provider whose ID tokens are accepted, the
+          ``iss`` claim of its tokens. See :ref:`build-cluster-oidc`.
+
+    * - ``-``
+      - ``auth.oidc.audience``
+      - | Client ID that the tokens must be issued to, ``auth.client_id`` of
+          the Jolt configuration.
+
+    * - ``-``
+      - ``auth.oidc.permissions``
+      - | Permissions of all users of the provider.
+        | Default: ``[]``
+
+    * - ``-``
+      - ``auth.oidc.groups``
+      - | Permissions of the members of groups. Each group has a ``name`` and
+          a list of ``permissions``.
+
+    * - ``-``
+      - ``auth.oidc.groups_claim``
+      - | Claim with the groups of the user. Nested claims are separated by
+          dots, such as ``realm_access.roles``.
+        | Default: ``groups``
+
+    * - ``-``
+      - ``auth.oidc.name_claim``
+      - | Claim with the name of the user, used in logs. The subject is used
+          if the claim is missing.
+        | Default: ``preferred_username``
+
 Example:
 
   .. code:: yaml
@@ -1533,76 +1473,6 @@ Example:
     grpc:
       keep_alive_time: "2h"
       keep_alive_timeout: "20s"
-
-.. _configuration-services-scheduler-auth:
-
-Authentication
-""""""""""""""
-
-Clients of the scheduler authenticate with tokens in the same way as clients
-of the :ref:`cache <configuration-services-cache-auth>`, configured in the
-``auth`` section of ``scheduler.yaml``. Tokens grant these permissions:
-
-  .. list-table::
-    :widths: 20 80
-    :header-rows: 1
-    :class: tight-table
-
-    * - Permission
-      - Allows
-    * - ``build``
-      - Building and cancelling builds, and running their tasks. Clients that
-        build also need ``read`` to see the logs of their tasks.
-    * - ``worker``
-      - Executing tasks, required by workers and the executors they start.
-    * - ``read``
-      - Listing builds and workers, following events and reading logs.
-    * - ``admin``
-      - Cancelling any build, rescheduling tasks and debugging the scheduler.
-        Administrators also need ``read`` to list builds and workers.
-
-Logs are opened in a browser, which asks for a user name and password.
-The token is the password, and the user name is ignored.
-
-Create tokens with ``jolt-cache token <name>``. Clients only send tokens over
-TLS, see :ref:`configuration-services-tls`.
-
-Example:
-
-  .. code:: yaml
-
-    # /etc/jolt/scheduler.yaml
-    auth:
-      tokens:
-        - name: developers
-          sha256: 9c56cc51b374c3ba189210d5b6d4bf57790d351c96c47c02190ecf1e430635ab
-          permissions: [build, read]
-        - name: workers
-          sha256: 4c1e0fb8de8c8e4c4f5b4ba9c3aa6a9ac5c3d7fb22bb4b8b0f4cbf5e8b0b6c3e
-          permissions: [worker]
-
-The scheduler accepts tokens of an OpenID Connect provider in the same way
-as the cache, see :ref:`configuration-services-cache-oidc`. Example, where
-all users may build:
-
-  .. code:: yaml
-
-    # /etc/jolt/scheduler.yaml
-    auth:
-      oidc:
-        issuer: https://keycloak.example.com/realms/jolt
-        audience: jolt
-        permissions: [build, read]
-        groups:
-          - name: jolt-admins
-            permissions: [admin]
-
-Jolt sends its token with ``token`` in the ``scheduler`` section of the
-configuration, or with the ``JOLT_SCHEDULER_TOKEN`` environment variable.
-Without a token, it sends the token of ``jolt login``.
-Workers use ``scheduler_token``, ``schedulerctl`` uses ``scheduler_token`` in
-``schedulerctl.yaml`` or ``JOLT_SCHEDULER_TOKEN``.
-
 
 Worker
 ^^^^^^
@@ -1750,7 +1620,7 @@ The worker can be configured using environment variables and/or a configuration 
     * - ``JOLT_SCHEDULER_TOKEN``
       - ``scheduler_token``
       - | Token that authenticates the worker with the scheduler. It needs the
-          ``worker`` permission. See :ref:`configuration-services-scheduler-auth`.
+          ``worker`` permission. See :ref:`build-cluster-tokens`.
 
         | The worker passes the token on to the executors it starts.
 
@@ -1758,7 +1628,7 @@ The worker can be configured using environment variables and/or a configuration 
       - ``ca_cert``
       - | PEM file with the certificates of the authorities that the certificates
           of the services are verified with. The worker passes it on to the
-          executors it starts. See :ref:`configuration-services-tls`.
+          executors it starts. See :ref:`build-cluster-tls`.
 
     * - ``JOLT_ALLOW_INSECURE_TOKEN``
       - ``allow_insecure_token``
@@ -1769,7 +1639,7 @@ The worker can be configured using environment variables and/or a configuration 
     * - ``JOLT_CACHE_TOKEN``
       - ``cache_token``
       - | Token that authenticates the executors with the cache, when they
-          upload artifacts. See :ref:`configuration-services-cache-auth`.
+          upload artifacts. See :ref:`build-cluster-tokens`.
 
     * - ``JOLT_NIX``
       - ``nix``

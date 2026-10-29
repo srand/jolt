@@ -197,3 +197,196 @@ Alternatively, if you are using a separate configuration file:
     .. code:: bash
 
       $ jolt -c client.conf build --network <task>
+
+
+.. _build-cluster-auth:
+
+Authentication
+~~~~~~~~~~~~~~
+
+Without configuration, the cache and the scheduler accept requests from
+anyone who can reach them. Before exposing a build cluster to a network you
+don't trust, secure the connections with TLS and authenticate clients, either
+with static tokens or with the accounts of an OpenID Connect provider. The
+two can be combined, with tokens for CI and workers and personal logins for
+users.
+
+.. _build-cluster-tls:
+
+TLS
+^^^
+
+The cache and the scheduler serve TLS on both HTTP and gRPC when they are
+configured with a certificate and private key (``cert`` and ``cert_key``).
+Clients then connect with ``https://`` and ``tls://`` URIs:
+
+  .. code:: ini
+
+    [cache]
+    http_uri = https://cache.example.com:8080
+    grpc_uri = tls://cache.example.com:9090
+
+    [scheduler]
+    uri = tls://scheduler.example.com:9090
+
+Clients verify the certificates of services with the authorities of the
+system. For a private authority, point ``jolt.ca_cert`` or ``JOLT_CA_CERT``
+to a PEM file with its certificate. Jolt, its workers, ``schedulerctl``,
+fstree and the dashboard all use these settings.
+
+Tokens are only sent over TLS, since they authenticate anyone who sees them.
+For a trusted network, ``jolt.allow_insecure_token`` or
+``JOLT_ALLOW_INSECURE_TOKEN`` allows sending them without it.
+
+.. _build-cluster-tokens:
+
+Tokens
+^^^^^^
+
+A token is a random string that grants permissions. Create one with:
+
+  .. code:: bash
+
+    $ jolt-cache token ci
+
+The command prints the token and the entry for the ``auth`` section of
+``cache.yaml`` or ``scheduler.yaml``. The configuration only contains the
+SHA-256 hash of the token. Once any token is configured, clients without a
+token have no permissions, unless ``auth.anonymous`` grants them some.
+
+The cache grants ``read``, to download and look up artifacts, and ``write``,
+to upload them. Example, where anyone may download artifacts but only CI may
+upload them:
+
+  .. code:: yaml
+
+    # /etc/jolt/cache.yaml
+    auth:
+      anonymous: [read]
+      tokens:
+        - name: ci
+          sha256: 31f69e6b9c24b00832b59b38a340b5346185c93eb9bb6bb54b2ef985aafdcb8f
+          permissions: [read, write]
+
+The scheduler grants these permissions:
+
+  .. list-table::
+    :widths: 20 80
+    :header-rows: 1
+    :class: tight-table
+
+    * - Permission
+      - Allows
+    * - ``build``
+      - Building and cancelling builds, and running their tasks. Clients that
+        build also need ``read`` to see the logs of their tasks.
+    * - ``worker``
+      - Executing tasks, required by workers and the executors they start.
+    * - ``read``
+      - Listing builds and workers, following events and reading logs.
+    * - ``admin``
+      - Cancelling any build, rescheduling tasks and debugging the scheduler.
+        Administrators also need ``read`` to list builds and workers.
+
+Example:
+
+  .. code:: yaml
+
+    # /etc/jolt/scheduler.yaml
+    auth:
+      tokens:
+        - name: developers
+          sha256: 9c56cc51b374c3ba189210d5b6d4bf57790d351c96c47c02190ecf1e430635ab
+          permissions: [build, read]
+        - name: workers
+          sha256: 4c1e0fb8de8c8e4c4f5b4ba9c3aa6a9ac5c3d7fb22bb4b8b0f4cbf5e8b0b6c3e
+          permissions: [worker]
+
+Clients send their tokens as bearer tokens:
+
+- Jolt uses ``cache.token`` and ``scheduler.token``, or the
+  ``JOLT_CACHE_TOKEN`` and ``JOLT_SCHEDULER_TOKEN`` environment variables.
+- Workers use ``scheduler_token`` and ``cache_token``, and pass them on to the
+  executors they start, which upload artifacts.
+- ``schedulerctl`` uses ``scheduler_token`` in ``schedulerctl.yaml`` or
+  ``JOLT_SCHEDULER_TOKEN``, and the dashboard ``JOLT_SCHEDULER_TOKEN``.
+
+Task logs are opened in a browser, which asks for a user name and password.
+Enter the token as the password; the user name is ignored.
+
+.. _build-cluster-oidc:
+
+Single Sign-On
+^^^^^^^^^^^^^^
+
+Instead of handing out tokens to users, the services can accept the ID tokens
+of an OpenID Connect provider, such as Keycloak, Dex or Authentik in front of
+an LDAP directory, or Microsoft Entra ID. Users sign in once with
+``jolt login``, and every service verifies their tokens on its own with the
+public keys of the provider. The services don't talk to the directory, and
+they don't share any secret.
+
+Register Jolt with the provider as a public client, with the OAuth device
+authorization grant enabled, and configure the services to accept tokens
+issued to it. Permissions are granted to all users of the provider and to the
+members of groups:
+
+  .. code:: yaml
+
+    # /etc/jolt/cache.yaml
+    auth:
+      oidc:
+        issuer: https://keycloak.example.com/realms/jolt
+        audience: jolt
+        permissions: [read]
+        groups:
+          - name: jolt-ci
+            permissions: [write]
+
+  .. code:: yaml
+
+    # /etc/jolt/scheduler.yaml
+    auth:
+      oidc:
+        issuer: https://keycloak.example.com/realms/jolt
+        audience: jolt
+        permissions: [build, read]
+        groups:
+          - name: jolt-admins
+            permissions: [admin]
+
+The services contact the provider when they verify the first token, so they
+start even when it is unavailable. Tokens configured in ``auth.tokens`` keep
+working alongside the provider.
+
+Users configure the provider in the ``auth`` section and sign in:
+
+  .. code:: bash
+
+    $ jolt config auth.issuer https://keycloak.example.com/realms/jolt
+    $ jolt login
+
+``jolt login`` asks for the user name and password in the terminal if the
+provider allows the OAuth password grant for the client. Otherwise it opens
+the browser, or prints a URL and a code to enter there. The tokens are stored
+in the system keyring, and Jolt refreshes them when they are about to expire,
+so users stay signed in until the refresh token expires or they run
+``jolt logout``. A token configured for a service takes precedence over the
+login.
+
+Notes on providers:
+
+- **Keycloak:** Groups aren't included in tokens by default. Add a *Group
+  Membership* mapper with the claim name ``groups`` and *Full group path*
+  turned off to the client, or use realm roles with
+  ``groups_claim: realm_access.roles``. Turn on *OAuth 2.0 Device
+  Authorization Grant* for the client, and *Direct access grants* to sign in
+  with a password in the terminal.
+- **Dex:** Request the ``groups`` scope with ``auth.scopes``.
+- **Microsoft Entra ID:** Use the issuer of your tenant,
+  ``https://login.microsoftonline.com/<tenant-id>/v2.0``, and the
+  application ID as the audience and ``auth.client_id``. Turn on *Allow
+  public client flows* for the application. Tokens contain the IDs of groups
+  rather than their names, so prefer app roles assigned to groups, with
+  ``groups_claim: roles``. Users sign in with the browser, which also
+  handles multi-factor authentication.
