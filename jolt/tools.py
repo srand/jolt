@@ -2680,6 +2680,8 @@ class Tools(object):
             raise_error_if(
                 exceptions and response.status_code not in [201, 204],
                 f"Upload to '{url_cleaned}' failed with status '{response.status_code}'")
+            if response.status_code not in [201, 204]:
+                log.warning("Upload to '{}' failed with status '{}'", url_cleaned, response.status_code)
         return response.status_code in [201, 204]
 
     def read_file(self, pathname, binary=False):
