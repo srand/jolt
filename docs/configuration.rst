@@ -252,6 +252,61 @@ Available configuration keys:
         | Default: ``<workspace>/allure-results``
 
 
+.. _configuration-auth:
+
+Auth
+^^^^
+
+The ``[auth]`` section configures the OpenID Connect provider that
+``jolt login`` signs in with, such as Keycloak, Dex or Authentik in front of
+an LDAP directory. ``jolt login`` prints a URL and a code to enter there, and
+waits until you have signed in with the provider. The provider must support
+the OAuth device authorization grant.
+
+The tokens are stored in the system keyring. Jolt sends the ID token to the
+cache and scheduler services, unless tokens are configured for them, and
+refreshes it with the refresh token when it is about to expire. Request the
+``offline_access`` scope to get a refresh token, or the login only lasts as
+long as the ID token. ``jolt logout`` removes the tokens. The services must
+be configured to accept the tokens, see
+:ref:`configuration-services-cache-oidc`.
+
+  .. list-table::
+    :widths: 20 10 70
+    :header-rows: 1
+    :class: tight-table
+
+    * - Config Key
+      - Type
+      - Description
+
+    * - ``issuer``
+      - String
+      - | URL of the provider, which publishes its configuration at
+          ``<issuer>/.well-known/openid-configuration``.
+    * - ``client_id``
+      - String
+      - | Client ID of Jolt, registered with the provider as a public client.
+          The services accept tokens issued to this client ID.
+        | Default: ``jolt``
+    * - ``client_secret``
+      - String
+      - | Secret of the client, for providers that require one.
+    * - ``scopes``
+      - String
+      - | Scopes requested from the provider, separated by spaces. Some
+          providers need a scope to include the groups of the user, such as
+          ``groups`` with Dex.
+        | Default: ``openid profile offline_access``
+
+Example:
+
+  .. code:: text
+
+    [auth]
+    issuer = https://keycloak.example.com/realms/jolt
+
+
 Autoweight
 ^^^^^^^^^^
 
@@ -319,7 +374,7 @@ Available configuration keys:
           token by this storage provider and by the
           :ref:`HTTP <configuration-plugins-http>` storage provider.
           The ``JOLT_CACHE_TOKEN`` environment variable takes precedence.
-          Without a token, the token of :ref:`jolt login <configuration-login>`
+          Without a token, the token of :ref:`jolt login <configuration-auth>`
           is sent. See :ref:`configuration-services-cache-auth`.
 
     * - ``http_uri``
@@ -615,61 +670,6 @@ is unavailable, Jolt prints a warning and the jobserver runs without pressure li
     pressure_max_memory = 100000
 
 
-.. _configuration-login:
-
-Login
-^^^^^
-
-The ``[login]`` section configures the OpenID Connect provider that
-``jolt login`` signs in with, such as Keycloak, Dex or Authentik in front of
-an LDAP directory. ``jolt login`` prints a URL and a code to enter there, and
-waits until you have signed in with the provider. The provider must support
-the OAuth device authorization grant.
-
-The tokens are stored in the system keyring. Jolt sends the ID token to the
-cache and scheduler services, unless tokens are configured for them, and
-refreshes it with the refresh token when it is about to expire. Request the
-``offline_access`` scope to get a refresh token, or the login only lasts as
-long as the ID token. ``jolt logout`` removes the tokens. The services must
-be configured to accept the tokens, see
-:ref:`configuration-services-cache-oidc`.
-
-  .. list-table::
-    :widths: 20 10 70
-    :header-rows: 1
-    :class: tight-table
-
-    * - Config Key
-      - Type
-      - Description
-
-    * - ``issuer``
-      - String
-      - | URL of the provider, which publishes its configuration at
-          ``<issuer>/.well-known/openid-configuration``.
-    * - ``client_id``
-      - String
-      - | Client ID of Jolt, registered with the provider as a public client.
-          The services accept tokens issued to this client ID.
-        | Default: ``jolt``
-    * - ``client_secret``
-      - String
-      - | Secret of the client, for providers that require one.
-    * - ``scopes``
-      - String
-      - | Scopes requested from the provider, separated by spaces. Some
-          providers need a scope to include the groups of the user, such as
-          ``groups`` with Dex.
-        | Default: ``openid profile offline_access``
-
-Example:
-
-  .. code:: text
-
-    [login]
-    issuer = https://keycloak.example.com/realms/jolt
-
-
 Logstash (HTTP)
 ^^^^^^^^^^^^^^^
 
@@ -841,7 +841,7 @@ Available configuration keys:
       - String
       - | Token that authenticates Jolt with the scheduler service. The
           ``JOLT_SCHEDULER_TOKEN`` environment variable takes precedence.
-          Without a token, the token of :ref:`jolt login <configuration-login>`
+          Without a token, the token of :ref:`jolt login <configuration-auth>`
           is sent. See :ref:`configuration-services-scheduler-auth`.
 
 Configuration variables for the scheduler service itself can be found here:
@@ -1252,7 +1252,7 @@ OpenID Connect
 
 The services also accept ID tokens issued by an OpenID Connect provider, such
 as Keycloak, Dex or Authentik in front of an LDAP directory. Users sign in
-with :ref:`jolt login <configuration-login>`, and every service verifies
+with :ref:`jolt login <configuration-auth>`, and every service verifies
 their tokens with the public keys of the provider, so one login works for all
 of them. The provider is configured in ``auth.oidc``, and its permissions are
 granted in addition to those of static tokens. Static tokens remain useful
@@ -1273,7 +1273,7 @@ for CI and workers.
     * - ``auth.oidc.audience``
       - String
       - | Client ID that tokens must be issued to, the ``client_id`` of the
-          ``login`` section of the Jolt configuration.
+          ``auth`` section of the Jolt configuration.
     * - ``auth.oidc.permissions``
       - List
       - | Permissions of all users of the provider.

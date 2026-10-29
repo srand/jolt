@@ -17,7 +17,7 @@ from jolt import log
 from jolt.error import raise_error, raise_error_if
 
 
-NAME = "login"
+NAME = "auth"
 KEYRING_SERVICE = "jolt"
 
 # Tokens are refreshed when they expire in less than this many seconds, so
@@ -132,7 +132,7 @@ def _store(tokens):
 
 def login():
     """ Signs in with the device authorization grant and stores the tokens. """
-    raise_error_if(not is_configured(), "Configure the OIDC provider with 'jolt config login.issuer <url>'")
+    raise_error_if(not is_configured(), "Configure the OIDC provider with 'jolt config auth.issuer <url>'")
 
     provider = _discover()
     device_endpoint = provider.get("device_authorization_endpoint")

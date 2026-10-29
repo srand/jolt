@@ -30,7 +30,7 @@ class LoginInternal(JoltTest):
         super().setup(deps, tools)
         login._id_token = None
         self.keyring = {}
-        self.config = {("login", "issuer"): "https://idp"}
+        self.config = {("auth", "issuer"): "https://idp"}
         self.posts = []
         self.responses = []
 
@@ -63,7 +63,7 @@ class LoginInternal(JoltTest):
         super().cleanup()
 
     def test_not_configured(self):
-        del self.config[("login", "issuer")]
+        del self.config[("auth", "issuer")]
         self.assertIsNone(login.get_token())
         self.assertIsNone(config.get_cache_token())
 
