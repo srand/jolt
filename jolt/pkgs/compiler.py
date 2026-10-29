@@ -6,6 +6,7 @@ import shutil
 import subprocess
 
 from jolt import Alias, Task, influence, utils
+from jolt.error import raise_task_error_if
 from jolt.tasks import TaskRegistry
 
 
@@ -70,6 +71,13 @@ class HostCompiler(Task):
     """
 
     name = "compiler/c"
+
+    def run(self, deps, tools):
+        info = host_compilers(self)
+        hint = ", or run Jolt from a Visual Studio developer prompt" if info["os"] == "windows" else ""
+        raise_task_error_if(
+            info["cc"] == "<not found>", self,
+            "No C compiler found: install one, or set CC to the one to use" + hint)
 
 
 class CCompiler(Alias):
