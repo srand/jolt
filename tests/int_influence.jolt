@@ -48,3 +48,36 @@ class InfluenceInternal(JoltTest):
         source = self.provider("File", "files")
         self.configuration_hash(self.provider("Parameters", "a=1"), source)
         source.get_influence.assert_not_called()
+
+    def strings(self, *providers):
+        task = MagicMock()
+        task.influence = list(providers)
+        with patch.object(influence.HashInfluenceRegistry.get(), "_providers", []):
+            return influence.HashInfluenceRegistry.get().get_strings(task)
+
+    def test_function_influence_hashes_dict_items_in_order(self):
+        def probe(task):
+            return {"os": "linux", "cc": "gcc 15"}
+
+        self.assertEqual(
+            self.strings(influence.FunctionInfluence(probe)),
+            ["Influence-Probe: cc=gcc 15", "Influence-Probe: os=linux"])
+
+    def test_function_influence_is_called_with_the_task(self):
+        def host_os(task):
+            return task.os
+
+        provider = influence.FunctionInfluence(host_os)
+        task = MagicMock(os="darwin")
+        self.assertEqual(provider.name, "HostOs")
+        self.assertEqual(provider.get_influence(task), "darwin")
+
+    def test_attribute_influence_expands_keywords(self):
+        task = MagicMock(url=["https://example.com/tool-{system}.zip"])
+        task.tools.expand.side_effect = lambda s: s.replace("{system}", "darwin")
+        self.assertEqual(
+            influence.TaskAttributeInfluence("url", expand=True).get_influence(task),
+            ["https://example.com/tool-darwin.zip"])
+        self.assertEqual(
+            influence.TaskAttributeInfluence("url").get_influence(task),
+            ["https://example.com/tool-{system}.zip"])

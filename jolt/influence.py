@@ -75,9 +75,10 @@ class TaintInfluenceProvider(object):
 
 
 class TaskAttributeInfluence(HashInfluenceProvider):
-    def __init__(self, attrib, sort=False):
+    def __init__(self, attrib, sort=False, expand=False):
         self._attrib = attrib
         self._sort = sort
+        self._expand = expand
         self.name = attrib.title()
 
     def get_influence(self, task):
@@ -88,10 +89,15 @@ class TaskAttributeInfluence(HashInfluenceProvider):
                 value.sort()
         except AttributeError:
             pass
+        if self._expand:
+            if type(value) is str:
+                value = task.tools.expand(value)
+            elif type(value) is list:
+                value = [task.tools.expand(item) if type(item) is str else item for item in value]
         return value
 
 
-def attribute(name, type=None, sort=False):
+def attribute(name, type=None, sort=False, expand=False):
     """ Add task attribute value as hash influence.
 
     Args:
@@ -105,6 +111,9 @@ def attribute(name, type=None, sort=False):
             as argument to automatically monitor files at those paths.
         sort (boolean, optional): Optionally sort the value. Always sort
             values that are unstable, such as dictionaries.
+        expand (boolean, optional): Expand keywords in the value, or in
+            the strings of a list, such as ``{version}``. Use it for values
+            that differ when they are expanded, for example by platform.
 
     Example:
 
@@ -142,7 +151,7 @@ def attribute(name, type=None, sort=False):
                 for item in items:
                     influence.append(type(item))
             else:
-                influence.append(TaskAttributeInfluence(name, sort))
+                influence.append(TaskAttributeInfluence(name, sort, expand))
             return influence
 
         cls._influence = _influence
@@ -534,6 +543,59 @@ def environ(variable):
         def _influence(self, *args, **kwargs):
             influence = _old_influence(self, *args, **kwargs)
             influence.append(TaskEnvironmentInfluence(variable))
+            return influence
+
+        cls._influence = _influence
+        return cls
+
+    return _decorate
+
+
+class FunctionInfluence(HashInfluenceProvider):
+    def __init__(self, fn):
+        self.fn = fn
+        self.name = fn.__name__.title().replace("_", "")
+
+    def get_influence(self, task):
+        value = self.fn(task)
+        if isinstance(value, dict):
+            return "\n".join("{}={}".format(key, value[key]) for key in sorted(value))
+        return value
+
+
+def function(fn):
+    """ Add the result of a function as hash influence.
+
+    The function is called with the task when its identity is calculated.
+    It may return a string or a dictionary, whose keys and values are
+    hashed in sorted order. Use it to make the identity depend on things
+    that are probed rather than declared, such as the output of a command.
+
+    Args:
+        fn (callable): Function that takes the task as argument.
+
+    Example:
+
+    .. code-block:: python
+
+        from jolt import influence
+
+        def compiler(task):
+            return {
+                "version": task.tools.run("cc --version", output=False).splitlines()[0],
+                "target": task.tools.run("cc -dumpmachine", output=False).strip(),
+            }
+
+        @influence.function(compiler)
+        class Example(Task):
+
+    """
+    def _decorate(cls):
+        _old_influence = cls._influence
+
+        def _influence(self, *args, **kwargs):
+            influence = _old_influence(self, *args, **kwargs)
+            influence.append(FunctionInfluence(fn))
             return influence
 
         cls._influence = _influence

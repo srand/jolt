@@ -108,7 +108,7 @@ Influence
 .. reference-influence-start
 
 .. automodule:: jolt.influence
-   :members: always, attribute, daily, environ, files, hourly, monthly, weekly, yearly
+   :members: always, attribute, daily, environ, files, function, hourly, monthly, weekly, yearly
 
 .. reference-influence-end
 
