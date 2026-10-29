@@ -44,6 +44,35 @@ class ToolsInternal(JoltTest):
         with t.environ(JOLT_THREADS="5"):
             self.assertEqual(t.thread_count(), 5)
 
+    def test_7z_archive(self):
+        import py7zr
+
+        t = tools.Tools()
+        with t.tmpdir() as tmp, t.cwd(tmp):
+            t.mkdir("src/sub")
+            t.write_file("src/sub/file.txt", "content")
+            t.write_file("src/other.txt", "other")
+            t.archive("src", "archive.7z")
+            t.extract("archive.7z", "all")
+            self.assertEqual(t.read_file("all/sub/file.txt"), "content")
+            self.assertEqual(t.read_file("all/other.txt"), "other")
+
+            t.extract("archive.7z", "some", files=["other.txt"])
+            self.assertEqual(t.read_file("some/other.txt"), "other")
+            self.assertFalse(t.exists("some/sub/file.txt"))
+
+            # Archives made by earlier versions have a member for the root directory
+            with py7zr.SevenZipFile(t.expand_path("legacy.7z"), "w") as archive:
+                archive.writeall(t.expand_path("src"), ".")
+            t.extract("legacy.7z", "legacy")
+            self.assertEqual(t.read_file("legacy/sub/file.txt"), "content")
+
+    def test_py7zr_imported_when_needed(self):
+        # Its extension modules enable the GIL of free-threaded Python
+        imported = subprocess.check_output(
+            [sys.executable, "-c", "import sys, jolt.tools; print('py7zr' in sys.modules)"], text=True)
+        self.assertEqual(imported.strip(), "False")
+
     @patch("jolt.config.get", return_value="3")
     def test_make_jobs_without_jobserver(self, _):
         t = tools.Tools()

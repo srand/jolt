@@ -1,4 +1,3 @@
-import py7zr
 import blake3
 import bz2
 import copy
@@ -910,9 +909,14 @@ class Tools(object):
         return filename
 
     def _make_7zfile(self, filename, fmt, rootdir):
+        # Imported when needed, since its extension modules enable the GIL
+        # of free-threaded Python
+        import py7zr
+
         self.mkdirname(filename)
         with py7zr.SevenZipFile(filename, 'w') as archive:
-            archive.writeall(rootdir, ".")
+            for name in sorted(os.listdir(rootdir)):
+                archive.writeall(os.path.join(rootdir, name), name)
         return filename
 
     def _make_tarfile(self, filename, fmt, rootdir):
@@ -1542,12 +1546,13 @@ class Tools(object):
                 except tarfile.StreamError as e:
                     raise_task_error(self._task, "failed to extract archive '{0}': {1}", filename, str(e))
             elif filename.endswith(".7z"):
+                import py7zr
+
                 with py7zr.SevenZipFile(filename, 'r') as archive:
-                    if files:
-                        for file in files:
-                            archive.extract(file, filepath)
-                    else:
-                        archive.extractall(filepath)
+                    # Archives made by earlier versions of Jolt have a member
+                    # for the root directory, which py7zr refuses to extract
+                    targets = list(files) if files else [name for name in archive.getnames() if name != "."]
+                    archive.extract(filepath, targets=targets)
             else:
                 raise_task_error(self._task, "unknown archive type '{0}'", fs.path.basename(filename))
         except Exception:
