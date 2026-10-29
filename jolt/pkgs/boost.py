@@ -1,6 +1,6 @@
 import os
 from jolt import attributes, Alias, BooleanParameter, Download, IntParameter, Parameter
-from jolt.pkgs import cpython
+from jolt.pkgs import cpython, icu
 from jolt.plugins import git
 from jolt.tasks import Task, TaskRegistry
 from jolt.error import raise_task_error_if
@@ -8,15 +8,18 @@ from jolt.error import raise_task_error_if
 
 @attributes.common_metadata()
 @attributes.requires("requires_git")
+@attributes.requires("requires_icu_{icu[on,off]}")
 @attributes.requires("requires_python_{python[on,off]}")
 @attributes.system
 class Boost(Task):
     name = "boost"
     version = Parameter("1.92.0", help="Boost version.")
     shared = BooleanParameter(False, help="Build shared libraries.")
+    icu = BooleanParameter(False, help="Enable ICU support.")
     python = BooleanParameter(False, help="Build Boost.Python.")
     bits = IntParameter(64, values=[32, 64], help="Address model, in bits.")
     requires_git = ["git:url=https://github.com/boostorg/boost.git,path={buildroot}/git-boost,rev=boost-{version},submodules=true"]
+    requires_icu_on = ["icu"]
     requires_python_on = ["cpython"]
 
     def write_user_config(self, deps, tools):
@@ -80,8 +83,19 @@ class Boost(Task):
             "-j{}".format(tools.cpu_count()),
         ]
 
+        # Boost.Locale and Boost.Regex otherwise use ICU from the host if it is found
+        if self.icu:
+            icu_path = deps["icu"].path
+            bootstrap_cmd.append("--with-icu={}".format(icu_path))
+            b2_cmd.append("-sICU_PATH={}".format(icu_path))
+        else:
+            bootstrap_cmd.append("--without-icu")
+            b2_cmd += ["--disable-icu", "boost.locale.icu=off"]
+
         with tools.cwd("{git[boost]}"):
             if self.system == "windows":
+                # The options of bootstrap.sh aren't supported
+                bootstrap_cmd = [option for option in bootstrap_cmd if "icu" not in option]
                 bootstrap_cmd = [".\\bootstrap.bat", "msvc"] + bootstrap_cmd
                 b2_cmd = [".\\b2"] + b2_cmd
             else:
