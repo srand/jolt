@@ -3046,6 +3046,7 @@ class Alias(Task):
         pass
 
 
+@attribute_influence("url", expand=True)
 class Download(Task):
     """
     Downloads file(s) over HTTP(S).
