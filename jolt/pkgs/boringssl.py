@@ -8,6 +8,7 @@ from jolt.tasks import TaskRegistry
 @attributes.requires("requires_nasm_{system}")
 @attributes.common_metadata()
 @attributes.system
+@cmake.options("options_{system}")
 @cmake.requires()
 @cmake.use_ninja()
 @cxxinfo.publish(libraries=["ssl", "crypto"])
@@ -21,6 +22,13 @@ class BoringSSL(cmake.CMake):
     options = [
         "BUILD_SHARED_LIBS={shared[ON,OFF]}",
     ]
+    options_linux = [
+        # GCC 15 finds an overflow in the Keccak code that can't happen, and
+        # warnings are errors
+        "CMAKE_C_FLAGS=-Wno-error=stringop-overflow",
+        "CMAKE_CXX_FLAGS=-Wno-error=stringop-overflow",
+    ]
+    """ Options passed to CMake on Linux. """
 
 
 TaskRegistry.get().add_task_class(BoringSSL)
