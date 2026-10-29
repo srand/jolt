@@ -563,6 +563,18 @@ class RemoteExecutionFactory(NetworkExecutorFactory):
 log.verbose("[Remote] Loaded")
 
 
+class _TokenCallCredentials(grpc.AuthMetadataPlugin):
+    """ Sends the current token with each call, so that tokens from logins are refreshed. """
+
+    def __call__(self, context, callback):
+        try:
+            token = config.get_scheduler_token()
+        except Exception as exc:
+            callback((), exc)
+            return
+        callback((("authorization", "Bearer " + token),) if token else (), None)
+
+
 class _ClientCallDetails(
         collections.namedtuple("_ClientCallDetails", ("method", "timeout", "metadata", "credentials", "wait_for_ready", "compression")),
         grpc.ClientCallDetails):
@@ -576,12 +588,13 @@ class _TokenInterceptor(
         grpc.StreamStreamClientInterceptor):
     """ Sends a bearer token with each call over channels without TLS, which call credentials aren't sent over. """
 
-    def __init__(self, token):
-        self._metadata = ("authorization", "Bearer " + token)
-
     def _details(self, details):
+        metadata = list(details.metadata or [])
+        token = config.get_scheduler_token()
+        if token:
+            metadata.append(("authorization", "Bearer " + token))
         return _ClientCallDetails(
-            details.method, details.timeout, list(details.metadata or []) + [self._metadata],
+            details.method, details.timeout, metadata,
             details.credentials, details.wait_for_ready, details.compression)
 
     def intercept_unary_unary(self, continuation, details, request):
@@ -599,7 +612,8 @@ class _TokenInterceptor(
 
 def scheduler_channel(address):
     """
-    Returns a channel to the scheduler, which sends the configured token.
+    Returns a channel to the scheduler, which sends the configured token,
+    or the token of the login, with each call.
 
     The channel uses TLS for tls:// URIs. Tokens are only sent over TLS,
     unless sending them without it is explicitly allowed.
@@ -614,7 +628,8 @@ def scheduler_channel(address):
                 root_certificates = f.read()
         credentials = grpc.ssl_channel_credentials(root_certificates=root_certificates)
         if token:
-            credentials = grpc.composite_channel_credentials(credentials, grpc.access_token_call_credentials(token))
+            credentials = grpc.composite_channel_credentials(
+                credentials, grpc.metadata_call_credentials(_TokenCallCredentials()))
         return grpc.secure_channel(address.netloc, credentials, options=grpc_keepalive_opts)
 
     channel = grpc.insecure_channel(address.netloc, options=grpc_keepalive_opts)
@@ -622,7 +637,7 @@ def scheduler_channel(address):
         raise_error_if(
             not config.get_allow_insecure_token(),
             "Refusing to send the scheduler token without TLS to {}, use a tls:// URI", address.geturl())
-        channel = grpc.intercept_channel(channel, _TokenInterceptor(token))
+        channel = grpc.intercept_channel(channel, _TokenInterceptor())
     return channel
 
 

@@ -248,14 +248,19 @@ def get_cachedir():
     return get("jolt", "cachedir", default)
 
 
+def _get_login_token():
+    from jolt import login
+    return login.get_token()
+
+
 def get_cache_token():
     """ Token that authenticates Jolt with the cache service, if any. """
-    return os.environ.get("JOLT_CACHE_TOKEN") or get("cache", "token")
+    return os.environ.get("JOLT_CACHE_TOKEN") or get("cache", "token") or _get_login_token()
 
 
 def get_scheduler_token():
     """ Token that authenticates Jolt with the scheduler service, if any. """
-    return os.environ.get("JOLT_SCHEDULER_TOKEN") or get("scheduler", "token")
+    return os.environ.get("JOLT_SCHEDULER_TOKEN") or get("scheduler", "token") or _get_login_token()
 
 
 def get_ca_cert():

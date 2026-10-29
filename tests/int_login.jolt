@@ -1,0 +1,139 @@
+import base64
+import json
+import os
+import sys
+import time
+from unittest import mock
+sys.path.append(".")
+
+from testsupport import JoltTest
+from jolt import config
+from jolt import login
+from jolt.error import JoltError
+
+
+def _jwt(exp):
+    payload = base64.urlsafe_b64encode(json.dumps({"exp": exp}).encode()).rstrip(b"=").decode()
+    return "header." + payload + ".signature"
+
+
+PROVIDER = {
+    "token_endpoint": "https://idp/token",
+    "device_authorization_endpoint": "https://idp/device",
+}
+
+
+class LoginInternal(JoltTest):
+    name = "int/login"
+
+    def setup(self, deps, tools):
+        super().setup(deps, tools)
+        login._id_token = None
+        self.keyring = {}
+        self.config = {("login", "issuer"): "https://idp"}
+        self.posts = []
+        self.responses = []
+
+        def get(section, key, default=None, **kwargs):
+            return self.config.get((section, key), default)
+
+        def post(url, data):
+            self.posts.append((url, data))
+            return self.responses.pop(0)
+
+        patches = [
+            mock.patch.object(config, "get", side_effect=get),
+            mock.patch.object(login, "_keyring_get", side_effect=lambda kind: self.keyring.get(kind)),
+            mock.patch.object(login, "_keyring_set", side_effect=lambda kind, value: self.keyring.__setitem__(kind, value)),
+            mock.patch.object(login, "_keyring_delete", side_effect=lambda kind: self.keyring.pop(kind, None)),
+            mock.patch.object(login, "_discover", return_value=PROVIDER),
+            mock.patch.object(login, "_post", side_effect=post),
+            mock.patch.object(login.time, "sleep"),
+            mock.patch.dict(os.environ, {}, clear=False),
+        ]
+        for patch in patches:
+            patch.start()
+        self.patches = patches
+        os.environ.pop("JOLT_CACHE_TOKEN", None)
+        os.environ.pop("JOLT_SCHEDULER_TOKEN", None)
+
+    def cleanup(self):
+        for patch in reversed(self.patches):
+            patch.stop()
+        super().cleanup()
+
+    def test_not_configured(self):
+        del self.config[("login", "issuer")]
+        self.assertIsNone(login.get_token())
+        self.assertIsNone(config.get_cache_token())
+
+    def test_not_logged_in(self):
+        self.assertIsNone(login.get_token())
+        self.assertEqual(self.posts, [])
+
+    def test_login_with_device_flow(self):
+        token = _jwt(time.time() + 3600)
+        self.responses = [
+            (200, {"device_code": "dev", "user_code": "ABCD", "verification_uri": "https://idp/activate", "interval": 1}),
+            (400, {"error": "authorization_pending"}),
+            (400, {"error": "slow_down"}),
+            (200, {"id_token": token, "refresh_token": "refresh"}),
+        ]
+        login.login()
+        self.assertEqual(self.posts[0][1]["client_id"], "jolt")
+        self.assertEqual(self.posts[1][1]["device_code"], "dev")
+        self.assertEqual(self.keyring, {"id_token": token, "refresh_token": "refresh"})
+        self.assertEqual(login.get_token(), token)
+
+    def test_login_denied(self):
+        self.responses = [
+            (200, {"device_code": "dev", "user_code": "ABCD", "verification_uri": "https://idp/activate"}),
+            (400, {"error": "access_denied"}),
+        ]
+        with self.assertRaises(JoltError):
+            login.login()
+        self.assertEqual(self.keyring, {})
+
+    def test_token_is_refreshed_before_it_expires(self):
+        self.keyring = {"id_token": _jwt(time.time() + 60), "refresh_token": "old"}
+        token = _jwt(time.time() + 3600)
+        self.responses = [(200, {"id_token": token, "refresh_token": "new"})]
+        self.assertEqual(login.get_token(), token)
+        self.assertEqual(self.posts[0][1]["refresh_token"], "old")
+        self.assertEqual(self.keyring, {"id_token": token, "refresh_token": "new"})
+        # The token is kept in memory until it is about to expire
+        self.assertEqual(login.get_token(), token)
+        self.assertEqual(len(self.posts), 1)
+
+    def test_refresh_token_used_by_another_process(self):
+        self.keyring = {"id_token": _jwt(time.time() + 60), "refresh_token": "old"}
+        token = _jwt(time.time() + 3600)
+
+        def other_process_refreshes(url, data):
+            self.keyring.update(id_token=token, refresh_token="new")
+            return 400, {"error": "invalid_grant"}
+
+        login._post.side_effect = other_process_refreshes
+        self.assertEqual(login.get_token(), token)
+
+    def test_expired_login(self):
+        self.keyring = {"id_token": _jwt(time.time() - 60), "refresh_token": "old"}
+        self.responses = [(400, {"error": "invalid_grant", "error_description": "Token is not active"})]
+        with self.assertRaises(JoltError):
+            login.get_token()
+
+    def test_configured_tokens_take_precedence(self):
+        token = _jwt(time.time() + 3600)
+        self.keyring = {"id_token": token}
+        self.assertEqual(config.get_cache_token(), token)
+        self.assertEqual(config.get_scheduler_token(), token)
+        self.config[("cache", "token")] = "cache-token"
+        self.assertEqual(config.get_cache_token(), "cache-token")
+        os.environ["JOLT_SCHEDULER_TOKEN"] = "env-token"
+        self.assertEqual(config.get_scheduler_token(), "env-token")
+
+    def test_logout(self):
+        self.keyring = {"id_token": _jwt(time.time() + 3600), "refresh_token": "refresh"}
+        login.logout()
+        self.assertEqual(self.keyring, {})
+        self.assertIsNone(login.get_token())

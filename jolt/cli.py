@@ -920,6 +920,31 @@ def _log(follow, delete):
         print(t.read_file(logfile))
 
 
+@cli.command(name="login")
+def _login():
+    """
+    Sign in to the services with an OpenID Connect provider.
+
+    Prints a URL where you sign in with the provider configured in the
+    login section of the configuration. The tokens are stored in the system
+    keyring and authenticate Jolt with the cache and scheduler services,
+    unless tokens are configured for them.
+    """
+    from jolt import login
+    login.login()
+    log.info("Logged in to {}", config.get("login", "issuer"))
+
+
+@cli.command(name="logout")
+def _logout():
+    """
+    Remove the tokens stored by the login command.
+    """
+    from jolt import login
+    login.logout()
+    log.info("Logged out from {}", config.get("login", "issuer"))
+
+
 @cli.command()
 @click.argument("task", shell_complete=_autocomplete_tasks)
 @click.option("-i", "--influence", is_flag=True, help="Print influence attributes and values.")

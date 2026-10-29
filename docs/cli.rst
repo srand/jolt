@@ -30,6 +30,12 @@ Command Line
 .. _reference-cli-log:
 .. click:: cli:_log
 	   :prog: jolt log
+.. _reference-cli-login:
+.. click:: cli:_login
+	   :prog: jolt login
+.. _reference-cli-logout:
+.. click:: cli:_logout
+	   :prog: jolt logout
 .. _reference-cli-report:
 .. click:: cli:_report
 	   :prog: jolt report
