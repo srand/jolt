@@ -15,7 +15,7 @@ class Harfbuzz(meson.Meson):
     name = "harfbuzz"
     version = Parameter("15.0.0", help="HarfBuzz version.")
     shared = BooleanParameter(False, help="Build shared libraries.")
-    requires_compiler = ["virtual/compiler/c"]
+    requires_compiler = ["virtual/compiler/c", "virtual/compiler/cxx"]
     requires_freetype = ["freetype:pic=true,shared={shared}"]
     requires_git = ["git:url=https://github.com/harfbuzz/harfbuzz.git,rev={version}"]
     srcdir = "{git[harfbuzz]}"

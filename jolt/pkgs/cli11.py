@@ -10,7 +10,7 @@ from jolt.tasks import TaskRegistry
 class CLI11(cmake.CMake):
     name = "cli11"
     version = Parameter("2.7.2", help="CLI11 version.")
-    requires_compiler = ["virtual/compiler/c"]
+    requires_compiler = ["virtual/compiler/c", "virtual/compiler/cxx"]
     requires_src = ["fetch:alias=src,url=https://github.com/CLIUtils/CLI11/archive/refs/tags/v{version}.tar.gz"]
     srcdir = "{fetch[src]}/CLI11-{version}"
     options = [

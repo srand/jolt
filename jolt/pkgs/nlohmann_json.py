@@ -12,7 +12,7 @@ class NlohmannJson(cmake.CMake):
     name = "nlohmann/json"
     version = Parameter("3.12.0", help="JSON for Modern C++ version.")
     tests = BooleanParameter(False, help="Build tests.")
-    requires_compiler = ["virtual/compiler/c"]
+    requires_compiler = ["virtual/compiler/c", "virtual/compiler/cxx"]
     requires_git = ["git:url=https://github.com/nlohmann/json.git,rev=v{version}"]
     srcdir = "{git[json]}"
     options = [

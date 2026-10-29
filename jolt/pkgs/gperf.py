@@ -9,7 +9,7 @@ from jolt.tasks import TaskRegistry
 class GPerf(autotools.Autotools):
     name = "gperf"
     version = Parameter("3.3", help="gperf version.")
-    requires_compiler = ["virtual/compiler/c"]
+    requires_compiler = ["virtual/compiler/c", "virtual/compiler/cxx"]
     requires_src = ["fetch:alias=src,url=http://ftpmirror.gnu.org/gperf/gperf-{version}.tar.gz"]
     srcdir = "{fetch[src]}/gperf-{version}"
 

@@ -27,7 +27,7 @@ class Mesa(Task):
     name = "mesa"
     version = Parameter("26.2.6", help="Mesa version.")
 
-    requires_compiler = ["virtual/compiler/c"]
+    requires_compiler = ["virtual/compiler/c", "virtual/compiler/cxx"]
     requires_cbindgen = ["cbindgen"]
     requires_expat = ["libexpat:pic=true"]
     requires_git = ["git:url=https://gitlab.freedesktop.org/mesa/mesa.git,rev=mesa-{version}"]

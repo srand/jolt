@@ -16,7 +16,7 @@ class Abseil(cmake.CMake):
     version = Parameter("20260817.0", help="Abseil version.")
     pic = BooleanParameter(False, help="Build with position independent code.")
     shared = BooleanParameter(False, help="Build shared libraries.")
-    requires_compiler = ["virtual/compiler/c"]
+    requires_compiler = ["virtual/compiler/c", "virtual/compiler/cxx"]
     requires_git = ["git:url=https://github.com/abseil/abseil-cpp.git,rev={version}"]
     srcdir = "{git[abseil-cpp]}"
     options = [

@@ -13,7 +13,7 @@ class Glog(cmake.CMake):
     name = "glog"
     version = Parameter("0.7.1", help="glog version.")
     options = ["BUILD_SHARED_LIBS=ON"]
-    requires_compiler = ["virtual/compiler/c"]
+    requires_compiler = ["virtual/compiler/c", "virtual/compiler/cxx"]
     requires_gflags = ["gflags"]
     requires_git = ["git:url=https://github.com/google/glog.git,rev=v{version}"]
     srcdir = "{git[glog]}"

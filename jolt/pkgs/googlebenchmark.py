@@ -11,7 +11,7 @@ from jolt.plugins import git, cmake
 class GoogleBenchmark(cmake.CMake):
     name = "google/benchmark"
     version = Parameter("1.10.0", help="Google Benchmark version.")
-    requires_compiler = ["virtual/compiler/c"]
+    requires_compiler = ["virtual/compiler/c", "virtual/compiler/cxx"]
     requires_git = ["git:url=https://github.com/google/benchmark.git,rev=v{version},submodules=true"]
     options = ["BENCHMARK_ENABLE_TESTING=OFF"]
     srcdir = "{git[benchmark]}"

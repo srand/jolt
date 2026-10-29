@@ -13,7 +13,7 @@ class GoogleTest(cmake.CMake):
     name = "google/test"
     version = Parameter("1.18.0", help="GoogleTest version.")
     shared = BooleanParameter(False, help="Build shared libraries.")
-    requires_compiler = ["virtual/compiler/c"]
+    requires_compiler = ["virtual/compiler/c", "virtual/compiler/cxx"]
     requires_git = ["git:url=https://github.com/google/googletest.git,rev=v{version}"]
     srcdir = "{git[googletest]}"
     options = [

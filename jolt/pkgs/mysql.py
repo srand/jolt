@@ -26,7 +26,7 @@ from jolt.tasks import TaskRegistry
 class MySQLBase(cmake.CMake):
     abstract = True
     version = Parameter("26.10.0", help="MySQL version.")
-    requires_compiler = ["virtual/compiler/c"]
+    requires_compiler = ["virtual/compiler/c", "virtual/compiler/cxx"]
     requires_curl = ["curl"]
     requires_darwin_libedit = ["libedit:shared=true"]
     requires_linux_krb5 = ["krb5"]

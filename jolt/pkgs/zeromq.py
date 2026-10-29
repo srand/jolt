@@ -14,7 +14,7 @@ class Libzmq(cmake.CMake):
     name = "libzmq"
     version = Parameter("4.3.5", help="ZeroMQ version.")
     shared = BooleanParameter(False, help="Build shared libraries.")
-    requires_compiler = ["virtual/compiler/c"]
+    requires_compiler = ["virtual/compiler/c", "virtual/compiler/cxx"]
     requires_git = ["git:url=https://github.com/zeromq/libzmq.git,rev=v{version}"]
     requires_sodium = ["libsodium:pic=true,shared={shared}"]
     """ Library used for CURVE security. """
@@ -48,7 +48,7 @@ class Libzmq(cmake.CMake):
 class Cppzmq(cmake.CMake):
     name = "cppzmq"
     version = Parameter("4.11.0", help="cppzmq version.")
-    requires_compiler = ["virtual/compiler/c"]
+    requires_compiler = ["virtual/compiler/c", "virtual/compiler/cxx"]
     requires_git = ["git:url=https://github.com/zeromq/cppzmq.git,rev=v{version}"]
     requires_libzmq = ["libzmq"]
     srcdir = "{git[cppzmq]}"

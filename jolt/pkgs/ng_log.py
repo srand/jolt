@@ -13,7 +13,7 @@ class NgLog(cmake.CMake):
     name = "ng-log"
     version = Parameter("0.8.4", help="ng-log version.")
     shared = BooleanParameter(False, help="Build shared libraries.")
-    requires_compiler = ["virtual/compiler/c"]
+    requires_compiler = ["virtual/compiler/c", "virtual/compiler/cxx"]
     requires_git = ["git:url=https://github.com/ng-log/ng-log.git,rev=v{version}"]
     srcdir = "{git[ng-log]}"
     options = ["BUILD_SHARED_LIBS={shared[ON,OFF]}"]

@@ -44,7 +44,7 @@ class PahoMQTT_CXX(cmake.CMake):
     version = Parameter("1.6.0", help="Paho MQTT C++ version.")
     shared = BooleanParameter(False, help="Build shared libraries.")
     ssl = BooleanParameter(True, help="Enable SSL support.")
-    requires_compiler = ["virtual/compiler/c"]
+    requires_compiler = ["virtual/compiler/c", "virtual/compiler/cxx"]
     requires_git = ["git:url=https://github.com/eclipse/paho.mqtt.cpp.git,rev=v{version}"]
     requires_mqtt_c = ["paho/mqtt-c:shared={shared},ssl={ssl}"]
     srcdir = "{git[paho.mqtt.cpp]}"

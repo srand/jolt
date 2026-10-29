@@ -11,7 +11,7 @@ from jolt.tasks import Task, TaskRegistry
 class B2(Task):
     name = "b2"
     version = Parameter("5.6.1", help="B2 version.")
-    requires_compiler = ["virtual/compiler/c"]
+    requires_compiler = ["virtual/compiler/c", "virtual/compiler/cxx"]
     requires_git = ["git:url=https://github.com/bfgroup/b2.git,rev={version}"]
 
     def run(self, artifact, tools):

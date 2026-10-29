@@ -13,7 +13,7 @@ class Flatbuffers(cmake.CMake):
     name = "flatbuffers"
     version = Parameter("25.12.19", help="FlatBuffers version.")
     shared = BooleanParameter(False, help="Build shared libraries.")
-    requires_compiler = ["virtual/compiler/c"]
+    requires_compiler = ["virtual/compiler/c", "virtual/compiler/cxx"]
     requires_git = ["git:url=https://github.com/google/flatbuffers.git,rev=v{version}"]
     srcdir = "{git[flatbuffers]}"
     options = [

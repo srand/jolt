@@ -23,7 +23,7 @@ class Soci(cmake.CMake):
     sqlite = BooleanParameter(True, help="Enable SQLite support.")
     odbc = BooleanParameter(False, help="Enable ODBC support.")
 
-    requires_compiler = ["virtual/compiler/c"]
+    requires_compiler = ["virtual/compiler/c", "virtual/compiler/cxx"]
     requires_boost_on = ["boost"]
     requires_fmt = ["fmt:shared={shared}"]
     requires_git = ["git:url=https://github.com/SOCI/soci.git,rev=v{version}"]

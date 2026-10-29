@@ -13,7 +13,7 @@ class Pybind11(cmake.CMake):
 
     name = "pybind11"
     version = Parameter("3.1.0", help="pybind11 version.")
-    requires_compiler = ["virtual/compiler/c"]
+    requires_compiler = ["virtual/compiler/c", "virtual/compiler/cxx"]
     requires_git = ["git:url=https://github.com/pybind/pybind11.git,rev=v{version}"]
     srcdir = "{git[pybind11]}"
     options = [

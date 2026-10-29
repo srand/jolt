@@ -14,7 +14,7 @@ class YamlCPP(cmake.CMake):
     name = "yaml-cpp"
     version = Parameter("0.9.0", help="yaml-cpp version.")
     shared = BooleanParameter(False, help="Build shared libraries.")
-    requires_compiler = ["virtual/compiler/c"]
+    requires_compiler = ["virtual/compiler/c", "virtual/compiler/cxx"]
     requires_git = ["git:url=https://github.com/jbeder/yaml-cpp.git,rev=yaml-cpp-{version}"]
     srcdir = "{git[yaml-cpp]}"
     options = [

@@ -13,7 +13,7 @@ class Inja(cmake.CMake):
     name = "inja"
     version = Parameter("3.5.0", help="Inja version.")
     tests = BooleanParameter(False, help="Build tests.")
-    requires_compiler = ["virtual/compiler/c"]
+    requires_compiler = ["virtual/compiler/c", "virtual/compiler/cxx"]
     requires_git = ["git:url=https://github.com/pantor/inja.git,rev=v{version}"]
     requires_json = ["nlohmann/json"]
     srcdir = "{git[inja]}"

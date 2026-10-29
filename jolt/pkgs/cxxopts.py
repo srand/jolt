@@ -14,7 +14,7 @@ class Cxxopts(cmake.CMake):
 
     name = "cxxopts"
     version = Parameter("3.3.1", help="cxxopts version.")
-    requires_compiler = ["virtual/compiler/c"]
+    requires_compiler = ["virtual/compiler/c", "virtual/compiler/cxx"]
     requires_git = ["git:url=https://github.com/jarro2783/cxxopts.git,rev=v{version}"]
     srcdir = "{git[cxxopts]}"
     options = [

@@ -15,7 +15,7 @@ class OneTbb(cmake.CMake):
     name = "onetbb"
     version = Parameter("2023.2.0", help="oneTBB version.")
     shared = BooleanParameter(True, help="Build shared libraries.")
-    requires_compiler = ["virtual/compiler/c"]
+    requires_compiler = ["virtual/compiler/c", "virtual/compiler/cxx"]
     requires_git = ["git:url=https://github.com/uxlfoundation/oneTBB.git,rev=v{version}"]
     srcdir = "{git[oneTBB]}"
     options = [

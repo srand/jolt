@@ -19,7 +19,7 @@ class Boost(Task):
     icu = BooleanParameter(False, help="Enable ICU support.")
     python = BooleanParameter(False, help="Build Boost.Python.")
     bits = IntParameter(64, values=[32, 64], help="Address model, in bits.")
-    requires_compiler = ["virtual/compiler/c"]
+    requires_compiler = ["virtual/compiler/c", "virtual/compiler/cxx"]
     requires_git = ["git:url=https://github.com/boostorg/boost.git,path={buildroot}/git-boost,rev=boost-{version},submodules=true"]
     requires_icu_on = ["icu"]
     requires_python_on = ["cpython"]

@@ -12,7 +12,7 @@ class SpirvTools(cmake.CMake):
     name = "spirv-tools"
     version = Parameter("2026.4", help="SPIRV-Tools version.")
     tests = BooleanParameter(False, help="Build tests.")
-    requires_compiler = ["virtual/compiler/c"]
+    requires_compiler = ["virtual/compiler/c", "virtual/compiler/cxx"]
     requires_git = ["git:url=https://github.com/KhronosGroup/SPIRV-Tools.git,rev=v{version}"]
     srcdir = "{git[SPIRV-Tools]}"
     options = ["SPIRV_SKIP_TESTS={tests[OFF,ON]}"]

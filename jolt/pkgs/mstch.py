@@ -13,7 +13,7 @@ from jolt.tasks import TaskRegistry
 class MSTCH(cmake.CMake):
     name = "mstch"
     version = Parameter("1.0.2", help="mstch version.")
-    requires_compiler = ["virtual/compiler/c"]
+    requires_compiler = ["virtual/compiler/c", "virtual/compiler/cxx"]
     requires_boost = ["boost"]
     requires_src = ["fetch:alias=src,url=https://github.com/no1msd/mstch/archive/refs/tags/{version}.tar.gz"]
     srcdir = "{fetch[src]}/mstch-{version}"

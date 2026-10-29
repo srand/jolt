@@ -12,7 +12,7 @@ class Fmt(cmake.CMake):
     name = "fmt"
     version = Parameter("12.2.0", help="fmt version.")
     shared = BooleanParameter(False, help="Build shared libraries.")
-    requires_compiler = ["virtual/compiler/c"]
+    requires_compiler = ["virtual/compiler/c", "virtual/compiler/cxx"]
     requires_git = ["git:url=https://github.com/fmtlib/fmt.git,rev={version}"]
     srcdir = "{git[fmt]}"
     options = [

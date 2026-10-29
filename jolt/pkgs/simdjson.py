@@ -13,7 +13,7 @@ class Simdjson(cmake.CMake):
     name = "simdjson"
     version = Parameter("5.0.7", help="simdjson version.")
     shared = BooleanParameter(False, help="Build shared libraries.")
-    requires_compiler = ["virtual/compiler/c"]
+    requires_compiler = ["virtual/compiler/c", "virtual/compiler/cxx"]
     requires_git = ["git:url=https://github.com/simdjson/simdjson.git,rev=v{version}"]
     srcdir = "{git[simdjson]}"
     options = [

@@ -15,7 +15,7 @@ class RE2(cmake.CMake):
     version = Parameter("2025-11-05", help="RE2 version.")
     pic = BooleanParameter(False, help="Build with position independent code.")
     shared = BooleanParameter(False, help="Build shared libraries.")
-    requires_compiler = ["virtual/compiler/c"]
+    requires_compiler = ["virtual/compiler/c", "virtual/compiler/cxx"]
     requires_abseil = ["abseil:shared={shared}"]
     requires_git = ["git:url=https://github.com/google/re2.git,rev={version}"]
     srcdir = "{git[re2]}"

@@ -13,7 +13,7 @@ class RapidJSON(cmake.CMake):
     name = "rapidjson"
     version = Parameter("24b5e7a", help="RapidJSON version.")
     options = ["CMAKE_POLICY_VERSION_MINIMUM=3.5"]
-    requires_compiler = ["virtual/compiler/c"]
+    requires_compiler = ["virtual/compiler/c", "virtual/compiler/cxx"]
     requires_git = ["git:url=https://github.com/Tencent/rapidjson.git,rev={version}"]
     srcdir = "{git[rapidjson]}"
     options = [

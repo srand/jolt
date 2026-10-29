@@ -14,7 +14,7 @@ class MagicEnum(cmake.CMake):
 
     name = "magic_enum"
     version = Parameter("0.9.8", help="magic_enum version.")
-    requires_compiler = ["virtual/compiler/c"]
+    requires_compiler = ["virtual/compiler/c", "virtual/compiler/cxx"]
     requires_git = ["git:url=https://github.com/Neargye/magic_enum.git,rev=v{version}"]
     srcdir = "{git[magic_enum]}"
     options = [

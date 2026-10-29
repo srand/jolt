@@ -14,7 +14,7 @@ class Doctest(cmake.CMake):
 
     name = "doctest"
     version = Parameter("2.5.3", help="doctest version.")
-    requires_compiler = ["virtual/compiler/c"]
+    requires_compiler = ["virtual/compiler/c", "virtual/compiler/cxx"]
     requires_git = ["git:url=https://github.com/doctest/doctest.git,rev=v{version}"]
     srcdir = "{git[doctest]}"
     options = [

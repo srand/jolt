@@ -122,7 +122,7 @@ class Gcc(autotools.Autotools):
         help="Target of a cross compiler, such as arm-none-eabi. Native compilers if not set.",
         valuesfn=targets(BAREMETAL_TARGETS, GLIBC_TARGETS, MUSL_TARGETS),
     )
-    requires_compiler = ["compiler/c"]
+    requires_compiler = ["compiler/c", "compiler/cxx"]
     requires_cross = ["binutils:target={target}"]
     """ Assembler and linker of the target, included in the cross compiler. """
     requires_libs = ["gmp", "mpc", "mpfr"]

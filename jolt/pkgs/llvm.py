@@ -57,7 +57,7 @@ class LLVMFromSrc(cmake.CMake):
     )
     version = Parameter(VERSION, help="LLVM version.")
 
-    requires_compiler = ["compiler/c"]
+    requires_compiler = ["compiler/c", "compiler/cxx"]
     requires_ninja = ["ninja"]
     requires_git = ["git:url=https://github.com/llvm/llvm-project.git,rev=llvmorg-{version}"]
 

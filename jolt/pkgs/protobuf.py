@@ -22,7 +22,7 @@ class Protobuf(cmake.CMake):
     version = Parameter("36.2", help="Protocol Buffers version.")
     pic = BooleanParameter(False, help="Build with position independent code.")
     shared = BooleanParameter(False, help="Build shared libraries.")
-    requires_compiler = ["virtual/compiler/c"]
+    requires_compiler = ["virtual/compiler/c", "virtual/compiler/cxx"]
     requires_abseil = ["abseil:pic={pic},shared={shared}"]
     requires_git = ["git:url=https://github.com/protocolbuffers/protobuf.git,rev=v{version}"]
     srcdir = "{git[protobuf]}"

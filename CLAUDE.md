@@ -75,13 +75,15 @@ cache shared between users and build workers.
   packages.
 - Don't write documentation by hand: `docs/_ext/jolt_packages.py` generates the
   package table and class reference from the recipes.
-- Packages that compile anything require the C compiler: add
+- Packages that compile anything require the compilers: add
   `@attributes.requires("requires_compiler")` and
-  `requires_compiler = ["virtual/compiler/c"]` (`compiler/c` for the toolchain
-  itself: gcc, binutils, C libraries, LLVM). The host compiler, OS and
-  architecture are only part of identities through this requirement; without
-  it, the shared cache mixes binaries of different platforms. Downloads of
-  prebuilt binaries are kept apart by their URLs.
+  `requires_compiler = ["virtual/compiler/c"]`, plus `"virtual/compiler/cxx"`
+  for projects written in C++, also header-only ones. The toolchain itself
+  (gcc, binutils, C libraries, LLVM) requires `compiler/c` and `compiler/cxx`
+  directly. The host compilers, their C++ standard library, OS and
+  architecture are only part of identities through these requirements;
+  without them, the shared cache mixes binaries of different platforms.
+  Downloads of prebuilt binaries are kept apart by their URLs.
 - Prefer depending on other Jolt packages over bundled copies and libraries on the
   build host. Check configure output for dependencies found on the host (paths in
   `/usr`) or silently skipped (`not found`), and add packages for them.

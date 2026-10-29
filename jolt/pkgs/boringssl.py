@@ -17,7 +17,7 @@ class BoringSSL(cmake.CMake):
     name = "boringssl"
     version = Parameter("0.20261020.0", help="BoringSSL version.")
     shared = BooleanParameter(False, help="Build shared libraries.")
-    requires_compiler = ["virtual/compiler/c"]
+    requires_compiler = ["virtual/compiler/c", "virtual/compiler/cxx"]
     requires_git = ["git:url=https://github.com/google/boringssl.git,rev={version}"]
     requires_nasm_windows = ["nasm"]
     srcdir = "{git[boringssl]}"

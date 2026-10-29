@@ -12,7 +12,7 @@ class RapidYAML(cmake.CMake):
     name = "rapidyaml"
     version = Parameter("0.16.0", help="rapidyaml version.")
     shared = BooleanParameter(False, help="Build shared libraries.")
-    requires_compiler = ["virtual/compiler/c"]
+    requires_compiler = ["virtual/compiler/c", "virtual/compiler/cxx"]
     requires_src = ["git:url=https://github.com/biojppm/rapidyaml.git,rev=v{version}"]
     srcdir = "{git[rapidyaml]}"
     options = [

@@ -23,7 +23,7 @@ class Grpc(cmake.CMake):
     pic = BooleanParameter(False, help="Build with position independent code.")
     shared = BooleanParameter(False, help="Build shared libraries.")
     generator = "Ninja"
-    requires_compiler = ["virtual/compiler/c"]
+    requires_compiler = ["virtual/compiler/c", "virtual/compiler/cxx"]
     requires_abseil = ["abseil:pic={pic},shared={shared}"]
     requires_cares = ["c-ares:pic={pic},shared={shared}"]
     requires_git = ["git:url=https://github.com/grpc/grpc.git,path={buildroot}/git_grpc,rev=v{version},submodules=true"]

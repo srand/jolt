@@ -11,7 +11,7 @@ from jolt.tasks import TaskRegistry
 class FastFloat(cmake.CMake):
     name = "fastfloat"
     version = Parameter("8.3.2", help="fast_float version.")
-    requires_compiler = ["virtual/compiler/c"]
+    requires_compiler = ["virtual/compiler/c", "virtual/compiler/cxx"]
     requires_git = ["git:url=https://github.com/fastfloat/fast_float.git,rev=v{version}"]
     srcdir = "{git[fast_float]}"
 

@@ -182,6 +182,7 @@ class Default(Alias):
         "cli11",
         "cmake",
         "compiler/c",
+        "compiler/cxx",
         "cppzmq",
         "cpython",
         "cpython/embed",

@@ -11,7 +11,7 @@ from jolt.tasks import TaskRegistry
 class Re2c(cmake.CMake):
     name = "re2c"
     version = Parameter("4.6", help="re2c version.")
-    requires_compiler = ["virtual/compiler/c"]
+    requires_compiler = ["virtual/compiler/c", "virtual/compiler/cxx"]
     requires_git = ["git:url=https://github.com/skvadrik/re2c.git,rev={version}"]
     srcdir = "{git[re2c]}"
 
