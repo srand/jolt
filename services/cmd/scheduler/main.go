@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/srand/jolt/scheduler/pkg/auth"
 	"github.com/srand/jolt/scheduler/pkg/log"
 	"github.com/srand/jolt/scheduler/pkg/logstash"
 	"github.com/srand/jolt/scheduler/pkg/scheduler"
@@ -77,10 +78,15 @@ var rootCmd = &cobra.Command{
 		// Create new logstash
 		stash := logstash.NewLogStash(&config.LogStash, stashFs)
 
+		authenticator, err := auth.New(config.Auth, scheduler.Permissions...)
+		if err != nil {
+			log.Fatal(err)
+		}
+
 		// Start listening for Grpc connections on all configured addresses
 		schedulerUris := viper.GetStringSlice("listen_grpc")
 		for _, uri := range schedulerUris {
-			go serveGrpc(sched, events, stash, uri)
+			go serveGrpc(sched, events, stash, authenticator, uri)
 		}
 
 		// Start listening for logstash HTTP connections on all configured addresses
@@ -99,7 +105,7 @@ var rootCmd = &cobra.Command{
 			logstash.NewHttpHandler(stash, r)
 			scheduler.NewHttpHandler(sched, r)
 
-			go http.ListenAndServe(host, utils.HttpLogger(r))
+			go http.ListenAndServe(host, utils.HttpLogger(authenticator.HttpHandler(r, scheduler.HttpPermission)))
 		}
 
 		// Ready to run the scheduler

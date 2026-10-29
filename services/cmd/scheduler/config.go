@@ -1,12 +1,16 @@
 package main
 
 import (
+	"github.com/srand/jolt/scheduler/pkg/auth"
 	"github.com/srand/jolt/scheduler/pkg/log"
 	"github.com/srand/jolt/scheduler/pkg/utils"
 )
 
 type Config struct {
 	utils.GRPCOptions `mapstructure:"grpc"`
+
+	// Tokens of clients and their permissions.
+	Auth auth.Config `mapstructure:"auth"`
 
 	// Addresses to listen on for gRPC.
 	ListenGrpc []string `mapstructure:"listen_grpc"`
@@ -28,6 +32,7 @@ func (c *Config) GetLogstashUri() string {
 
 func (c *Config) Log() {
 	log.Info("Scheduler configuration:")
+	log.Infof("  auth: %s", config.Auth.String())
 	log.Infof("  gRPC listen addresses: %v", config.ListenGrpc)
 	log.Infof("  HTTP listen addresses: %v", config.ListenHttp)
 	log.Infof("  Public HTTP addresses: %v", config.PublicHttp)

@@ -167,7 +167,10 @@ func (a *Authenticator) HttpHandler(handler http.Handler, permission func(*http.
 		_, err := a.Authorize(TokenFromHeader(r.Header.Get("Authorization")), permission(r))
 		switch {
 		case errors.Is(err, ErrUnauthenticated):
-			w.Header().Set("WWW-Authenticate", `Bearer realm="jolt"`)
+			// Browsers ask for the password of basic authentication,
+			// which can be the token
+			w.Header().Add("WWW-Authenticate", `Bearer realm="jolt"`)
+			w.Header().Add("WWW-Authenticate", `Basic realm="jolt"`)
 			http.Error(w, err.Error(), http.StatusUnauthorized)
 		case err != nil:
 			http.Error(w, err.Error(), http.StatusForbidden)
@@ -211,6 +214,26 @@ func (a *Authenticator) ServerOptions(permission func(method string) Permission)
 			return handler(srv, ss)
 		}),
 	}
+}
+
+type tokenCredentials string
+
+func (t tokenCredentials) GetRequestMetadata(ctx context.Context, uri ...string) (map[string]string, error) {
+	return map[string]string{"authorization": "Bearer " + string(t)}, nil
+}
+
+func (t tokenCredentials) RequireTransportSecurity() bool {
+	// The services don't use TLS for gRPC yet
+	return false
+}
+
+// DialOptions returns gRPC dial options that send the token with each call,
+// or none if the token is empty.
+func DialOptions(token string) []grpc.DialOption {
+	if token == "" {
+		return nil
+	}
+	return []grpc.DialOption{grpc.WithPerRPCCredentials(tokenCredentials(token))}
 }
 
 // NewToken returns a random token.

@@ -18,6 +18,9 @@ type WorkerConfig struct {
 	// gRPC URI to the cache service.
 	CacheGrpcUri string `mapstructure:"cache_grpc_uri"`
 
+	// Token that authenticates the executors with the cache service.
+	CacheToken string `mapstructure:"cache_token"`
+
 	// Directory to use for caching.
 	CacheDir string `mapstructure:"cache_dir"`
 
@@ -29,6 +32,10 @@ type WorkerConfig struct {
 
 	// Base URL to the scheduler service.
 	SchedulerGrpcUri string `mapstructure:"scheduler_grpc_uri"`
+
+	// Token that authenticates the worker and its executors with the
+	// scheduler service.
+	SchedulerToken string `mapstructure:"scheduler_token"`
 
 	// Thread count for the worker.
 	ThreadCount int `mapstructure:"threads"`
@@ -77,9 +84,19 @@ func (c *WorkerConfig) Log() {
 	log.Infof("  cache_dir = %s", c.CacheDir)
 	log.Infof("  cache_http_uri = %s", c.CacheHttpUri)
 	log.Infof("  cache_grpc_uri = %s", c.CacheGrpcUri)
+	log.Infof("  cache_token = %s", secret(c.CacheToken))
 	log.Infof("  scheduler_grpc_uri = %s", c.SchedulerGrpcUri)
+	log.Infof("  scheduler_token = %s", secret(c.SchedulerToken))
 	log.Infof("  nix = %v", c.Nix)
 	log.Infof("  nix_keep = %v", c.NixEnvironmentToKeep)
 	log.Infof("  thread_count = %v", c.ThreadCount)
 	c.Grpc.Log()
+}
+
+// Returns a placeholder for a secret value in logs.
+func secret(value string) string {
+	if value == "" {
+		return "(not set)"
+	}
+	return "(set)"
 }

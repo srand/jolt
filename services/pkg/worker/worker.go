@@ -20,6 +20,8 @@ import (
 	"github.com/srand/jolt/scheduler/pkg/protocol"
 	"github.com/srand/jolt/scheduler/pkg/scheduler"
 	"github.com/srand/jolt/scheduler/pkg/utils"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -59,8 +61,15 @@ func (w *worker) Run() {
 
 	for {
 		if err := w.run(); err != nil {
-			log.Debug(err)
-			time.Sleep(time.Second)
+			// Authentication fails until the configuration is fixed
+			switch status.Code(err) {
+			case codes.Unauthenticated, codes.PermissionDenied:
+				log.Error("Not allowed to connect to the scheduler, check scheduler_token:", err)
+				time.Sleep(10 * time.Second)
+			default:
+				log.Debug(err)
+				time.Sleep(time.Second)
+			}
 			continue
 		}
 		break
@@ -112,6 +121,9 @@ func (w *worker) run() error {
 		return err
 	}
 
+	// Error that ended the connection, set before requests is closed
+	var recvErr error
+
 	requests := make(chan *protocol.WorkerRequest)
 	go func() {
 		defer close(requests)
@@ -121,7 +133,7 @@ func (w *worker) run() error {
 				return
 			}
 			if err != nil {
-				log.Debug(err)
+				recvErr = err
 				return
 			}
 
@@ -156,6 +168,9 @@ func (w *worker) run() error {
 							break
 						}
 					}
+				}
+				if recvErr != nil {
+					return recvErr
 				}
 				return errors.New("Disconnected from scheduler")
 			}

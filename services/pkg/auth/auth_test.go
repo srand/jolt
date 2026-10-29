@@ -117,7 +117,7 @@ func TestHttpHandler(t *testing.T) {
 	assert.Equal(t, http.StatusOK, request(http.MethodGet, "").Code)
 	response := request(http.MethodPut, "")
 	assert.Equal(t, http.StatusUnauthorized, response.Code)
-	assert.Equal(t, `Bearer realm="jolt"`, response.Header().Get("WWW-Authenticate"))
+	assert.Equal(t, []string{`Bearer realm="jolt"`, `Basic realm="jolt"`}, response.Header().Values("WWW-Authenticate"))
 	assert.Equal(t, http.StatusUnauthorized, request(http.MethodPut, "Bearer wrong-token").Code)
 	assert.Equal(t, http.StatusForbidden, request(http.MethodPut, "Bearer reader-token").Code)
 	assert.Equal(t, http.StatusOK, request(http.MethodPut, "Bearer ci-token").Code)
@@ -132,6 +132,16 @@ func TestAuthorizeContext(t *testing.T) {
 	assert.Equal(t, codes.Unauthenticated, status.Code(a.authorizeContext(context.Background(), Read)))
 	assert.Equal(t, codes.PermissionDenied, status.Code(a.authorizeContext(withToken("Bearer reader-token"), Write)))
 	assert.NoError(t, a.authorizeContext(withToken("Bearer ci-token"), Write))
+}
+
+func TestDialOptions(t *testing.T) {
+	assert.Empty(t, DialOptions(""))
+	assert.Len(t, DialOptions("token"), 1)
+
+	md, err := tokenCredentials("token").GetRequestMetadata(context.Background())
+	assert.NoError(t, err)
+	assert.Equal(t, "Bearer token", md["authorization"])
+	assert.Equal(t, "token", TokenFromHeader(md["authorization"]))
 }
 
 func TestNewToken(t *testing.T) {

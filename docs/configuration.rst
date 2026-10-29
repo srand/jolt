@@ -1324,13 +1324,66 @@ Example:
 
   .. code:: yaml
 
-    # /etc/jolt/cache.yaml
+    # /etc/jolt/scheduler.yaml
     listen_http: "http://:8080"
     listen_grpc: "tcp://:9090"
     public_http: "http://scheduler.jolt.domain"
     grpc:
       keepalive_time: "2h"
       keepalive_timeout: "20s"
+
+.. _configuration-services-scheduler-auth:
+
+Authentication
+""""""""""""""
+
+Clients of the scheduler authenticate with tokens in the same way as clients
+of the :ref:`cache <configuration-services-cache-auth>`, configured in the
+``auth`` section of ``scheduler.yaml``. Tokens grant these permissions:
+
+  .. list-table::
+    :widths: 20 80
+    :header-rows: 1
+    :class: tight-table
+
+    * - Permission
+      - Allows
+    * - ``build``
+      - Building and cancelling builds, and running their tasks. Clients that
+        build also need ``read`` to see the logs of their tasks.
+    * - ``worker``
+      - Executing tasks, required by workers and the executors they start.
+    * - ``read``
+      - Listing builds and workers, following events and reading logs.
+    * - ``admin``
+      - Cancelling any build, rescheduling tasks and debugging the scheduler.
+        Administrators also need ``read`` to list builds and workers.
+
+Logs are opened in a browser, which asks for a user name and password.
+The token is the password, and the user name is ignored.
+
+Create tokens with ``jolt-cache token <name>``. The scheduler doesn't use TLS
+for gRPC, so tokens are only protected on trusted networks or behind a
+proxy that terminates TLS.
+
+Example:
+
+  .. code:: yaml
+
+    # /etc/jolt/scheduler.yaml
+    auth:
+      tokens:
+        - name: developers
+          sha256: 9c56cc51b374c3ba189210d5b6d4bf57790d351c96c47c02190ecf1e430635ab
+          permissions: [build, read]
+        - name: workers
+          sha256: 4c1e0fb8de8c8e4c4f5b4ba9c3aa6a9ac5c3d7fb22bb4b8b0f4cbf5e8b0b6c3e
+          permissions: [worker]
+
+Jolt sends its token with ``token`` in the ``scheduler`` section of the
+configuration, or with the ``JOLT_SCHEDULER_TOKEN`` environment variable.
+Workers use ``scheduler_token``, ``schedulerctl`` uses ``scheduler_token`` in
+``schedulerctl.yaml`` or ``JOLT_SCHEDULER_TOKEN``.
 
 
 Worker
@@ -1474,6 +1527,18 @@ The worker can be configured using environment variables and/or a configuration 
       - | The URI of the scheduler gRPC service to which the worker will connect and enlist.
 
         | See ``JOLT_CACHE_GRPC_URI`` for format. The default is ``tcp://scheduler:9090``.
+
+    * - ``JOLT_SCHEDULER_TOKEN``
+      - ``scheduler_token``
+      - | Token that authenticates the worker with the scheduler. It needs the
+          ``worker`` permission. See :ref:`configuration-services-scheduler-auth`.
+
+        | The worker passes the token on to the executors it starts.
+
+    * - ``JOLT_CACHE_TOKEN``
+      - ``cache_token``
+      - | Token that authenticates the executors with the cache, when they
+          upload artifacts. See :ref:`configuration-services-cache-auth`.
 
     * - ``JOLT_NIX``
       - ``nix``

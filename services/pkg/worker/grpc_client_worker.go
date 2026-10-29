@@ -1,6 +1,7 @@
 package worker
 
 import (
+	"github.com/srand/jolt/scheduler/pkg/auth"
 	"github.com/srand/jolt/scheduler/pkg/protocol"
 	"github.com/srand/jolt/scheduler/pkg/utils"
 	"google.golang.org/grpc"
@@ -13,6 +14,7 @@ func NewWorkerClient(workerConfig *WorkerConfig) (protocol.WorkerClient, error) 
 	}
 
 	dialOptions = append(dialOptions, workerConfig.Grpc.ToDialOptions()...)
+	dialOptions = append(dialOptions, auth.DialOptions(workerConfig.SchedulerToken)...)
 
 	grpcUri, err := utils.ParseGrpcUrl(workerConfig.SchedulerGrpcUri)
 	if err != nil {

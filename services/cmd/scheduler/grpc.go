@@ -5,6 +5,7 @@ import (
 	"net"
 	"net/url"
 
+	"github.com/srand/jolt/scheduler/pkg/auth"
 	"github.com/srand/jolt/scheduler/pkg/log"
 	"github.com/srand/jolt/scheduler/pkg/logstash"
 	"github.com/srand/jolt/scheduler/pkg/protocol"
@@ -13,7 +14,7 @@ import (
 )
 
 // Sets up a gRPC server on a specific listening address and starts it.
-func serveGrpc(sched scheduler.Scheduler, events *scheduler.EventHub, stash logstash.LogStash, address string) {
+func serveGrpc(sched scheduler.Scheduler, events *scheduler.EventHub, stash logstash.LogStash, authenticator *auth.Authenticator, address string) {
 	// Parse URI
 	uri, err := url.Parse(address)
 	if err != nil {
@@ -50,6 +51,7 @@ func serveGrpc(sched scheduler.Scheduler, events *scheduler.EventHub, stash logs
 
 	// Setup gRPC options
 	opts := config.GRPCOptions.ToServerOptions()
+	opts = append(opts, authenticator.ServerOptions(scheduler.GrpcPermission)...)
 
 	// Setup gRPC server
 	server := grpc.NewServer(opts...)

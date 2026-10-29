@@ -57,6 +57,16 @@ var rootCmd = &cobra.Command{
 		}
 		workerConfig.Log()
 
+		// Executors inherit the tokens from the environment
+		for name, value := range map[string]string{
+			"JOLT_CACHE_TOKEN":     workerConfig.CacheToken,
+			"JOLT_SCHEDULER_TOKEN": workerConfig.SchedulerToken,
+		} {
+			if value != "" {
+				os.Setenv(name, value)
+			}
+		}
+
 		workerClient, err := worker.NewWorkerClient(workerConfig)
 		if err != nil {
 			log.Fatal(err)
@@ -90,6 +100,9 @@ func main() {
 	viper.BindPFlag("threads", rootCmd.Flags().Lookup("threads"))
 	viper.SetEnvPrefix("jolt")
 	viper.AutomaticEnv()
+	// Settings only read from the environment or the configuration file
+	viper.BindEnv("cache_token")
+	viper.BindEnv("scheduler_token")
 
 	viper.SetConfigName("worker.yaml")
 	viper.SetConfigType("yaml")
