@@ -21,6 +21,12 @@ class Rust(Download):
     """ Target triple on Windows x86-64. """
     triple_darwin_x86_64 = "x86_64-apple-darwin"
     """ Target triple on macOS x86-64. """
+    triple_darwin_arm64 = "aarch64-apple-darwin"
+    """ Target triple on macOS arm64. """
+    triple_linux_aarch64 = "aarch64-unknown-linux-gnu"
+    """ Target triple on Linux arm64. """
+    triple_windows_arm64 = "aarch64-pc-windows-msvc"
+    """ Target triple on Windows arm64. """
 
     def publish(self, artifact, tools):
         self.installdir = tools.builddir("install")
