@@ -41,7 +41,11 @@ jobs:
         shell: bash
     env:
       JOLT_CACHE: ${{ github.workspace }}/cache
-      JOLT_CACHE_URI: https://kaffekanna.asuscomm.com:8888/files
+      # The cache plugin looks up all artifacts with one request. The router
+      # in front of the cache drops connections beyond about 20 at a time,
+      # which the HEAD request per artifact of the http plugin exceeds.
+      JOLT_CACHE_HTTP_URI: https://kaffekanna.asuscomm.com:8888
+      JOLT_CACHE_GRPC_URI: tls://kaffekanna.asuscomm.com:8889
       JOLT_CACHE_TOKEN: ${{ secrets.JOLT_CACHE_TOKEN }}
     steps:
       - name: Checkout repository
@@ -106,7 +110,7 @@ jobs:
         timeout-minutes: 330
         run: |
           set -o pipefail
-          jolt -c jolt.cachedir="$JOLT_CACHE" -c jolt.cachesize=1T -c http.uri="$JOLT_CACHE_URI" build -k default 2>&1 | tee "$RUNNER_TEMP/jolt.log"
+          jolt -c jolt.cachedir="$JOLT_CACHE" -c jolt.cachesize=1T -c cache.http_uri="$JOLT_CACHE_HTTP_URI" -c cache.grpc_uri="$JOLT_CACHE_GRPC_URI" build -k default 2>&1 | tee "$RUNNER_TEMP/jolt.log"
 
       - name: Summarize
         if: always()
