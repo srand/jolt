@@ -7,11 +7,13 @@ from jolt.tasks import TaskRegistry
 @attributes.requires("requires_m4")
 @attributes.requires("requires_src")
 @cxxinfo.publish(libraries=["fl"])
+@attributes.requires("requires_compiler")
 class Flex(autotools.Autotools):
     """ Fast lexical analyzer generator """
 
     name = "flex"
     version = Parameter("2.6.4", help="flex version.")
+    requires_compiler = ["virtual/compiler/c"]
     requires_m4 = ["m4"]
     requires_src = ["fetch:alias=src,url=https://github.com/westes/flex/releases/download/v{version}/flex-{version}.tar.gz"]
     srcdir = "{fetch[src]}/flex-{version}"

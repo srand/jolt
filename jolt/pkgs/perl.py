@@ -19,7 +19,7 @@ class StrawberryPerl(Download):
 
 
 @attributes.system
-@influence.string("{system}")
+@influence.attribute("system")
 class HostPerl(Task):
     name = "perl/host"
 

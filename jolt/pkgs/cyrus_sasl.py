@@ -9,6 +9,7 @@ from jolt.tasks import TaskRegistry
 @autotools.requires()
 @pkgconfig.requires()
 @cxxinfo.publish(libraries=["sasl2"])
+@attributes.requires("requires_compiler")
 class CyrusSasl(autotools.Autotools):
     """
     Simple Authentication and Security Layer library
@@ -19,6 +20,7 @@ class CyrusSasl(autotools.Autotools):
 
     name = "cyrus-sasl"
     version = Parameter("2.1.28", help="Cyrus SASL version.")
+    requires_compiler = ["virtual/compiler/c"]
     requires_libs = ["krb5", "openssl"]
     """ Libraries used by the GSSAPI and other mechanisms. """
     requires_src = ["fetch:alias=src,url=https://github.com/cyrusimap/cyrus-sasl/releases/download/cyrus-sasl-{version}/cyrus-sasl-{version}.tar.gz"]

@@ -6,12 +6,14 @@ from jolt.tasks import BooleanParameter, TaskRegistry
 @attributes.common_metadata()
 @attributes.requires("requires_git")
 @cxxinfo.publish(libraries=["udev"])
+@attributes.requires("requires_compiler")
 class LibudevZero(Task):
     """ Daemonless replacement for libudev """
 
     name = "libudev-zero"
     version = Parameter("1.0.5", help="libudev-zero version.")
     shared = BooleanParameter(False, help="Build shared libraries.")
+    requires_compiler = ["virtual/compiler/c"]
     requires_git = ["git:clean=true,url=https://github.com/illiliti/libudev-zero.git,rev={version}"]
     srcdir = "{git[libudev-zero]}"
     """ Source directory. """

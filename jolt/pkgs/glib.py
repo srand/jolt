@@ -9,9 +9,11 @@ from jolt.tasks import TaskRegistry
 @attributes.requires("requires_pcre2")
 @attributes.requires("requires_zlib")
 @meson.requires()
+@attributes.requires("requires_compiler")
 class GLib(meson.Meson):
     name = "glib"
     version = Parameter("2.90.1", help="GLib version.")
+    requires_compiler = ["virtual/compiler/c"]
     requires_git = ["git:url=https://gitlab.gnome.org/GNOME/glib.git,rev={version},submodules=true"]
     requires_libffi = ["libffi"]
     requires_pcre2 = ["pcre2:pic=true"]

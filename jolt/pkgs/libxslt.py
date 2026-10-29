@@ -6,9 +6,11 @@ from jolt.tasks import TaskRegistry
 
 @attributes.requires("requires_git")
 @attributes.requires("requires_libxml2")
+@attributes.requires("requires_compiler")
 class Libxslt(cmake.CMake):
     name = "libxslt"
     version = Parameter("1.1.45", help="libxslt version.")
+    requires_compiler = ["virtual/compiler/c"]
     requires_git = ["git:url=https://gitlab.gnome.org/GNOME/libxslt.git,rev=v{version}"]
     requires_libxml2 = ["libxml2"]
     srcdir = "{git[libxslt]}"

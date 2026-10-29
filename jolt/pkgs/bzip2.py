@@ -6,6 +6,7 @@ from jolt.plugins import cxxinfo, fetch, ninja
 @attributes.requires("requires_src")
 @attributes.system
 @ninja.attributes.cflags("cflags_linux_pic_{pic[on,off]}")
+@attributes.requires("requires_compiler")
 class LibBzip2(ninja.CXXLibrary):
     name = "libbzip2"
     binary = "bzip2"
@@ -18,6 +19,7 @@ class LibBzip2(ninja.CXXLibrary):
     cflags_linux_pic_on = ["-fPIC"]
     """ Compiler flags on Linux when building with position independent code. """
     incremental = False
+    requires_compiler = ["virtual/compiler/c"]
     requires_src = ["fetch:alias=src,url=https://sourceware.org/pub/bzip2/bzip2-{version}.tar.gz"]
     source_influence = False
     sources = [

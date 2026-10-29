@@ -12,10 +12,12 @@ from jolt.tasks import TaskRegistry
 @cmake.requires()
 @cmake.use_ninja()
 @cxxinfo.publish(libraries=["ssl", "crypto"])
+@attributes.requires("requires_compiler")
 class BoringSSL(cmake.CMake):
     name = "boringssl"
     version = Parameter("0.20261020.0", help="BoringSSL version.")
     shared = BooleanParameter(False, help="Build shared libraries.")
+    requires_compiler = ["virtual/compiler/c"]
     requires_git = ["git:url=https://github.com/google/boringssl.git,rev={version}"]
     requires_nasm_windows = ["nasm"]
     srcdir = "{git[boringssl]}"

@@ -24,10 +24,12 @@ class NinjaBin(Download):
 @attributes.requires("requires_git")
 @attributes.requires("requires_re2c")
 @cmake.requires()
+@attributes.requires("requires_compiler")
 class NinjaSrc(cmake.CMake):
     name = "ninja/src"
     version = Parameter("1.13.2", help="Ninja version.")
     tests = BooleanParameter(False, help="Build tests.")
+    requires_compiler = ["virtual/compiler/c"]
     requires_git = ["git:url=https://github.com/ninja-build/ninja.git,rev=v{version}"]
     requires_re2c = ["re2c"]
     srcdir = "{git[ninja]}"

@@ -13,6 +13,7 @@ from jolt.tasks import TaskRegistry
 @cmake.requires()
 @cmake.use_ninja()
 @cxxinfo.publish()
+@attributes.requires("requires_compiler")
 class Soci(cmake.CMake):
     name = "soci"
     version = Parameter("4.1.4", help="SOCI version.")
@@ -22,6 +23,7 @@ class Soci(cmake.CMake):
     sqlite = BooleanParameter(True, help="Enable SQLite support.")
     odbc = BooleanParameter(False, help="Enable ODBC support.")
 
+    requires_compiler = ["virtual/compiler/c"]
     requires_boost_on = ["boost"]
     requires_fmt = ["fmt:shared={shared}"]
     requires_git = ["git:url=https://github.com/SOCI/soci.git,rev=v{version}"]

@@ -9,11 +9,13 @@ from jolt.tasks import TaskRegistry
 @cmake.requires()
 @cmake.use_ninja()
 @cxxinfo.publish()
+@attributes.requires("requires_compiler")
 class Zlib(cmake.CMake):
     name = "zlib"
     version = Parameter("1.3.2", help="zlib version.")
     pic = BooleanParameter(False, help="Build with position independent code.")
     shared = BooleanParameter(False, help="Build shared libraries.")
+    requires_compiler = ["virtual/compiler/c"]
     requires_git = ["git:clean=true,url=https://github.com/madler/zlib.git,rev=v{version}"]
     srcdir = "{git[zlib]}"
     options = [
@@ -57,11 +59,13 @@ class Zlib(cmake.CMake):
 @cmake.requires()
 @cmake.use_ninja()
 @cxxinfo.publish()
+@attributes.requires("requires_compiler")
 class ZlibNg(cmake.CMake):
     name = "zlib-ng"
     version = Parameter("2.3.3", help="zlib-ng version.")
     pic = BooleanParameter(False, help="Build with position independent code.")
     shared = BooleanParameter(False, help="Build shared libraries.")
+    requires_compiler = ["virtual/compiler/c"]
     requires_git = ["git:url=https://github.com/zlib-ng/zlib-ng.git,rev={version}"]
     srcdir = "{git[zlib-ng]}"
     options = [

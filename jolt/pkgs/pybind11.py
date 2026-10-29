@@ -7,11 +7,13 @@ from jolt.tasks import TaskRegistry
 @attributes.requires("requires_git")
 @cmake.requires()
 @cmake.use_ninja()
+@attributes.requires("requires_compiler")
 class Pybind11(cmake.CMake):
     """ Header-only library for exposing C++ to Python and Python to C++ """
 
     name = "pybind11"
     version = Parameter("3.1.0", help="pybind11 version.")
+    requires_compiler = ["virtual/compiler/c"]
     requires_git = ["git:url=https://github.com/pybind/pybind11.git,rev=v{version}"]
     srcdir = "{git[pybind11]}"
     options = [

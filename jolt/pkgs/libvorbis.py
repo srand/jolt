@@ -10,10 +10,12 @@ from jolt.tasks import TaskRegistry
 @cmake.use_ninja()
 @pkgconfig.requires()
 @cxxinfo.publish(libraries=["vorbis", "vorbisenc", "vorbisfile"])
+@attributes.requires("requires_compiler")
 class Libvorbis(cmake.CMake):
     name = "libvorbis"
     version = Parameter("1.3.7", help="libvorbis version.")
     shared = BooleanParameter(False, help="Build shared libraries.")
+    requires_compiler = ["virtual/compiler/c"]
     requires_git = ["git:url=https://github.com/xiph/vorbis.git,rev=v{version}"]
     requires_ogg = ["libogg"]
     srcdir = "{git[vorbis]}"

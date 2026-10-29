@@ -9,10 +9,12 @@ from jolt.tasks import TaskRegistry
 @attributes.requires("requires_x11_{x11[on,off]}")
 @meson.requires()
 @cxxinfo.publish(libraries=["xkbcommon"])
+@attributes.requires("requires_compiler")
 class Libxkbcommon(meson.Meson):
     name = "libxkbcommon"
     version = Parameter("1.13.2", help="libxkbcommon version.")
     x11 = BooleanParameter(False, help="Build the libxkbcommon-x11 library.")
+    requires_compiler = ["virtual/compiler/c"]
     requires_bison = ["bison"]
     requires_git = ["git:url=https://github.com/xkbcommon/libxkbcommon.git,rev=xkbcommon-{version}"]
     requires_x11_on = ["xorg/libxcb"]

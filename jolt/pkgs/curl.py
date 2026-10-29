@@ -13,11 +13,13 @@ from jolt.tasks import TaskRegistry
 @cmake.requires()
 @cmake.use_ninja()
 @cxxinfo.publish()
+@attributes.requires("requires_compiler")
 class Curl(cmake.CMake):
     name = "curl"
     version = Parameter("8.23.0", help="curl version.")
     pic = BooleanParameter(False, help="Build with position independent code.")
     shared = BooleanParameter(False, help="Build shared libraries.")
+    requires_compiler = ["virtual/compiler/c"]
     requires_brotli = ["brotli:pic={pic},shared={shared}"]
     requires_git = ["git:url=https://github.com/curl/curl.git,rev=curl-{_version_tag},submodules=true"]
     requires_ssl = ["virtual/ssl:pic={pic},shared={shared}"]

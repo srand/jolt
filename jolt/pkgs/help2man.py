@@ -4,9 +4,11 @@ from jolt.tasks import TaskRegistry
 
 
 @attributes.requires("requires_src")
+@attributes.requires("requires_compiler")
 class Help2Man(autotools.Autotools):
     name = "help2man"
     version = Parameter("1.49.3", help="help2man version.")
+    requires_compiler = ["virtual/compiler/c"]
     requires_src = ["fetch:alias=src,url=http://ftpmirror.gnu.org/help2man/help2man-{version}.tar.xz"]
     srcdir = "{fetch[src]}/help2man-{version}"
 

@@ -8,10 +8,12 @@ from jolt.tasks import TaskRegistry
 @cmake.requires()
 @cmake.use_ninja()
 @cxxinfo.publish(libraries=["spdlog"])
+@attributes.requires("requires_compiler")
 class Spdlog(cmake.CMake):
     name = "spdlog"
     version = Parameter("1.17.0", help="spdlog version.")
     shared = BooleanParameter(False, help="Build shared libraries.")
+    requires_compiler = ["virtual/compiler/c"]
     requires_git = ["git:url=https://github.com/gabime/spdlog.git,rev=v{version}"]
     srcdir = "{git[spdlog]}"
     options = [

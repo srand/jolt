@@ -29,6 +29,7 @@ class LLVMFromBin(Download):
 @cmake.options("_libclc_options")
 @cmake.requires()
 @cmake.use_ninja()
+@attributes.requires("requires_compiler")
 class LLVMFromSrc(cmake.CMake):
     name = "llvm/src"
 
@@ -56,6 +57,7 @@ class LLVMFromSrc(cmake.CMake):
     )
     version = Parameter(VERSION, help="LLVM version.")
 
+    requires_compiler = ["compiler/c"]
     requires_ninja = ["ninja"]
     requires_git = ["git:url=https://github.com/llvm/llvm-project.git,rev=llvmorg-{version}"]
 

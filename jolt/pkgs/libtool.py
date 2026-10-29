@@ -8,10 +8,12 @@ from jolt.tasks import TaskRegistry
 @attributes.requires("requires_help2man")
 @attributes.requires("requires_texinfo")
 @autotools.requires(libtool=False)
+@attributes.requires("requires_compiler")
 class Libtool(autotools.Autotools):
     name = "libtool"
     version = Parameter("2.6.2", help="Libtool version.")
 
+    requires_compiler = ["virtual/compiler/c"]
     requires_git = ["git:url=git://git.git.savannah.gnu.org/libtool.git,rev=v{version}"]
     requires_help2man = ["help2man"]
     requires_texinfo = ["texinfo"]

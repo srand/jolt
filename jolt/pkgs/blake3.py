@@ -5,11 +5,13 @@ from jolt.tasks import TaskRegistry
 
 @attributes.requires("requires_git")
 @cmake.requires()
+@attributes.requires("requires_compiler")
 class Blake3(cmake.CMake):
     name = "blake3"
     version = Parameter("1.8.7", help="BLAKE3 version.")
     pic = BooleanParameter(False, help="Build with position independent code.")
     shared = BooleanParameter(False, help="Build shared libraries.")
+    requires_compiler = ["virtual/compiler/c"]
     requires_git = ["git:url=https://github.com/BLAKE3-team/BLAKE3.git,rev={version}"]
     srcdir = "{git[BLAKE3]}/c"
     options = [

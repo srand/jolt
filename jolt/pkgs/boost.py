@@ -11,6 +11,7 @@ from jolt.error import raise_task_error_if
 @attributes.requires("requires_icu_{icu[on,off]}")
 @attributes.requires("requires_python_{python[on,off]}")
 @attributes.system
+@attributes.requires("requires_compiler")
 class Boost(Task):
     name = "boost"
     version = Parameter("1.92.0", help="Boost version.")
@@ -18,6 +19,7 @@ class Boost(Task):
     icu = BooleanParameter(False, help="Enable ICU support.")
     python = BooleanParameter(False, help="Build Boost.Python.")
     bits = IntParameter(64, values=[32, 64], help="Address model, in bits.")
+    requires_compiler = ["virtual/compiler/c"]
     requires_git = ["git:url=https://github.com/boostorg/boost.git,path={buildroot}/git-boost,rev=boost-{version},submodules=true"]
     requires_icu_on = ["icu"]
     requires_python_on = ["cpython"]

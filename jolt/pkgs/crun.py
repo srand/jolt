@@ -9,11 +9,13 @@ from jolt.tasks import TaskRegistry
 @attributes.requires("requires_libcap_{caps[on,off]}")
 @autotools.requires()
 @pkgconfig.requires()
+@attributes.requires("requires_compiler")
 class CRun(autotools.Autotools):
     name = "crun"
     version = Parameter("1.30.1", help="crun version.")
     caps = BooleanParameter(False, help="Enable capabilities support.")
     systemd = BooleanParameter(False, help="Enable systemd support.")
+    requires_compiler = ["virtual/compiler/c"]
     requires_git = ["git:url=https://github.com/containers/crun.git,rev={version},submodules=true"]
     requires_json_c = ["json-c"]
     requires_libcap_on = ["libcap"]

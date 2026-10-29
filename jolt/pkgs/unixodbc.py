@@ -6,10 +6,12 @@ from jolt.tasks import TaskRegistry
 @attributes.requires("requires_src")
 @autotools.requires()
 @cxxinfo.publish(libraries=["odbc"])
+@attributes.requires("requires_compiler")
 class UnixODBC(autotools.Autotools):
     name = "unixodbc"
     version = Parameter("2.3.14", help="unixODBC version.")
     shared = BooleanParameter(False, help="Build shared libraries.")
+    requires_compiler = ["virtual/compiler/c"]
     requires_src = ["fetch:alias=src,url=https://github.com/lurcher/unixODBC/releases/download/v{version}/unixODBC-{version}.tar.gz"]
     srcdir = "{fetch[src]}/unixODBC-{version}"
     options = [

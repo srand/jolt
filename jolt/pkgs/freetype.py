@@ -9,6 +9,7 @@ from jolt.tasks import TaskRegistry
 @cmake.requires()
 @cmake.use_ninja()
 @cxxinfo.publish(incpaths=["include/freetype2"], libraries=["freetype"])
+@attributes.requires("requires_compiler")
 class Freetype(cmake.CMake):
     """ Font rendering library """
 
@@ -16,6 +17,7 @@ class Freetype(cmake.CMake):
     version = Parameter("2.15.0", help="FreeType version.")
     pic = BooleanParameter(False, help="Build with position independent code.")
     shared = BooleanParameter(False, help="Build shared libraries.")
+    requires_compiler = ["virtual/compiler/c"]
     requires_git = ["git:url=https://gitlab.freedesktop.org/freetype/freetype.git,rev=VER-{_version}"]
     requires_libs = [
         "libpng:pic={pic},shared={shared}",

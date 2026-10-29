@@ -6,6 +6,7 @@ from jolt.tasks import TaskRegistry
 
 @attributes.requires("requires_git")
 @attributes.requires("requires_{_variant}")
+@attributes.requires("requires_compiler")
 class Musl(Task):
     """
     musl C library
@@ -18,6 +19,7 @@ class Musl(Task):
     name = "musl"
     version = Parameter("1.2.6", help="musl version.")
     target = Parameter(required=False, help="Target of the library, such as aarch64-linux-musl. The host if not set.")
+    requires_compiler = ["compiler/c"]
     requires_cross = ["gcc:target={target}"]
     """ Cross compiler for the target. """
     requires_git = ["git:clean=true,url=https://git.musl-libc.org/git/musl,rev=v{version}"]

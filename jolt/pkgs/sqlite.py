@@ -6,10 +6,12 @@ from jolt.tasks import TaskRegistry
 @attributes.requires("requires_git")
 @autotools.requires()
 @cxxinfo.publish(libraries=["sqlite3"])
+@attributes.requires("requires_compiler")
 class SQLitePosix(autotools.Autotools):
     name = "sqlite/posix"
     version = Parameter("3.54.1", help="SQLite version.")
     shared = BooleanParameter(False, help="Build shared libraries.")
+    requires_compiler = ["virtual/compiler/c"]
     requires_git = ["git:url=https://github.com/sqlite/sqlite.git,rev=version-{version}"]
     srcdir = "{git[sqlite]}"
     options = [
@@ -20,10 +22,12 @@ class SQLitePosix(autotools.Autotools):
 @attributes.common_metadata()
 @attributes.requires("requires_git")
 @cxxinfo.publish(libraries=["sqlite3"])
+@attributes.requires("requires_compiler")
 class SQLiteWin32(Task):
     name = "sqlite/win32"
     version = Parameter("3.54.1", help="SQLite version.")
     shared = BooleanParameter(True, help="Build shared libraries.")
+    requires_compiler = ["virtual/compiler/c"]
     requires_git = ["git:clean=true,url=https://github.com/sqlite/sqlite.git,rev=version-{version}"]
     srcdir = "{git[sqlite]}"
     """ Source directory. """

@@ -8,6 +8,7 @@ import os
 @attributes.system
 @cmake.requires()
 @cmake.use_ninja()
+@attributes.requires("requires_compiler")
 class Abseil(cmake.CMake):
     """ Abseil C++ Common Libraries """
 
@@ -15,6 +16,7 @@ class Abseil(cmake.CMake):
     version = Parameter("20260817.0", help="Abseil version.")
     pic = BooleanParameter(False, help="Build with position independent code.")
     shared = BooleanParameter(False, help="Build shared libraries.")
+    requires_compiler = ["virtual/compiler/c"]
     requires_git = ["git:url=https://github.com/abseil/abseil-cpp.git,rev={version}"]
     srcdir = "{git[abseil-cpp]}"
     options = [

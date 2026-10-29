@@ -7,11 +7,13 @@ from jolt.tasks import TaskRegistry
 @attributes.requires("requires_libs")
 @attributes.requires("requires_src")
 @cxxinfo.publish(libraries=["mpc"])
+@attributes.requires("requires_compiler")
 class Mpc(autotools.Autotools):
     """ GNU multiple precision complex arithmetic library """
 
     name = "mpc"
     version = Parameter("1.4.1", help="GNU MPC version.")
+    requires_compiler = ["virtual/compiler/c"]
     requires_libs = ["gmp", "mpfr"]
     requires_src = ["fetch:alias=src,url=https://ftpmirror.gnu.org/gnu/mpc/mpc-{version}.tar.xz"]
     srcdir = "{fetch[src]}/mpc-{version}"

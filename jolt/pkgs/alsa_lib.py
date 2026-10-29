@@ -5,11 +5,13 @@ from jolt.tasks import TaskRegistry
 
 @attributes.requires("requires_src")
 @cxxinfo.publish(libraries=["asound"])
+@attributes.requires("requires_compiler")
 class AlsaLib(autotools.Autotools):
     """ Advanced Linux Sound Architecture library """
 
     name = "alsa-lib"
     version = Parameter("1.2.16.1", help="alsa-lib version.")
+    requires_compiler = ["virtual/compiler/c"]
     requires_src = ["fetch:alias=src,url=https://www.alsa-project.org/files/pub/lib/alsa-lib-{version}.tar.bz2"]
     srcdir = "{fetch[src]}/alsa-lib-{version}"
     options = [

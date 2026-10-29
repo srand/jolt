@@ -8,9 +8,11 @@ from jolt.tasks import TaskRegistry
 @attributes.requires("requires_help2man")
 @attributes.requires("requires_m4")
 @attributes.requires("requires_texinfo")
+@attributes.requires("requires_compiler")
 class Autoconf(autotools.Autotools):
     name = "autoconf"
     version = Parameter("2.73", help="Autoconf version.")
+    requires_compiler = ["virtual/compiler/c"]
     requires_git = ["fetch:alias=src,url=https://ftpmirror.gnu.org/gnu/autoconf/autoconf-{version}.tar.gz"]
     requires_help2man = ["help2man"]
     requires_m4 = ["m4"]

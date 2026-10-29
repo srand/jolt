@@ -5,6 +5,7 @@ from jolt.tasks import TaskRegistry
 
 @attributes.requires("requires_src")
 @cxxinfo.publish(libraries=["icuio", "icui18n", "icuuc", "icudata"])
+@attributes.requires("requires_compiler")
 class Icu(autotools.Autotools):
     """ International Components for Unicode, the ICU4C libraries and their data """
 
@@ -12,6 +13,7 @@ class Icu(autotools.Autotools):
     version = Parameter("79.1", help="ICU version.")
     pic = BooleanParameter(False, help="Build with position independent code.")
     shared = BooleanParameter(False, help="Build shared libraries.")
+    requires_compiler = ["virtual/compiler/c"]
     requires_src = ["fetch:alias=src,url=https://github.com/unicode-org/icu/releases/download/release-{version}/icu4c-{version}-sources.tgz"]
     srcdir = "{fetch[src]}/icu/source"
     options = [

@@ -6,11 +6,13 @@ from jolt.tasks import TaskRegistry
 
 @attributes.requires("requires_git")
 @autotools.requires()
+@attributes.requires("requires_compiler")
 class PkgConfPosix(autotools.Autotools):
     """ Package that provides the 'pkgconf' binary, an alternative implementation of 'pkg-config'. """
 
     name = "pkgconf/posix"
     version = Parameter("3.0.10", help="pkgconf version.")
+    requires_compiler = ["virtual/compiler/c"]
     requires_git = ["git:url=https://github.com/pkgconf/pkgconf.git,rev=pkgconf-{version}"]
     srcdir = "{git[pkgconf]}"
     options = ["--enable-static", "--disable-shared"]
@@ -26,11 +28,13 @@ class PkgConfPosix(autotools.Autotools):
 
 @attributes.requires("requires_git")
 @meson.requires()
+@attributes.requires("requires_compiler")
 class PkgConfWin32(meson.Meson):
     """ Package that provides the 'pkgconf' binary, an alternative implementation of 'pkg-config'. """
 
     name = "pkgconf/win32"
     version = Parameter("3.0.10", help="pkgconf version.")
+    requires_compiler = ["virtual/compiler/c"]
     requires_git = ["git:url=https://github.com/pkgconf/pkgconf.git,rev=pkgconf-{version}"]
     srcdir = "{git[pkgconf]}"
     options = [

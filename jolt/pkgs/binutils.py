@@ -5,12 +5,14 @@ from jolt.tasks import TaskRegistry
 
 @attributes.requires("requires_src")
 @autotools.options("options_{_variant}")
+@attributes.requires("requires_compiler")
 class Binutils(autotools.Autotools):
     """ GNU assembler, linker and binary tools """
 
     name = "binutils"
     version = Parameter("2.47", help="GNU Binutils version.")
     target = Parameter(required=False, help="Target of cross tools, such as arm-none-eabi. Native tools if not set.")
+    requires_compiler = ["compiler/c"]
     requires_src = ["fetch:alias=src,url=https://ftpmirror.gnu.org/gnu/binutils/binutils-{version}.tar.xz"]
     srcdir = "{fetch[src]}/binutils-{version}"
     options = [

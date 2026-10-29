@@ -10,11 +10,13 @@ from jolt.tasks import ListParameter, TaskRegistry
 @attributes.common_metadata()
 @attributes.system
 @cxxinfo.publish(libraries=["ssl", "crypto"])
+@attributes.requires("requires_compiler")
 class OpenSSL(Task):
     name = "openssl"
     version = Parameter("4.1.0", help="OpenSSL version.")
     shared = BooleanParameter(False, help="Build shared libraries.")
 
+    requires_compiler = ["virtual/compiler/c"]
     requires_git = ["git:url=https://github.com/openssl/openssl.git,rev=openssl-{version}"]
     requires_perl = ["virtual/perl"]
     requires_windows_nasm = ["nasm"]

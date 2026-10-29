@@ -1,12 +1,15 @@
+from jolt import attributes
 from jolt.plugins import python
 from jolt.tasks import TaskRegistry
 
 
 @python.requires()
+@attributes.requires("requires_compiler")
 class Python(python.PythonEnv):
     """ Builds and publishes a Python virtual environment with specified packages. """
 
     name = "python"
+    requires_compiler = ["virtual/compiler/c"]
 
     requirements = [
         "setuptools",

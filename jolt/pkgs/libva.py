@@ -7,9 +7,11 @@ from jolt.tasks import TaskRegistry
 @attributes.requires("requires_git")
 @attributes.requires("requires_libdrm")
 @meson.requires()
+@attributes.requires("requires_compiler")
 class Libva(meson.Meson):
     name = "libva"
     version = Parameter("2.24.1", help="libva version.")
+    requires_compiler = ["virtual/compiler/c"]
     requires_git = ["git:url=https://github.com/intel/libva.git,rev={version}"]
     requires_libdrm = ["libdrm"]
     srcdir = "{git[libva]}"

@@ -22,10 +22,12 @@ from jolt.tasks import TaskRegistry
 @attributes.requires("requires_wayland")
 @attributes.requires("requires_xrandr")
 @attributes.common_metadata()
+@attributes.requires("requires_compiler")
 class Mesa(Task):
     name = "mesa"
     version = Parameter("26.2.6", help="Mesa version.")
 
+    requires_compiler = ["virtual/compiler/c"]
     requires_cbindgen = ["cbindgen"]
     requires_expat = ["libexpat:pic=true"]
     requires_git = ["git:url=https://gitlab.freedesktop.org/mesa/mesa.git,rev=mesa-{version}"]

@@ -8,6 +8,7 @@ from jolt.tasks import TaskRegistry
 @cmake.requires()
 @cmake.use_ninja()
 @cxxinfo.publish(libraries=["uv"])
+@attributes.requires("requires_compiler")
 class Libuv(cmake.CMake):
     """ Cross-platform asynchronous I/O """
 
@@ -15,6 +16,7 @@ class Libuv(cmake.CMake):
     version = Parameter("1.53.0", help="libuv version.")
     pic = BooleanParameter(False, help="Build with position independent code.")
     shared = BooleanParameter(False, help="Build shared libraries.")
+    requires_compiler = ["virtual/compiler/c"]
     requires_git = ["git:url=https://github.com/libuv/libuv.git,rev=v{version}"]
     srcdir = "{git[libuv]}"
     options = [

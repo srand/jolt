@@ -6,9 +6,11 @@ from jolt.tasks import TaskRegistry
 @attributes.requires("requires_src")
 @cmake.requires()
 @cmake.use_ninja()
+@attributes.requires("requires_compiler")
 class Patchelf(cmake.CMake):
     name = "patchelf"
     version = Parameter("0.19.2", help="PatchELF version.")
+    requires_compiler = ["virtual/compiler/c"]
     requires_src = ["fetch:alias=src,url=https://github.com/NixOS/patchelf/archive/refs/tags/{version}.tar.gz"]
     srcdir = "{fetch[src]}/patchelf-{version}"
 

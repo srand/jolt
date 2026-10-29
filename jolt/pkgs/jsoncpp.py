@@ -9,10 +9,12 @@ from jolt.tasks import TaskRegistry
 @cmake.requires()
 @cmake.use_ninja()
 @cxxinfo.publish()
+@attributes.requires("requires_compiler")
 class JsonCPP(cmake.CMake):
     name = "jsoncpp"
     version = Parameter("1.9.8", help="JsonCpp version.")
     tests = BooleanParameter(False, help="Build tests.")
+    requires_compiler = ["virtual/compiler/c"]
     requires_git = ["git:url=https://github.com/open-source-parsers/jsoncpp.git,rev={version}"]
     srcdir = "{git[jsoncpp]}"
     options = [

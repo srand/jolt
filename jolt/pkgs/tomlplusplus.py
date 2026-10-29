@@ -7,10 +7,12 @@ from jolt.tasks import TaskRegistry
 @attributes.requires("requires_git")
 @cmake.requires()
 @cmake.use_ninja()
+@attributes.requires("requires_compiler")
 class TomlPlusPlus(cmake.CMake):
     name = "tomlplusplus"
     version = Parameter("3.4.0", help="toml++ version.")
     tests = BooleanParameter(False, help="Build tests.")
+    requires_compiler = ["virtual/compiler/c"]
     requires_git = ["git:url=https://github.com/marzer/tomlplusplus.git,rev=v{version}"]
     srcdir = "{git[tomlplusplus]}"
 

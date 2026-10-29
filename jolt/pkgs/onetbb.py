@@ -8,12 +8,14 @@ from jolt.tasks import TaskRegistry
 @cmake.requires()
 @cmake.use_ninja()
 @cxxinfo.publish(libraries=["tbb", "tbbmalloc"])
+@attributes.requires("requires_compiler")
 class OneTbb(cmake.CMake):
     """ oneAPI Threading Building Blocks, a library for task parallelism """
 
     name = "onetbb"
     version = Parameter("2023.2.0", help="oneTBB version.")
     shared = BooleanParameter(True, help="Build shared libraries.")
+    requires_compiler = ["virtual/compiler/c"]
     requires_git = ["git:url=https://github.com/uxlfoundation/oneTBB.git,rev=v{version}"]
     srcdir = "{git[oneTBB]}"
     options = [

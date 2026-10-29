@@ -6,10 +6,12 @@ from jolt.tasks import BooleanParameter, TaskRegistry
 @attributes.common_metadata()
 @attributes.requires("requires_src")
 @cxxinfo.publish(libraries=["cap", "psx"])
+@attributes.requires("requires_compiler")
 class Libcap(Task):
     name = "libcap"
     version = Parameter("2.78", help="libcap version.")
     shared = BooleanParameter(False, help="Build shared libraries.")
+    requires_compiler = ["virtual/compiler/c"]
     requires_src = ["git:url=https://git.kernel.org/pub/scm/libs/libcap/libcap.git,rev=libcap-{version}"]
     srcdir = "{git[libcap]}"
     """ Source directory. """

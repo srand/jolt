@@ -8,12 +8,14 @@ from jolt.tasks import TaskRegistry
 @attributes.requires("requires_udev")
 @pkgconfig.requires()
 @cxxinfo.publish(libraries=["usb-1.0"])
+@attributes.requires("requires_compiler")
 class Libusb(autotools.Autotools):
     """ Library for access to USB devices """
 
     name = "libusb"
     version = Parameter("1.0.30", help="libusb version.")
     shared = BooleanParameter(False, help="Build shared libraries.")
+    requires_compiler = ["virtual/compiler/c"]
     requires_src = ["fetch:alias=src,url=https://github.com/libusb/libusb/releases/download/v{version}/libusb-{version}.tar.bz2"]
     requires_udev = ["libudev-zero"]
     srcdir = "{fetch[src]}/libusb-{version}"

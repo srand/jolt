@@ -1,8 +1,9 @@
-from jolt import attributes, Parameter, Task
+from jolt import attributes, influence, Parameter, Task
 from jolt.tasks import TaskRegistry
 
 
 @attributes.system
+@influence.attribute("system")
 class Fstree(Task):
     name = "fstree"
     version = Parameter("26.10.203", help="fstree version.")

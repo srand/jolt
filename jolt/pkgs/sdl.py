@@ -10,10 +10,12 @@ from jolt.tasks import TaskRegistry
 @cmake.requires()
 @cmake.use_ninja()
 @cxxinfo.publish()
+@attributes.requires("requires_compiler")
 class SDL(cmake.CMake):
     name = "sdl"
     version = Parameter("3.4.18", help="SDL version.")
     shared = BooleanParameter(False, help="Build shared libraries.")
+    requires_compiler = ["virtual/compiler/c"]
     requires_git = ["git:url=https://github.com/libsdl-org/SDL.git,rev=release-{version}"]
     requires_linux = ["alsa-lib", "libusb:shared={shared}", "xorg/libxtst"]
     """ Libraries that SDL is built against on Linux. ALSA and XTest are loaded at runtime. """

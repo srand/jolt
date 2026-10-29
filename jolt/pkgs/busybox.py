@@ -4,10 +4,12 @@ from jolt.tasks import TaskRegistry
 
 
 @attributes.requires("requires_git")
+@attributes.requires("requires_compiler")
 class BusyBox(Task):
     name = "busybox"
     defconfig = Parameter(required=False, help="BusyBox defconfig file.")
     version = Parameter("1.38.0", help="BusyBox version.")
+    requires_compiler = ["virtual/compiler/c"]
     requires_git = ["git:url=git://busybox.net/busybox.git,rev={version_tag}"]
     srcdir = "{git[busybox]}"
     """ Source directory. """

@@ -8,6 +8,7 @@ from jolt.tasks import TaskRegistry
 @cmake.requires()
 @cmake.use_ninja()
 @cxxinfo.publish(libraries=["webpdemux", "webpmux", "webp", "sharpyuv"])
+@attributes.requires("requires_compiler")
 class Libwebp(cmake.CMake):
     """ WebP image codec """
 
@@ -15,6 +16,7 @@ class Libwebp(cmake.CMake):
     version = Parameter("1.6.0", help="libwebp version.")
     pic = BooleanParameter(False, help="Build with position independent code.")
     shared = BooleanParameter(False, help="Build shared libraries.")
+    requires_compiler = ["virtual/compiler/c"]
     requires_git = ["git:url=https://github.com/webmproject/libwebp.git,rev=v{version}"]
     srcdir = "{git[libwebp]}"
     options = [

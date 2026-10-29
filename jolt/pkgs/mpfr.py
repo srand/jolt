@@ -7,11 +7,13 @@ from jolt.tasks import TaskRegistry
 @attributes.requires("requires_gmp")
 @attributes.requires("requires_src")
 @cxxinfo.publish(libraries=["mpfr"])
+@attributes.requires("requires_compiler")
 class Mpfr(autotools.Autotools):
     """ GNU multiple precision floating-point library """
 
     name = "mpfr"
     version = Parameter("4.2.2", help="MPFR version.")
+    requires_compiler = ["virtual/compiler/c"]
     requires_gmp = ["gmp"]
     requires_src = ["fetch:alias=src,url=https://ftpmirror.gnu.org/gnu/mpfr/mpfr-{version}.tar.xz"]
     srcdir = "{fetch[src]}/mpfr-{version}"

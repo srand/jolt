@@ -9,10 +9,12 @@ from jolt.tasks import TaskRegistry
 @autotools.requires()
 @pkgconfig.requires()
 @cxxinfo.publish(libraries=["edit"])
+@attributes.requires("requires_compiler")
 class Libedit(autotools.Autotools):
     name = "libedit"
     version = Parameter("20260512-3.1", help="libedit version.")
     shared = BooleanParameter(False, help="Build shared libraries.")
+    requires_compiler = ["virtual/compiler/c"]
     requires_git = ["fetch:alias=src,url=https://thrysoee.dk/editline/libedit-{version}.tar.gz"]
     requires_ncurses = ["ncurses=ncurses:shared=true"]  # No pkgconfig module without shared libs
     srcdir = "{fetch[src]}/libedit-{version}"

@@ -9,9 +9,11 @@ from jolt.tasks import TaskRegistry
 @attributes.requires("requires_perl")
 @attributes.requires("requires_zlib")
 @attributes.system
+@attributes.requires("requires_compiler")
 class NASM(Task):
     name = "nasm"
     version = Parameter("3.02", help="NASM version.")
+    requires_compiler = ["virtual/compiler/c"]
     requires_autotools_darwin = ["autoconf", "automake"]
     requires_autotools_linux = requires_autotools_darwin
     requires_git = ["git:url=https://github.com/netwide-assembler/nasm.git,rev=nasm-{version}"]

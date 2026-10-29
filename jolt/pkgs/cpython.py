@@ -26,6 +26,7 @@ def _unpack_adjust_scripts(artifact, tools):
 @attributes.requires("requires_zstd_{zstd[on,off]}")
 @attributes.requires("requires_xz_{xz[on,off]}")
 @pkgconfig.requires()
+@attributes.requires("requires_compiler")
 class CPythonPosix(autotools.Autotools):
     """ Builds and publishes CPython libraries and headers. """
 
@@ -37,6 +38,7 @@ class CPythonPosix(autotools.Autotools):
     zlib = BooleanParameter(True, help="Enable zlib support.")
     zstd = BooleanParameter(True, help="Enable Zstandard support.")
     xz = BooleanParameter(True, help="Enable XZ Utils support.")
+    requires_compiler = ["virtual/compiler/c"]
     requires_git = ["git:url=https://github.com/python/cpython.git,rev=v{version}"]
     requires_libffi_on = ["libffi"]
     requires_sqlite_on = ["sqlite"]
@@ -68,12 +70,14 @@ class CPythonPosix(autotools.Autotools):
 @attributes.requires("requires_git")
 @attributes.requires("requires_ssl_{ssl[on,off]}")
 @attributes.common_metadata()
+@attributes.requires("requires_compiler")
 class CPythonWin32(Task):
     """ Builds and publishes CPython libraries and headers. """
 
     name = "cpython/win32"
     version = Parameter("3.15.2", help="CPython version.")
     ssl = BooleanParameter(True, help="Enable SSL support.")
+    requires_compiler = ["virtual/compiler/c"]
     requires_git = ["git:url=https://github.com/python/cpython.git,rev=v{version}"]
     requires_ssl_on = ["virtual/ssl"]
     srcdir = "{git[cpython]}"

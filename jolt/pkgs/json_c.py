@@ -8,6 +8,7 @@ from jolt.tasks import TaskRegistry
 @cmake.requires()
 @cmake.use_ninja()
 @cxxinfo.publish(libraries=["json-c"])
+@attributes.requires("requires_compiler")
 class JsonC(cmake.CMake):
     """ JSON implementation in C """
 
@@ -15,6 +16,7 @@ class JsonC(cmake.CMake):
     version = Parameter("0.19", help="json-c version.")
     pic = BooleanParameter(False, help="Build with position independent code.")
     shared = BooleanParameter(False, help="Build shared libraries.")
+    requires_compiler = ["virtual/compiler/c"]
     requires_src = ["fetch:alias=src,url=https://s3.amazonaws.com/json-c_releases/releases/json-c-{version}.tar.gz"]
     srcdir = "{fetch[src]}/json-c-{version}"
     options = [

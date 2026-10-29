@@ -10,11 +10,13 @@ from jolt.tasks import TaskRegistry
 @cmake.requires()
 @cmake.use_ninja()
 @cxxinfo.publish()
+@attributes.requires("requires_compiler")
 class LibjpegTurbo(cmake.CMake):
     name = "libjpeg-turbo"
     version = Parameter("3.2.1", help="libjpeg-turbo version.")
     pic = BooleanParameter(False, help="Build with position independent code.")
     shared = BooleanParameter(False, help="Build shared libraries.")
+    requires_compiler = ["virtual/compiler/c"]
     requires_git = ["git:url=https://github.com/libjpeg-turbo/libjpeg-turbo.git,rev={version}"]
     requires_nasm = ["nasm"]
     srcdir = "{git[libjpeg-turbo]}"

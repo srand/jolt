@@ -13,6 +13,7 @@ from jolt.tasks import TaskRegistry
 @cmake.options("options_{system}_gl_{gl}")
 @cmake.requires()
 @cmake.use_ninja()
+@attributes.requires("requires_compiler")
 class Qt(cmake.CMake):
     name = "qt"
     version = Parameter("6.12.0", help="Qt version.")
@@ -20,6 +21,7 @@ class Qt(cmake.CMake):
     webengine = BooleanParameter(False, help="Enable WebEngine module.")
 
     generator = "Ninja"
+    requires_compiler = ["virtual/compiler/c"]
     requires_dbus_linux = ["dbus"]
     requires_git = ["git:path={buildroot}/git-qt,url=https://github.com/qt/qt5.git,rev=v{version},submodules=true"]
     requires_ninja = ["ninja"]

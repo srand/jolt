@@ -6,11 +6,13 @@ from jolt.tasks import TaskRegistry
 
 @attributes.requires("requires_m4")
 @attributes.requires("requires_src")
+@attributes.requires("requires_compiler")
 class Bison(autotools.Autotools):
     """ GNU parser generator """
 
     name = "bison"
     version = Parameter("3.8.2", help="GNU Bison version.")
+    requires_compiler = ["virtual/compiler/c"]
     requires_m4 = ["m4"]
     requires_src = ["fetch:alias=src,url=https://ftpmirror.gnu.org/gnu/bison/bison-{version}.tar.xz"]
     srcdir = "{fetch[src]}/bison-{version}"

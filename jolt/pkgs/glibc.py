@@ -7,6 +7,7 @@ from jolt.tasks import TaskRegistry
 @attributes.requires("requires_src")
 @attributes.requires("requires_tools")
 @attributes.requires("requires_{_variant}")
+@attributes.requires("requires_compiler")
 class Glibc(Task):
     """
     GNU C library
@@ -19,6 +20,7 @@ class Glibc(Task):
     name = "glibc"
     version = Parameter("2.44", help="GNU C Library version.")
     target = Parameter(required=False, help="Target of the library, such as aarch64-linux-gnu. The host if not set.")
+    requires_compiler = ["compiler/c"]
     requires_cross = ["gcc:target={target}", "linux-headers:target={target}"]
     """ Cross compiler and kernel headers of the target. """
     requires_native = ["linux-headers"]

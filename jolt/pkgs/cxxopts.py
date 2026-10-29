@@ -8,11 +8,13 @@ from jolt.tasks import TaskRegistry
 @cmake.requires()
 @cmake.use_ninja()
 @cxxinfo.publish()
+@attributes.requires("requires_compiler")
 class Cxxopts(cmake.CMake):
     """ Command line option parser for C++ """
 
     name = "cxxopts"
     version = Parameter("3.3.1", help="cxxopts version.")
+    requires_compiler = ["virtual/compiler/c"]
     requires_git = ["git:url=https://github.com/jarro2783/cxxopts.git,rev=v{version}"]
     srcdir = "{git[cxxopts]}"
     options = [

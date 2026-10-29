@@ -8,12 +8,14 @@ from jolt.tasks import TaskRegistry
 @attributes.requires("requires_git")
 @meson.requires()
 @cxxinfo.publish(incpaths=["include/harfbuzz"], libraries=["harfbuzz"])
+@attributes.requires("requires_compiler")
 class Harfbuzz(meson.Meson):
     """ Text shaping engine """
 
     name = "harfbuzz"
     version = Parameter("15.0.0", help="HarfBuzz version.")
     shared = BooleanParameter(False, help="Build shared libraries.")
+    requires_compiler = ["virtual/compiler/c"]
     requires_freetype = ["freetype:pic=true,shared={shared}"]
     requires_git = ["git:url=https://github.com/harfbuzz/harfbuzz.git,rev={version}"]
     srcdir = "{git[harfbuzz]}"

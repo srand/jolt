@@ -8,11 +8,13 @@ from jolt.tasks import TaskRegistry
 @cmake.requires()
 @cmake.use_ninja()
 @cxxinfo.publish(libraries=["nghttp2"])
+@attributes.requires("requires_compiler")
 class Nghttp2(cmake.CMake):
     name = "nghttp2"
     version = Parameter("1.70.0", help="nghttp2 version.")
     pic = BooleanParameter(False, help="Build with position independent code.")
     shared = BooleanParameter(False, help="Build shared libraries.")
+    requires_compiler = ["virtual/compiler/c"]
     requires_git = ["git:url=https://github.com/nghttp2/nghttp2.git,rev=v{version}"]
     srcdir = "{git[nghttp2]}"
     options = [

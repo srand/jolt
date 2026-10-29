@@ -11,11 +11,13 @@ from jolt.tasks import TaskRegistry
 @cmake.requires()
 @cmake.use_ninja()
 @cxxinfo.publish(libraries=["vulkan"])
+@attributes.requires("requires_compiler")
 class VulkanLoader(cmake.CMake):
     """ Vulkan ICD loader """
 
     name = "vulkan-loader"
     version = Parameter("1.4.366", help="Vulkan-Loader version.")
+    requires_compiler = ["virtual/compiler/c"]
     requires_git = ["git:url=https://github.com/KhronosGroup/Vulkan-Loader.git,rev=v{version}"]
     requires_headers = ["vulkan-headers:version={version}"]
     requires_linux = ["wayland", "xorg/libx11", "xorg/libxcb", "xorg/libxrandr"]

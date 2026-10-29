@@ -9,11 +9,13 @@ from jolt.tasks import TaskRegistry
 @cmake.requires()
 @cmake.use_ninja()
 @cxxinfo.publish(libraries=["re2"])
+@attributes.requires("requires_compiler")
 class RE2(cmake.CMake):
     name = "re2"
     version = Parameter("2025-11-05", help="RE2 version.")
     pic = BooleanParameter(False, help="Build with position independent code.")
     shared = BooleanParameter(False, help="Build shared libraries.")
+    requires_compiler = ["virtual/compiler/c"]
     requires_abseil = ["abseil:shared={shared}"]
     requires_git = ["git:url=https://github.com/google/re2.git,rev={version}"]
     srcdir = "{git[re2]}"

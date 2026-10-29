@@ -16,12 +16,14 @@ from jolt.tasks import TaskRegistry
 @cmake.requires()
 @cmake.use_ninja()
 @cxxinfo.publish()
+@attributes.requires("requires_compiler")
 class Grpc(cmake.CMake):
     name = "grpc"
     version = Parameter("1.85.0", help="gRPC version.")
     pic = BooleanParameter(False, help="Build with position independent code.")
     shared = BooleanParameter(False, help="Build shared libraries.")
     generator = "Ninja"
+    requires_compiler = ["virtual/compiler/c"]
     requires_abseil = ["abseil:pic={pic},shared={shared}"]
     requires_cares = ["c-ares:pic={pic},shared={shared}"]
     requires_git = ["git:url=https://github.com/grpc/grpc.git,path={buildroot}/git_grpc,rev=v{version},submodules=true"]

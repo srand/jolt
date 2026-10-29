@@ -9,9 +9,11 @@ from jolt.tasks import TaskRegistry
 @cmake.requires()
 @cmake.use_ninja()
 @cxxinfo.publish(libraries=["mstch"])
+@attributes.requires("requires_compiler")
 class MSTCH(cmake.CMake):
     name = "mstch"
     version = Parameter("1.0.2", help="mstch version.")
+    requires_compiler = ["virtual/compiler/c"]
     requires_boost = ["boost"]
     requires_src = ["fetch:alias=src,url=https://github.com/no1msd/mstch/archive/refs/tags/{version}.tar.gz"]
     srcdir = "{fetch[src]}/mstch-{version}"

@@ -7,9 +7,11 @@ from jolt.tasks import Task, TaskRegistry
 @attributes.common_metadata()
 @attributes.requires("requires_git")
 @attributes.system
+@attributes.requires("requires_compiler")
 class B2(Task):
     name = "b2"
     version = Parameter("5.6.1", help="B2 version.")
+    requires_compiler = ["virtual/compiler/c"]
     requires_git = ["git:url=https://github.com/bfgroup/b2.git,rev={version}"]
 
     def run(self, artifact, tools):

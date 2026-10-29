@@ -11,10 +11,12 @@ from jolt.tasks import TaskRegistry
 @cmake.use_ninja()
 @pkgconfig.requires()
 @cxxinfo.publish(libraries=["event"])
+@attributes.requires("requires_compiler")
 class LibEvent(cmake.CMake):
     name = "libevent"
     version = Parameter("2.1.13", help="libevent version.")
     options = ["CMAKE_POLICY_VERSION_MINIMUM=3.5"]
+    requires_compiler = ["virtual/compiler/c"]
     requires_git = ["git:url=https://github.com/libevent/libevent.git,rev=release-{version}-stable"]
     requires_ssl = ["openssl"]
     srcdir = "{git[libevent]}"

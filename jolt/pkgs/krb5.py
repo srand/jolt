@@ -7,11 +7,13 @@ from jolt.tasks import TaskRegistry
 @attributes.requires("requires_bison")
 @attributes.requires("requires_src")
 @cxxinfo.publish(libraries=["gssapi_krb5", "krb5", "k5crypto", "com_err"])
+@attributes.requires("requires_compiler")
 class Krb5(autotools.Autotools):
     """ MIT Kerberos """
 
     name = "krb5"
     version = Parameter("1.22.2", help="MIT Kerberos version.")
+    requires_compiler = ["virtual/compiler/c"]
     requires_bison = ["bison"]
     requires_src = ["fetch:alias=src,url=https://kerberos.org/dist/krb5/{_major_minor}/krb5-{version}.tar.gz"]
     srcdir = "{fetch[src]}/krb5-{version}/src"

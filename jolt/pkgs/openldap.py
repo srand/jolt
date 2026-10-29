@@ -9,12 +9,14 @@ from jolt.tasks import TaskRegistry
 @autotools.requires()
 @pkgconfig.requires()
 @cxxinfo.publish(libraries=["ldap", "lber"])
+@attributes.requires("requires_compiler")
 class OpenLDAP(autotools.Autotools):
     """ Lightweight Directory Access Protocol client libraries """
 
     name = "openldap"
     version = Parameter("2.6.16", help="OpenLDAP version.")
     shared = BooleanParameter(False, help="Build shared libraries.")
+    requires_compiler = ["virtual/compiler/c"]
     requires_libs = ["cyrus-sasl", "openssl"]
     """ Libraries used for SASL authentication and TLS. """
     requires_src = ["fetch:alias=src,url=https://www.openldap.org/software/download/OpenLDAP/openldap-release/openldap-{version}.tgz"]

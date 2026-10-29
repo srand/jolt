@@ -38,10 +38,12 @@ class Rust(Download):
 
 @attributes.requires("requires_git")
 @attributes.requires("requires_rust")
+@attributes.requires("requires_compiler")
 class RustBindgen(rust.Rust):
     name = "rust-bindgen"
     version = Parameter("0.73.2", help="rust-bindgen version.")
 
+    requires_compiler = ["virtual/compiler/c"]
     requires_git = ["git:url=https://github.com/rust-lang/rust-bindgen.git,rev=v{version}"]
     requires_rust = ["rust"]
     srcdir = "{git[rust-bindgen]}/bindgen-cli"

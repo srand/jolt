@@ -9,11 +9,13 @@ from jolt.tasks import TaskRegistry
 @cmake.requires()
 @cmake.use_ninja()
 @cxxinfo.publish()
+@attributes.requires("requires_compiler")
 class Zstd(cmake.CMake):
     name = "zstd"
     version = Parameter("ebc93b0", help="Zstandard version.")
     pic = BooleanParameter(False, help="Build with position independent code.")
     shared = BooleanParameter(False, help="Build shared libraries.")
+    requires_compiler = ["virtual/compiler/c"]
     requires_git = ["git:url=https://github.com/facebook/zstd.git,rev={version}"]
     srcdir = "{git[zstd]}"
     options = [

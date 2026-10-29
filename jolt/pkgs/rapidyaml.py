@@ -7,10 +7,12 @@ from jolt.tasks import TaskRegistry
 @cmake.requires()
 @cmake.use_ninja()
 @cxxinfo.publish(libraries=["ryml"])
+@attributes.requires("requires_compiler")
 class RapidYAML(cmake.CMake):
     name = "rapidyaml"
     version = Parameter("0.16.0", help="rapidyaml version.")
     shared = BooleanParameter(False, help="Build shared libraries.")
+    requires_compiler = ["virtual/compiler/c"]
     requires_src = ["git:url=https://github.com/biojppm/rapidyaml.git,rev=v{version}"]
     srcdir = "{git[rapidyaml]}"
     options = [

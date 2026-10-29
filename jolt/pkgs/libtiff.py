@@ -9,6 +9,7 @@ from jolt.tasks import TaskRegistry
 @cmake.requires()
 @cmake.use_ninja()
 @cxxinfo.publish(libraries=["tiff"])
+@attributes.requires("requires_compiler")
 class Libtiff(cmake.CMake):
     """ TIFF image library """
 
@@ -16,6 +17,7 @@ class Libtiff(cmake.CMake):
     version = Parameter("4.7.2", help="LibTIFF version.")
     pic = BooleanParameter(False, help="Build with position independent code.")
     shared = BooleanParameter(False, help="Build shared libraries.")
+    requires_compiler = ["virtual/compiler/c"]
     requires_git = ["git:url=https://gitlab.com/libtiff/libtiff.git,rev=v{version}"]
     requires_libs = [
         "libjpeg-turbo:pic={pic},shared={shared}",

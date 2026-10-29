@@ -8,10 +8,12 @@ from jolt.tasks import TaskRegistry
 @cmake.requires()
 @cmake.use_ninja()
 @cxxinfo.publish(libraries=["ogg"])
+@attributes.requires("requires_compiler")
 class Libogg(cmake.CMake):
     name = "libogg"
     version = Parameter("1.3.6", help="libogg version.")
     shared = BooleanParameter(False, help="Build shared libraries.")
+    requires_compiler = ["virtual/compiler/c"]
     requires_git = ["git:url=https://github.com/xiph/ogg.git,rev=v{version}"]
     srcdir = "{git[ogg]}"
     options = [

@@ -23,6 +23,7 @@ from jolt.pkgs import cista
 from jolt.pkgs import clang
 from jolt.pkgs import cli11
 from jolt.pkgs import cmake
+from jolt.pkgs import compiler
 from jolt.pkgs import cpython
 from jolt.pkgs import crun
 from jolt.pkgs import curl
@@ -180,6 +181,7 @@ class Default(Alias):
         "clang-tidy",
         "cli11",
         "cmake",
+        "compiler/c",
         "cppzmq",
         "cpython",
         "cpython/embed",

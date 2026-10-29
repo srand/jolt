@@ -8,11 +8,13 @@ from jolt.tasks import TaskRegistry
 @cmake.requires()
 @cmake.use_ninja()
 @cxxinfo.publish()
+@attributes.requires("requires_compiler")
 class Doctest(cmake.CMake):
     """ C++ testing framework """
 
     name = "doctest"
     version = Parameter("2.5.3", help="doctest version.")
+    requires_compiler = ["virtual/compiler/c"]
     requires_git = ["git:url=https://github.com/doctest/doctest.git,rev=v{version}"]
     srcdir = "{git[doctest]}"
     options = [

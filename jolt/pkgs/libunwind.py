@@ -8,10 +8,12 @@ from jolt.tasks import TaskRegistry
 @attributes.system
 @autotools.requires()
 @pkgconfig.to_cxxinfo(["libunwind", "libunwind-generic", "libunwind-coredump", "libunwind-ptrace", "libunwind-setjmp"])
+@attributes.requires("requires_compiler")
 class LibUnwind(autotools.Autotools):
     name = "libunwind"
     version = Parameter("1.8.3", help="libunwind version.")
     options = ["--disable-tests"]
+    requires_compiler = ["virtual/compiler/c"]
     requires_git = ["git:url=https://github.com/libunwind/libunwind.git,rev=v{version}"]
     srcdir = "{git[libunwind]}"
 

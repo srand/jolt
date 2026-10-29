@@ -9,11 +9,13 @@ from jolt.tasks import TaskRegistry
 @cmake.requires()
 @cmake.use_ninja()
 @cxxinfo.publish()
+@attributes.requires("requires_compiler")
 class PahoMQTT_C(cmake.CMake):
     name = "paho/mqtt-c"
     version = Parameter("1.3.16", help="Paho MQTT C version.")
     shared = BooleanParameter(False, help="Build shared libraries.")
     ssl = BooleanParameter(True, help="Enable SSL support.")
+    requires_compiler = ["virtual/compiler/c"]
     requires_git = ["git:url=https://github.com/eclipse/paho.mqtt.c.git,rev=v{version}"]
     requires_ssl_on = ["openssl"]
     srcdir = "{git[paho.mqtt.c]}"
@@ -36,11 +38,13 @@ class PahoMQTT_C(cmake.CMake):
 @cmake.requires()
 @cmake.use_ninja()
 @cxxinfo.publish()
+@attributes.requires("requires_compiler")
 class PahoMQTT_CXX(cmake.CMake):
     name = "paho/mqtt-cxx"
     version = Parameter("1.6.0", help="Paho MQTT C++ version.")
     shared = BooleanParameter(False, help="Build shared libraries.")
     ssl = BooleanParameter(True, help="Enable SSL support.")
+    requires_compiler = ["virtual/compiler/c"]
     requires_git = ["git:url=https://github.com/eclipse/paho.mqtt.cpp.git,rev=v{version}"]
     requires_mqtt_c = ["paho/mqtt-c:shared={shared},ssl={ssl}"]
     srcdir = "{git[paho.mqtt.cpp]}"
@@ -62,9 +66,11 @@ class PahoMQTT_CXX(cmake.CMake):
 @cmake.requires()
 @cmake.use_ninja()
 @cxxinfo.publish()
+@attributes.requires("requires_compiler")
 class PahoMQTT_Embedded_C(cmake.CMake):
     name = "paho/mqtt-embedded-c"
     version = Parameter("1.1.0", help="Paho MQTT Embedded C version.")
+    requires_compiler = ["virtual/compiler/c"]
     requires_git = ["git:url=https://github.com/eclipse/paho.mqtt.embedded-c.git,rev=v{version}"]
     srcdir = "{git[paho.mqtt.embedded-c]}"
     options = ["CMAKE_POLICY_VERSION_MINIMUM=3.5"]

@@ -8,10 +8,12 @@ from jolt.tasks import TaskRegistry
 @cmake.requires()
 @cmake.use_ninja()
 @cxxinfo.publish(libraries=["Catch2"])
+@attributes.requires("requires_compiler")
 class Catch2(cmake.CMake):
     name = "catch2"
     version = Parameter("3.16.1", help="Catch2 version.")
     shared = BooleanParameter(False, help="Build shared libraries.")
+    requires_compiler = ["virtual/compiler/c"]
     requires_git = ["git:url=https://github.com/catchorg/Catch2.git,rev=v{version}"]
     srcdir = "{git[Catch2]}"
     options = [

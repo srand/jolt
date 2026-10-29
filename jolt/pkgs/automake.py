@@ -6,9 +6,11 @@ from jolt.tasks import TaskRegistry
 @attributes.requires("requires_git")
 @attributes.requires("requires_texinfo")
 @autotools.requires(automake=False, libtool=False)
+@attributes.requires("requires_compiler")
 class Automake(autotools.Autotools):
     name = "automake"
     version = Parameter("1.19", help="Automake version.")
+    requires_compiler = ["virtual/compiler/c"]
     requires_git = ["fetch:alias=src,url=https://ftpmirror.gnu.org/gnu/automake/automake-{version}.tar.xz"]
     requires_texinfo = ["texinfo"]
     srcdir = "{fetch[src]}/automake-{version}"

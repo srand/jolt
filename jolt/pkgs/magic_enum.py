@@ -8,11 +8,13 @@ from jolt.tasks import TaskRegistry
 @cmake.requires()
 @cmake.use_ninja()
 @cxxinfo.publish()
+@attributes.requires("requires_compiler")
 class MagicEnum(cmake.CMake):
     """ Static reflection for enums in C++ """
 
     name = "magic_enum"
     version = Parameter("0.9.8", help="magic_enum version.")
+    requires_compiler = ["virtual/compiler/c"]
     requires_git = ["git:url=https://github.com/Neargye/magic_enum.git,rev=v{version}"]
     srcdir = "{git[magic_enum]}"
     options = [

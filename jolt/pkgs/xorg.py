@@ -5,10 +5,12 @@ from jolt.tasks import TaskRegistry
 
 @attributes.requires("requires_git")
 @autotools.requires()
+@attributes.requires("requires_compiler")
 class XorgMacros(autotools.Autotools):
     name = "xorg/macros"
     version = Parameter("1.20.2", help="util-macros version.")
 
+    requires_compiler = ["virtual/compiler/c"]
     requires_git = ["git:url=https://gitlab.freedesktop.org/xorg/util/macros.git,rev=util-macros-{version}"]
     srcdir = "{git[macros]}"
 
@@ -16,9 +18,11 @@ class XorgMacros(autotools.Autotools):
 @attributes.requires("requires_macros")
 @attributes.requires("requires_src")
 @autotools.requires()
+@attributes.requires("requires_compiler")
 class Inputproto(autotools.Autotools):
     name = "xorg/inputproto"
     version = Parameter("2.3.2", help="inputproto version.")
+    requires_compiler = ["virtual/compiler/c"]
     requires_macros = ["xorg/macros"]
     requires_src = ["fetch:alias=src,url=https://www.x.org/releases/individual/proto/inputproto-{version}.tar.gz"]
     srcdir = "{fetch[src]}/inputproto-{version}"
@@ -28,9 +32,11 @@ class Inputproto(autotools.Autotools):
 @attributes.requires("requires_macros")
 @attributes.requires("requires_src")
 @autotools.requires()
+@attributes.requires("requires_compiler")
 class Glproto(autotools.Autotools):
     name = "xorg/glproto"
     version = Parameter("1.4.17", help="glproto version.")
+    requires_compiler = ["virtual/compiler/c"]
     requires_macros = ["xorg/macros"]
     requires_src = ["fetch:alias=src,url=https://www.x.org/releases/individual/proto/glproto-{version}.tar.gz"]
     srcdir = "{fetch[src]}/glproto-{version}"
@@ -40,9 +46,11 @@ class Glproto(autotools.Autotools):
 @attributes.requires("requires_macros")
 @attributes.requires("requires_src")
 @autotools.requires()
+@attributes.requires("requires_compiler")
 class Kbproto(autotools.Autotools):
     name = "xorg/kbproto"
     version = Parameter("1.0.7", help="kbproto version.")
+    requires_compiler = ["virtual/compiler/c"]
     requires_macros = ["xorg/macros"]
     requires_src = ["fetch:alias=src,url=https://www.x.org/releases/individual/proto/kbproto-{version}.tar.gz"]
     srcdir = "{fetch[src]}/kbproto-{version}"
@@ -52,9 +60,11 @@ class Kbproto(autotools.Autotools):
 @attributes.requires("requires_macros")
 @attributes.requires("requires_src")
 @autotools.requires()
+@attributes.requires("requires_compiler")
 class Randrproto(autotools.Autotools):
     name = "xorg/randrproto"
     version = Parameter("1.5.0", help="randrproto version.")
+    requires_compiler = ["virtual/compiler/c"]
     requires_macros = ["xorg/macros"]
     requires_src = ["fetch:alias=src,url=https://www.x.org/releases/individual/proto/randrproto-{version}.tar.gz"]
     srcdir = "{fetch[src]}/randrproto-{version}"
@@ -64,9 +74,11 @@ class Randrproto(autotools.Autotools):
 @attributes.requires("requires_macros")
 @attributes.requires("requires_src")
 @autotools.requires()
+@attributes.requires("requires_compiler")
 class Renderproto(autotools.Autotools):
     name = "xorg/renderproto"
     version = Parameter("0.11.1", help="renderproto version.")
+    requires_compiler = ["virtual/compiler/c"]
     requires_macros = ["xorg/macros"]
     requires_src = ["fetch:alias=src,url=https://www.x.org/releases/individual/proto/renderproto-{version}.tar.gz"]
     srcdir = "{fetch[src]}/renderproto-{version}"
@@ -78,9 +90,11 @@ class Renderproto(autotools.Autotools):
 @attributes.requires("requires_xcb")
 @autotools.requires()
 @pkgconfig.requires()
+@attributes.requires("requires_compiler")
 class XcbKeysyms(autotools.Autotools):
     name = "xorg/xcb-keysyms"
     version = Parameter("0.4.1", help="xcb-util-keysyms version.")
+    requires_compiler = ["virtual/compiler/c"]
     requires_macros = ["xorg/macros"]
     requires_src = ["fetch:alias=src,url=https://www.x.org/releases/individual/lib/xcb-util-keysyms-{version}.tar.xz"]
     requires_xcb = ["xorg/libxcb"]
@@ -91,9 +105,11 @@ class XcbKeysyms(autotools.Autotools):
 @attributes.requires("requires_xorg_macros")
 @autotools.requires()
 @pkgconfig.requires()
+@attributes.requires("requires_compiler")
 class XcbProto(autotools.Autotools):
     name = "xorg/xcb-proto"
     version = Parameter("1.17.0", help="xcb-proto version.")
+    requires_compiler = ["virtual/compiler/c"]
     requires_git = ["git:url=https://gitlab.freedesktop.org/xorg/proto/xcbproto.git,rev=xcb-proto-{version}"]
     requires_xorg_macros = ["xorg/macros"]
     srcdir = "{git[xcbproto]}"
@@ -104,9 +120,11 @@ class XcbProto(autotools.Autotools):
 @attributes.requires("requires_xproto")
 @autotools.requires()
 @pkgconfig.requires()
+@attributes.requires("requires_compiler")
 class Xau(autotools.Autotools):
     name = "xorg/libxau"
     version = Parameter("1.0.12", help="libXau version.")
+    requires_compiler = ["virtual/compiler/c"]
     requires_macros = ["xorg/macros"]
     requires_src = ["fetch:alias=src,url=https://www.x.org/releases/individual/lib/libXau-{version}.tar.gz"]
     requires_xproto = ["xorg/xproto"]
@@ -118,9 +136,11 @@ class Xau(autotools.Autotools):
 @attributes.requires("requires_xproto")
 @autotools.requires()
 @pkgconfig.requires()
+@attributes.requires("requires_compiler")
 class LibXdmcp(autotools.Autotools):
     name = "xorg/libxdmcp"
     version = Parameter("1.1.5", help="libXdmcp version.")
+    requires_compiler = ["virtual/compiler/c"]
     requires_macros = ["xorg/macros"]
     requires_src = ["fetch:alias=src,url=https://www.x.org/releases/individual/lib/libXdmcp-{version}.tar.gz"]
     requires_xproto = ["xorg/xproto"]
@@ -134,9 +154,11 @@ class LibXdmcp(autotools.Autotools):
 @attributes.requires("requires_xproto")
 @autotools.requires()
 @pkgconfig.requires()
+@attributes.requires("requires_compiler")
 class Xext(autotools.Autotools):
     name = "xorg/libxext"
     version = Parameter("1.3.7", help="libXext version.")
+    requires_compiler = ["virtual/compiler/c"]
     requires_macros = ["xorg/macros"]
     requires_src = ["fetch:alias=src,url=https://www.x.org/releases/individual/lib/libXext-{version}.tar.gz"]
     requires_x11 = ["xorg/libx11"]
@@ -148,9 +170,11 @@ class Xext(autotools.Autotools):
 @attributes.requires("requires_macros")
 @attributes.requires("requires_src")
 @autotools.requires()
+@attributes.requires("requires_compiler")
 class Xextproto(autotools.Autotools):
     name = "xorg/xextproto"
     version = Parameter("7.3.0", help="xextproto version.")
+    requires_compiler = ["virtual/compiler/c"]
     requires_macros = ["xorg/macros"]
     requires_src = ["fetch:alias=src,url=https://www.x.org/releases/individual/proto/xextproto-{version}.tar.gz"]
     srcdir = "{fetch[src]}/xextproto-{version}"
@@ -160,9 +184,11 @@ class Xextproto(autotools.Autotools):
 @attributes.requires("requires_macros")
 @attributes.requires("requires_src")
 @autotools.requires()
+@attributes.requires("requires_compiler")
 class Xproto(autotools.Autotools):
     name = "xorg/xproto"
     version = Parameter("7.0.31", help="xproto version.")
+    requires_compiler = ["virtual/compiler/c"]
     requires_macros = ["xorg/macros"]
     requires_src = ["fetch:alias=src,url=https://www.x.org/releases/individual/proto/xproto-{version}.tar.gz"]
     srcdir = "{fetch[src]}/xproto-{version}"
@@ -172,9 +198,11 @@ class Xproto(autotools.Autotools):
 @attributes.requires("requires_macros")
 @attributes.requires("requires_src")
 @autotools.requires()
+@attributes.requires("requires_compiler")
 class Xf86vidmodeproto(autotools.Autotools):
     name = "xorg/xf86vidmodeproto"
     version = Parameter("2.3.1", help="xf86vidmodeproto version.")
+    requires_compiler = ["virtual/compiler/c"]
     requires_macros = ["xorg/macros"]
     requires_src = ["fetch:alias=src,url=https://www.x.org/releases/individual/proto/xf86vidmodeproto-{version}.tar.gz"]
     srcdir = "{fetch[src]}/xf86vidmodeproto-{version}"
@@ -184,9 +212,11 @@ class Xf86vidmodeproto(autotools.Autotools):
 @attributes.requires("requires_macros")
 @attributes.requires("requires_src")
 @autotools.requires()
+@attributes.requires("requires_compiler")
 class Xtrans(autotools.Autotools):
     name = "xorg/xtrans"
     version = Parameter("1.6.0", help="xtrans version.")
+    requires_compiler = ["virtual/compiler/c"]
     requires_macros = ["xorg/macros"]
     requires_src = ["fetch:alias=src,url=https://www.x.org/releases/individual/lib/xtrans-{version}.tar.gz"]
     srcdir = "{fetch[src]}/xtrans-{version}"
@@ -197,9 +227,11 @@ class Xtrans(autotools.Autotools):
 @attributes.requires("requires_xext")
 @attributes.requires("requires_xrender")
 @autotools.requires()
+@attributes.requires("requires_compiler")
 class Xrandr(autotools.Autotools):
     name = "xorg/libxrandr"
     version = Parameter("1.5.5", help="libXrandr version.")
+    requires_compiler = ["virtual/compiler/c"]
     requires_randrproto = ["xorg/randrproto"]
     requires_src = ["fetch:alias=src,url=https://www.x.org/releases/individual/lib/libXrandr-{version}.tar.gz"]
     requires_xext = ["xorg/libxext"]
@@ -213,9 +245,11 @@ class Xrandr(autotools.Autotools):
 @attributes.requires("requires_x11")
 @autotools.requires()
 @pkgconfig.requires()
+@attributes.requires("requires_compiler")
 class Xrender(autotools.Autotools):
     name = "xorg/libxrender"
     version = Parameter("0.9.13", help="libXrender version.")
+    requires_compiler = ["virtual/compiler/c"]
     requires_macros = ["xorg/macros"]
     requires_renderproto = ["xorg/renderproto"]
     requires_src = ["fetch:alias=src,url=https://www.x.org/releases/individual/lib/libXrender-{version}.tar.gz"]
@@ -229,10 +263,12 @@ class Xrender(autotools.Autotools):
 @pkgconfig.to_cxxinfo(["xshmfence"])
 @pkgconfig.requires()
 @autotools.requires()
+@attributes.requires("requires_compiler")
 class Libxshmfence(autotools.Autotools):
     name = "xorg/libxshmfence"
     version = Parameter("1.3.3", help="libxshmfence version.")
 
+    requires_compiler = ["virtual/compiler/c"]
     requires_git = ["fetch:alias=src,url=https://www.x.org/releases/individual/lib/libxshmfence-{version}.tar.gz"]
     requires_xproto = ["xproto"]
     requires_xorg_macros = ["xorg/macros"]
@@ -249,9 +285,11 @@ class Libxshmfence(autotools.Autotools):
 @attributes.requires("requires_xproto")
 @autotools.requires()
 @pkgconfig.requires()
+@attributes.requires("requires_compiler")
 class Libxxf86vm(autotools.Autotools):
     name = "xorg/libxxf86vm"
     version = Parameter("1.1.7", help="libXxf86vm version.")
+    requires_compiler = ["virtual/compiler/c"]
     requires_src = ["fetch:alias=src,url=https://www.x.org/releases/individual/lib/libXxf86vm-{version}.tar.gz"]
     srcdir = "{fetch[src]}/libXxf86vm-{version}"
     requires_libx11 = ["xorg/libx11"]
@@ -268,10 +306,12 @@ class Libxxf86vm(autotools.Autotools):
 @attributes.requires("requires_xcb_proto")
 @pkgconfig.to_cxxinfo(["xcb"])
 @autotools.requires()
+@attributes.requires("requires_compiler")
 class Libxcb(autotools.Autotools):
     name = "xorg/libxcb"
     version = Parameter("1.17.0", help="libxcb version.")
 
+    requires_compiler = ["virtual/compiler/c"]
     requires_git = ["fetch:alias=src,url=https://www.x.org/releases/individual/lib/libxcb-{version}.tar.gz"]
     requires_xau = ["xorg/libxau"]
     requires_xorg_macros = ["xorg/macros"]
@@ -292,10 +332,12 @@ class Libxcb(autotools.Autotools):
 @autotools.requires()
 @pkgconfig.requires()
 @pkgconfig.to_cxxinfo(["x11", "x11-xcb"])
+@attributes.requires("requires_compiler")
 class Libx11(autotools.Autotools):
     name = "xorg/libx11"
     version = Parameter("1.8.14", help="libX11 version.")
 
+    requires_compiler = ["virtual/compiler/c"]
     requires_inputproto = ["xorg/inputproto"]
     requires_kbproto = ["xorg/kbproto"]
     requires_libxau = ["xorg/libxau"]
@@ -336,11 +378,13 @@ class LibX11Xcb(Task):
 
 @attributes.requires("requires_src")
 @meson.requires()
+@attributes.requires("requires_compiler")
 class Xorgproto(meson.Meson):
     """ Combined X.Org X11 protocol headers """
 
     name = "xorg/xorgproto"
     version = Parameter("2026.1", help="xorgproto version.")
+    requires_compiler = ["virtual/compiler/c"]
     requires_src = ["fetch:alias=src,url=https://www.x.org/releases/individual/proto/xorgproto-{version}.tar.xz"]
     srcdir = "{fetch[src]}/xorgproto-{version}"
 
@@ -351,9 +395,11 @@ class Xorgproto(meson.Meson):
 @attributes.requires("requires_xorgproto")
 @autotools.requires()
 @pkgconfig.requires()
+@attributes.requires("requires_compiler")
 class Libxfixes(autotools.Autotools):
     name = "xorg/libxfixes"
     version = Parameter("6.0.2", help="libXfixes version.")
+    requires_compiler = ["virtual/compiler/c"]
     requires_macros = ["xorg/macros"]
     requires_src = ["fetch:alias=src,url=https://www.x.org/releases/individual/lib/libXfixes-{version}.tar.xz"]
     requires_x11 = ["xorg/libx11"]
@@ -373,9 +419,11 @@ class Libxfixes(autotools.Autotools):
 @attributes.requires("requires_xorgproto")
 @autotools.requires()
 @pkgconfig.requires()
+@attributes.requires("requires_compiler")
 class Libxi(autotools.Autotools):
     name = "xorg/libxi"
     version = Parameter("1.8.4", help="libXi version.")
+    requires_compiler = ["virtual/compiler/c"]
     requires_macros = ["xorg/macros"]
     requires_src = ["fetch:alias=src,url=https://www.x.org/releases/individual/lib/libXi-{version}.tar.xz"]
     requires_x11 = ["xorg/libx11"]
@@ -397,9 +445,11 @@ class Libxi(autotools.Autotools):
 @attributes.requires("requires_xorgproto")
 @autotools.requires()
 @pkgconfig.requires()
+@attributes.requires("requires_compiler")
 class Libxtst(autotools.Autotools):
     name = "xorg/libxtst"
     version = Parameter("1.2.6", help="libXtst version.")
+    requires_compiler = ["virtual/compiler/c"]
     requires_macros = ["xorg/macros"]
     requires_src = ["fetch:alias=src,url=https://www.x.org/releases/individual/lib/libXtst-{version}.tar.xz"]
     requires_x11 = ["xorg/libx11"]

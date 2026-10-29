@@ -4,9 +4,11 @@ from jolt.tasks import TaskRegistry
 
 
 @attributes.requires("requires_src")
+@attributes.requires("requires_compiler")
 class M4(autotools.Autotools):
     name = "m4"
     version = Parameter("1.4.21", help="GNU M4 version.")
+    requires_compiler = ["virtual/compiler/c"]
     requires_src = ["fetch:alias=src,url=http://ftpmirror.gnu.org/m4/m4-{version}.tar.xz"]
     srcdir = "{fetch[src]}/m4-{version}"
 

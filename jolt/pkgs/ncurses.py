@@ -7,11 +7,13 @@ import os
 @attributes.requires("requires_src")
 @autotools.requires()
 @pkgconfig.requires()
+@attributes.requires("requires_compiler")
 class Ncurses(autotools.Autotools):
     name = "ncurses"
     version = Parameter("6.6", help="ncurses version.")
     widechar = BooleanParameter(False, help="Build ncurses with wide character support.")
     shared = BooleanParameter(False, help="Build shared libraries.")
+    requires_compiler = ["virtual/compiler/c"]
     requires_src = ["fetch:alias=src,url=https://invisible-mirror.net/archives/ncurses/ncurses-{version}.tar.gz"]
     srcdir = "{fetch[src]}/ncurses-{version}"
     options = [
