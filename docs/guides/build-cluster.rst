@@ -59,18 +59,20 @@ client before the build is submitted, so they may refer to its environment:
     [params]
     username = {environ[USER]}
 
-The scheduler forwards the parameters unchanged in administration events.
-They are supplied by the client and are not verified.
+The dashboard shows ``username`` and ``origin`` with the tasks of each
+build, and other tools that follow the builds of the scheduler see all
+parameters. Jolt doesn't check them: whoever submits a build can set them to
+anything, so they tell you who claims to have started a build, not who did.
 
 .. warning::
 
-   Build parameters are visible to all administration event subscribers.
-   Do not put secrets in ``[params]``.
+   Anyone who can see the builds of the scheduler can see their parameters.
+   Don't put passwords or other secrets in ``[params]``.
 
-Parameters do not change task identities unless a task explicitly declares an
-influence, such as ``@influence.config("params", "origin")``. They do however
-contribute to the build ID, so otherwise identical submissions with different
-parameters are registered as separate builds.
+Changing a parameter doesn't make Jolt rebuild tasks whose artifacts are
+already in the cache, unless the task asks for it with
+``@influence.config("params", "origin")``. The same tasks submitted with
+different parameters are still listed as separate builds.
 
 
 Docker Swarm
