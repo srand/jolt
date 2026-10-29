@@ -1042,6 +1042,14 @@ The cache service can be configured using environment variables and/or a configu
       - String
       - | The path to the server certificate private key file to use if HTTPS is enabled.
 
+    * - ``JOLT_CACHE_EXPIRATION``
+      - ``expiration``
+      - Duration
+      - | Time from the last access to an artifact until it expires and may be
+          evicted, such as ``72h``. Only expired artifacts are evicted when the
+          cache exceeds its maximum size.
+        | Default: ``0``, artifacts expire immediately.
+
     * - ``JOLT_CACHE_INSECURE``
       - ``insecure``
       - Boolean
@@ -1059,7 +1067,7 @@ The cache service can be configured using environment variables and/or a configu
       - ``listen_http``
       - String
       - | The address and port on which the cache will listen for HTTP(S) requests.
-        | The default is ``:8080`` for HTTP and ``:8443`` for HTTPS.
+        | The default is ``:8080``, also for HTTPS.
 
     * - ``JOLT_CACHE_MAX_SIZE``
       - ``max_size``
@@ -1067,13 +1075,21 @@ The cache service can be configured using environment variables and/or a configu
       - | The maximum size of the cache in bytes. This is a soft limit and
           the cache may exceed this size temporarily. The cache will start to
           evict artifacts when it exceeds this size.
-        | Default: ``10GiB``
+        | Default: ``10GB``
 
     * - ``JOLT_CACHE_PATH``
-      - ``cache_path``
+      - ``path``
       - String
       - | The path to the cache directory.
         | Default: ``/data``
+
+    * - ``JOLT_CACHE_TREE_CACHE_SIZE``
+      - ``tree_cache_size``
+      - String
+      - | Memory for the parsed trees of workspaces, which speeds up pushes. It
+          should hold the trees of the workspaces being pushed, roughly 13 MB
+          per 100,000 files.
+        | Default: ``1GiB``
 
     * - ``JOLT_CACHE_VERBOSITY``
       - ``verbosity``
@@ -1082,13 +1098,13 @@ The cache service can be configured using environment variables and/or a configu
         | Default: ``0``
 
     * - ``-``
-      - ``grpc.keepalive_time``
+      - ``grpc.keep_alive_time``
       - Duration
       - | The time after which a keepalive ping is sent on the gRPC channel.
         | Default: ``2h``.
 
     * - ``-``
-      - ``grpc.keepalive_timeout``
+      - ``grpc.keep_alive_timeout``
       - Duration
       - | The time to wait for an acknowledgment to the keepalive ping.
           If the acknowledgment is not received within this time, the
@@ -1096,7 +1112,7 @@ The cache service can be configured using environment variables and/or a configu
         | Default: ``20s``.
 
     * - ``-``
-      - ``grpc.permit_keepalive_without_calls``
+      - ``grpc.permit_keep_alive_without_calls``
       - Boolean
       - | Whether to allow keepalive pings when there are no calls.
         | Default: ``false``.
@@ -1113,12 +1129,12 @@ Example:
   .. code:: yaml
 
     # /etc/jolt/cache.yaml
-    listen_http: "http://:8080"
+    listen_http: "tcp://:8080"
     listen_grpc: "tcp://:9090"
     max_size: "2TiB"
     grpc:
-      keepalive_time: "2h"
-      keepalive_timeout: "20s"
+      keep_alive_time: "2h"
+      keep_alive_timeout: "20s"
 
 .. _configuration-services-cache-auth:
 
@@ -1299,24 +1315,23 @@ The scheduler can be configured using environment variables and/or a configurati
       - Config File Key
       - Description
 
-    * - ``-``
+    * - ``JOLT_CERT``
       - ``cert``
-      - | The path to the server certificate file, also set with ``--cert``.
-          gRPC and HTTP use TLS when a certificate and private key are configured.
+      - | The path to the server certificate file. gRPC and HTTP use TLS when a
+          certificate and private key are configured.
 
-    * - ``-``
+    * - ``JOLT_CERT_KEY``
       - ``cert_key``
-      - | The path to the private key of the server certificate, also set with
-          ``--cert-key``.
+      - | The path to the private key of the server certificate.
 
-    * - ``JOLT_SCHEDULER_LISTEN_GRPC``
+    * - ``JOLT_LISTEN_GRPC``
       - ``listen_grpc``
       - | The address and port on which the scheduler will listen for gRPC requests.
           The gRPC endpoint is used by clients and workers to communicate with the scheduler
           and exchange task data.
         | The default is ``:9090``.
 
-    * - ``JOLT_SCHEDULER_LISTEN_HTTP``
+    * - ``JOLT_LISTEN_HTTP``
       - ``listen_http``
       - | The address and port on which the scheduler will listen for HTTP requests.
           The HTTP endpoint is used for metrics and task log stashing.
@@ -1346,19 +1361,19 @@ The scheduler can be configured using environment variables and/or a configurati
           the ``disk`` storage backend.
 
     * - ``-``
-      - ``grpc.keepalive_time``
+      - ``grpc.keep_alive_time``
       - | The time after which a keepalive ping is sent on the gRPC channel.
         | Default: ``2h``.
 
     * - ``-``
-      - ``grpc.keepalive_timeout``
+      - ``grpc.keep_alive_timeout``
       - | The time to wait for an acknowledgment to the keepalive ping.
           If the acknowledgment is not received within this time, the
           connection is closed.
         | Default: ``20s``.
 
     * - ``-``
-      - ``grpc.permit_keepalive_without_calls``
+      - ``grpc.permit_keep_alive_without_calls``
       - | Whether to allow keepalive pings when there are no calls.
         | Default: ``false``.
 
@@ -1373,12 +1388,12 @@ Example:
   .. code:: yaml
 
     # /etc/jolt/scheduler.yaml
-    listen_http: "http://:8080"
+    listen_http: "tcp://:8080"
     listen_grpc: "tcp://:9090"
     public_http: "http://scheduler.jolt.domain"
     grpc:
-      keepalive_time: "2h"
-      keepalive_timeout: "20s"
+      keep_alive_time: "2h"
+      keep_alive_timeout: "20s"
 
 .. _configuration-services-scheduler-auth:
 
