@@ -258,6 +258,29 @@ def get_scheduler_token():
     return os.environ.get("JOLT_SCHEDULER_TOKEN") or get("scheduler", "token")
 
 
+def get_ca_cert():
+    """ PEM file with the certificates of the authorities of services, if any. """
+    return os.environ.get("JOLT_CA_CERT") or get("jolt", "ca_cert")
+
+
+def get_allow_insecure_token():
+    """ True if tokens may be sent to services without TLS. """
+    value = os.environ.get("JOLT_ALLOW_INSECURE_TOKEN")
+    if value:
+        return value.lower() in ("1", "true", "yes", "on")
+    return getboolean("jolt", "allow_insecure_token", False)
+
+
+def get_service_environ():
+    """ Environment that passes the tokens and TLS settings on to tools, such as fstree. """
+    env = {
+        "JOLT_CA_CERT": get_ca_cert(),
+        "JOLT_CACHE_TOKEN": get_cache_token(),
+        "JOLT_ALLOW_INSECURE_TOKEN": "true" if get_allow_insecure_token() else None,
+    }
+    return {key: value for key, value in env.items() if value}
+
+
 def get_workdir():
     return _workdir
 

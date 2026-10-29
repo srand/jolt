@@ -39,6 +39,20 @@ The ``[jolt]`` config section contains global configuration:
       - Type
       - Description
 
+    * - ``allow_insecure_token``
+      - Boolean
+      - | Send the tokens of services without TLS. Jolt refuses to by default.
+          The ``JOLT_ALLOW_INSECURE_TOKEN`` environment variable takes precedence.
+          See :ref:`configuration-services-tls`.
+        | Default: ``false``
+
+    * - ``ca_cert``
+      - String
+      - | PEM file with the certificates of the authorities that the certificates
+          of services are verified with, such as a private authority. The
+          ``JOLT_CA_CERT`` environment variable takes precedence.
+          See :ref:`configuration-services-tls`.
+
     * - ``cachedir``
       - String
       - | Filesystem path to a directory where the Jolt artifact cache will reside.
@@ -296,6 +310,7 @@ Available configuration keys:
       - | The gRPC URI of the remote artifact cache. The targeted service is expected
           to implement the default Jolt cache gRPC service. The service is used to
           synchronize workspaces between workers in distributed execution.
+          Use ``tls://`` for connections secured with TLS.
         | Default: ``tcp://cache:9090``
 
     * - ``token``
@@ -739,7 +754,8 @@ Available configuration keys:
 
     * - ``grpc_uri``
       - String
-      - | The gRPC URI of the scheduler service.
+      - | The gRPC URI of the scheduler service. Use ``tls://`` for connections
+          secured with TLS.
         | Default: ``tcp://scheduler:9090``
 
     * - ``grpc_keepalive_time``

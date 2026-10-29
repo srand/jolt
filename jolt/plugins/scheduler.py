@@ -407,7 +407,7 @@ class RemoteSession(object):
 
         # Address of the scheduler.
         self.address = config.geturi(NAME, "grpc_uri", None) or config.geturi(NAME, "uri", "tcp://scheduler.:9090")
-        raise_error_if(self.address.scheme not in ["tcp"], "Invalid scheme in scheduler URI config: {}", self.address.scheme)
+        raise_error_if(self.address.scheme not in ["tcp", "tls"], "Invalid scheme in scheduler URI config: {}", self.address.scheme)
         raise_error_if(not self.address.netloc, "Invalid network address in scheduler URI config: {}", self.address.netloc)
 
         # URI of scheduler HTTP endpoints.
@@ -574,7 +574,7 @@ class _TokenInterceptor(
         grpc.UnaryStreamClientInterceptor,
         grpc.StreamUnaryClientInterceptor,
         grpc.StreamStreamClientInterceptor):
-    """ Sends a bearer token with each call. """
+    """ Sends a bearer token with each call over channels without TLS, which call credentials aren't sent over. """
 
     def __init__(self, token):
         self._metadata = ("authorization", "Bearer " + token)
@@ -598,11 +598,30 @@ class _TokenInterceptor(
 
 
 def scheduler_channel(address):
-    """ Returns a channel to the scheduler, which sends the configured token. """
-    # The scheduler doesn't use TLS, so the token can't be sent as call credentials
-    channel = grpc.insecure_channel(address.netloc, options=grpc_keepalive_opts)
+    """
+    Returns a channel to the scheduler, which sends the configured token.
+
+    The channel uses TLS for tls:// URIs. Tokens are only sent over TLS,
+    unless sending them without it is explicitly allowed.
+    """
     token = config.get_scheduler_token()
+
+    if address.scheme == "tls":
+        ca_cert = config.get_ca_cert()
+        root_certificates = None
+        if ca_cert:
+            with open(ca_cert, "rb") as f:
+                root_certificates = f.read()
+        credentials = grpc.ssl_channel_credentials(root_certificates=root_certificates)
+        if token:
+            credentials = grpc.composite_channel_credentials(credentials, grpc.access_token_call_credentials(token))
+        return grpc.secure_channel(address.netloc, credentials, options=grpc_keepalive_opts)
+
+    channel = grpc.insecure_channel(address.netloc, options=grpc_keepalive_opts)
     if token:
+        raise_error_if(
+            not config.get_allow_insecure_token(),
+            "Refusing to send the scheduler token without TLS to {}, use a tls:// URI", address.geturl())
         channel = grpc.intercept_channel(channel, _TokenInterceptor(token))
     return channel
 
@@ -614,7 +633,7 @@ def scheduler_channel(address):
 @click.pass_context
 def executor(ctx, worker, build, request):
     address = config.geturi(NAME, "grpc_uri", None) or config.geturi(NAME, "uri", "tcp://scheduler.:9090")
-    raise_error_if(address.scheme not in ["tcp"], "Invalid scheme in scheduler URI config: {}", address.scheme)
+    raise_error_if(address.scheme not in ["tcp", "tls"], "Invalid scheme in scheduler URI config: {}", address.scheme)
     raise_error_if(not address.netloc, "Invalid network address in scheduler URI config: {}", address.netloc)
 
     channel = scheduler_channel(address)

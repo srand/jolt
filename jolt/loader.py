@@ -454,7 +454,7 @@ def export_workspace(tasks=None) -> common_pb.Workspace:
             fstree_enabled = False
             log.warning("No cache gRPC URI configured, will not push workspace to remote cache")
         else:
-            raise_error_if(cache_grpc_uri.scheme not in ["tcp"], "Invalid scheme in cache gRPC URI config: {}", cache_grpc_uri.scheme)
+            raise_error_if(cache_grpc_uri.scheme not in ["tcp", "tls"], "Invalid scheme in cache gRPC URI config: {}", cache_grpc_uri.scheme)
             raise_error_if(not cache_grpc_uri.netloc, "Invalid network address in cache gRPC URI config: {}", cache_grpc_uri.netloc)
 
     # Push workspace to remote cache if possible
@@ -473,7 +473,8 @@ def export_workspace(tasks=None) -> common_pb.Workspace:
                             [fstree, "write-tree", "--json", "--cache", cachedir, "--ignore", ignorefile, "--index", indexfile, "--remote", cache_grpc_uri.geturl(), "--threads", str(tools.thread_count())] + jobserver_args,
                             stdout=subprocess.DEVNULL,
                             stderr=subprocess.PIPE,
-                            cwd=tools.getcwd())
+                            cwd=tools.getcwd(),
+                            env=dict(os.environ, **config.get_service_environ()))
 
                         for line in iter(process.stderr.readline, b''):
                             try:
@@ -502,7 +503,8 @@ def export_workspace(tasks=None) -> common_pb.Workspace:
                         [fstree, "write-tree-push", "--json", "--cache", cachedir, "--ignore", ignorefile, "--index", indexfile, "--remote", cache_grpc_uri.geturl(), "--threads", str(tools.thread_count())] + jobserver_args,
                         stdout=subprocess.DEVNULL,
                         stderr=subprocess.PIPE,
-                        cwd=tools.getcwd())
+                        cwd=tools.getcwd(),
+                        env=dict(os.environ, **config.get_service_environ()))
 
                     for line in iter(process.stderr.readline, b''):
                         try:

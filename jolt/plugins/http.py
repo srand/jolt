@@ -40,6 +40,11 @@ class Http(cache.StorageProvider):
         self._upload = config.getboolean(NAME, "upload", True)
         self._download = config.getboolean(NAME, "download", True)
         self._disabled = False
+        # Certificates of private authorities replace those of the system
+        self._verify = config.get_ca_cert() or True
+        raise_error_if(
+            config.get_cache_token() and not self._uri.startswith("https://") and not config.get_allow_insecure_token(),
+            "Refusing to send the cache token without TLS to {}, use an https:// URI", self._uri)
 
     def _get_auth(self):
         token = config.get_cache_token()
@@ -84,7 +89,8 @@ class Http(cache.StorageProvider):
             artifact.get_archive_path(),
             exceptions=False,
             auth=self._get_auth(),
-            timeout=TIMEOUT)
+            timeout=TIMEOUT,
+            verify=self._verify)
 
     def download_enabled(self):
         return not self._disabled and self._download
@@ -101,7 +107,8 @@ class Http(cache.StorageProvider):
             archive, url,
             exceptions=False,
             auth=self._get_auth(),
-            timeout=TIMEOUT)
+            timeout=TIMEOUT,
+            verify=self._verify)
 
     def upload_enabled(self):
         return not self._disabled and self._upload
@@ -113,7 +120,7 @@ class Http(cache.StorageProvider):
 
         url = self._get_url(artifact)
         try:
-            response = tools.http_session.head(url, stream=True, timeout=TIMEOUT_HEAD, auth=self._get_auth())
+            response = tools.http_session.head(url, stream=True, timeout=TIMEOUT_HEAD, auth=self._get_auth(), verify=self._verify)
         except ConnectTimeout:
             self._disabled = True
             log.warning("[HTTP] failed to establish server connection, disabled")
