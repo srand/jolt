@@ -128,6 +128,23 @@ jobs:
           path: ${{ runner.temp }}/jolt.log
           if-no-files-found: ignore
 
+      - name: Stop the build
+        if: always()
+        # Processes of a build that timed out may still be running, and the
+        # cache can't be saved while they write to it
+        shell: python
+        run: |
+          import os, psutil
+          me = os.getpid()
+          procs = [p for p in psutil.process_iter(["cmdline"])
+                   if p.pid != me and any(os.path.basename(arg) in ("jolt", "jolt.exe") for arg in (p.info["cmdline"] or []))]
+          for p in procs:
+              print("Stopping", p.pid, " ".join(p.info["cmdline"])[:200])
+              for child in p.children(recursive=True):
+                  child.kill()
+              p.kill()
+          psutil.wait_procs(procs, timeout=60)
+
       - name: Save Jolt cache
         if: always()
         uses: actions/cache/save@v4
