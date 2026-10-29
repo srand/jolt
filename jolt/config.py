@@ -253,6 +253,11 @@ def get_cache_token():
     return os.environ.get("JOLT_CACHE_TOKEN") or get("cache", "token")
 
 
+def get_scheduler_token():
+    """ Token that authenticates Jolt with the scheduler service, if any. """
+    return os.environ.get("JOLT_SCHEDULER_TOKEN") or get("scheduler", "token")
+
+
 def get_workdir():
     return _workdir
 

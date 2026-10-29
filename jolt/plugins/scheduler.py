@@ -1,4 +1,5 @@
 import click
+import collections
 import grpc
 import queue
 from threading import Lock
@@ -413,10 +414,7 @@ class RemoteSession(object):
         self.http_uri = config.get(NAME, "http_uri", f"http://{self.address.netloc}")
 
         # GRPC channel.
-        self.channel = grpc.insecure_channel(
-            target=self.address.netloc,
-            options=grpc_keepalive_opts,
-        )
+        self.channel = scheduler_channel(self.address)
 
         # GRPC stub for the scheduler service.
         self.exec = scheduler_grpc.SchedulerStub(self.channel)
@@ -565,6 +563,50 @@ class RemoteExecutionFactory(NetworkExecutorFactory):
 log.verbose("[Remote] Loaded")
 
 
+class _ClientCallDetails(
+        collections.namedtuple("_ClientCallDetails", ("method", "timeout", "metadata", "credentials", "wait_for_ready", "compression")),
+        grpc.ClientCallDetails):
+    pass
+
+
+class _TokenInterceptor(
+        grpc.UnaryUnaryClientInterceptor,
+        grpc.UnaryStreamClientInterceptor,
+        grpc.StreamUnaryClientInterceptor,
+        grpc.StreamStreamClientInterceptor):
+    """ Sends a bearer token with each call. """
+
+    def __init__(self, token):
+        self._metadata = ("authorization", "Bearer " + token)
+
+    def _details(self, details):
+        return _ClientCallDetails(
+            details.method, details.timeout, list(details.metadata or []) + [self._metadata],
+            details.credentials, details.wait_for_ready, details.compression)
+
+    def intercept_unary_unary(self, continuation, details, request):
+        return continuation(self._details(details), request)
+
+    def intercept_unary_stream(self, continuation, details, request):
+        return continuation(self._details(details), request)
+
+    def intercept_stream_unary(self, continuation, details, request_iterator):
+        return continuation(self._details(details), request_iterator)
+
+    def intercept_stream_stream(self, continuation, details, request_iterator):
+        return continuation(self._details(details), request_iterator)
+
+
+def scheduler_channel(address):
+    """ Returns a channel to the scheduler, which sends the configured token. """
+    # The scheduler doesn't use TLS, so the token can't be sent as call credentials
+    channel = grpc.insecure_channel(address.netloc, options=grpc_keepalive_opts)
+    token = config.get_scheduler_token()
+    if token:
+        channel = grpc.intercept_channel(channel, _TokenInterceptor(token))
+    return channel
+
+
 @cli.cli.command(hidden=True)
 @click.option("-w", "--worker", required=True, help="Worker identifier.")
 @click.option("-b", "--build", required=True, help="Build identifier to enlist for.")
@@ -575,7 +617,7 @@ def executor(ctx, worker, build, request):
     raise_error_if(address.scheme not in ["tcp"], "Invalid scheme in scheduler URI config: {}", address.scheme)
     raise_error_if(not address.netloc, "Invalid network address in scheduler URI config: {}", address.netloc)
 
-    channel = grpc.insecure_channel(address.netloc, options=grpc_keepalive_opts)
+    channel = scheduler_channel(address)
     log.verbose("Waiting for GRPC channel to connect")
     grpc.channel_ready_future(channel).result()
     log.verbose("GRPC channel established: {}", address.netloc)

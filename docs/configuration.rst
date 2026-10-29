@@ -764,6 +764,12 @@ Available configuration keys:
       - | The HTTP URI of the scheduler service.
         | Default: ``http://scheduler:8080``
 
+    * - ``token``
+      - String
+      - | Token that authenticates Jolt with the scheduler service. The
+          ``JOLT_SCHEDULER_TOKEN`` environment variable takes precedence.
+          See :ref:`configuration-services-scheduler-auth`.
+
 Configuration variables for the scheduler service itself can be found here:
 :ref:`Scheduler <configuration-services-scheduler>`
 
