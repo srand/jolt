@@ -139,6 +139,11 @@ message BuildInfo {
     // Client configuration parameters, forwarded as-is. Visible to administration
     // subscribers; clients must not include secrets in parameters.
     repeated Property parameters = 4;
+
+    // Names of the authenticated clients that submitted the build, in the
+    // order they submitted it. Identical submissions share a build, and any of
+    // its owners may cancel it. Empty when the scheduler doesn't authenticate.
+    repeated string owners = 5;
 }
 
 // A build has been removed after terminal cleanup.

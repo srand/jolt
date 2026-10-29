@@ -145,9 +145,19 @@ func TestAuthorizeContext(t *testing.T) {
 		return metadata.NewIncomingContext(context.Background(), metadata.Pairs("authorization", header))
 	}
 
-	assert.Equal(t, codes.Unauthenticated, status.Code(a.authorizeContext(context.Background(), Read)))
-	assert.Equal(t, codes.PermissionDenied, status.Code(a.authorizeContext(withToken("Bearer reader-token"), Write)))
-	assert.NoError(t, a.authorizeContext(withToken("Bearer ci-token"), Write))
+	code := func(ctx context.Context, permission Permission) codes.Code {
+		_, err := a.authorizeContext(ctx, permission)
+		return status.Code(err)
+	}
+	assert.Equal(t, codes.Unauthenticated, code(context.Background(), Read))
+	assert.Equal(t, codes.PermissionDenied, code(withToken("Bearer reader-token"), Write))
+
+	// The context of an authorized call has its client
+	ctx, err := a.authorizeContext(withToken("Bearer ci-token"), Write)
+	assert.NoError(t, err)
+	identity, ok := IdentityFromContext(ctx)
+	assert.True(t, ok)
+	assert.Equal(t, "ci", identity.Name)
 }
 
 func TestDialOptions(t *testing.T) {

@@ -3,8 +3,11 @@ package scheduler
 import (
 	"context"
 
+	"github.com/srand/jolt/scheduler/pkg/auth"
 	"github.com/srand/jolt/scheduler/pkg/protocol"
 	"github.com/srand/jolt/scheduler/pkg/utils"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 type schedulerService struct {
@@ -47,6 +50,14 @@ func (s *schedulerService) ScheduleBuild(request *protocol.BuildRequest, stream 
 	}
 	defer observer.Close()
 
+	// Identical submissions share the registered build, which may not be
+	// the one created above
+	if identity, ok := auth.IdentityFromContext(stream.Context()); ok && !identity.Anonymous {
+		if registered, err := s.scheduler.GetBuild(id); err == nil {
+			registered.AddOwner(identity.Name)
+		}
+	}
+
 	for {
 		select {
 		case update, ok := <-observer.Updates():
@@ -75,6 +86,18 @@ func (s *schedulerService) ScheduleBuild(request *protocol.BuildRequest, stream 
 }
 
 func (s *schedulerService) CancelBuild(ctx context.Context, req *protocol.CancelBuildRequest) (*protocol.CancelBuildResponse, error) {
+	// Clients may only cancel the builds they submitted, unless they administer
+	// the scheduler
+	if identity, ok := auth.IdentityFromContext(ctx); ok && !identity.Allows(AdminPermission) {
+		build, err := s.scheduler.GetBuild(req.BuildId)
+		if err != nil {
+			return nil, utils.GrpcError(err)
+		}
+		if !build.IsOwner(identity.Name) || identity.Anonymous {
+			return nil, status.Errorf(codes.PermissionDenied, "%s may only cancel its own builds", identity.Name)
+		}
+	}
+
 	if err := s.scheduler.CancelBuild(req.BuildId); err != nil {
 		return nil, utils.GrpcError(err)
 	}

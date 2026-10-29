@@ -9,8 +9,9 @@ import (
 )
 
 const (
-	// Build and cancel builds, and run their tasks. Clients that build also
-	// need to read, to see the logs of their tasks.
+	// Build, cancel the builds that the client submitted, and run their
+	// tasks. Clients that build also need to read, to see the logs of their
+	// tasks.
 	BuildPermission auth.Permission = "build"
 	// Execute tasks, required by workers and the executors they start.
 	WorkerPermission auth.Permission = "worker"

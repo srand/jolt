@@ -3,6 +3,7 @@ package scheduler
 import (
 	"context"
 	"errors"
+	"slices"
 	"sync"
 	"time"
 
@@ -27,6 +28,9 @@ type priorityBuild struct {
 
 	// Private copy of the client parameters, published in build metadata.
 	parameters []*protocol.Property
+
+	// Names of the authenticated clients that submitted the build.
+	owners []string
 
 	// Scheduler telemetry, separate from client observers that keep a build alive.
 	statusChanged func(*protocol.BuildInfo)
@@ -138,6 +142,7 @@ func (b *priorityBuild) infoNoLock() *protocol.BuildInfo {
 		Status:      b.status,
 		ScheduledAt: timestamppb.New(b.scheduledAt),
 		Parameters:  b.parameters,
+		Owners:      slices.Clone(b.owners),
 	}
 }
 
@@ -276,6 +281,24 @@ func (b *priorityBuild) HasRunningTask() bool {
 // Returns the identity of the build.
 func (b *priorityBuild) Id() string {
 	return b.id
+}
+
+func (b *priorityBuild) AddOwner(name string) {
+	b.Lock()
+	defer b.Unlock()
+	if slices.Contains(b.owners, name) {
+		return
+	}
+	b.owners = append(b.owners, name)
+	if b.statusChanged != nil {
+		b.statusChanged(b.infoNoLock())
+	}
+}
+
+func (b *priorityBuild) IsOwner(name string) bool {
+	b.RLock()
+	defer b.RUnlock()
+	return slices.Contains(b.owners, name)
 }
 
 // Schedule one the build's tasks for execution.

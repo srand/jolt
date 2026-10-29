@@ -57,4 +57,10 @@ type Build interface {
 
 	// Returns true if the build should stream logs back to the client.
 	LogStreamEnabled() bool
+
+	// Adds a client that submitted the build to its owners.
+	AddOwner(name string)
+
+	// Returns true if the client submitted the build.
+	IsOwner(name string) bool
 }

@@ -294,8 +294,9 @@ The scheduler grants these permissions:
     * - Permission
       - Allows
     * - ``build``
-      - Building and cancelling builds, and running their tasks. Clients that
-        build also need ``read`` to see the logs of their tasks.
+      - Building, cancelling the builds that the client submitted, and running
+        their tasks. Clients that build also need ``read`` to see the logs of
+        their tasks.
     * - ``worker``
       - Executing tasks, required by workers and the executors they start.
     * - ``read``

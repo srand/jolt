@@ -66,6 +66,8 @@ type Config struct {
 type Identity struct {
 	Name        string
 	Permissions []Permission
+	// The client didn't present a token.
+	Anonymous bool
 }
 
 // Allows returns true if the client has the permission.
@@ -83,7 +85,7 @@ type Authenticator struct {
 // those of the service, which grants all of them when it isn't configured.
 func New(config Config, permissions ...Permission) (*Authenticator, error) {
 	a := &Authenticator{
-		anonymous: Identity{Name: "anonymous", Permissions: permissions},
+		anonymous: Identity{Name: "anonymous", Permissions: permissions, Anonymous: true},
 		tokens:    map[[sha256.Size]byte]Identity{},
 	}
 
@@ -204,21 +206,47 @@ func (a *Authenticator) HttpHandler(handler http.Handler, permission func(*http.
 	})
 }
 
-func (a *Authenticator) authorizeContext(ctx context.Context, permission Permission) error {
+type identityKey struct{}
+
+// IdentityFromContext returns the client that made a call, which the
+// interceptors of ServerOptions add to the context of the call.
+func IdentityFromContext(ctx context.Context) (*Identity, bool) {
+	identity, ok := ctx.Value(identityKey{}).(*Identity)
+	return identity, ok
+}
+
+// ContextWithIdentity returns a context with the client that made a call.
+func ContextWithIdentity(ctx context.Context, identity *Identity) context.Context {
+	return context.WithValue(ctx, identityKey{}, identity)
+}
+
+// authorizeContext returns the context of a call with its client, if the
+// client has the permission.
+func (a *Authenticator) authorizeContext(ctx context.Context, permission Permission) (context.Context, error) {
 	token := ""
 	if md, ok := metadata.FromIncomingContext(ctx); ok {
 		if values := md.Get("authorization"); len(values) > 0 {
 			token = TokenFromHeader(values[0])
 		}
 	}
-	_, err := a.Authorize(ctx, token, permission)
+	identity, err := a.Authorize(ctx, token, permission)
 	switch {
 	case errors.Is(err, ErrUnauthenticated):
-		return status.Error(codes.Unauthenticated, err.Error())
+		return nil, status.Error(codes.Unauthenticated, err.Error())
 	case err != nil:
-		return status.Error(codes.PermissionDenied, err.Error())
+		return nil, status.Error(codes.PermissionDenied, err.Error())
 	}
-	return nil
+	return ContextWithIdentity(ctx, identity), nil
+}
+
+// A server stream whose context includes the client.
+type identityStream struct {
+	grpc.ServerStream
+	ctx context.Context
+}
+
+func (s identityStream) Context() context.Context {
+	return s.ctx
 }
 
 // ServerOptions returns gRPC server options that authorize calls with the
@@ -226,16 +254,18 @@ func (a *Authenticator) authorizeContext(ctx context.Context, permission Permiss
 func (a *Authenticator) ServerOptions(permission func(method string) Permission) []grpc.ServerOption {
 	return []grpc.ServerOption{
 		grpc.ChainUnaryInterceptor(func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
-			if err := a.authorizeContext(ctx, permission(info.FullMethod)); err != nil {
+			ctx, err := a.authorizeContext(ctx, permission(info.FullMethod))
+			if err != nil {
 				return nil, err
 			}
 			return handler(ctx, req)
 		}),
 		grpc.ChainStreamInterceptor(func(srv any, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
-			if err := a.authorizeContext(ss.Context(), permission(info.FullMethod)); err != nil {
+			ctx, err := a.authorizeContext(ss.Context(), permission(info.FullMethod))
+			if err != nil {
 				return err
 			}
-			return handler(srv, ss)
+			return handler(srv, identityStream{ServerStream: ss, ctx: ctx})
 		}),
 	}
 }
