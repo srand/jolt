@@ -33,6 +33,9 @@ Command Line
 .. _reference-cli-login:
 .. click:: cli:_login
 	   :prog: jolt login
+.. _reference-cli-token:
+.. click:: cli:_token
+	   :prog: jolt token
 .. _reference-cli-logout:
 .. click:: cli:_logout
 	   :prog: jolt logout

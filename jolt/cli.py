@@ -938,6 +938,39 @@ def _login(grant):
     log.info("Logged in to {}", config.get("auth", "issuer"))
 
 
+@cli.command(name="token")
+@click.argument("name")
+@click.option("-p", "--permission", "permissions", multiple=True,
+              help="Permission granted to the token, such as read or write (repeatable).")
+def _token(name, permissions):
+    """
+    Create a token for the cache and scheduler services.
+
+    Prints a new random token and the entry for the auth section of
+    cache.yaml or scheduler.yaml. The entry only contains the SHA-256 hash
+    of the token, so the token itself is shown only once. NAME identifies
+    the client in the logs of the services.
+
+    The cache grants read and write. The scheduler grants build, worker,
+    read and admin.
+    """
+    import hashlib
+    import secrets
+
+    token = secrets.token_urlsafe(32)
+    digest = hashlib.sha256(token.encode()).hexdigest()
+
+    print("Token: " + token)
+    print()
+    print("Add the token to the auth section of cache.yaml or scheduler.yaml:")
+    print()
+    print("auth:")
+    print("  tokens:")
+    print("    - name: " + name)
+    print("      sha256: " + digest)
+    print("      permissions: [{}]".format(", ".join(permissions)))
+
+
 @cli.command(name="logout")
 def _logout():
     """

@@ -204,3 +204,15 @@ class LoginInternal(JoltTest):
         login.logout()
         self.assertEqual(self.keyring, {})
         self.assertIsNone(login.get_token())
+
+    def test_token(self):
+        import hashlib
+        from click.testing import CliRunner
+        from jolt import cli
+
+        result = CliRunner().invoke(cli._token, ["ci", "-p", "read", "-p", "write"])
+        self.assertEqual(result.exit_code, 0, result.output)
+        token = result.output.split("Token: ")[1].split()[0]
+        self.assertIn("- name: ci", result.output)
+        self.assertIn("sha256: " + hashlib.sha256(token.encode()).hexdigest(), result.output)
+        self.assertIn("permissions: [read, write]", result.output)
