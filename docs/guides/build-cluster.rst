@@ -44,12 +44,12 @@ Build Parameters
 ~~~~~~~~~~~~~~~~
 
 Build submissions carry the ``[params]`` section of the configuration to the
-scheduler and the workers. The parameters can be used to attribute builds, for
-example to a user and a CI job:
+scheduler and the workers. The parameters can describe builds, for example the
+CI job that started them:
 
   .. code:: bash
 
-    $ jolt -c params.username=alice -c params.origin="$BUILD_URL" build -n my-task
+    $ jolt -c params.origin="$BUILD_URL" -c params.branch=main build -n my-task
 
 They can also be set in the configuration file. Values are expanded on the
 client before the build is submitted, so they may refer to its environment:
@@ -57,12 +57,13 @@ client before the build is submitted, so they may refer to its environment:
   .. code:: ini
 
     [params]
-    username = {environ[USER]}
+    origin = {environ[BUILD_URL]}
 
-The dashboard shows ``username`` and ``origin`` with the tasks of each
-build, and other tools that follow the builds of the scheduler see all
-parameters. Jolt doesn't check them: whoever submits a build can set them to
-anything, so they tell you who claims to have started a build, not who did.
+The dashboard shows all parameters of a build, and ``origin`` with its tasks,
+as a link if it is a URL. Other tools that follow the builds of the scheduler
+see them too. Jolt doesn't check parameters: whoever submits a build can set
+them to anything. Who submitted a build is known from its owners instead, the
+authenticated clients that the scheduler records, see :ref:`build-cluster-auth`.
 
 .. warning::
 
