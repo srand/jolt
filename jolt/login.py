@@ -1,16 +1,23 @@
 """
-Signs in to an OpenID Connect provider with the OAuth device authorization
-grant, and keeps a valid ID token that authenticates Jolt with the cache and
-scheduler services.
+Signs in to an OpenID Connect provider and keeps a valid ID token that
+authenticates Jolt with the cache and scheduler services.
+
+Users sign in with their user name and password in the terminal, with the
+OAuth password grant, if the provider allows it for the client. Otherwise
+they sign in with the browser, with the device authorization grant.
 
 The refresh and ID tokens are stored in the system keyring. The ID token is
 refreshed when it is about to expire.
 """
 
 import base64
+import getpass
 import json
+import os
+import sys
 import threading
 import time
+import webbrowser
 
 from jolt import config
 from jolt import log
@@ -19,6 +26,7 @@ from jolt.error import raise_error, raise_error_if
 
 NAME = "auth"
 KEYRING_SERVICE = "jolt"
+GRANTS = ["auto", "password", "device"]
 
 # Tokens are refreshed when they expire in less than this many seconds, so
 # that they stay valid through calls and tools that receive them.
@@ -130,24 +138,86 @@ def _store(tokens):
     return id_token
 
 
-def login():
-    """ Signs in with the device authorization grant and stores the tokens. """
-    raise_error_if(not is_configured(), "Configure the OIDC provider with 'jolt config auth.issuer <url>'")
+def _scopes():
+    return config.get(NAME, "scopes", "openid profile offline_access")
 
-    provider = _discover()
+
+def _logged_in(tokens):
+    with _lock:
+        _store(tokens)
+    if not tokens.get("refresh_token"):
+        log.warning("The OIDC provider didn't return a refresh token, request the offline_access scope to stay logged in")
+
+
+def _password_allowed(provider):
+    """
+    Returns true if the client may sign in with a password. Providers such
+    as Keycloak advertise the password grant even when the client may not
+    use it. They refuse credentials without a user name as invalid if it
+    may, and the grant as unauthorized if it may not.
+    """
+    if "password" not in provider.get("grant_types_supported", []):
+        return False
+    status, response = _post(provider["token_endpoint"], _client_auth({
+        "grant_type": "password",
+        "username": "",
+        "password": "",
+    }))
+    return response.get("error") not in ("unauthorized_client", "unsupported_grant_type")
+
+
+def _password_login(provider, required):
+    """
+    Signs in with the user name and password, or returns False if the
+    provider doesn't allow it and it isn't required.
+    """
+    default_user = config.get(NAME, "username") or getpass.getuser()
+    username = input("User name [{}]: ".format(default_user)).strip() or default_user
+    password = getpass.getpass("Password: ")
+
+    status, tokens = _post(provider["token_endpoint"], _client_auth({
+        "grant_type": "password",
+        "username": username,
+        "password": password,
+        "scope": _scopes(),
+    }))
+    if status == 200:
+        _logged_in(tokens)
+        return True
+
+    error = tokens.get("error")
+    if error in ("unauthorized_client", "unsupported_grant_type") and not required:
+        log.info("The OIDC provider doesn't allow signing in with a password, signing in with the browser")
+        return False
+    raise_error("Login failed: {}", tokens.get("error_description") or error)
+
+
+def _can_open_browser():
+    """ Returns true if a graphical browser can be opened. Without a display,
+    the webbrowser module would start a text browser in the terminal. """
+    if sys.platform in ("win32", "darwin"):
+        return True
+    if os.environ.get("SSH_CONNECTION"):
+        return False
+    return bool(os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY"))
+
+
+def _device_login(provider):
     device_endpoint = provider.get("device_authorization_endpoint")
     raise_error_if(not device_endpoint, "The OIDC provider at {} doesn't support the device authorization grant", _issuer())
 
-    scopes = config.get(NAME, "scopes", "openid profile offline_access")
-    status, device = _post(device_endpoint, _client_auth({"scope": scopes}))
+    status, device = _post(device_endpoint, _client_auth({"scope": _scopes()}))
     raise_error_if(status != 200, "The OIDC provider refused to start the login: {}",
                    device.get("error_description") or device.get("error"))
 
-    if device.get("verification_uri_complete"):
-        log.info("Open this URL to sign in: {}", device["verification_uri_complete"])
-    else:
-        log.info("Open this URL to sign in: {}", device["verification_uri"])
+    url = device.get("verification_uri_complete") or device["verification_uri"]
+    log.info("Open this URL to sign in: {}", url)
     log.info("Code: {}", device["user_code"])
+    if _can_open_browser():
+        try:
+            webbrowser.open(url)
+        except Exception as exc:
+            log.debug("Failed to open the browser: {}", exc)
 
     interval = device.get("interval", 5)
     deadline = time.time() + device.get("expires_in", 600)
@@ -158,10 +228,7 @@ def login():
             "device_code": device["device_code"],
         }))
         if status == 200:
-            with _lock:
-                _store(tokens)
-            if not tokens.get("refresh_token"):
-                log.warning("The OIDC provider didn't return a refresh token, request the offline_access scope to stay logged in")
+            _logged_in(tokens)
             return
         error = tokens.get("error")
         if error == "authorization_pending":
@@ -172,6 +239,32 @@ def login():
         raise_error("Login failed: {}", tokens.get("error_description") or error)
 
     raise_error("Login timed out")
+
+
+def login(grant=None):
+    """
+    Signs in and stores the tokens.
+
+    The grant is password, device or auto. Auto signs in with a password if
+    the provider supports it and there is a terminal to ask for it in, and
+    with the browser otherwise.
+    """
+    raise_error_if(not is_configured(), "Configure the OIDC provider with 'jolt config auth.issuer <url>'")
+    grant = grant or config.get(NAME, "grant", "auto")
+    raise_error_if(grant not in GRANTS, "Invalid auth.grant '{}', valid grants are: {}", grant, ", ".join(GRANTS))
+
+    provider = _discover()
+
+    if grant == "password":
+        raise_error_if(not sys.stdin.isatty(), "Can't ask for the password without a terminal")
+        _password_login(provider, required=True)
+        return
+
+    if grant == "auto" and sys.stdin.isatty() and _password_allowed(provider):
+        if _password_login(provider, required=False):
+            return
+
+    _device_login(provider)
 
 
 def logout():

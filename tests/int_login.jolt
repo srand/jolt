@@ -20,7 +20,11 @@ def _jwt(exp):
 PROVIDER = {
     "token_endpoint": "https://idp/token",
     "device_authorization_endpoint": "https://idp/device",
+    "grant_types_supported": ["password", "urn:ietf:params:oauth:grant-type:device_code"],
 }
+
+DEVICE = {"device_code": "dev", "user_code": "ABCD", "verification_uri": "https://idp/activate",
+          "verification_uri_complete": "https://idp/activate?user_code=ABCD", "interval": 1}
 
 
 class LoginInternal(JoltTest):
@@ -33,6 +37,7 @@ class LoginInternal(JoltTest):
         self.config = {("auth", "issuer"): "https://idp"}
         self.posts = []
         self.responses = []
+        self.tty = False
 
         def get(section, key, default=None, **kwargs):
             return self.config.get((section, key), default)
@@ -49,6 +54,12 @@ class LoginInternal(JoltTest):
             mock.patch.object(login, "_discover", return_value=PROVIDER),
             mock.patch.object(login, "_post", side_effect=post),
             mock.patch.object(login.time, "sleep"),
+            mock.patch.object(login.sys.stdin, "isatty", side_effect=lambda: self.tty),
+            mock.patch.object(login, "input", create=True, return_value=""),
+            mock.patch.object(login.getpass, "getpass", return_value="secret"),
+            mock.patch.object(login.getpass, "getuser", return_value="alice"),
+            mock.patch.object(login, "_can_open_browser", return_value=True),
+            mock.patch.object(login.webbrowser, "open"),
             mock.patch.dict(os.environ, {}, clear=False),
         ]
         for patch in patches:
@@ -74,7 +85,7 @@ class LoginInternal(JoltTest):
     def test_login_with_device_flow(self):
         token = _jwt(time.time() + 3600)
         self.responses = [
-            (200, {"device_code": "dev", "user_code": "ABCD", "verification_uri": "https://idp/activate", "interval": 1}),
+            (200, DEVICE),
             (400, {"error": "authorization_pending"}),
             (400, {"error": "slow_down"}),
             (200, {"id_token": token, "refresh_token": "refresh"}),
@@ -84,10 +95,66 @@ class LoginInternal(JoltTest):
         self.assertEqual(self.posts[1][1]["device_code"], "dev")
         self.assertEqual(self.keyring, {"id_token": token, "refresh_token": "refresh"})
         self.assertEqual(login.get_token(), token)
+        login.webbrowser.open.assert_called_once_with("https://idp/activate?user_code=ABCD")
+
+    def test_login_with_password(self):
+        self.tty = True
+        token = _jwt(time.time() + 3600)
+        self.responses = [
+            (401, {"error": "invalid_grant"}),
+            (200, {"id_token": token, "refresh_token": "refresh"}),
+        ]
+        login.login()
+        self.assertEqual(self.posts[0][1]["username"], "")
+        data = self.posts[1][1]
+        self.assertEqual((data["grant_type"], data["username"], data["password"]), ("password", "alice", "secret"))
+        self.assertEqual(self.keyring, {"id_token": token, "refresh_token": "refresh"})
+        login.webbrowser.open.assert_not_called()
+
+    def test_password_not_allowed_opens_browser(self):
+        self.tty = True
+        token = _jwt(time.time() + 3600)
+        self.responses = [
+            (400, {"error": "unauthorized_client"}),
+            (200, DEVICE),
+            (200, {"id_token": token, "refresh_token": "refresh"}),
+        ]
+        login.login()
+        # Not asked for the password
+        login.getpass.getpass.assert_not_called()
+        self.assertEqual(self.posts[1][0], "https://idp/device")
+        self.assertEqual(self.keyring["id_token"], token)
+        login.webbrowser.open.assert_called_once()
+
+    def test_wrong_password(self):
+        self.tty = True
+        self.responses = [
+            (401, {"error": "invalid_grant"}),
+            (401, {"error": "invalid_grant", "error_description": "Invalid user credentials"}),
+        ]
+        with self.assertRaises(JoltError):
+            login.login()
+        self.assertEqual(len(self.posts), 2)
+        self.assertEqual(self.keyring, {})
+
+    def test_password_required(self):
+        self.tty = True
+        self.responses = [(400, {"error": "unauthorized_client"})]
+        with self.assertRaises(JoltError):
+            login.login("password")
+        self.tty = False
+        with self.assertRaises(JoltError):
+            login.login("password")
+
+    def test_without_terminal_uses_browser(self):
+        token = _jwt(time.time() + 3600)
+        self.responses = [(200, DEVICE), (200, {"id_token": token})]
+        login.login()
+        self.assertEqual(self.posts[0][0], "https://idp/device")
 
     def test_login_denied(self):
         self.responses = [
-            (200, {"device_code": "dev", "user_code": "ABCD", "verification_uri": "https://idp/activate"}),
+            (200, DEVICE),
             (400, {"error": "access_denied"}),
         ]
         with self.assertRaises(JoltError):

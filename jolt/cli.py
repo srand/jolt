@@ -921,17 +921,20 @@ def _log(follow, delete):
 
 
 @cli.command(name="login")
-def _login():
+@click.option("-g", "--grant", type=click.Choice(["auto", "password", "device"]),
+              help="How to sign in: with a password in the terminal, with the browser, or automatically.")
+def _login(grant):
     """
     Sign in to the services with an OpenID Connect provider.
 
-    Prints a URL where you sign in with the provider configured in the
-    auth section of the configuration. The tokens are stored in the system
-    keyring and authenticate Jolt with the cache and scheduler services,
-    unless tokens are configured for them.
+    Signs in with the provider configured in the auth section of the
+    configuration. Asks for your user name and password if the provider
+    allows it, and opens the browser to sign in there otherwise. The tokens
+    are stored in the system keyring and authenticate Jolt with the cache
+    and scheduler services, unless tokens are configured for them.
     """
     from jolt import login
-    login.login()
+    login.login(grant)
     log.info("Logged in to {}", config.get("auth", "issuer"))
 
 

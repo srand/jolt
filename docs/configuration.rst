@@ -259,9 +259,15 @@ Auth
 
 The ``[auth]`` section configures the OpenID Connect provider that
 ``jolt login`` signs in with, such as Keycloak, Dex or Authentik in front of
-an LDAP directory. ``jolt login`` prints a URL and a code to enter there, and
-waits until you have signed in with the provider. The provider must support
-the OAuth device authorization grant.
+an LDAP directory. ``jolt login`` signs in in one of two ways:
+
+- With your user name and password in the terminal, with the OAuth password
+  grant, if the provider allows it for the client. In Keycloak, enable
+  *Direct access grants* for the client. This doesn't work with providers
+  that require a second factor or send you on to another provider.
+- With the browser otherwise, with the OAuth device authorization grant.
+  Jolt opens the browser if there is a display, and prints the URL and a
+  code to enter there, and waits until you have signed in.
 
 The tokens are stored in the system keyring. Jolt sends the ID token to the
 cache and scheduler services, unless tokens are configured for them, and
@@ -292,12 +298,23 @@ be configured to accept the tokens, see
     * - ``client_secret``
       - String
       - | Secret of the client, for providers that require one.
+    * - ``grant``
+      - String
+      - | How ``jolt login`` signs in: ``password`` in the terminal,
+          ``device`` with the browser, or ``auto`` with a password if the
+          provider allows it and with the browser otherwise. The ``--grant``
+          option of ``jolt login`` takes precedence.
+        | Default: ``auto``
     * - ``scopes``
       - String
       - | Scopes requested from the provider, separated by spaces. Some
           providers need a scope to include the groups of the user, such as
           ``groups`` with Dex.
         | Default: ``openid profile offline_access``
+    * - ``username``
+      - String
+      - | User name suggested when signing in with a password.
+        | Default: the name of the user on the computer.
 
 Example:
 
