@@ -329,6 +329,22 @@ Clients send their tokens as bearer tokens:
 - ``schedulerctl`` uses ``scheduler_token`` in ``schedulerctl.yaml`` or
   ``JOLT_SCHEDULER_TOKEN``, and the dashboard ``JOLT_SCHEDULER_TOKEN``.
 
+Example worker configuration, for a scheduler and cache served with TLS by a
+private authority:
+
+  .. code:: yaml
+
+    # /etc/jolt/worker.yaml
+    scheduler_grpc_uri: tls://scheduler.example.com:9090
+    scheduler_token: <token with the worker permission>
+    cache_grpc_uri: tls://cache.example.com:9090
+    cache_token: <token with the read and write permissions>
+    ca_cert: /etc/jolt/ca.pem
+
+The environment variables ``JOLT_SCHEDULER_TOKEN``, ``JOLT_CACHE_TOKEN`` and
+``JOLT_CA_CERT`` work as well, and keep the tokens out of the file, for
+example when they come from Docker or Kubernetes secrets.
+
 Task logs are opened in a browser, which asks for a user name and password.
 Enter the token as the password; the user name is ignored.
 
