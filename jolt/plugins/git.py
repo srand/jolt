@@ -176,9 +176,17 @@ class GitRepository(object):
     def _revision_refspec(self, rev=None):
         """ Refspec fetching a single revision into a local ref.
 
-        An unspecified revision means the remote's default branch.
+        An unspecified revision means the remote's default branch, its HEAD.
+        Remotes that are empty, have no HEAD or whose HEAD names a missing
+        branch don't advertise any HEAD, and fetches fail, see _fetch_revision.
         """
         return "+{0}:{1}".format(rev or "HEAD", self.fetchref)
+
+    def _raise_no_default_branch(self):
+        raise_error(
+            "Repository '{0}' has no default branch to check out: it is empty, it has no "
+            "HEAD, or its HEAD names a branch that doesn't exist. Specify the branch, tag or "
+            "commit to check out with rev, for example: git:url={0},rev=main", self.url)
 
     def _fetch_reference(self, refpath, shallow=False, rev=None, depth=1):
         """ Copy objects from a reference repository into the local repository.
@@ -262,7 +270,13 @@ class GitRepository(object):
                     self._fetch_revision(rev)
                 else:
                     self.fetch()
-                self.tools.run("git checkout -f FETCH_HEAD", output_on_error=True, new_session=True)
+                try:
+                    self.tools.run("git checkout -f FETCH_HEAD", output_on_error=True, new_session=True)
+                except JoltCommandError:
+                    # An empty repository fetches nothing to check out
+                    if not rev:
+                        self._raise_no_default_branch()
+                    raise
                 if shallow and rev and not self.is_valid_sha(rev):
                     # Create a local tag so that the revision can later be
                     # resolved (e.g. by rev_parse) without re-contacting the
@@ -282,6 +296,10 @@ class GitRepository(object):
         raise_error_if(
             self.repository is None,
             "Failed to clone repository '{0}'", self.relpath)
+        # Git clones a repository whose HEAD names a missing branch without
+        # checking anything out, which would leave the workspace empty
+        if not rev and self.repository.head_is_unborn:
+            self._raise_no_default_branch()
         if submodules:
             self._update_submodules()
 
@@ -441,16 +459,22 @@ class GitRepository(object):
             # that its objects are reachable for git. Tag auto-following is
             # disabled to keep the fetch down to the requested revision.
             with self._progress("Fetching " + self._name) as (progress_option, progress):
-                self.tools.run(
-                    "git fetch --force --no-tags --depth={depth} {progress_option} {extra_fetch_options} {url} {refspec}",
-                    depth=depth,
-                    progress_option=progress_option,
-                    extra_fetch_options=extra_fetch_options,
-                    url=self.url,
-                    refspec=self._revision_refspec(rev),
-                    output_on_error=True,
-                    progress=progress,
-                    new_session=True)
+                try:
+                    self.tools.run(
+                        "git fetch --force --no-tags --depth={depth} {progress_option} {extra_fetch_options} {url} {refspec}",
+                        depth=depth,
+                        progress_option=progress_option,
+                        extra_fetch_options=extra_fetch_options,
+                        url=self.url,
+                        refspec=self._revision_refspec(rev),
+                        output_on_error=True,
+                        progress=progress,
+                        new_session=True)
+                except JoltCommandError as e:
+                    # Retrying won't help, so fail with a JoltError right away
+                    if not rev and any("couldn't find remote ref HEAD" in line for line in e.stderr):
+                        self._raise_no_default_branch()
+                    raise
 
     @_changes_workspace
     def checkout(self, rev, commit=None, submodules=False):
