@@ -1,5 +1,5 @@
 from jolt import attributes, Parameter
-from jolt.pkgs import krb5, openssl
+from jolt.pkgs import compiler, krb5, openssl
 from jolt.plugins import autotools, cxxinfo, fetch, pkgconfig
 from jolt.tasks import TaskRegistry
 

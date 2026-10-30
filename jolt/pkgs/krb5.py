@@ -1,5 +1,5 @@
 from jolt import attributes, Parameter
-from jolt.pkgs import bison
+from jolt.pkgs import bison, compiler
 from jolt.plugins import autotools, cxxinfo, fetch
 from jolt.tasks import TaskRegistry
 

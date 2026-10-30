@@ -1,5 +1,5 @@
 from jolt import attributes, BooleanParameter, Parameter
-from jolt.pkgs import freetype
+from jolt.pkgs import compiler, freetype
 from jolt.plugins import cxxinfo, git, meson
 from jolt.tasks import TaskRegistry
 

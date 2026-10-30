@@ -1,5 +1,5 @@
 from jolt import attributes, Parameter
-from jolt.pkgs import wayland
+from jolt.pkgs import compiler, wayland
 from jolt.plugins import git, meson
 from jolt.tasks import TaskRegistry
 

@@ -1,6 +1,7 @@
 from jolt import BooleanParameter, Parameter, attributes
 from jolt.plugins import autotools, fetch, pkgconfig
 from jolt.tasks import TaskRegistry
+from jolt.pkgs import compiler
 import os
 
 

@@ -1,6 +1,7 @@
 from jolt import attributes, influence, Parameter, Task
 from jolt.plugins import git
 from jolt.tasks import TaskRegistry
+from jolt.pkgs import compiler
 
 
 @attributes.requires("requires_git")

@@ -1,5 +1,5 @@
 from jolt import attributes, BooleanParameter, Parameter
-from jolt.pkgs import boost, curl, cyrus_sasl, krb5, libedit, libtirpc, libudev_zero, lz4, openldap, openssl, rapidjson, zlib, zstd
+from jolt.pkgs import boost, compiler, curl, cyrus_sasl, krb5, libedit, libtirpc, libudev_zero, lz4, openldap, openssl, rapidjson, zlib, zstd
 from jolt.plugins import cmake, cxxinfo, git, pkgconfig
 from jolt.tasks import TaskRegistry
 

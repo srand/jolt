@@ -2,6 +2,7 @@ import os
 from jolt import attributes, Parameter
 from jolt.plugins import git
 from jolt.tasks import Task, TaskRegistry
+from jolt.pkgs import compiler
 
 
 @attributes.common_metadata()

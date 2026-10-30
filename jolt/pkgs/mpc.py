@@ -1,5 +1,5 @@
 from jolt import attributes, Parameter
-from jolt.pkgs import gmp, mpfr
+from jolt.pkgs import compiler, gmp, mpfr
 from jolt.plugins import autotools, cxxinfo, fetch
 from jolt.tasks import TaskRegistry
 

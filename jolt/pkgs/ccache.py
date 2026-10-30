@@ -1,5 +1,5 @@
 from jolt import attributes, Parameter
-from jolt.pkgs import blake3, cmake, fmt, zstd
+from jolt.pkgs import blake3, cmake, compiler, fmt, zstd
 from jolt.plugins import cmake, git
 from jolt.tasks import TaskRegistry
 

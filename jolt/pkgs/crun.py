@@ -1,5 +1,5 @@
 from jolt import attributes, BooleanParameter, Parameter
-from jolt.pkgs import json_c, libcap
+from jolt.pkgs import compiler, json_c, libcap
 from jolt.plugins import git, autotools, pkgconfig
 from jolt.tasks import TaskRegistry
 

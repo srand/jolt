@@ -1,5 +1,5 @@
 from jolt import attributes, BooleanParameter, Parameter
-from jolt.pkgs import ncurses
+from jolt.pkgs import compiler, ncurses
 from jolt.plugins import cxxinfo, git, autotools, pkgconfig
 from jolt.tasks import TaskRegistry
 

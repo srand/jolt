@@ -1,5 +1,5 @@
 from jolt import attributes, Parameter, BooleanParameter
-from jolt.pkgs import cmake, dbus, ninja, libglvnd, protobuf
+from jolt.pkgs import cmake, compiler, dbus, libglvnd, ninja, protobuf
 from jolt.plugins import git, cmake
 from jolt.tasks import TaskRegistry
 

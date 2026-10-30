@@ -1,5 +1,5 @@
 from jolt import attributes, BooleanParameter, Parameter
-from jolt.pkgs import cyrus_sasl, openssl
+from jolt.pkgs import compiler, cyrus_sasl, openssl
 from jolt.plugins import autotools, cxxinfo, fetch, pkgconfig
 from jolt.tasks import TaskRegistry
 

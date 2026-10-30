@@ -1,5 +1,5 @@
 from jolt import attributes, BooleanParameter, Parameter
-from jolt.pkgs import ninja
+from jolt.pkgs import compiler, ninja
 from jolt.plugins import git
 from jolt.plugins.ninja import CXXLibrary
 from jolt.tasks import TaskRegistry

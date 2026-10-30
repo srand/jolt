@@ -1,5 +1,5 @@
 from jolt import attributes, BooleanParameter, Parameter
-from jolt.pkgs import boost, cmake, fmt, mysql, sqlite, unixodbc
+from jolt.pkgs import boost, cmake, compiler, fmt, mysql, sqlite, unixodbc
 from jolt.plugins import cxxinfo, git, cmake
 from jolt.tasks import TaskRegistry
 

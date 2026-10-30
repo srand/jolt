@@ -1,5 +1,5 @@
 from jolt import attributes, Parameter
-from jolt.pkgs import cmake, llvm, spirv_tools
+from jolt.pkgs import cmake, compiler, llvm, spirv_tools
 from jolt.plugins import git, cmake
 from jolt.tasks import TaskRegistry
 

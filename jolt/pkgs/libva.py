@@ -1,5 +1,5 @@
 from jolt import attributes, Parameter
-from jolt.pkgs import libdrm, meson
+from jolt.pkgs import compiler, libdrm, meson
 from jolt.plugins import git, meson
 from jolt.tasks import TaskRegistry
 

@@ -1,5 +1,5 @@
 from jolt import attributes, Parameter
-from jolt.pkgs import rust
+from jolt.pkgs import compiler, rust
 from jolt.plugins import rust
 from jolt.tasks import TaskRegistry
 

@@ -1,5 +1,5 @@
 from jolt import attributes, Parameter
-from jolt.pkgs import cmake, gflags
+from jolt.pkgs import cmake, compiler, gflags
 from jolt.plugins import git, cmake
 from jolt.tasks import TaskRegistry
 

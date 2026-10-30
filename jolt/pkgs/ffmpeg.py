@@ -1,5 +1,5 @@
 from jolt import attributes, BooleanParameter, Parameter
-from jolt.pkgs import nasm, pkgconfig, xz, xorg
+from jolt.pkgs import compiler, nasm, pkgconfig, x11, xorg, xz
 from jolt.plugins import git, autotools
 from jolt.tasks import TaskRegistry
 

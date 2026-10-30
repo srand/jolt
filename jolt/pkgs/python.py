@@ -1,6 +1,7 @@
 from jolt import attributes
 from jolt.plugins import python
 from jolt.tasks import TaskRegistry
+from jolt.pkgs import compiler
 
 
 @python.requires()

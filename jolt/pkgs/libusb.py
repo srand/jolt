@@ -1,5 +1,5 @@
 from jolt import attributes, BooleanParameter, Parameter
-from jolt.pkgs import libudev_zero
+from jolt.pkgs import compiler, libudev_zero
 from jolt.plugins import autotools, cxxinfo, fetch, pkgconfig
 from jolt.tasks import TaskRegistry
 

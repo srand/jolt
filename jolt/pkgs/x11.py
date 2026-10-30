@@ -1,4 +1,5 @@
 from jolt import Alias
+from jolt.pkgs import xorg
 from jolt.tasks import TaskRegistry
 
 

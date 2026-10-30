@@ -1,5 +1,5 @@
 from jolt import attributes, Parameter, BooleanParameter
-from jolt.pkgs import libpciaccess, meson
+from jolt.pkgs import compiler, libpciaccess, meson
 from jolt.plugins import git, meson
 from jolt.tasks import TaskRegistry
 

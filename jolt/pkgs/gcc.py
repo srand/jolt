@@ -1,7 +1,7 @@
 import re
 
 from jolt import attributes, ListParameter, Parameter
-from jolt.pkgs import binutils, glibc, gmp, mpc, mpfr, musl
+from jolt.pkgs import binutils, compiler, glibc, gmp, mpc, mpfr, musl
 from jolt.plugins import autotools, fetch
 from jolt.tasks import TaskRegistry
 

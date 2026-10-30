@@ -1,6 +1,7 @@
 from jolt import attributes, Parameter
 from jolt.plugins import autotools, fetch
 from jolt.tasks import TaskRegistry
+from jolt.pkgs import compiler
 
 
 @attributes.common_metadata()

@@ -1,5 +1,5 @@
 from jolt import attributes, Parameter
-from jolt.pkgs import cmake, vulkan_headers, wayland, xorg
+from jolt.pkgs import cmake, compiler, vulkan_headers, wayland, xorg
 from jolt.plugins import cmake, cxxinfo, git
 from jolt.tasks import TaskRegistry
 

@@ -1,6 +1,6 @@
 import os
 from jolt import attributes, Alias, BooleanParameter, Download, IntParameter, Parameter
-from jolt.pkgs import cpython, icu
+from jolt.pkgs import compiler, cpython, icu
 from jolt.plugins import git
 from jolt.tasks import Task, TaskRegistry
 from jolt.error import raise_task_error_if

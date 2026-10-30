@@ -1,5 +1,5 @@
 from jolt import attributes, Parameter, Task
-from jolt.pkgs import gcc
+from jolt.pkgs import compiler, gcc
 from jolt.plugins import git
 from jolt.tasks import TaskRegistry
 

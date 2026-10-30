@@ -1,5 +1,5 @@
 from jolt import attributes, Parameter, Task
-from jolt.pkgs import bison, gcc, linux_headers
+from jolt.pkgs import bison, compiler, gcc, linux_headers
 from jolt.plugins import fetch
 from jolt.tasks import TaskRegistry
 

@@ -1,6 +1,7 @@
 from jolt import attributes, Parameter
 from jolt.plugins import cmake, git, autotools, pkgconfig
 from jolt.tasks import TaskRegistry
+from jolt.pkgs import compiler
 
 
 @attributes.requires("requires_git")

@@ -1,6 +1,7 @@
 from jolt import attributes, BooleanParameter, Parameter
 from jolt.plugins import autotools, cxxinfo, fetch
 from jolt.tasks import TaskRegistry
+from jolt.pkgs import compiler
 
 
 @attributes.requires("requires_src")

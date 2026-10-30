@@ -1,6 +1,7 @@
 from jolt import attributes, BooleanParameter, Parameter, Task
 from jolt.plugins import cmake, git
 from jolt.tasks import TaskRegistry
+from jolt.pkgs import compiler
 import os
 
 

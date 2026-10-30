@@ -1,5 +1,5 @@
 from jolt import attributes, Parameter
-from jolt.pkgs import gperf, libtool
+from jolt.pkgs import compiler, gperf, libtool
 from jolt.plugins import git, autotools, pkgconfig
 from jolt.tasks import TaskRegistry
 

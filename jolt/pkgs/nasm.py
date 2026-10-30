@@ -1,5 +1,5 @@
 from jolt import attributes, Parameter, Task
-from jolt.pkgs import autoconf, automake, perl, zlib
+from jolt.pkgs import autoconf, automake, compiler, perl, zlib
 from jolt.plugins import autotools, git
 from jolt.tasks import TaskRegistry
 

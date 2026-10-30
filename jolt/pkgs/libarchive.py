@@ -1,7 +1,7 @@
 from jolt import attributes, BooleanParameter, Parameter
 from jolt.tasks import TaskRegistry
 from jolt.plugins import cmake, cxxinfo, git
-from jolt.pkgs import bzip2, libexpat, lz4, openssl, xz, zlib, zstd
+from jolt.pkgs import bzip2, compiler, libexpat, lz4, openssl, xz, zlib, zstd
 
 
 @attributes.requires("requires_bzip2")

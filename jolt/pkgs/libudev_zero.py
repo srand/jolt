@@ -1,6 +1,7 @@
 from jolt import attributes, Parameter, Task
 from jolt.plugins import cxxinfo, git
 from jolt.tasks import BooleanParameter, TaskRegistry
+from jolt.pkgs import compiler
 
 
 @attributes.common_metadata()

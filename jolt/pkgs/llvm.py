@@ -1,6 +1,6 @@
 from jolt import Alias, BooleanParameter, Download, ListParameter, Parameter, Task, attributes
 from jolt.error import raise_task_error_if
-from jolt.pkgs import cmake, ninja
+from jolt.pkgs import cmake, compiler, ninja
 from jolt.plugins import git, cmake
 from jolt.tasks import TaskRegistry
 

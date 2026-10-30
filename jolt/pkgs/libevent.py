@@ -1,6 +1,6 @@
 import os
 from jolt import attributes, Parameter
-from jolt.pkgs import cmake, openssl
+from jolt.pkgs import cmake, compiler, openssl
 from jolt.plugins import cxxinfo, git, cmake, pkgconfig
 from jolt.tasks import TaskRegistry
 

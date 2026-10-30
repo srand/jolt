@@ -1,6 +1,7 @@
 from jolt import Parameter, attributes
 from jolt.plugins import autotools, fetch, pkgconfig
 from jolt.tasks import TaskRegistry
+from jolt.pkgs import compiler
 
 
 @attributes.requires("requires_src")

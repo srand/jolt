@@ -1,5 +1,5 @@
 from jolt import attributes, Alias, BooleanParameter, Download, Parameter
-from jolt.pkgs import cmake, re2c
+from jolt.pkgs import cmake, compiler, re2c
 from jolt.plugins import git, cmake
 from jolt.tasks import TaskRegistry
 

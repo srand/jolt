@@ -1,5 +1,5 @@
 from jolt import attributes, BooleanParameter, Parameter, Task
-from jolt.pkgs import nasm, perl
+from jolt.pkgs import compiler, nasm, perl
 from jolt.plugins import cxxinfo, git
 from jolt.tasks import ListParameter, TaskRegistry
 

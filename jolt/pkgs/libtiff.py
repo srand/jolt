@@ -1,5 +1,5 @@
 from jolt import attributes, BooleanParameter, Parameter
-from jolt.pkgs import cmake, libjpeg_turbo, libwebp, xz, zlib, zstd
+from jolt.pkgs import cmake, compiler, libjpeg_turbo, libwebp, xz, zlib, zstd
 from jolt.plugins import cmake, cxxinfo, git
 from jolt.tasks import TaskRegistry
 

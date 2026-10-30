@@ -1,5 +1,5 @@
 from jolt import attributes, BooleanParameter, Parameter, Task
-from jolt.pkgs import abseil, cares, cmake, nasm, protobuf, re2, ssl, zlib
+from jolt.pkgs import abseil, cares, cmake, compiler, nasm, protobuf, re2, ssl, zlib
 from jolt.plugins import cxxinfo, git, cmake
 from jolt.tasks import TaskRegistry
 

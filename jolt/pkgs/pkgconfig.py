@@ -2,6 +2,7 @@ import os
 from jolt import attributes, Alias, Task, Parameter
 from jolt.plugins import autotools, git, meson
 from jolt.tasks import TaskRegistry
+from jolt.pkgs import compiler
 
 
 @attributes.requires("requires_git")

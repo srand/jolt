@@ -1,5 +1,5 @@
 from jolt import attributes, Alias, BooleanParameter, Parameter, Task
-from jolt.pkgs import libffi, sqlite, ssl, zlib, zstd, xz
+from jolt.pkgs import compiler, libffi, sqlite, ssl, xz, zlib, zstd
 from jolt.plugins import autotools, git, pkgconfig
 from jolt.tasks import TaskRegistry
 

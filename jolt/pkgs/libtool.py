@@ -1,5 +1,5 @@
 from jolt import attributes, Parameter
-from jolt.pkgs import help2man, texinfo
+from jolt.pkgs import compiler, help2man, texinfo
 from jolt.plugins import autotools, git
 from jolt.tasks import TaskRegistry
 

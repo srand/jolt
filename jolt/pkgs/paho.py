@@ -1,5 +1,5 @@
 from jolt import attributes, BooleanParameter, Parameter
-from jolt.pkgs import openssl
+from jolt.pkgs import compiler, openssl
 from jolt.plugins import cmake, cxxinfo, git
 from jolt.tasks import TaskRegistry
 

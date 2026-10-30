@@ -3,6 +3,7 @@ import platform
 from jolt import attributes, Parameter, Task
 from jolt.plugins import fetch
 from jolt.tasks import TaskRegistry
+from jolt.pkgs import compiler
 
 
 @attributes.requires("requires_src")

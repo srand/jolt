@@ -1,5 +1,5 @@
 from jolt import attributes, BooleanParameter, Parameter
-from jolt.pkgs import bison, xorg
+from jolt.pkgs import bison, compiler, xorg
 from jolt.plugins import cxxinfo, git, meson
 from jolt.tasks import TaskRegistry
 
