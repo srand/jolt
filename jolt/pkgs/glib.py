@@ -5,17 +5,20 @@ from jolt.tasks import TaskRegistry
 
 
 @attributes.requires("requires_git")
-@attributes.requires("requires_libffi")
+@attributes.requires("requires_libffi_{system}")
 @attributes.requires("requires_pcre2")
 @attributes.requires("requires_zlib")
 @meson.requires()
+@meson.options("options_{system}")
+@attributes.system
 @attributes.requires("requires_compiler")
 class GLib(meson.Meson):
     name = "glib"
     version = Parameter("2.90.1", help="GLib version.")
     requires_compiler = ["virtual/compiler/c"]
     requires_git = ["git:url=https://gitlab.gnome.org/GNOME/glib.git,rev={version},submodules=true"]
-    requires_libffi = ["libffi"]
+    requires_libffi_darwin = ["libffi"]
+    requires_libffi_linux = requires_libffi_darwin
     requires_pcre2 = ["pcre2:pic=true"]
     requires_zlib = ["zlib:pic=true"]
     srcdir = "{git[glib]}"
@@ -33,6 +36,8 @@ class GLib(meson.Meson):
         "wrap_mode=nofallback",
     ]
     """ Options passed to ``meson setup``. """
+    options_windows = ["force_fallback_for=libffi"]
+    """ The libffi package is built with Autotools, which doesn't work on Windows. """
 
     def publish(self, artifact, tools):
         super().publish(artifact, tools)
