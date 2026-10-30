@@ -82,6 +82,12 @@ jobs:
         if: runner.os == 'Windows'
         uses: ilammy/msvc-dev-cmd@v1
 
+      - name: Remove link.exe of Git
+        if: runner.os == 'Windows'
+        # Git's coreutils link.exe comes before the MSVC linker in the PATH of
+        # bash, and Rust and nmake would run it instead
+        run: rm -f /usr/bin/link.exe
+
       - name: Install Jolt
         run: pip install --upgrade -e .
 
