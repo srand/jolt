@@ -23,6 +23,8 @@ class Ccache(cmake.CMake):
         "ENABLE_DOCUMENTATION=OFF",
         "ENABLE_TESTING=OFF",
         "REDIS_STORAGE_BACKEND=OFF",
+        # The static MSVC runtime clashes with the dynamic one of fmt
+        "STATIC_LINK=OFF",
     ]
 
 
