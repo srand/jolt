@@ -19,8 +19,13 @@ class Eigen(cmake.CMake):
     srcdir = "{git[eigen]}"
     options = [
         "BUILD_TESTING=OFF",
+        # BLAS and LAPACK need a Fortran compiler
+        "EIGEN_BUILD_BLAS=OFF",
+        "EIGEN_BUILD_DEMOS=OFF",
         "EIGEN_BUILD_DOC=OFF",
+        "EIGEN_BUILD_LAPACK=OFF",
         "EIGEN_BUILD_PKGCONFIG=ON",
+        "EIGEN_BUILD_TESTING=OFF",
     ]
 
     def publish(self, artifact, tools):
