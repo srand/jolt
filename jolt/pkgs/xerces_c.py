@@ -17,6 +17,9 @@ class XercesC(cmake.CMake):
     srcdir = "{git[xerces-c]}"
     options = [
         "BUILD_SHARED_LIBS={shared[ON,OFF]}",
+        # Found on the build host. ICU headers also need C++17, xerces-c uses C++14.
+        "CMAKE_DISABLE_FIND_PACKAGE_CURL=ON",
+        "CMAKE_DISABLE_FIND_PACKAGE_ICU=ON",
     ]
 
 
