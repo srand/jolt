@@ -1,6 +1,21 @@
-from jolt import Task, attributes
+from jolt import Task, attributes, utils
 
 
+def options(attrib):
+    """
+    Decorates a Meson task with an alternative ``options`` attribute.
+
+    The new attribute will be concatenated with the regular
+    ``options`` attribute.
+
+    Args:
+        attrib (str): Name of alternative attribute.
+            Keywords are expanded.
+    """
+    return utils.concat_attributes("options", attrib)
+
+
+@options("options")
 @attributes.common_metadata()
 class Meson(Task):
     """ Base class for Meson-based build tasks. """
@@ -23,7 +38,7 @@ class Meson(Task):
 
     def run(self, deps, tools):
         self.deps = deps
-        options = tools.expand(self.options)
+        options = tools.expand(self._options())
         at = tools.meson(deps, incremental=self.incremental)
         at.configure(self.srcdir or self.joltdir, *options)
         at.build()
