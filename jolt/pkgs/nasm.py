@@ -5,28 +5,31 @@ from jolt.tasks import TaskRegistry
 
 
 @attributes.requires("requires_autotools_{system}")
-@attributes.requires("requires_git")
-@attributes.requires("requires_perl")
-@attributes.requires("requires_zlib")
+@attributes.requires("requires_source_{system}")
 @attributes.system
-@attributes.requires("requires_compiler")
 class NASM(Task):
     name = "nasm"
     version = Parameter("3.02", help="NASM version.")
-    requires_compiler = ["virtual/compiler/c"]
     requires_autotools_darwin = ["autoconf", "automake"]
     requires_autotools_linux = requires_autotools_darwin
-    requires_git = ["git:url=https://github.com/netwide-assembler/nasm.git,rev=nasm-{version}"]
-    requires_zlib = ["zlib"]
-    requires_perl = ["virtual/perl"]
+    requires_source_darwin = [
+        "git:url=https://github.com/netwide-assembler/nasm.git,rev=nasm-{version}",
+        "virtual/compiler/c",
+        "virtual/perl",
+        "zlib",
+    ]
+    """ Requirements of the source build. On Windows, the official build is downloaded instead. """
+    requires_source_linux = requires_source_darwin
     srcdir = "{git[nasm]}"
     """ Source directory. """
+    url = "https://www.nasm.us/pub/nasm/releasebuilds/{version}/win64/nasm-{version}-win64.zip"
+    """ Official Windows build. """
 
     def run(self, deps, tools):
-        self.srcdir = tools.expand_path(self.srcdir)
         self.builddir = tools.builddir()
 
         if self.system != "windows":
+            self.srcdir = tools.expand_path(self.srcdir)
             with tools.cwd(self.srcdir):
                 tools.run("{srcdir}/autogen.sh")
 
@@ -34,12 +37,14 @@ class NASM(Task):
                 tools.run("{srcdir}/configure")
                 tools.run("make {}", tools.make_jobs())
         else:
-            with tools.cwd(self.srcdir):
-                tools.run("nmake -f Mkfiles/msvc.mak")
+            # The MSVC makefile fails with "No Target Architecture" in winnt.h
+            with tools.cwd(self.builddir):
+                tools.download(self.url, "nasm.zip")
+                tools.extract("nasm.zip", ".")
 
     def publish(self, artifact, tools):
         if self.system == "windows":
-            with tools.cwd(self.srcdir):
+            with tools.cwd(self.builddir, "nasm-{version}"):
                 artifact.collect("nasm.exe", "bin/")
                 artifact.collect("ndisasm.exe", "bin/")
         else:
