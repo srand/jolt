@@ -13,7 +13,7 @@ caches what they produce, and shares the results with your whole team and CI.
    :target: https://pypi.org/project/jolt/
    :alt: Python versions
 
-.. image:: https://readthedocs.org/projects/jolt/badge/?version=latest
+.. image:: https://img.shields.io/readthedocs/jolt.svg
    :target: https://jolt.readthedocs.io/
    :alt: Documentation
 
