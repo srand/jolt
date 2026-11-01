@@ -13,7 +13,7 @@ class VulkanHeaders(cmake.CMake):
     """ Vulkan header files and API registry """
 
     name = "vulkan-headers"
-    version = Parameter("1.4.366", help="Vulkan-Headers version.")
+    version = Parameter("1.4.367", help="Vulkan-Headers version.")
     requires_compiler = ["virtual/compiler/c"]
     requires_git = ["git:url=https://github.com/KhronosGroup/Vulkan-Headers.git,rev=v{version}"]
     srcdir = "{git[Vulkan-Headers]}"

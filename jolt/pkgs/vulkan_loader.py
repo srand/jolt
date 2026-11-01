@@ -16,7 +16,7 @@ class VulkanLoader(cmake.CMake):
     """ Vulkan ICD loader """
 
     name = "vulkan-loader"
-    version = Parameter("1.4.366", help="Vulkan-Loader version.")
+    version = Parameter("1.4.367", help="Vulkan-Loader version.")
     requires_compiler = ["virtual/compiler/c"]
     requires_git = ["git:url=https://github.com/KhronosGroup/Vulkan-Loader.git,rev=v{version}"]
     requires_headers = ["vulkan-headers:version={version}"]
