@@ -18,7 +18,7 @@ from jolt.pkgs import bzip2, compiler, libexpat, lz4, openssl, xz, zlib, zstd
 @attributes.requires("requires_compiler")
 class Libarchive(cmake.CMake):
     name = "libarchive"
-    version = Parameter("3.8.10", help="libarchive version.")
+    version = Parameter("3.8.11", help="libarchive version.")
     shared = BooleanParameter(False, help="Build shared libraries.")
     requires_compiler = ["virtual/compiler/c"]
     requires_bzip2 = ["libbzip2"]
