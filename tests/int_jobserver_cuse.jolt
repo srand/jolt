@@ -109,3 +109,41 @@ class JobserverCuseInternal(JoltTest):
             server.dev_init_done(None)
             self.assertTrue(called.wait(5))
         make.assert_called_once_with("/dev/jobserver")
+
+    def run_server(self, server, node_exists):
+        server.lib.fuse_session_mount.return_value = 0
+        server.lib.fuse_session_loop.return_value = 0
+        with mock.patch.object(jobserver_cuse.os, "open", return_value=99), \
+             mock.patch.object(jobserver_cuse.os.path, "exists", return_value=node_exists), \
+             mock.patch.object(server, "log") as log:
+            result = server.run(["jobserver"])
+        cuse_info = server.lib.cuse_lowlevel_new.call_args[0][1]._obj
+        return result, cuse_info, log
+
+    def test_fixed_device_number(self):
+        """ The device is given the configured number, so that it stays the same after restarts. """
+        with mock.patch.object(JobServer, "_load_fuse", return_value=mock.MagicMock()):
+            server = JobServer(tokens=1, major=120, minor=7)
+        result, cuse_info, _ = self.run_server(server, node_exists=True)
+        self.assertEqual(0, result)
+        self.assertEqual((120, 7), (cuse_info.dev_major, cuse_info.dev_minor))
+
+    def test_dynamic_device_number(self):
+        server = self.server(tokens=1)
+        _, cuse_info, _ = self.run_server(server, node_exists=True)
+        self.assertEqual((0, 0), (cuse_info.dev_major, cuse_info.dev_minor))
+
+    def test_device_number_in_use(self):
+        """ The kernel rejects a device number in use, which ends the session without an error. """
+        with mock.patch.object(JobServer, "_load_fuse", return_value=mock.MagicMock()):
+            server = JobServer(tokens=1, major=120, minor=7)
+        result, _, log = self.run_server(server, node_exists=False)
+        self.assertEqual(1, result)
+        self.assertIn("may be in use", log.call_args[0][0])
+
+    def test_invalid_device_number(self):
+        with mock.patch.object(JobServer, "_load_fuse", return_value=mock.MagicMock()):
+            with self.assertRaises(ValueError):
+                JobServer(tokens=1, major=4096)
+            with self.assertRaises(ValueError):
+                JobServer(tokens=1, minor=-1)

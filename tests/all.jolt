@@ -33,6 +33,7 @@ class All(Alias):
         "flake8",
         "int/git",
         "int/influence",
+        "int/jobserver/k8s",
         "int/loader",
         "int/log",
         "int/login",

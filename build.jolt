@@ -71,7 +71,10 @@ class JoltImage(docker.DockerImage):
 
 @influence.files("{dockerfile}")
 @attributes.requires("requires_push_{push}")
+@git.influence("jolt/plugins/deviceplugin_pb2.py")
+@git.influence("jolt/plugins/deviceplugin_pb2_grpc.py")
 @git.influence("jolt/plugins/jobserver_cuse.py")
+@git.influence("jolt/plugins/jobserver_k8s.py")
 @git.influence("jolt/plugins/jobserver_pressure.py")
 class JobServerImage(docker.DockerImage):
     name = "jolt/jobserver"
@@ -271,6 +274,7 @@ class GenerateProtobufs(cxx.Compilation):
     incpaths = ["."]
     sources = [
         "jolt/common.proto",
+        "jolt/plugins/deviceplugin.proto",
         "jolt/plugins/remote_execution/administration.proto",
         "jolt/plugins/remote_execution/log.proto",
         "jolt/plugins/remote_execution/scheduler.proto",

@@ -1,0 +1,165 @@
+import os
+import queue
+import sys
+import tempfile
+import threading
+from concurrent import futures
+from unittest import mock
+
+import grpc
+
+sys.path.append(".")
+
+from testsupport import JoltTest
+from jolt.plugins import deviceplugin_pb2 as api
+from jolt.plugins import deviceplugin_pb2_grpc as api_grpc
+from jolt.plugins.jobserver_cuse import JobServer
+from jolt.plugins.jobserver_k8s import DevicePlugin, KUBELET_SOCKET
+
+
+class Kubelet(api_grpc.RegistrationServicer):
+    """ Accepts registrations on the kubelet socket. """
+
+    def __init__(self, plugin_path):
+        self.plugin_path = plugin_path
+        self.requests = queue.Queue()
+        self.server = None
+
+    def Register(self, request, context):
+        self.requests.put(request)
+        return api.Empty()
+
+    def start(self):
+        self.server = grpc.server(futures.ThreadPoolExecutor(max_workers=2))
+        api_grpc.add_RegistrationServicer_to_server(self, self.server)
+        self.server.add_insecure_port("unix://" + os.path.join(self.plugin_path, KUBELET_SOCKET))
+        self.server.start()
+
+    def restart(self):
+        """ Remove the sockets of plugins, like the kubelet does when it starts. """
+        for name in os.listdir(self.plugin_path):
+            if name != KUBELET_SOCKET:
+                os.unlink(os.path.join(self.plugin_path, name))
+
+    def stop(self):
+        self.server.stop(grace=None)
+
+
+class JobserverK8sInternal(JoltTest):
+    name = "int/jobserver/k8s"
+
+    def setup(self, deps, tools):
+        super().setup(deps, tools)
+        # Unix socket paths are limited to about 100 characters
+        self.tmp = tempfile.TemporaryDirectory(prefix="jolt-k8s-")
+        self.plugin_path = self.tmp.name
+        self.kubelet = Kubelet(self.plugin_path)
+        self.kubelet.start()
+        self.plugin = DevicePlugin(
+            "jolt/jobserver", "/dev/jobserver", devices=3,
+            plugin_path=self.plugin_path, retry_interval=0.1)
+        self.thread = None
+
+    def cleanup(self):
+        self.plugin.shutdown()
+        if self.thread is not None:
+            self.thread.join(5)
+        self.kubelet.stop()
+        self.tmp.cleanup()
+        super().cleanup()
+
+    def serve(self):
+        self.thread = threading.Thread(target=self.plugin.serve, daemon=True)
+        self.thread.start()
+        return self.kubelet.requests.get(timeout=5)
+
+    def stub(self):
+        channel = grpc.insecure_channel("unix://" + self.plugin.socket)
+        return channel, api_grpc.DevicePluginStub(channel)
+
+    def test_register(self):
+        """ The plugin registers its resource and socket with the kubelet. """
+        request = self.serve()
+        self.assertEqual("v1beta1", request.version)
+        self.assertEqual("jolt/jobserver", request.resource_name)
+        self.assertEqual("jolt-jobserver.sock", request.endpoint)
+        self.assertTrue(os.path.exists(os.path.join(self.plugin_path, request.endpoint)))
+
+    def test_list_and_watch(self):
+        """ All devices are advertised as healthy, and the stream stays open. """
+        self.serve()
+        channel, stub = self.stub()
+        with channel:
+            stream = stub.ListAndWatch(api.Empty())
+            response = next(stream)
+            self.assertEqual(
+                ["jobserver-0", "jobserver-1", "jobserver-2"],
+                [device.ID for device in response.devices])
+            self.assertEqual({"Healthy"}, {device.health for device in response.devices})
+            # The stream ends when the plugin stops
+            self.plugin.shutdown()
+            with self.assertRaises((StopIteration, grpc.RpcError)):
+                next(stream)
+
+    def test_allocate(self):
+        """ Each container is given the device node. """
+        self.serve()
+        channel, stub = self.stub()
+        with channel:
+            response = stub.Allocate(api.AllocateRequest(container_requests=[
+                api.ContainerAllocateRequest(devices_ids=["jobserver-0"]),
+                api.ContainerAllocateRequest(devices_ids=["jobserver-1"]),
+            ]))
+        self.assertEqual(2, len(response.container_responses))
+        for container in response.container_responses:
+            self.assertEqual(1, len(container.devices))
+            self.assertEqual("/dev/jobserver", container.devices[0].host_path)
+            self.assertEqual("/dev/jobserver", container.devices[0].container_path)
+            self.assertEqual("rw", container.devices[0].permissions)
+            self.assertEqual("/dev/jobserver", container.envs["JOLT_JOBSERVER_PATH"])
+
+    def test_register_again_after_kubelet_restart(self):
+        """ The kubelet removes the plugin socket when it restarts, and the plugin registers again. """
+        self.serve()
+        self.kubelet.restart()
+        request = self.kubelet.requests.get(timeout=5)
+        self.assertEqual("jolt/jobserver", request.resource_name)
+        self.assertTrue(os.path.exists(self.plugin.socket))
+
+    def test_register_retried_until_kubelet_runs(self):
+        """ Registration is retried while the kubelet is unavailable. """
+        self.kubelet.stop()
+        failed = threading.Event()
+
+        def log(message, *args):
+            if message.startswith("[KUBERNETES] cannot register"):
+                failed.set()
+
+        with mock.patch("jolt.plugins.jobserver_k8s.log", side_effect=log):
+            self.thread = threading.Thread(target=self.plugin.serve, daemon=True)
+            self.thread.start()
+            self.assertTrue(failed.wait(5))
+            self.kubelet.start()
+            request = self.kubelet.requests.get(timeout=5)
+        self.assertEqual("jolt/jobserver", request.resource_name)
+
+    def jobserver(self, device_plugin):
+        # The FUSE library is replaced, the callbacks are called directly
+        with mock.patch.object(JobServer, "_load_fuse", return_value=mock.MagicMock()):
+            return JobServer(tokens=1, device_plugin=device_plugin)
+
+    def test_advertised_once_device_node_exists(self):
+        """ The device is advertised after its node is made accessible. """
+        plugin = mock.MagicMock()
+        server = self.jobserver(plugin)
+        with mock.patch.object(server, "make_accessible", return_value=True) as make:
+            server.publish_device()
+        make.assert_called_once_with("/dev/jobserver")
+        plugin.serve.assert_called_once_with()
+
+    def test_not_advertised_without_device_node(self):
+        plugin = mock.MagicMock()
+        server = self.jobserver(plugin)
+        with mock.patch.object(server, "make_accessible", return_value=False):
+            server.publish_device()
+        plugin.serve.assert_not_called()

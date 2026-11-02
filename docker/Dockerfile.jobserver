@@ -1,9 +1,18 @@
 FROM alpine:latest
 RUN apk add --no-cache \
     python3 \
+    py3-grpcio \
     py3-pip \
+    py3-protobuf \
     fuse3
 
-COPY jolt/plugins/jobserver_cuse.py /opt/jolt/jobserver.py
-COPY jolt/plugins/jobserver_pressure.py /opt/jolt/jobserver_pressure.py
-ENTRYPOINT ["python3", "/opt/jolt/jobserver.py"]
+# The generated gRPC code imports the device plugin API from jolt.plugins
+COPY jolt/plugins/deviceplugin_pb2.py \
+     jolt/plugins/deviceplugin_pb2_grpc.py \
+     jolt/plugins/jobserver_cuse.py \
+     jolt/plugins/jobserver_k8s.py \
+     jolt/plugins/jobserver_pressure.py \
+     /opt/jolt/jolt/plugins/
+RUN touch /opt/jolt/jolt/__init__.py /opt/jolt/jolt/plugins/__init__.py
+ENV PYTHONPATH=/opt/jolt
+ENTRYPOINT ["python3", "-m", "jolt.plugins.jobserver_cuse"]

@@ -9,6 +9,10 @@ No tokens are handed out while system pressure exceeds the limits set with
 JOLT_JOBSERVER_PRESSURE_MAX_{CPU,IO,MEMORY}. With limits, tokens are handed
 out gradually, over JOLT_JOBSERVER_RAMP_TIME seconds, so that the pressure
 of new jobs shows before more tokens are handed out.
+
+The kernel gives the device a free number, or JOLT_JOBSERVER_DEVICE_MAJOR
+and JOLT_JOBSERVER_DEVICE_MINOR. With JOLT_JOBSERVER_K8S_RESOURCE, the device is advertised to the kubelet
+as that resource once its node exists (see jobserver_k8s.py).
 """
 
 from __future__ import annotations
@@ -35,6 +39,9 @@ else:
 POLLIN = 0x001
 POLLOUT = 0x004
 O_NONBLOCK = os.O_NONBLOCK
+# Limits of device numbers in Linux
+MAX_MAJOR = (1 << 12) - 1
+MAX_MINOR = (1 << 20) - 1
 
 
 fuse_req_t = ctypes.c_void_p
@@ -151,12 +158,24 @@ class JobServer:
         psi_path: Optional[str] = None,
         ramp_time: float = DEFAULT_RAMP_TIME,
         interval: float = DEFAULT_INTERVAL,
+        device_plugin: Optional[Any] = None,
+        major: int = 0,
+        minor: int = 0,
     ) -> None:
+        if not 0 <= major <= MAX_MAJOR:
+            raise ValueError(f"device major number must be between 0 and {MAX_MAJOR}")
+        if not 0 <= minor <= MAX_MINOR:
+            raise ValueError(f"device minor number must be between 0 and {MAX_MINOR}")
         self.tokens = tokens if tokens is not None else (os.cpu_count() or 1) + 1
         self.devname = devname
+        # The number of the device, chosen by the kernel if the major is 0
+        self.major = major
+        self.minor = minor
         self.monitor = PressureMonitor(pressure, path=psi_path)
         self.ramp_time = ramp_time
         self.interval = interval
+        # Advertises the device to Kubernetes once its node exists
+        self.device_plugin = device_plugin
         # Limits the tokens handed out while pressure is monitored
         self.ramp: Optional[TokenRamp] = None
         self.throttled = False
@@ -329,32 +348,35 @@ class JobServer:
             self.lib.fuse_lowlevel_notify_poll(ph)
             self.lib.fuse_pollhandle_destroy(ph)
 
-    def make_accessible(self, path: str, timeout: float = 10.0) -> None:
+    def make_accessible(self, path: str, timeout: float = 10.0) -> bool:
         """
         Lets all users open the device node, which is created for root
         only. The node appears shortly after the device is registered, so
-        this waits for it.
+        this waits for it. Returns whether the node exists.
         """
         deadline = time.monotonic() + timeout
         while True:
             try:
                 os.chmod(path, 0o666)
-                return
+                return True
             except FileNotFoundError:
                 if time.monotonic() >= deadline:
                     self.log("warning: device node %s did not appear, its permissions are unchanged\n", path)
-                    return
+                    return False
                 time.sleep(0.05)
             except OSError as exc:
                 self.log("warning: cannot change permissions of %s: %s\n", path, exc)
-                return
+                return True
+
+    def publish_device(self) -> None:
+        """ Make the device node accessible, and then advertise it to Kubernetes. """
+        if self.make_accessible(os.path.join("/dev", self.devname)) and self.device_plugin is not None:
+            self.device_plugin.serve()
 
     def dev_init_done(self, _userdata: ctypes.c_void_p) -> None:
         # The device is registered, and its node is about to be created. Wait
         # for it on another thread, so as not to hold up requests.
-        threading.Thread(
-            target=self.make_accessible, args=(os.path.join("/dev", self.devname),), daemon=True
-        ).start()
+        threading.Thread(target=self.publish_device, daemon=True).start()
 
     def dev_open(self, req: fuse_req_t, fi: Any) -> None:
         ctx = self.lib.fuse_req_ctx(req).contents
@@ -460,12 +482,13 @@ class JobServer:
 
         devname = ctypes.c_char_p(b"DEVNAME=" + self.devname.encode())
         dev_info = (ctypes.c_char_p * 1)(devname)
-        cuse_info = CuseInfo(0, 0, 1, dev_info, 0)
+        cuse_info = CuseInfo(self.major, self.minor, 1, dev_info, 0)
 
         session = self.lib.cuse_lowlevel_new(
             ctypes.byref(fuse_args), ctypes.byref(cuse_info), ctypes.byref(self.ops), None
         )
         if not session:
+            os.close(cuse_fd)
             return 1
 
         stop = threading.Event()
@@ -480,12 +503,24 @@ class JobServer:
         try:
             if self.lib.fuse_session_mount(session, mountpoint):
                 return 1
-            return 1 if self.lib.fuse_session_loop(session) else 0
+            failed = self.lib.fuse_session_loop(session)
+            # A rejected device ends the loop as if it was closed. The
+            # kernel only logs why it rejected it.
+            if not os.path.exists(os.path.join("/dev", self.devname)):
+                if self.major:
+                    self.log("error: cannot create /dev/%s with device number %d:%d, it may be in use\n",
+                             self.devname, self.major, self.minor)
+                else:
+                    self.log("error: cannot create /dev/%s, see the kernel log\n", self.devname)
+                return 1
+            return 1 if failed else 0
         finally:
             stop.set()
+            if self.device_plugin is not None:
+                self.device_plugin.shutdown()
+            # Also closes the CUSE file descriptor
             self.lib.fuse_session_unmount(session)
             self.lib.fuse_session_destroy(session)
-            os.close(cuse_fd)
 
 
 def parse_args(argv: list[str]) -> tuple[int, list[str]]:
@@ -521,10 +556,22 @@ def main(argv: list[str]) -> int:
             resource: os.getenv(f"JOLT_JOBSERVER_PRESSURE_MAX_{resource.upper()}")
             for resource in RESOURCES
         }
+        device_plugin = None
+        resource = os.getenv("JOLT_JOBSERVER_K8S_RESOURCE")
+        if resource:
+            # Requires gRPC, which the jobserver doesn't otherwise need
+            from jolt.plugins.jobserver_k8s import DevicePlugin, DEFAULT_DEVICES
+            device_plugin = DevicePlugin(
+                resource, os.path.join("/dev", devname),
+                devices=int(os.getenv("JOLT_JOBSERVER_K8S_DEVICES", DEFAULT_DEVICES)),
+            )
         jobserver = JobServer(
             tokens, devname, pressure,
             ramp_time=float(os.getenv("JOLT_JOBSERVER_RAMP_TIME", DEFAULT_RAMP_TIME)),
             interval=float(os.getenv("JOLT_JOBSERVER_PRESSURE_INTERVAL", DEFAULT_INTERVAL)),
+            device_plugin=device_plugin,
+            major=int(os.getenv("JOLT_JOBSERVER_DEVICE_MAJOR", 0)),
+            minor=int(os.getenv("JOLT_JOBSERVER_DEVICE_MINOR", 0)),
         )
         print(f"Starting jobserver with {tokens} tokens on /dev/{devname}", file=sys.stderr)
         return jobserver.run(fuse_argv)

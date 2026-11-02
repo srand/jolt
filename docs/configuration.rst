@@ -1330,6 +1330,20 @@ The following configuration environment variables are available:
       - | The name of the character device file exposed by the jobserver.
         | Default: ``jobserver``
 
+    * - ``JOLT_JOBSERVER_DEVICE_MAJOR``
+      - Integer
+      - | The major number of the device. With a fixed number, the device keeps
+          its number when the jobserver restarts. Pick a number that no other
+          driver uses, such as one of the numbers reserved for local use,
+          60–63 and 120–127, that isn't listed in ``/proc/devices``.
+          The jobserver exits if the number is in use.
+        | Default: ``0``, the kernel gives the device a free number.
+
+    * - ``JOLT_JOBSERVER_DEVICE_MINOR``
+      - Integer
+      - | The minor number of the device, with ``JOLT_JOBSERVER_DEVICE_MAJOR``.
+        | Default: ``0``
+
     * - ``JOLT_JOBSERVER_TOKEN_COUNT``
       - Integer
       - | The number of slots to use when launching the jobserver helper process.
@@ -1362,6 +1376,17 @@ The following configuration environment variables are available:
           are set. ``0`` hands them out at once.
         | Default: ``30``
 
+    * - ``JOLT_JOBSERVER_K8S_RESOURCE``
+      - String
+      - | Name of the Kubernetes resource that the device is advertised as, such as
+          ``jolt/jobserver``. See :ref:`Kubernetes <configuration-services-jobserver-k8s>` below.
+        | Default: not set, the device isn't advertised.
+
+    * - ``JOLT_JOBSERVER_K8S_DEVICES``
+      - Integer
+      - | The number of containers on the node that can be allocated the device.
+        | Default: ``110``, the default maximum number of pods on a node.
+
 The pressure limits work as described for the
 :ref:`Jobserver <configuration-plugins-jobserver>` plugin, except that tokens are
 withheld immediately, since the server controls every read from the device.
@@ -1375,6 +1400,84 @@ the :ref:`Jobserver <configuration-plugins-jobserver>` plugin section:
 
     [jobserver]
     path = /dev/jobserver
+
+.. _configuration-services-jobserver-k8s:
+
+In Kubernetes, the jobserver runs as a DaemonSet on every node. Workers that mount
+``/dev/jobserver`` from the host may start before the device exists, and then run
+without the jobserver. With ``JOLT_JOBSERVER_K8S_RESOURCE``, the jobserver is also a
+`device plugin <https://kubernetes.io/docs/concepts/extend-kubernetes/compute-storage-net/device-plugins/>`_
+that advertises the device to the kubelet as an extended resource, once its node
+exists. Pods that request the resource are scheduled to nodes where the jobserver
+runs and start only when the device is available. The device is added to their
+containers, which therefore need neither the host's ``/dev`` nor privileges, and
+``JOLT_JOBSERVER_PATH`` is set to its path.
+
+The jobserver container needs the host's ``/var/lib/kubelet/device-plugins``
+directory, where it registers with the kubelet. The kubelet removes the sockets
+of plugins when it restarts, and the jobserver then registers again. All
+containers share the same device, which is advertised as
+``JOLT_JOBSERVER_K8S_DEVICES`` devices, so each container that requests the
+resource should request one.
+
+  .. code:: yaml
+
+    apiVersion: apps/v1
+    kind: DaemonSet
+    metadata:
+      name: jolt-jobserver
+    spec:
+      selector:
+        matchLabels:
+          app: jolt-jobserver
+      template:
+        metadata:
+          labels:
+            app: jolt-jobserver
+        spec:
+          hostPID: true
+          containers:
+            - name: jolt-jobserver
+              image: robrt/jolt-jobserver:latest
+              env:
+                - name: JOLT_JOBSERVER_K8S_RESOURCE
+                  value: jolt/jobserver
+                # Keeps the device number of the device in the workers
+                - name: JOLT_JOBSERVER_DEVICE_MAJOR
+                  value: "120"
+              securityContext:
+                privileged: true
+              volumeMounts:
+                - name: dev
+                  mountPath: /dev
+                - name: device-plugins
+                  mountPath: /var/lib/kubelet/device-plugins
+          volumes:
+            - name: dev
+              hostPath:
+                path: /dev
+            - name: device-plugins
+              hostPath:
+                path: /var/lib/kubelet/device-plugins
+
+Workers request the resource:
+
+  .. code:: yaml
+
+    containers:
+      - name: jolt-worker
+        image: robrt/jolt-worker:latest
+        resources:
+          limits:
+            jolt/jobserver: 1
+
+.. note::
+
+   The container runtime creates the device node in a container when the
+   container starts, with the number that the device has then. Give the device
+   a fixed number with ``JOLT_JOBSERVER_DEVICE_MAJOR``, or the kernel may give
+   it another number when the jobserver restarts, and containers started before
+   then can no longer open it.
 
 
 .. _configuration-services-scheduler:
