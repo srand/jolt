@@ -1,4 +1,4 @@
-import importlib_metadata
+from importlib import metadata as importlib_metadata
 import os
 
 from jolt import config
