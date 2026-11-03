@@ -29,7 +29,7 @@ func newHashWriter(writer WriteCloseDiscarder, digest utils.Digest) (*hashWriter
 	case utils.Sha256Algorithm:
 		hash = sha256.New()
 	default:
-		return nil, fmt.Errorf("%v: unsupported digest algorithm: %s", utils.ErrBadRequest, digest.Algorithm())
+		return nil, fmt.Errorf("%w: unsupported digest algorithm: %s", utils.ErrBadRequest, digest.Algorithm())
 	}
 
 	return &hashWriter{
@@ -44,18 +44,17 @@ func (w *hashWriter) Write(data []byte) (int, error) {
 	return w.tee.Write(data)
 }
 
+// Close stores the object if its content has the expected digest, and
+// discards it otherwise.
 func (w *hashWriter) Close() error {
-	if err := w.writer.Close(); err != nil {
-		return err
-	}
-
 	hex := hex.EncodeToString(w.hash.Sum(nil))
 
 	if w.digest.Hex() != hex {
-		return fmt.Errorf("%v: hash mismatch: expected %s, got %s", utils.ErrBadRequest, w.digest.Hex(), hex)
+		w.writer.Discard()
+		return fmt.Errorf("%w: hash mismatch: expected %s, got %s", utils.ErrBadRequest, w.digest.Hex(), hex)
 	}
 
-	return nil
+	return w.writer.Close()
 }
 
 func (w *hashWriter) Discard() error {
