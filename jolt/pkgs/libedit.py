@@ -16,13 +16,16 @@ class Libedit(autotools.Autotools):
     shared = BooleanParameter(False, help="Build shared libraries.")
     requires_compiler = ["virtual/compiler/c"]
     requires_git = ["fetch:alias=src,url=https://thrysoee.dk/editline/libedit-{version}.tar.gz"]
-    requires_ncurses = ["ncurses=ncurses:shared=true"]  # No pkgconfig module without shared libs
+    requires_ncurses = ["ncurses:pic=true"]
+    """
+    Linked statically: the install name of the shared libraries on macOS is in
+    /jolt-prefix, and programs that configure runs can't load them.
+    """
     srcdir = "{fetch[src]}/libedit-{version}"
     options = [
         "--disable-examples",
-        "--{shared[with,without]}-shared",
-        "--enable-pc-files",
-        "--with-pkg-config-libdir=/jolt-prefix/lib/pkgconfig",
+        "--enable-shared={shared[yes,no]}",
+        "--enable-static={shared[no,yes]}",
     ]
 
     def run(self, deps, tools):
@@ -31,6 +34,10 @@ class Libedit(autotools.Autotools):
             LDFLAGS=tools.run("pkg-config --libs ncurses").strip() + " " + tools.getenv("LDFLAGS", ""),
         ):
             super().run(deps, tools)
+        if not self.shared:
+            # Consumers of the static library must link ncurses
+            with tools.cwd(tools.autotools().installdir, "jolt-prefix", "lib", "pkgconfig"):
+                tools.replace_in_file("libedit.pc", "Requires:\n", "Requires: ncurses\n")
 
     def publish(self, artifact, tools):
         super().publish(artifact, tools)
