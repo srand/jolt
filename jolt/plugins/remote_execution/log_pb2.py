@@ -11,11 +11,12 @@ from google.protobuf.internal import builder as _builder
 _sym_db = _symbol_database.Default()
 
 
+from jolt._vendor.buf.validate import validate_pb2 as buf_dot_validate_dot_validate__pb2
 from google.protobuf import timestamp_pb2 as google_dot_protobuf_dot_timestamp__pb2
 from jolt import common_pb2 as jolt_dot_common__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\'jolt/plugins/remote_execution/log.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x11jolt/common.proto\"\x83\x01\n\x0eReadLogRequest\x12\n\n\x02id\x18\x01 \x01(\t\x12*\n\x06\x62\x65\x66ore\x18\x02 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12)\n\x05\x61\x66ter\x18\x03 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x0e\n\x06\x66ollow\x18\x04 \x01(\x08\"9\n\x0fReadLogResponse\x12\n\n\x02id\x18\x01 \x01(\t\x12\x1a\n\x08loglines\x18\x02 \x03(\x0b\x32\x08.LogLine2:\n\x08LogStash\x12.\n\x07ReadLog\x12\x0f.ReadLogRequest\x1a\x10.ReadLogResponse0\x01\x42\x0eZ\x0cpkg/protocolb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\'jolt/plugins/remote_execution/log.proto\x1a\x1b\x62uf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x11jolt/common.proto\"\x8c\x01\n\x0eReadLogRequest\x12\x13\n\x02id\x18\x01 \x01(\tB\x07\xbaH\x04r\x02\x10\x01\x12*\n\x06\x62\x65\x66ore\x18\x02 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12)\n\x05\x61\x66ter\x18\x03 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x0e\n\x06\x66ollow\x18\x04 \x01(\x08\"9\n\x0fReadLogResponse\x12\n\n\x02id\x18\x01 \x01(\t\x12\x1a\n\x08loglines\x18\x02 \x03(\x0b\x32\x08.LogLine2:\n\x08LogStash\x12.\n\x07ReadLog\x12\x0f.ReadLogRequest\x1a\x10.ReadLogResponse0\x01\x42\x0eZ\x0cpkg/protocolb\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -23,10 +24,12 @@ _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'jolt.plugins.remote_executi
 if _descriptor._USE_C_DESCRIPTORS == False:
   _globals['DESCRIPTOR']._options = None
   _globals['DESCRIPTOR']._serialized_options = b'Z\014pkg/protocol'
-  _globals['_READLOGREQUEST']._serialized_start=96
-  _globals['_READLOGREQUEST']._serialized_end=227
-  _globals['_READLOGRESPONSE']._serialized_start=229
-  _globals['_READLOGRESPONSE']._serialized_end=286
-  _globals['_LOGSTASH']._serialized_start=288
-  _globals['_LOGSTASH']._serialized_end=346
+  _globals['_READLOGREQUEST'].fields_by_name['id']._options = None
+  _globals['_READLOGREQUEST'].fields_by_name['id']._serialized_options = b'\272H\004r\002\020\001'
+  _globals['_READLOGREQUEST']._serialized_start=125
+  _globals['_READLOGREQUEST']._serialized_end=265
+  _globals['_READLOGRESPONSE']._serialized_start=267
+  _globals['_READLOGRESPONSE']._serialized_end=324
+  _globals['_LOGSTASH']._serialized_start=326
+  _globals['_LOGSTASH']._serialized_end=384
 # @@protoc_insertion_point(module_scope)

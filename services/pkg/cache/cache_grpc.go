@@ -16,7 +16,7 @@ import (
 )
 
 // Generate protocol buffer code and gRPC stubs.
-//go:generate protoc -I. --go_out=../.. --go-grpc_out=../.. cache.proto
+//go:generate protoc -I. -I../../../third_party/protovalidate --go_out=../.. --go-grpc_out=../.. cache.proto
 
 // Maximum number of subtrees that a single HasTree request checks at once.
 // Each check opens a tree object and looks up its children, so an unbounded

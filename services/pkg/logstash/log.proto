@@ -1,5 +1,6 @@
 syntax = "proto3";
 
+import "buf/validate/validate.proto";
 import "google/protobuf/timestamp.proto";
 import "jolt/common.proto";
 
@@ -8,7 +9,7 @@ option go_package = "pkg/protocol";
 // Request to read a log file.
 message ReadLogRequest {
     // Log stream identifier
-    string id = 1;
+    string id = 1 [(buf.validate.field).string.min_len = 1];
 
     // Include records before and after these timestamps.
     // May be left empty if no filtering is desired.

@@ -5,8 +5,10 @@ option go_package = "pkg/cache";
 
 package fstree;
 
+import "buf/validate/validate.proto";
+
 message ReadObjectRequest {
-    string digest = 1;
+    string digest = 1 [(buf.validate.field).string.min_len = 1];
 }
 
 message ReadObjectResponse {
@@ -22,7 +24,7 @@ message WriteObjectResponse {
 }
 
 message HasObjectRequest {
-    repeated string digest = 1;
+    repeated string digest = 1 [(buf.validate.field).repeated.items.string.min_len = 1];
 }
 
 message HasObjectResponse {
@@ -30,7 +32,7 @@ message HasObjectResponse {
 }
 
 message HasTreeRequest {
-    repeated string digest = 1;
+    repeated string digest = 1 [(buf.validate.field).repeated.items.string.min_len = 1];
 }
 
 message HasTreeResponse {
