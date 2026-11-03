@@ -12,7 +12,7 @@
 
 set -e
 
-protoc -I. \
+protoc -I. -Ithird_party/protovalidate \
     --go_out=services \
     --go-grpc_out=services \
     jolt/common.proto \

@@ -269,9 +269,10 @@ class JoltDebianPackage(docker.DockerImage):
 
 
 @git.influence("protocol")
+@influence.files("third_party/protovalidate/buf/validate/validate.proto")
 class GenerateProtobufs(cxx.Compilation):
     name = "jolt/protobufs"
-    incpaths = ["."]
+    incpaths = [".", "third_party/protovalidate"]
     sources = [
         "jolt/common.proto",
         "jolt/plugins/deviceplugin.proto",
@@ -285,6 +286,22 @@ class GenerateProtobufs(cxx.Compilation):
     def run(self, deps, tools):
         with tools.nixpkgs(nixfile="shell.nix"):
             super().run(deps, tools)
+
+            # The protobufs import buf/validate/validate.proto, which isn't
+            # available from PyPI as Python code. Jolt ships its own copy.
+            with tools.cwd(self.outdir):
+                for path in ["jolt/_vendor", "jolt/_vendor/buf", "jolt/_vendor/buf/validate"]:
+                    tools.mkdir(path)
+                    tools.write_file(f"{path}/__init__.py", "")
+            with tools.cwd("{joltdir}/third_party/protovalidate"):
+                tools.run("protoc --python_out={0}/jolt/_vendor buf/validate/validate.proto", self.outdir)
+
+        with tools.cwd(self.outdir):
+            for pathname in tools.glob("jolt/**/*_pb2.py"):
+                tools.replace_in_file(
+                    pathname,
+                    "from buf.validate import validate_pb2",
+                    "from jolt._vendor.buf.validate import validate_pb2")
 
     def publish(self, artifact, tools):
         with tools.cwd(self.outdir):

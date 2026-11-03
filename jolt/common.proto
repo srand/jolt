@@ -1,5 +1,6 @@
 syntax = "proto3";
 
+import "buf/validate/validate.proto";
 import "google/protobuf/timestamp.proto";
 
 option go_package = "pkg/protocol";
@@ -64,10 +65,10 @@ message Platform {
 
 message Task {
     // Name of the task, without any parameters
-    string name = 1;
+    string name = 1 [(buf.validate.field).string.min_len = 1];
 
     // SHA1 identity (influence)
-    string identity = 2;
+    string identity = 2 [(buf.validate.field).string.min_len = 1];
 
     // UUID, unique for one invokation of the task.
     string instance = 3;
@@ -228,7 +229,7 @@ message BuildEnvironment {
     repeated string task_default_parameters = 4;
 
     // Map of tasks indexed by task SHA1 identity.
-    map<string, Task> tasks = 5;
+    map<string, Task> tasks = 5 [(buf.validate.field).map.keys.string.min_len = 1];
 
     // Requested log level for the build.
     LogLevel loglevel = 6;

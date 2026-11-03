@@ -8,7 +8,7 @@ Using pip
 ---------
 
 Jolt is available in the Python Package Index and can be installed using ``pip``.
-You need a working installation of Python 3.8+. Plugins can have additional requirements.
+You need a working installation of Python 3.11+. Plugins can have additional requirements.
 Consult plugin documentation for details.
 
 Run:

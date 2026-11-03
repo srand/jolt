@@ -38,6 +38,7 @@ class All(Alias):
         "int/log",
         "int/login",
         "int/pkgs",
+        "int/selfdeploy",
         "int/tools",
         "int/utils",
         "nfr",

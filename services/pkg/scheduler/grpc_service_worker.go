@@ -10,6 +10,8 @@ import (
 	"github.com/srand/jolt/scheduler/pkg/logstash"
 	"github.com/srand/jolt/scheduler/pkg/protocol"
 	"github.com/srand/jolt/scheduler/pkg/utils"
+	"google.golang.org/grpc/codes"
+	grpcstatus "google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -267,6 +269,10 @@ func (s *workerService) GetTasks(stream protocol.Worker_GetTasksServer) error {
 	log.Infof("new - executor - build_id: %s, worker: %s", execInfo.Request.BuildId, execInfo.Worker.Id)
 	defer log.Debugf("del - executor - build_id: %s, worker: %s", execInfo.Request.BuildId, execInfo.Worker.Id)
 
+	// Error that ended the stream of updates, if not the end of the stream.
+	// Written before updates is closed.
+	var recvErr error
+
 	updates := make(chan *protocol.TaskUpdate, 100)
 	go func() {
 		defer close(updates)
@@ -277,7 +283,12 @@ func (s *workerService) GetTasks(stream protocol.Worker_GetTasksServer) error {
 				return
 			}
 			if err != nil {
-				log.Trace("Executor read error:", err)
+				if grpcstatus.Code(err) == codes.InvalidArgument {
+					log.Warnf("Invalid message from executor - build_id: %s, worker: %s: %v", execInfo.Request.BuildId, execInfo.Worker.Id, err)
+				} else {
+					log.Trace("Executor read error:", err)
+				}
+				recvErr = err
 				return
 			}
 			// Only forward worker allocation on state transitions
@@ -320,7 +331,7 @@ func (s *workerService) GetTasks(stream protocol.Worker_GetTasksServer) error {
 			// If a task update is received, process it
 
 			if update == nil {
-				return nil
+				return recvErr
 			}
 
 			if currentTask == nil {

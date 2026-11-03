@@ -2,6 +2,7 @@ syntax = "proto3";
 
 option go_package = "pkg/protocol";
 
+import "buf/validate/validate.proto";
 import "jolt/common.proto";
 
 // A build request.
@@ -9,7 +10,7 @@ message BuildRequest {
     // The build environment.
     // Jolt client version, recipes, workspace resources,
     // task identities, etc.
-    BuildEnvironment environment = 1;
+    BuildEnvironment environment = 1 [(buf.validate.field).required = true];
 
     // Build priority.
     // A higher number means higher priority.
@@ -33,7 +34,7 @@ message BuildUpdate {
 message CancelBuildRequest {
     // Identifier of the build to cancel.
     // See BuildResponse.id.
-    string build_id = 1;
+    string build_id = 1 [(buf.validate.field).string.min_len = 1];
 }
 
 message CancelBuildResponse {
@@ -50,6 +51,7 @@ message TaskRequest {
     string build_id = 1;
 
     // The identity of the task to execute.
+    // Empty in the first message of an executor.
     string task_id = 2;
 }
 
@@ -65,7 +67,7 @@ message WorkerAllocation {
 // An update on the progress of an executing task.
 message TaskUpdate {
     // The original task execution request.
-    TaskRequest request = 1;
+    TaskRequest request = 1 [(buf.validate.field).required = true];
 
     // The current status of the task.
     TaskStatus status = 2;

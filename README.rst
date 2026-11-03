@@ -180,7 +180,7 @@ them with TLS, tokens and single sign-on.
 Installing
 ==========
 
-From PyPI, for Python 3.9 or later:
+From PyPI, for Python 3.11 or later:
 
 .. code:: bash
 
