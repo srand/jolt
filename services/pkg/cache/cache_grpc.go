@@ -342,7 +342,7 @@ func (x *cacheService) WriteObject(srv CacheService_WriteObjectServer) error {
 						return status.Errorf(codes.Internal, "failed to close blob: %v", err)
 					}
 					log.Debug("PUT object", digest)
-					return nil
+					return srv.SendAndClose(&WriteObjectResponse{})
 				}
 				return nil
 			}
