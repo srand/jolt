@@ -36,8 +36,13 @@ class GLib(meson.Meson):
         "wrap_mode=nofallback",
     ]
     """ Options passed to ``meson setup``. """
-    options_windows = ["force_fallback_for=libffi"]
-    """ The libffi package is built with Autotools, which doesn't work on Windows. """
+    options_darwin = ["force_fallback_for=intl"]
+    """ libintl isn't part of the C library, GLib uses the proxy-libintl subproject instead. """
+    options_windows = ["force_fallback_for=intl,libffi"]
+    """
+    libintl isn't part of the C library, GLib uses the proxy-libintl subproject instead.
+    The libffi package is built with Autotools, which doesn't work on Windows.
+    """
 
     def publish(self, artifact, tools):
         super().publish(artifact, tools)
