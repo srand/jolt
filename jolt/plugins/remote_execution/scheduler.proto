@@ -48,11 +48,11 @@ message CancelBuildResponse {
 // already executed before scheduling a task.
 message TaskRequest {
     // The build request that the task belongs to.
-    string build_id = 1 [(buf.validate.field).string.min_len = 1];
+    string build_id = 1;
 
     // The identity of the task to execute.
     // Empty in the first message of an executor.
-    string task_id = 2 [(buf.validate.field).string.pattern = "^[0-9a-f]*$"];
+    string task_id = 2;
 }
 
 // The allocated worker

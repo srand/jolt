@@ -75,6 +75,25 @@ func TestValidateAcceptsUnknownEnums(t *testing.T) {
 	assert.NoError(t, protovalidate.Validate(update))
 }
 
+// The Jolt client may send an empty build id after a race with a failing
+// request; the scheduler then answers NotFound and the client retries.
+func TestValidateAcceptsTaskRequestWithoutBuild(t *testing.T) {
+	assert.NoError(t, protovalidate.Validate(&protocol.TaskRequest{TaskId: "ab"}))
+}
+
+// Older receivers must accept identities in formats added later.
+func TestValidateAcceptsOtherIdentityFormats(t *testing.T) {
+	request := &protocol.BuildRequest{
+		Environment: &protocol.BuildEnvironment{
+			Tasks: map[string]*protocol.Task{
+				"t": {Name: "t", Identity: "blake3:AB"},
+			},
+		},
+	}
+	assert.NoError(t, protovalidate.Validate(request))
+	assert.NoError(t, protovalidate.Validate(&protocol.TaskRequest{BuildId: "b", TaskId: "blake3:AB"}))
+}
+
 // Worker properties are not validated.
 func TestValidateAcceptsWorkerUpdate(t *testing.T) {
 	update := &protocol.WorkerUpdate{
@@ -97,16 +116,13 @@ func TestValidateRejects(t *testing.T) {
 	}
 
 	tests := map[string]proto.Message{
-		"empty task name":         environment("t", &protocol.Task{Identity: identity}),
-		"uppercase task identity": environment("t", &protocol.Task{Name: "t", Identity: "ABC"}),
-		"empty task identity":     environment("t", &protocol.Task{Name: "t"}),
-		"empty task key":          environment("", &protocol.Task{Name: "t", Identity: identity}),
-		"no environment":          &protocol.BuildRequest{},
-		"empty cancel build id":   &protocol.CancelBuildRequest{},
-		"empty task build id":     &protocol.TaskRequest{TaskId: "ab"},
-		"non-hex task id":         &protocol.TaskRequest{BuildId: "b", TaskId: "xyz"},
-		"task update no request":  &protocol.TaskUpdate{},
-		"empty log id":            &protocol.ReadLogRequest{},
+		"empty task name":        environment("t", &protocol.Task{Identity: identity}),
+		"empty task identity":    environment("t", &protocol.Task{Name: "t"}),
+		"empty task key":         environment("", &protocol.Task{Name: "t", Identity: identity}),
+		"no environment":         &protocol.BuildRequest{},
+		"empty cancel build id":  &protocol.CancelBuildRequest{},
+		"task update no request": &protocol.TaskUpdate{},
+		"empty log id":           &protocol.ReadLogRequest{},
 	}
 
 	for name, message := range tests {

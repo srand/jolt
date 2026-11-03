@@ -68,7 +68,7 @@ message Task {
     string name = 1 [(buf.validate.field).string.min_len = 1];
 
     // SHA1 identity (influence)
-    string identity = 2 [(buf.validate.field).string.pattern = "^[0-9a-f]+$"];
+    string identity = 2 [(buf.validate.field).string.min_len = 1];
 
     // UUID, unique for one invokation of the task.
     string instance = 3;

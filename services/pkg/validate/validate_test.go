@@ -114,7 +114,7 @@ func TestStreamRejectsLaterMessage(t *testing.T) {
 func TestServerStreamRequestValidated(t *testing.T) {
 	conn := serve(t, &schedulerServer{}, &workerServer{}, pkgvalidate.ServerOptions()...)
 
-	stream, err := protocol.NewSchedulerClient(conn).ScheduleTask(testContext(t), &protocol.TaskRequest{TaskId: "zz"})
+	stream, err := protocol.NewSchedulerClient(conn).ScheduleBuild(testContext(t), &protocol.BuildRequest{})
 	assert.NoError(t, err)
 	_, err = stream.Recv()
 	assert.Equal(t, codes.InvalidArgument, status.Code(err))

@@ -76,10 +76,13 @@ checked, so annotating them is documentation only; keep it to what is certain.
 
 As a guide for the builder, and subject to the checks above:
 
-- Identifiers that the server indexes on are non-empty: `TaskRequest.build_id`
-  and `task_id`, `CancelBuildRequest.build_id`, `ReadLogRequest.id`, cache
-  `digest`s. Note that `CANCEL_BUILD` instructions carry an empty `BuildRequest`.
-- Hex identities are hex (`^[0-9a-f]+$`, no length).
+- Identifiers that the server indexes on are non-empty: `Task.identity`,
+  `CancelBuildRequest.build_id`, `ReadLogRequest.id`, cache `digest`s. Note
+  that `CANCEL_BUILD` instructions carry an empty `BuildRequest`.
+- Not `TaskRequest`: the executor's first message has no `task_id`, and the
+  client can send an empty `build_id` after a race with a failed request, which
+  the scheduler answers with `NotFound` and the client retries.
+- No format for identities: a hex pattern would reject a future `alg:hex` form.
 - Required sub-messages that the server dereferences, for example
   `BuildRequest.environment` and `BuildEnvironment.client`/`workspace`, if every
   released client sets them.
