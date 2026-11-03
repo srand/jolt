@@ -1,8 +1,6 @@
 package logstash
 
 import (
-	"encoding/gob"
-
 	"github.com/srand/jolt/scheduler/pkg/protocol"
 	"github.com/srand/jolt/scheduler/pkg/utils"
 )
@@ -14,24 +12,18 @@ type LogReader interface {
 
 type fileLogReader struct {
 	file    utils.File
-	decoder *gob.Decoder
+	records *recordReader
 }
 
 func newFileLogReader(file utils.File) *fileLogReader {
 	return &fileLogReader{
 		file:    file,
-		decoder: gob.NewDecoder(file),
+		records: newRecordReader(file),
 	}
 }
 
 func (r *fileLogReader) ReadLine() (*protocol.LogLine, error) {
-	var line protocol.LogLine
-
-	if err := r.decoder.Decode(&line); err != nil {
-		return nil, err
-	}
-
-	return &line, nil
+	return r.records.ReadLine()
 }
 
 func (r *fileLogReader) Close() error {

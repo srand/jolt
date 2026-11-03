@@ -2,7 +2,6 @@ package logstash
 
 import (
 	"context"
-	"encoding/gob"
 	"io"
 	"sync"
 
@@ -14,9 +13,9 @@ import (
 // file is not the end of the stream while a writer is still open: the read
 // blocks until more bytes arrive.
 //
-// The blocking belongs here, underneath the gob decoder, rather than in a retry
-// loop around it. A decoder that reads a half-written record fails with
-// io.ErrUnexpectedEOF and cannot be resumed, so it must never see a short read.
+// The blocking belongs here, underneath the record reader, rather than in a
+// retry loop around it. A reader that reads a half-written record fails with
+// io.ErrUnexpectedEOF and has lost its place, so it must never see a short read.
 type tailReader struct {
 	ctx   context.Context
 	file  utils.File
@@ -58,7 +57,7 @@ func (r *tailReader) Read(p []byte) (int, error) {
 }
 
 type followLogReader struct {
-	decoder   *gob.Decoder
+	records   *recordReader
 	file      utils.File
 	stash     *logStash
 	id        string
@@ -70,7 +69,7 @@ func newFollowLogReader(ctx context.Context, stash *logStash, file utils.File, i
 	tail := &tailReader{ctx: ctx, file: file, stash: stash, id: id}
 
 	return &followLogReader{
-		decoder: gob.NewDecoder(tail),
+		records: newRecordReader(tail),
 		file:    file,
 		stash:   stash,
 		id:      id,
@@ -78,13 +77,7 @@ func newFollowLogReader(ctx context.Context, stash *logStash, file utils.File, i
 }
 
 func (r *followLogReader) ReadLine() (*protocol.LogLine, error) {
-	var line protocol.LogLine
-
-	if err := r.decoder.Decode(&line); err != nil {
-		return nil, err
-	}
-
-	return &line, nil
+	return r.records.ReadLine()
 }
 
 // Close is idempotent: a reader may be closed more than once in ordinary Go

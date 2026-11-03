@@ -1,9 +1,7 @@
 package logstash
 
 import (
-	"bytes"
 	"context"
-	"encoding/gob"
 	"errors"
 	"io"
 	"os"
@@ -296,25 +294,24 @@ func (s *FollowTestSuite) TestFollowUnblocksOnContextCancel() {
 	}
 }
 
-// The reason this design blocks underneath the decoder instead of retrying it:
-// a gob record that is only half written must not desync the decoder.
+// The reason this design blocks underneath the record reader instead of
+// retrying it: a record that is only half written must not desync the reader.
 func (s *FollowTestSuite) TestFollowDecodesRecordSplitAcrossWaits() {
 	// Produce a byte stream holding two records, and find a split point inside
 	// the second one.
-	var buf bytes.Buffer
-	encoder := gob.NewEncoder(&buf)
-	assert.NoError(s.T(), encoder.Encode(s.line("first")))
-	mark := buf.Len()
-	assert.NoError(s.T(), encoder.Encode(s.line("second")))
+	all, err := appendRecord(nil, s.line("first"))
+	assert.NoError(s.T(), err)
+	mark := len(all)
+	all, err = appendRecord(all, s.line("second"))
+	assert.NoError(s.T(), err)
 
-	all := buf.Bytes()
 	split := mark + (len(all)-mark)/2
 
 	// Register a writer so follow mode blocks, but write the bytes by hand.
 	writer, err := s.stash.Append(logId1)
 	assert.NoError(s.T(), err)
 
-	file, err := s.fs.OpenFile(logId1, os.O_WRONLY, 0644)
+	file, err := s.fs.OpenFile(logPath(logId1), os.O_WRONLY, 0644)
 	assert.NoError(s.T(), err)
 	defer file.Close()
 
@@ -352,6 +349,49 @@ func (s *FollowTestSuite) TestFollowDecodesRecordSplitAcrossWaits() {
 	}
 
 	assert.NoError(s.T(), writer.Close())
+}
+
+func (s *FollowTestSuite) TestFollowSeesLinesOfAllWriters() {
+	// The scheduler adds the details of an error to a log while the worker
+	// may still be writing to it.
+	worker, err := s.stash.Append(logId1)
+	assert.NoError(s.T(), err)
+
+	reader, err := s.stash.Follow(context.Background(), logId1)
+	assert.NoError(s.T(), err)
+	defer reader.Close()
+
+	expect := func(message string) {
+		select {
+		case result := <-s.readAsync(reader):
+			assert.NoError(s.T(), result.err)
+			if assert.NotNil(s.T(), result.line) {
+				assert.Equal(s.T(), message, result.line.Message)
+			}
+		case <-time.After(2 * time.Second):
+			s.T().Fatalf("ReadLine did not return %q", message)
+		}
+	}
+
+	assert.NoError(s.T(), worker.WriteLine(s.line("worker")))
+	expect("worker")
+
+	scheduler, err := s.stash.Append(logId1)
+	assert.NoError(s.T(), err)
+	assert.NoError(s.T(), scheduler.WriteLine(s.line("error details")))
+	expect("error details")
+
+	assert.NoError(s.T(), worker.Close())
+	assert.NoError(s.T(), scheduler.WriteLine(s.line("more details")))
+	expect("more details")
+	assert.NoError(s.T(), scheduler.Close())
+
+	select {
+	case result := <-s.readAsync(reader):
+		assert.Equal(s.T(), io.EOF, result.err)
+	case <-time.After(2 * time.Second):
+		s.T().Fatal("ReadLine did not end after the last writer closed")
+	}
 }
 
 func TestFollow(t *testing.T) {

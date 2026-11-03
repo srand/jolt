@@ -4,8 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"os"
+	"path/filepath"
+	"strings"
+	"sync"
 
 	"github.com/google/uuid"
 	"github.com/spf13/afero"
@@ -56,6 +58,21 @@ func canonicalLogId(id string) (string, error) {
 	return parsed.String(), nil
 }
 
+// Logs are stored in files named after their ids, with an extension for
+// their format, the records of log_record.go.
+const logExtension = ".pb"
+
+func logPath(id string) string {
+	return id + logExtension
+}
+
+// Returns true for logs written by earlier versions, which encoded lines with
+// gob in files named after the log id only.
+func isGobLog(path string) bool {
+	id, err := canonicalLogId(path)
+	return err == nil && id == path
+}
+
 func newLogFile(fs utils.Fs, path string) *logFile {
 	var size int64 = 0
 
@@ -93,6 +110,9 @@ type logStream struct {
 	writers   int
 	followers int
 	notify    chan struct{}
+
+	// Held while a writer adds a record to the log.
+	writeMu sync.Mutex
 }
 
 type logStash struct {
@@ -120,9 +140,19 @@ func NewLogStash(config LogStashConfig, fs utils.Fs) LogStash {
 
 	// Load existing log files into LRU
 	logCount := 0
+	gobCount := 0
 
 	afero.Walk(fs, ".", func(path string, info os.FileInfo, err error) error {
 		if path == "." {
+			return nil
+		}
+
+		// Logs of earlier versions can't be read or appended to.
+		if !strings.Contains(path, string(filepath.Separator)) && isGobLog(path) {
+			if err := fs.Remove(path); err != nil {
+				log.Warn("Failed to remove log of an earlier version:", path, err)
+			}
+			gobCount++
 			return nil
 		}
 
@@ -131,6 +161,9 @@ func NewLogStash(config LogStashConfig, fs utils.Fs) LogStash {
 		return nil
 	})
 
+	if gobCount > 0 {
+		log.Infof("Removed %d log files written by an earlier version", gobCount)
+	}
 	log.Infof("Loaded %d log files into logstash LRU cache. Size: %s / %s",
 		logCount, utils.HumanByteSize(stash.lru.Size()), utils.HumanByteSize(config.MaxSize()))
 
@@ -151,27 +184,22 @@ func (s *logStash) Append(id string) (LogWriter, error) {
 	if err != nil {
 		return nil, err
 	}
-	file, err := s.fs.Open(id)
+	// The log of a task is appended to when the task runs again, and when
+	// the scheduler adds the details of an error to it.
+	file, err := s.fs.OpenFile(logPath(id), os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0666)
 	if err != nil {
-		file, err = s.fs.Create(id)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		if _, err := file.Seek(0, io.SeekEnd); err != nil {
-			file.Close()
-			return nil, err
-		}
+		return nil, err
 	}
 
 	s.Lock()
-	s.lru.Remove(id)
-	s.streamLocked(id).writers++
+	s.lru.Remove(logPath(id))
+	stream := s.streamLocked(id)
+	stream.writers++
 	s.Unlock()
 
 	log.Debug("add - log - id:", id)
 
-	return newFileLogWriter(s, file, id), nil
+	return newFileLogWriter(s, stream, file, id), nil
 }
 
 // ReadLog reads a log from the logstash server
@@ -180,7 +208,7 @@ func (s *logStash) Read(id string) (LogReader, error) {
 	if err != nil {
 		return nil, err
 	}
-	file, err := s.fs.Open(id)
+	file, err := s.fs.Open(logPath(id))
 	if err != nil {
 		return nil, err
 	}
@@ -199,7 +227,7 @@ func (s *logStash) Follow(ctx context.Context, id string) (LogReader, error) {
 	// Register before opening, so a writer closing in between still wakes us.
 	s.addFollower(id)
 
-	file, err := s.fs.Open(id)
+	file, err := s.fs.Open(logPath(id))
 	if err != nil {
 		s.dropFollower(id)
 		return nil, err
@@ -212,7 +240,7 @@ func (s *logStash) logClosed(writer *fileLogWriter) {
 	s.Lock()
 	defer s.Unlock()
 
-	s.lru.Add(newLogFile(s.fs, writer.id))
+	s.lru.Add(newLogFile(s.fs, logPath(writer.id)))
 
 	stream, ok := s.streams[writer.id]
 	if !ok {

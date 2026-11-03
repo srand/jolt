@@ -3,7 +3,9 @@ package logstash
 import (
 	"context"
 	"io"
+	"os"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -130,8 +132,106 @@ func (s *LogStashTestSuite) TestActiveReopenedLogIsNotEvicted() {
 	s.writeLines(other, strings.Repeat("2", 100), 100)
 	assert.NoError(s.T(), other.Close())
 
-	_, err = fs.Stat(logId1)
+	_, err = fs.Stat(logPath(logId1))
 	assert.NoError(s.T(), err)
+}
+
+// Reads all lines of a log.
+func (s *LogStashTestSuite) readAll(stash LogStash, id string) []string {
+	reader, err := stash.Read(id)
+	if !assert.NoError(s.T(), err) {
+		return nil
+	}
+	defer reader.Close()
+
+	messages := []string{}
+	for {
+		line, err := reader.ReadLine()
+		if err != nil {
+			assert.Equal(s.T(), io.EOF, err)
+			return messages
+		}
+		messages = append(messages, line.Message)
+	}
+}
+
+// Logs are tested on disk too, where a file opened for reading can't be
+// written to and appending is done by the operating system.
+func (s *LogStashTestSuite) filesystems() map[string]utils.Fs {
+	return map[string]utils.Fs{
+		"memory": afero.NewMemMapFs(),
+		"disk":   afero.NewBasePathFs(afero.NewOsFs(), s.T().TempDir()),
+	}
+}
+
+func (s *LogStashTestSuite) TestReopenedLogIsAppended() {
+	// Tasks that run again append to their log, and so does the scheduler
+	// when it adds the details of an error.
+	for name, fs := range s.filesystems() {
+		stash := NewLogStash(&s.config, fs)
+		for _, message := range []string{"first", "second", "third"} {
+			writer, err := stash.Append(logId1)
+			assert.NoError(s.T(), err, name)
+			s.writeLines(writer, message, 1)
+			assert.NoError(s.T(), writer.Close(), name)
+		}
+		assert.Equal(s.T(), []string{"first", "second", "third"}, s.readAll(stash, logId1), name)
+
+		// The log is still appended to after a restart
+		stash = NewLogStash(&s.config, fs)
+		writer, err := stash.Append(logId1)
+		assert.NoError(s.T(), err, name)
+		s.writeLines(writer, "fourth", 1)
+		assert.NoError(s.T(), writer.Close(), name)
+		assert.Equal(s.T(), []string{"first", "second", "third", "fourth"}, s.readAll(stash, logId1), name)
+	}
+}
+
+func (s *LogStashTestSuite) TestConcurrentWritersKeepRecordsApart() {
+	for name, fs := range s.filesystems() {
+		stash := NewLogStash(&s.config, fs)
+		messages := []string{strings.Repeat("a", 5000), strings.Repeat("b", 3), strings.Repeat("c", 700)}
+
+		var wg sync.WaitGroup
+		for _, message := range messages {
+			writer, err := stash.Append(logId1)
+			assert.NoError(s.T(), err, name)
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				s.writeLines(writer, message, 100)
+				assert.NoError(s.T(), writer.Close(), name)
+			}()
+		}
+		wg.Wait()
+
+		counts := map[string]int{}
+		for _, message := range s.readAll(stash, logId1) {
+			counts[message]++
+		}
+		assert.Equal(s.T(), map[string]int{messages[0]: 100, messages[1]: 100, messages[2]: 100}, counts, name)
+	}
+}
+
+func (s *LogStashTestSuite) TestRemovesLogsOfEarlierVersions() {
+	// Logs encoded with gob can neither be read nor appended to.
+	assert.NoError(s.T(), afero.WriteFile(s.fs, logId1, []byte("gob"), 0644))
+	assert.NoError(s.T(), afero.WriteFile(s.fs, "other", []byte("other"), 0644))
+	writer, err := s.stash.Append(logId2)
+	assert.NoError(s.T(), err)
+	s.writeLines(writer, "kept", 1)
+	assert.NoError(s.T(), writer.Close())
+
+	stash := NewLogStash(&s.config, s.fs)
+
+	_, err = s.fs.Stat(logId1)
+	assert.True(s.T(), os.IsNotExist(err), "gob log is removed")
+	_, err = s.fs.Stat("other")
+	assert.NoError(s.T(), err, "other files are kept")
+	assert.Equal(s.T(), []string{"kept"}, s.readAll(stash, logId2))
+
+	_, err = stash.Read(logId1)
+	assert.Error(s.T(), err)
 }
 
 func (s *LogStashTestSuite) TestLoadsExistingLogs() {
@@ -141,7 +241,7 @@ func (s *LogStashTestSuite) TestLoadsExistingLogs() {
 	assert.NoError(s.T(), err)
 	s.writeLines(writer, strings.Repeat("1", 1000), 10)
 	assert.NoError(s.T(), writer.Close())
-	info, err := s.fs.Stat(logId1)
+	info, err := s.fs.Stat(logPath(logId1))
 	assert.NoError(s.T(), err)
 
 	config := new(MockLogStashConfig)
