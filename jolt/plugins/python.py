@@ -136,13 +136,19 @@ class PythonEnv(Task):
     def relocate_scripts(self, artifact, tools, frompath, topath):
         bindir = "Scripts" if self.system == "windows" else "bin"
 
-        with tools.cwd(artifact.path, bindir):
-            for script in tools.glob("*"):
-                if script.startswith("python"):
+        # Script launchers on Windows contain the normalized path of the
+        # interpreter, the artifact path can mix separators.
+        frompath, topath = str(frompath), str(topath)
+        paths = {(frompath, topath), (fs.path.normpath(frompath), fs.path.normpath(topath))}
+
+        with tools.cwd(artifact.path):
+            for script in tools.glob(fs.path.join(bindir, "*")):
+                if fs.path.basename(script).startswith("python"):
                     continue
                 if os.path.isdir(tools.expand_path(script)):
                     continue
-                tools.replace_in_file(script, frompath, topath)
+                for search, replace in paths:
+                    tools.replace_in_file(script, search, replace)
 
         with tools.cwd(artifact.path):
             if not tools.exists("local/bin"):
@@ -179,10 +185,18 @@ class PythonEnv(Task):
 
         # Copy the Python installation to the artifact path
         with tools.cwd(py_home):
-            artifact.collect(py_exe, "bin/python3")
-            artifact.collect("lib/python3")
-            artifact.collect("lib/python{version_major}")
-            artifact.collect("lib/libpython{version_major}.*")
+            if self.system == "windows":
+                # The standard library is in lib/ and extension modules in DLLs/.
+                # Python finds its prefix by searching up from bin/ for lib/os.py.
+                artifact.collect(py_exe, "bin/python3.exe")
+                artifact.collect("bin/*.dll")
+                artifact.collect("lib")
+                artifact.collect("DLLs")
+            else:
+                artifact.collect(py_exe, "bin/python3")
+                artifact.collect("lib/python3")
+                artifact.collect("lib/python{version_major}")
+                artifact.collect("lib/libpython{version_major}.*")
 
         # Create common symlinks
         if self.system != "windows":
@@ -194,7 +208,7 @@ class PythonEnv(Task):
 
         # Install required packages into the artifact using pip
         with tools.environ(PYTHONHOME=artifact.path):
-            py_exe = fs.path.join(artifact.path, "bin", "python3")
+            py_exe = fs.path.join(artifact.path, "bin", "python3.exe" if self.system == "windows" else "python3")
             with tools.tmpdir() as tmp, tools.cwd(tmp):
                 tools.write_file(
                     "requirements.txt",
@@ -217,6 +231,8 @@ class PythonEnv(Task):
 
         artifact.environ.PATH.append("bin")
         artifact.environ.PATH.append("local/bin")
+        if self.system == "windows":
+            artifact.environ.PATH.append("Scripts")
         artifact.strings.install_prefix = artifact.path
 
     def unpack(self, artifact, tools):

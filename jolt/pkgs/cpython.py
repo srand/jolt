@@ -1,11 +1,13 @@
 from jolt import attributes, Alias, BooleanParameter, Parameter, Task
+from jolt import filesystem as fs
 from jolt.pkgs import compiler, libffi, sqlite, ssl, xz, zlib, zstd
 from jolt.plugins import autotools, git, pkgconfig
 from jolt.tasks import TaskRegistry
 
 
-def _unpack_adjust_scripts(artifact, tools):
-    bindir = "Scripts" if artifact.strings.system == "windows" else "bin"
+def _unpack_adjust_scripts(artifact, tools, bindir="bin"):
+    frompath = str(artifact.strings.install_prefix)
+    topath = artifact.final_path
 
     with tools.cwd(artifact.path, bindir):
         # Adjust paths in scripts
@@ -13,7 +15,10 @@ def _unpack_adjust_scripts(artifact, tools):
             # Ignore python executables
             if script.startswith("python"):
                 continue
-            tools.replace_in_file(script, artifact.strings.install_prefix, artifact.final_path)
+            # Script launchers on Windows contain the normalized path of
+            # the interpreter, the artifact path can mix separators.
+            for search, replace in {(frompath, topath), (fs.path.normpath(frompath), fs.path.normpath(topath))}:
+                tools.replace_in_file(script, search, replace)
 
     artifact.strings.install_prefix = artifact.final_path
 
@@ -108,7 +113,13 @@ class CPythonWin32(Task):
             artifact.collect("python.exe", "bin/python3.exe")
             artifact.collect("python.exe", "bin/python{version_major}.exe")
             artifact.collect("*.dll", "bin/")
+            artifact.collect("*.pyd", "DLLs/")
             artifact.collect("*.lib", "lib/")
+        # Python finds its prefix by searching up from bin/ for lib/os.py,
+        # and installs pip into lib/site-packages like the POSIX build does.
+        python = fs.path.join(artifact.path, "bin", "python3.exe")
+        tools.run([python, "-I", "-m", "ensurepip"], shell=False)
+        artifact.strings.install_prefix = artifact.path
         with tools.tmpdir() as tmp, tools.cwd(tmp):
             tools.write_file(
                 "python3.pc",
@@ -144,7 +155,7 @@ Cflags: -I${{includedir}}
 
     def unpack(self, artifact, tools):
         super().unpack(artifact, tools)
-        _unpack_adjust_scripts(artifact, tools)
+        _unpack_adjust_scripts(artifact, tools, "Scripts")
 
 
 @attributes.requires("requires_{system}")
