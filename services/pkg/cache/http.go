@@ -98,7 +98,7 @@ func NewHttpHandler(cache Cache, service CacheGrpcService) http.Handler {
 	mux.HandleFunc("HEAD /objects/{digest}", func(w http.ResponseWriter, r *http.Request) {
 		digest, err := utils.ParseDigest(r.PathValue("digest"))
 		if err != nil {
-			newError(w, r, fmt.Errorf("%v: %v", utils.ErrBadRequest, err))
+			newError(w, r, fmt.Errorf("%w: %v", utils.ErrBadRequest, err))
 			return
 		}
 
@@ -114,7 +114,7 @@ func NewHttpHandler(cache Cache, service CacheGrpcService) http.Handler {
 	mux.HandleFunc("GET /objects/{digest}", func(w http.ResponseWriter, r *http.Request) {
 		digest, err := utils.ParseDigest(r.PathValue("digest"))
 		if err != nil {
-			newError(w, r, fmt.Errorf("%v: %v", utils.ErrBadRequest, err))
+			newError(w, r, fmt.Errorf("%w: %v", utils.ErrBadRequest, err))
 			return
 		}
 
@@ -144,7 +144,7 @@ func NewHttpHandler(cache Cache, service CacheGrpcService) http.Handler {
 		response := FindBlobsResponse{}
 
 		if err := bindJSON(r, &request); err != nil {
-			newError(w, r, fmt.Errorf("%v: %v", utils.ErrBadRequest, err))
+			newError(w, r, fmt.Errorf("%w: %v", utils.ErrBadRequest, err))
 			return
 		}
 
@@ -166,7 +166,7 @@ func NewHttpHandler(cache Cache, service CacheGrpcService) http.Handler {
 	mux.HandleFunc("PUT /objects/{digest}", func(w http.ResponseWriter, r *http.Request) {
 		digest, err := utils.ParseDigest(r.PathValue("digest"))
 		if err != nil {
-			newError(w, r, fmt.Errorf("%v: %v", utils.ErrBadRequest, err))
+			newError(w, r, fmt.Errorf("%w: %v", utils.ErrBadRequest, err))
 			return
 		}
 
@@ -227,7 +227,7 @@ func NewHttpHandler(cache Cache, service CacheGrpcService) http.Handler {
 		response := FindFilesResponse{}
 
 		if err := bindJSON(r, &request); err != nil {
-			newError(w, r, fmt.Errorf("%v: %v", utils.ErrBadRequest, err))
+			newError(w, r, fmt.Errorf("%w: %v", utils.ErrBadRequest, err))
 			return
 		}
 
