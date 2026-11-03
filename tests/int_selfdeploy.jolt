@@ -1,0 +1,51 @@
+import contextlib
+import glob
+import os
+import sys
+sys.path.append(".")
+
+from testsupport import JoltTest
+from jolt import cli  # noqa: F401, imports jolt modules in dependency order
+from jolt.plugins import selfdeploy
+
+
+class Artifact(object):
+    def __init__(self):
+        self.files = set()
+
+    def collect(self, pathname, *args, **kwargs):
+        self.files.update(glob.glob(pathname, recursive=True))
+
+
+class Tools(object):
+    @contextlib.contextmanager
+    def cwd(self, path):
+        cwd = os.getcwd()
+        os.chdir(path)
+        try:
+            yield
+        finally:
+            os.chdir(cwd)
+
+    def builddir(self):
+        return os.getcwd()
+
+
+class Task(object):
+    dependencies = []
+    extra_files = []
+
+
+class SelfDeployInternal(JoltTest):
+    name = "int/selfdeploy"
+
+    def test_publish_collects_all_modules(self):
+        artifact = Artifact()
+        selfdeploy.Jolt.publish(Task(), artifact, Tools())
+
+        with Tools().cwd(selfdeploy._path):
+            modules = {
+                path for path in glob.glob("jolt/**/*.py", recursive=True)
+                if "__pycache__" not in path
+            }
+        self.assertEqual(modules - artifact.files, set())

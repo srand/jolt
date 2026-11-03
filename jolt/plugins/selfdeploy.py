@@ -82,10 +82,8 @@ class Jolt(Task):
         with tools.cwd(_path):
             artifact.collect('README.rst')
             artifact.collect('setup.py')
-            artifact.collect('jolt/*.py')
+            artifact.collect('jolt/**/*.py')
             artifact.collect('jolt/*.sh')
-            artifact.collect('jolt/*/*.py')
-            artifact.collect('jolt/*/*/*.py')
             artifact.collect('jolt/*/*.xslt')
             artifact.collect('jolt/*/*.template')
             artifact.collect('jolt/bin')
