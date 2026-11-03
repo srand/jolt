@@ -5,7 +5,9 @@ from jolt.tasks import TaskRegistry
 
 
 @attributes.requires("requires_git")
+@attributes.system
 @cmake.requires()
+@cmake.options("options_{system}")
 @cmake.use_ninja()
 @attributes.requires("requires_compiler")
 class OpenCV(cmake.CMake):
@@ -21,6 +23,12 @@ class OpenCV(cmake.CMake):
         "BUILD_PERF_TESTS=OFF",
         "BUILD_SHARED_LIBS={shared[ON,OFF]}",
     ]
+    options_windows = ["CMAKE_ASM_COMPILER=OFF"]
+    """
+    The MLAS kernels of the DNN module are GNU assembly for ELF, which MSVC can't
+    build. Without an assembler, OpenCV uses its own SGEMM instead of MLAS;
+    otherwise CMake finds the MinGW compiler of the build host.
+    """
 
 
 TaskRegistry.get().add_task_class(OpenCV)
