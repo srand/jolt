@@ -106,3 +106,18 @@ func (d Digest) Hex() string {
 func (d Digest) String() string {
 	return string(d.alg) + ":" + d.hex
 }
+
+// MarshalText encodes the digest in its string form, such as in JSON.
+func (d Digest) MarshalText() ([]byte, error) {
+	return []byte(d.String()), nil
+}
+
+// UnmarshalText parses a digest in the form accepted by ParseDigest.
+func (d *Digest) UnmarshalText(text []byte) error {
+	digest, err := ParseDigest(string(text))
+	if err != nil {
+		return err
+	}
+	*d = digest
+	return nil
+}
