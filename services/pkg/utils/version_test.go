@@ -16,6 +16,11 @@ func TestVersionLessThan(t *testing.T) {
 		{"1.1.0", "1.0.0", false},
 		{"2.0.0", "1.0.0", false},
 		{"1.0.0", "1.0.0", false},
+		// Parts are compared in order, and as numbers
+		{"2.0.0", "1.9.9", false},
+		{"1.2.0", "1.1.9", false},
+		{"1.9.0", "1.10.0", true},
+		{"0.9.9", "1.0.0", true},
 	}
 
 	// Run test cases

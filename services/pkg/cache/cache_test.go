@@ -217,6 +217,66 @@ func (s *LRUCacheTestSuite) TestHasObjects() {
 	assert.NotNil(s.T(), cache.HasObject(present))
 }
 
+func (s *LRUCacheTestSuite) TestObjectWithOtherContentIsNotStored() {
+	cache := s.newCache()
+	digest := utils.NewDigest(utils.Sha1Algorithm, "356a192b7913b04c54574d18c28d46e6395428ab")
+
+	writer, err := cache.WriteObject(digest)
+	assert.NoError(s.T(), err)
+	_, err = writer.Write([]byte("2"))
+	assert.NoError(s.T(), err)
+	assert.ErrorIs(s.T(), writer.Close(), utils.ErrBadRequest)
+
+	assert.Nil(s.T(), cache.HasObject(digest))
+	assert.Equal(s.T(), int64(0), cache.Statistics().Artifacts)
+	files, err := afero.ReadDir(s.fs, "objects/35/6a19")
+	assert.NoError(s.T(), err)
+	assert.Empty(s.T(), files, "the upload is removed")
+
+	// The object can be uploaded with the right content
+	s.write(cache, digest, []byte("1"))
+	assert.NotNil(s.T(), cache.HasObject(digest))
+}
+
+func (s *LRUCacheTestSuite) TestStatistics() {
+	cache := s.newCache()
+
+	d1 := utils.NewDigest(utils.Sha1Algorithm, "356a192b7913b04c54574d18c28d46e6395428ab")
+	d2 := utils.NewDigest(utils.Sha1Algorithm, "da4b9237bacccdf19c0760cab7aec4a8359010b0")
+	d3 := utils.NewDigest(utils.Sha1Algorithm, "77de68daecd823babbb58edb1c8e14d7106e83bb")
+	assert.Equal(s.T(), CacheStats{}, cache.Statistics())
+
+	assert.Nil(s.T(), cache.HasObject(d1))
+	s.write(cache, d1, []byte{'1'})
+	s.write(cache, d2, []byte{'2'})
+	assert.NotNil(s.T(), cache.HasObject(d1))
+	assert.NotNil(s.T(), cache.HasObject(d2))
+	_, err := cache.ReadObject(d3)
+	assert.ErrorIs(s.T(), err, utils.ErrNotFound)
+
+	// d1 was used least recently and is evicted
+	s.write(cache, d3, []byte{'3'})
+
+	assert.Equal(s.T(), CacheStats{Artifacts: 2, Evictions: 1, Hits: 2, Misses: 2, Size: 2}, cache.Statistics())
+}
+
+func (s *LRUCacheTestSuite) TestLoad() {
+	// Files and objects that are in storage when the service starts are in
+	// the cache.
+	object := utils.NewDigest(utils.Sha1Algorithm, "356a192b7913b04c54574d18c28d46e6395428ab")
+	hex := object.Hex()
+	assert.NoError(s.T(), afero.WriteFile(s.fs, "objects/"+hex[:2]+"/"+hex[2:6]+"/"+hex[6:], []byte("1"), 0644))
+	assert.NoError(s.T(), afero.WriteFile(s.fs, "files/task/artifact.tar.zst", []byte("22"), 0644))
+	s.config.ExpectedCalls = []*mock.Call{}
+	s.config.On("MaxSize").Return(10)
+	s.config.On("ExpirationTime").Return(time.Duration(0))
+
+	cache := s.newCache()
+	assert.Equal(s.T(), CacheStats{Artifacts: 2, Size: 3}, cache.Statistics())
+	assert.NotNil(s.T(), cache.HasObject(object))
+	assert.NotNil(s.T(), cache.HasFile("task/artifact.tar.zst"))
+}
+
 func TestLRUCacheTestSuite(t *testing.T) {
 	suite.Run(t, new(LRUCacheTestSuite))
 }

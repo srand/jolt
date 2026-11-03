@@ -16,6 +16,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -262,4 +263,116 @@ func TestNewToken(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotEqual(t, first, second)
 	assert.Len(t, HashToken(first), 64)
+}
+
+func TestIdentityIsAnonymousWithoutToken(t *testing.T) {
+	a := newTestAuthenticator(t, permissions(Read))
+
+	identity, err := a.Authenticate(ctx, "")
+	assert.NoError(t, err)
+	assert.True(t, identity.Anonymous)
+
+	identity, err = a.Authenticate(ctx, "ci-token")
+	assert.NoError(t, err)
+	assert.False(t, identity.Anonymous)
+}
+
+func TestSingleTokenAnonymousHasNoPermissions(t *testing.T) {
+	a, err := New(Config{Tokens: []Token{{Name: "ci", Hash: HashToken("ci-token"), Permissions: []Permission{Read}}}}, Read, Write)
+	assert.NoError(t, err)
+
+	_, err = a.Authorize(ctx, "", Read)
+	assert.ErrorIs(t, err, ErrUnauthenticated)
+}
+
+func TestTokenHashMustBeSHA256(t *testing.T) {
+	for _, hash := range []string{
+		HashToken("x")[:62],
+		HashToken("x") + "00",
+		"zz" + HashToken("x")[2:],
+	} {
+		_, err := New(Config{Tokens: []Token{{Name: "bad", Hash: hash}}}, Read)
+		assert.ErrorContains(t, err, "invalid SHA-256 hash", hash)
+	}
+}
+
+func TestTokenShapedLikeJWTWithoutOIDC(t *testing.T) {
+	// Tokens are only verified by an OIDC provider if one is configured.
+	a := newTestAuthenticator(t, nil)
+	_, err := a.Authorize(ctx, "a.b.c", Read)
+	assert.ErrorIs(t, err, ErrUnauthenticated)
+}
+
+func TestNewTokenHas256Bits(t *testing.T) {
+	token, err := NewToken()
+	assert.NoError(t, err)
+	data, err := base64.RawURLEncoding.DecodeString(token)
+	assert.NoError(t, err)
+	assert.Len(t, data, 32)
+}
+
+func TestUnaryCallsAreAuthorized(t *testing.T) {
+	a := newTestAuthenticator(t, nil)
+
+	// A service with a unary method, which answers with the name of its client
+	type unaryService any
+	service := &grpc.ServiceDesc{
+		ServiceName: "test.Unary",
+		HandlerType: (*unaryService)(nil),
+		Methods: []grpc.MethodDesc{{
+			MethodName: "Method",
+			Handler: func(srv any, ctx context.Context, dec func(any) error, interceptor grpc.UnaryServerInterceptor) (any, error) {
+				in := &emptypb.Empty{}
+				if err := dec(in); err != nil {
+					return nil, err
+				}
+				handler := func(ctx context.Context, req any) (any, error) {
+					identity, ok := IdentityFromContext(ctx)
+					if !ok {
+						return nil, status.Error(codes.Internal, "no identity")
+					}
+					grpc.SetHeader(ctx, metadata.Pairs("identity", identity.Name))
+					return &emptypb.Empty{}, nil
+				}
+				return interceptor(ctx, in, &grpc.UnaryServerInfo{Server: srv, FullMethod: "/test.Unary/Method"}, handler)
+			},
+		}},
+	}
+	server := grpc.NewServer(a.ServerOptions(func(string) Permission { return Write })...)
+	server.RegisterService(service, struct{}{})
+	listener, err := net.Listen("tcp", "localhost:0")
+	assert.NoError(t, err)
+	go server.Serve(listener)
+	defer server.Stop()
+
+	call := func(token string) (string, error) {
+		target, opts, err := DialOptions("tcp://"+listener.Addr().String(), ClientOptions{Token: token, AllowInsecureToken: true})
+		assert.NoError(t, err)
+		conn, err := grpc.NewClient(target, opts...)
+		assert.NoError(t, err)
+		defer conn.Close()
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		var header metadata.MD
+		err = conn.Invoke(ctx, "/test.Unary/Method", &emptypb.Empty{}, &emptypb.Empty{}, grpc.Header(&header))
+		return strings.Join(header.Get("identity"), ","), err
+	}
+
+	_, err = call("")
+	assert.Equal(t, codes.Unauthenticated, status.Code(err))
+	_, err = call("reader-token")
+	assert.Equal(t, codes.PermissionDenied, status.Code(err))
+	name, err := call("ci-token")
+	assert.NoError(t, err)
+	assert.Equal(t, "ci", name)
+}
+
+func TestConfigString(t *testing.T) {
+	config := Config{Tokens: []Token{{Name: "ci", Hash: HashToken("ci-token"), Permissions: []Permission{Read}}}}
+	assert.Equal(t, "anonymous=default tokens=[ci[read]]", config.String())
+
+	config.Anonymous = permissions(Read)
+	config.OIDC = &OIDCConfig{Issuer: "https://idp", Audience: "jolt", Groups: []Group{{Name: "dev", Permissions: []Permission{Write}}}}
+	assert.Equal(t, "anonymous=[read] tokens=[ci[read]] oidc={issuer=https://idp audience=jolt permissions=[] groups=[dev[write]]}", config.String())
+	assert.NotContains(t, config.String(), HashToken("ci-token"))
 }

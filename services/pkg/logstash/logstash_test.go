@@ -134,6 +134,35 @@ func (s *LogStashTestSuite) TestActiveReopenedLogIsNotEvicted() {
 	assert.NoError(s.T(), err)
 }
 
+func (s *LogStashTestSuite) TestLoadsExistingLogs() {
+	// Logs written before a restart can be read, and are evicted when the
+	// stash is full.
+	writer, err := s.stash.Append(logId1)
+	assert.NoError(s.T(), err)
+	s.writeLines(writer, strings.Repeat("1", 1000), 10)
+	assert.NoError(s.T(), writer.Close())
+	info, err := s.fs.Stat(logId1)
+	assert.NoError(s.T(), err)
+
+	config := new(MockLogStashConfig)
+	config.On("MaxSize").Return(int(info.Size()))
+	stash := NewLogStash(config, s.fs)
+	reader, err := stash.Read(logId1)
+	assert.NoError(s.T(), err)
+	line, err := reader.ReadLine()
+	assert.NoError(s.T(), err)
+	assert.Equal(s.T(), strings.Repeat("1", 1000), line.Message)
+	reader.Close()
+
+	// The stash is full, so the next log evicts the old one
+	writer, err = stash.Append(logId2)
+	assert.NoError(s.T(), err)
+	s.writeLines(writer, "2", 1)
+	assert.NoError(s.T(), writer.Close())
+	_, err = stash.Read(logId1)
+	assert.Error(s.T(), err)
+}
+
 func (s *LogStashTestSuite) TestCreate() {
 	// Create two log files in the stash
 	writer, err := s.stash.Append(logId1)

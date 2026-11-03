@@ -55,3 +55,65 @@ func TestPlatformEquals(t *testing.T) {
 	a.AddProperty("node.arch", "arm64")
 	assert.True(t, a.Equals(b))
 }
+
+func TestPlatformFulfills(t *testing.T) {
+	p := NewPlatform()
+	p.AddProperty("node.os", "linux")
+	p.AddProperty("label", "fast")
+
+	r := NewPlatform()
+	assert.True(t, p.Fulfills(r), "no requirements")
+
+	r.AddProperty("node.os", "linux")
+	assert.True(t, p.Fulfills(r))
+
+	r.AddProperty("label", "slow")
+	assert.False(t, p.Fulfills(r), "missing property")
+
+	other := NewPlatform()
+	other.AddProperty("node.os", "windows")
+	assert.False(t, p.Fulfills(other), "other value of property")
+}
+
+func TestPlatformEqualsSubset(t *testing.T) {
+	a := NewPlatform()
+	a.AddProperty("node.os", "linux")
+	b := NewPlatform()
+	b.AddProperty("node.os", "linux")
+	b.AddProperty("node.arch", "amd64")
+
+	assert.False(t, a.Equals(b))
+	assert.False(t, b.Equals(a))
+}
+
+func TestPlatformProtobufRoundTrip(t *testing.T) {
+	p := NewPlatform()
+	p.AddProperty("node.os", "linux")
+	p.AddProperty("label", "a=b")
+
+	assert.True(t, p.Equals(NewPlatformFromProtobuf(p.Protobuf())))
+	assert.True(t, NewPlatform().Equals(NewPlatformFromProtobuf(nil)))
+}
+
+func TestPlatformGetPropertiesForKey(t *testing.T) {
+	p := NewPlatform()
+	p.AddProperty("label", "fast")
+	p.AddProperty("label", "linux")
+	p.AddProperty("labels", "other")
+
+	labels, ok := p.GetPropertiesForKey("label")
+	assert.True(t, ok)
+	assert.ElementsMatch(t, []string{"fast", "linux"}, labels)
+
+	values, ok := p.GetPropertiesForKey("missing")
+	assert.False(t, ok)
+	assert.Empty(t, values)
+}
+
+func TestPlatformGetHostname(t *testing.T) {
+	p := NewPlatform()
+	assert.Equal(t, "", p.GetHostname())
+
+	p.AddProperty("worker.hostname", "host")
+	assert.Equal(t, "host", p.GetHostname())
+}

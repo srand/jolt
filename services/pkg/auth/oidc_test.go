@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -174,4 +175,38 @@ func TestOIDCInvalidConfiguration(t *testing.T) {
 		Groups: []Group{{Name: "admins", Permissions: []Permission{"admin"}}},
 	}}, Read)
 	assert.Error(t, err)
+}
+
+func TestOIDCNameClaim(t *testing.T) {
+	p := newTestProvider(t)
+	a, err := New(Config{
+		OIDC: &OIDCConfig{Issuer: p.server.URL, Audience: "jolt", NameClaim: "email", Permissions: []Permission{Read}},
+	}, Read)
+	assert.NoError(t, err)
+
+	identity, err := a.Authorize(ctx, p.token(t, map[string]any{"email": "alice@example.com", "preferred_username": "alice"}), Read)
+	assert.NoError(t, err)
+	assert.Equal(t, "alice@example.com", identity.Name)
+}
+
+func TestOIDCOnlyVerifiesJWTs(t *testing.T) {
+	// Tokens that aren't JWTs are rejected without asking the provider.
+	p := newTestProvider(t)
+	var requests atomic.Int64
+	handler := p.server.Config.Handler
+	p.server.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests.Add(1)
+		handler.ServeHTTP(w, r)
+	})
+	a := newOIDCAuthenticator(t, p)
+
+	for _, token := range []string{"opaque", "a.b", "a.b.c.d"} {
+		_, err := a.Authorize(ctx, token, Read)
+		assert.ErrorIs(t, err, ErrUnauthenticated, token)
+	}
+	assert.Zero(t, requests.Load())
+
+	_, err := a.Authorize(ctx, p.token(t, nil), Read)
+	assert.NoError(t, err)
+	assert.NotZero(t, requests.Load())
 }

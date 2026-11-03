@@ -22,6 +22,8 @@ func TestParseSize(t *testing.T) {
 		{"123MiB", 123 * 1024 * 1024},
 		{"123GiB", 123 * 1024 * 1024 * 1024},
 		{"123TiB", 123 * 1024 * 1024 * 1024 * 1024},
+		{"123PiB", 123 * 1024 * 1024 * 1024 * 1024 * 1024},
+		{"3EiB", 3 * 1024 * 1024 * 1024 * 1024 * 1024 * 1024},
 
 		{"123K", 123 * 1000},
 		{"123KB", 123 * 1000},
@@ -31,12 +33,16 @@ func TestParseSize(t *testing.T) {
 		{"123GB", 123 * 1000 * 1000 * 1000},
 		{"123T", 123 * 1000 * 1000 * 1000 * 1000},
 		{"123TB", 123 * 1000 * 1000 * 1000 * 1000},
+		{"123P", 123 * 1000 * 1000 * 1000 * 1000 * 1000},
+		{"123PB", 123 * 1000 * 1000 * 1000 * 1000 * 1000},
+		{"3E", 3 * 1000 * 1000 * 1000 * 1000 * 1000 * 1000},
+		{"3EB", 3 * 1000 * 1000 * 1000 * 1000 * 1000 * 1000},
 	}
 
 	for _, data := range testData {
 		size, err := ParseSize(data.input)
-		assert.NoError(t, err)
-		assert.Equal(t, data.value, size)
+		assert.NoError(t, err, data.input)
+		assert.Equal(t, data.value, size, data.input)
 	}
 }
 

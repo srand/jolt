@@ -1,6 +1,8 @@
 package utils
 
 import (
+	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -48,6 +50,25 @@ func TestParseDigestFail(t *testing.T) {
 	// Empty
 	_, err = ParseDigest("sha1:")
 	assert.Error(t, err)
+
+	// Unknown algorithm
+	_, err = ParseDigest("md5:d41d8cd98f00b204e9800998ecf8427e")
+	assert.Error(t, err)
+}
+
+func TestParseDigestLength(t *testing.T) {
+	// Digests must have the length of their algorithm, neither shorter nor
+	// longer. A trailing odd digit must not be dropped to make it fit.
+	for alg, size := range map[string]int{"sha1": 20, "sha256": 32, "blake3": 32} {
+		hex := strings.Repeat("ab", size)
+		_, err := ParseDigest(alg + ":" + hex)
+		assert.NoError(t, err, alg)
+
+		for _, invalid := range []string{hex[:len(hex)-2], hex + "ab", hex + "a"} {
+			_, err := ParseDigest(alg + ":" + invalid)
+			assert.Error(t, err, "%s:%s", alg, invalid)
+		}
+	}
 }
 
 func TestDigestString(t *testing.T) {
@@ -91,4 +112,19 @@ func BenchmarkParseDigest(b *testing.B) {
 			b.Fatal(err)
 		}
 	}
+}
+
+func TestDigestJSON(t *testing.T) {
+	digests := []Digest{}
+	assert.NoError(t, json.Unmarshal([]byte(`["sha1:7D97E98F8AF710C7E7FE703ABC8F639E0EE507C4", "7d97e98f8af710c7e7fe703abc8f639e0ee507c4"]`), &digests))
+	assert.Equal(t, []Digest{
+		NewDigest(Sha1Algorithm, "7d97e98f8af710c7e7fe703abc8f639e0ee507c4"),
+		NewDigest(Sha1Algorithm, "7d97e98f8af710c7e7fe703abc8f639e0ee507c4"),
+	}, digests)
+
+	data, err := json.Marshal(digests[:1])
+	assert.NoError(t, err)
+	assert.Equal(t, `["sha1:7d97e98f8af710c7e7fe703abc8f639e0ee507c4"]`, string(data))
+
+	assert.Error(t, json.Unmarshal([]byte(`["sha1:../../etc/passwd"]`), &digests))
 }

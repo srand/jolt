@@ -140,3 +140,66 @@ func (suite *LRUTestSuite) TestUpdateAll() {
 	suite.lru.Add(item3)
 	suite.mock.AssertExpectations(suite.T())
 }
+
+func (suite *LRUTestSuite) TestFullCacheIsNotTrimmed() {
+	// Items are only evicted when the size exceeds the maximum.
+	suite.lru = NewLRU(3, suite.mock.Evict)
+	suite.lru.Add(TestItem{path: "item1", size: 1})
+	suite.lru.Add(TestItem{path: "item2", size: 2})
+
+	suite.Equal(2, suite.lru.Count())
+	suite.Equal(int64(3), suite.lru.Size())
+	suite.mock.AssertNotCalled(suite.T(), "Evict", mock.Anything)
+}
+
+func (suite *LRUTestSuite) TestEvictUntilBelowMaximum() {
+	// Several items are evicted if needed to make room for a large one.
+	suite.lru = NewLRU(4, suite.mock.Evict)
+	item1 := TestItem{path: "item1", size: 1}
+	item2 := TestItem{path: "item2", size: 1}
+	item3 := TestItem{path: "item3", size: 2}
+	item4 := TestItem{path: "item4", size: 3}
+	suite.lru.Add(item1)
+	suite.lru.Add(item2)
+	suite.lru.Add(item3)
+
+	suite.mock.On("Evict", item1).Return(true).Once()
+	suite.mock.On("Evict", item2).Return(true).Once()
+	suite.mock.On("Evict", item3).Return(true).Once()
+	suite.lru.Add(item4)
+	suite.mock.AssertExpectations(suite.T())
+
+	suite.Equal(1, suite.lru.Count())
+	suite.Equal(int64(3), suite.lru.Size())
+}
+
+func (suite *LRUTestSuite) TestRemove() {
+	suite.lru = NewLRU(10, suite.mock.Evict)
+	suite.lru.Add(TestItem{path: "item1", size: 2})
+	suite.lru.Add(TestItem{path: "item2", size: 3})
+
+	suite.lru.Remove("item1")
+	suite.lru.Remove("missing")
+	suite.Equal(1, suite.lru.Count())
+	suite.Equal(int64(3), suite.lru.Size())
+	_, ok := suite.lru.Get("item1")
+	suite.False(ok)
+}
+
+func (suite *LRUTestSuite) TestUpdate() {
+	item1 := TestItem{path: "item1", size: 1}
+	suite.lru.Add(item1)
+
+	item, ok := suite.lru.Update("item1", nil)
+	suite.True(ok)
+	suite.Equal(item1, item)
+
+	var updated []TestItem
+	item, ok = suite.lru.Update("item1", func(item TestItem) { updated = append(updated, item) })
+	suite.True(ok)
+	suite.Equal(item1, item)
+	suite.Equal([]TestItem{item1}, updated)
+
+	_, ok = suite.lru.Update("missing", func(item TestItem) { suite.Fail("updated missing item") })
+	suite.False(ok)
+}
