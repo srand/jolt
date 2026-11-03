@@ -10,6 +10,7 @@ import (
 	"github.com/srand/jolt/scheduler/pkg/logstash"
 	"github.com/srand/jolt/scheduler/pkg/protocol"
 	"github.com/srand/jolt/scheduler/pkg/scheduler"
+	"github.com/srand/jolt/scheduler/pkg/validate"
 	"google.golang.org/grpc"
 )
 
@@ -52,6 +53,7 @@ func serveGrpc(sched scheduler.Scheduler, events *scheduler.EventHub, stash logs
 	// Setup gRPC options
 	opts := config.GRPCOptions.ToServerOptions()
 	opts = append(opts, authenticator.ServerOptions(scheduler.GrpcPermission)...)
+	opts = append(opts, validate.ServerOptions()...)
 
 	if config.Secure() {
 		creds, err := auth.ServerCredentials(config.Certificate, config.PrivateKey)

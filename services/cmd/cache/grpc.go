@@ -8,6 +8,7 @@ import (
 	"github.com/srand/jolt/scheduler/pkg/auth"
 	"github.com/srand/jolt/scheduler/pkg/cache"
 	"github.com/srand/jolt/scheduler/pkg/log"
+	"github.com/srand/jolt/scheduler/pkg/validate"
 	"google.golang.org/grpc"
 	_ "google.golang.org/grpc/encoding/gzip"
 )
@@ -51,6 +52,7 @@ func serveGrpc(service cache.CacheServiceServer, authenticator *auth.Authenticat
 	// Setup gRPC options
 	opts := config.GRPCOptions.ToServerOptions()
 	opts = append(opts, authenticator.ServerOptions(cache.GrpcPermission)...)
+	opts = append(opts, validate.ServerOptions()...)
 
 	// gRPC uses TLS like HTTP, with the same certificate
 	if !config.Insecure {
