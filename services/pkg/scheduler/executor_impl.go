@@ -37,7 +37,3 @@ func (o *executor) Platform() *Platform {
 func (o *executor) Tasks() chan *Task {
 	return o.queueConsumer.Chan
 }
-
-func (o *executor) Unacknowledged() *Task {
-	return o.queueConsumer.Unacknowledged()
-}

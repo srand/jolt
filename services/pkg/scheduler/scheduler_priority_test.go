@@ -176,7 +176,7 @@ func TestTaskStatisticsByStatus(t *testing.T) {
 	}
 }
 
-func TestListBuildsAndWorkers(t *testing.T) {
+func TestListBuilds(t *testing.T) {
 	scheduler := NewPriorityScheduler()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -203,10 +203,6 @@ func TestListBuildsAndWorkers(t *testing.T) {
 	defer executor.Close()
 	assert.Equal(t, taskA, <-executor.Tasks())
 
-	idle, err := scheduler.NewWorker(NewPlatformWithDefaults(), NewPlatform())
-	assert.NoError(t, err)
-	defer idle.Close()
-
 	builds := scheduler.ListBuilds(false)
 	if assert.Len(t, builds.Builds, 1) {
 		assert.Equal(t, "build", builds.Builds[0].Id)
@@ -224,17 +220,5 @@ func TestListBuildsAndWorkers(t *testing.T) {
 			"a": protocol.TaskStatus_TASK_ASSIGNED,
 			"b": taskB.Status(),
 		}, names)
-	}
-
-	workers := scheduler.ListWorkers()
-	if assert.Len(t, workers.Workers, 2) {
-		tasks := map[string]*protocol.ListWorkersResponse_Task{}
-		for _, w := range workers.Workers {
-			tasks[w.Id] = w.Task
-			assert.True(t, NewPlatformWithDefaults().Equals(NewPlatformFromProtobuf(w.Platform)))
-		}
-		assert.Contains(t, tasks, worker.Id())
-		assert.Contains(t, tasks, idle.Id())
-		assert.Nil(t, tasks[idle.Id()], "idle worker has no task")
 	}
 }

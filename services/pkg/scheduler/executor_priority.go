@@ -9,10 +9,6 @@ func (o *priorityExecutor) Acknowledge() {
 	o.executor.Acknowledge()
 }
 
-func (o *priorityExecutor) Unacknowledged() *Task {
-	return o.executor.Unacknowledged()
-}
-
 func (o *priorityExecutor) Close() {
 	o.executor.Close()
 }

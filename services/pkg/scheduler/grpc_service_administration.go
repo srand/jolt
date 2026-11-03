@@ -39,9 +39,36 @@ func (s *adminService) ListBuilds(_ context.Context, req *protocol.ListBuildsReq
 	return s.scheduler.ListBuilds(req.Tasks), nil
 }
 
-func (s *adminService) ListWorkers(_ context.Context, req *protocol.ListWorkersRequest) (*protocol.ListWorkersResponse, error) {
-	// Not implemented
-	return s.scheduler.ListWorkers(), nil
+// Workers are listed from the event hub, which tracks the task of each worker
+// from the status of the tasks, like the event stream does.
+func (s *adminService) ListWorkers(ctx context.Context, req *protocol.ListWorkersRequest) (*protocol.ListWorkersResponse, error) {
+	workers, err := s.events.Workers(ctx)
+	if err != nil {
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return nil, status.FromContextError(ctxErr).Err()
+		}
+		return nil, utils.GrpcError(err)
+	}
+
+	response := &protocol.ListWorkersResponse{
+		Workers: make([]*protocol.ListWorkersResponse_Worker, 0, len(workers)),
+	}
+	for _, worker := range workers {
+		item := &protocol.ListWorkersResponse_Worker{
+			Id:           worker.Id,
+			Platform:     worker.Platform,
+			TaskPlatform: worker.TaskPlatform,
+		}
+		if task := worker.GetTask(); task != nil {
+			item.Task = &protocol.ListWorkersResponse_Task{
+				Id:     task.Identity,
+				Name:   task.Name,
+				Status: task.Status,
+			}
+		}
+		response.Workers = append(response.Workers, item)
+	}
+	return response, nil
 }
 
 func (s *adminService) Reschedule(_ context.Context, _ *empty.Empty) (*empty.Empty, error) {

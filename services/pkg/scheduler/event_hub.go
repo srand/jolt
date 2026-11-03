@@ -57,6 +57,7 @@ type eventUpdate struct {
 	build         *protocol.BuildInfo
 	buildRemoved  string
 	subscribe     *subscribeRequest
+	listWorkers   chan []*protocol.WorkerInfo
 }
 
 type subscribeRequest struct {
@@ -127,6 +128,29 @@ func (h *EventHub) Subscribe(ctx context.Context, filter *EventFilter) (*utils.B
 	}
 }
 
+// Workers returns the connected workers and the tasks assigned to them, with
+// every update posted before the call applied.
+func (h *EventHub) Workers(ctx context.Context) ([]*protocol.WorkerInfo, error) {
+	result := make(chan []*protocol.WorkerInfo, 1)
+
+	select {
+	case h.incoming <- &eventUpdate{listWorkers: result}:
+	case <-h.done:
+		return nil, utils.ErrTerminated
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
+
+	select {
+	case workers := <-result:
+		return workers, nil
+	case <-h.done:
+		return nil, utils.ErrTerminated
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
+}
+
 // Must only be called from the hub goroutine.
 func (h *EventHub) subscribe(filter *EventFilter) *utils.BroadcastConsumer[*protocol.SchedulerEvent] {
 	consumer := h.broadcast.NewConsumer()
@@ -183,6 +207,13 @@ func (h *EventHub) apply(update *eventUpdate, now time.Time) {
 		}
 	case update.subscribe != nil:
 		update.subscribe.result <- h.subscribe(update.subscribe.filter)
+	case update.listWorkers != nil:
+		// Published messages are never modified, so they can be shared.
+		workers := make([]*protocol.WorkerInfo, 0, len(h.workers))
+		for _, worker := range h.workers {
+			workers = append(workers, worker)
+		}
+		update.listWorkers <- workers
 	}
 }
 
