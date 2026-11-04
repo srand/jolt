@@ -1,12 +1,14 @@
 import base64
 from collections import OrderedDict
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from contextlib import contextmanager, ExitStack
 import copy
 import fnmatch
 import functools
+import os
 import platform
 from threading import RLock
+import stat
 import subprocess
 from os import environ
 from os import sys as os_sys
@@ -2026,6 +2028,7 @@ class Task(TaskBase):
 class SubTask(object):
     def __init__(self, task):
         self._deps = []
+        self._depfiles = []
         self._identity = []
         self._influence = []
         self._message = None
@@ -2067,6 +2070,15 @@ class SubTask(object):
             hash.update(dep.influence.encode())
         return hash.hexdigest()
 
+    def _output_record(self, output):
+        """ The identity of the subtask and the content hash of an output. """
+        path = fs.path.join(self._task.joltdir, output)
+        if fs.path.isdir(path):
+            return self.identity + " directory"
+        if not fs.path.exists(path):
+            return None
+        return self.identity + " " + utils.hashfile(path)
+
     @functools.cached_property
     def is_outdated(self):
         try:
@@ -2074,12 +2086,10 @@ class SubTask(object):
                 if self.influence != self._tools.read_file(self.identity):
                     return True
                 for output in self.outputs:
-                    output = fs.as_canonpath(output)
-                    assert self._tools.read_file(output + ".identity") == self.identity
-
-                # FIXME: Check hash content of output file
-                for output in self.outputs:
-                    if not fs.path.exists(fs.path.join(self._task.joltdir, output)):
+                    record = self._output_record(output)
+                    if record is None:
+                        return True
+                    if self._tools.read_file(fs.as_canonpath(output) + ".identity") != record:
                         return True
                 for dep in self.dependencies:
                     if dep.is_outdated:
@@ -2089,18 +2099,16 @@ class SubTask(object):
             return True
 
     def set_uptodate(self):
-        try:
-            del self.influence
-            del self.is_outdated
-        except AttributeError:
-            pass
+        self.__dict__.pop("influence", None)
+        self.__dict__.pop("is_outdated", None)
         with self._tools.cwd(self._tools.builddir("subtasks", incremental=True)):
             self._tools.write_file(self.identity, self.influence)
 
             for output in self.outputs:
+                record = self._output_record(output)
                 output = fs.as_canonpath(output)
                 self._tools.mkdirname(output)
-                self._tools.write_file(output + ".identity", self.identity)
+                self._tools.write_file(output + ".identity", record or "")
 
     def run(self):
         pass
@@ -2121,6 +2129,8 @@ class SubTask(object):
         self.add_influence(utils.hashfile(path))
 
     def add_influence_depfile(self, path):
+        self._depfiles.append(path)
+
         def depfile():
             result = ""
             try:
@@ -2153,17 +2163,37 @@ class SubTask(object):
     def outputs(self):
         return self._outputs
 
+    @property
+    def depfiles(self):
+        """ Make dependency files written by the subtask. """
+        return self._depfiles
+
 
 class Input(SubTask):
+    """ A file that isn't produced by any subtask. Hashed when the subtasks run. """
+
     def __init__(self, task, input):
         super().__init__(task)
         self._outputs = [input]
-        self.add_influence_file(input)
-        self.set_uptodate()
 
     @property
     def message(self):
         return f"[IN] {self._outputs[0]}"
+
+    @property
+    def path(self):
+        return self._tools.expand_path(self._outputs[0])
+
+    @functools.cached_property
+    def influence(self):
+        return utils.hashfile(self.path)
+
+    @functools.cached_property
+    def is_outdated(self):
+        return not fs.path.exists(self.path)
+
+    def set_uptodate(self):
+        pass
 
     def run(self):
         raise_task_error(self._task, "Input file '{}' does not exist", self._outputs[0])
@@ -2209,12 +2239,85 @@ class FileRenderSubtask(SubTask):
     def __init__(self, task, path, **kwargs):
         super().__init__(task)
         self.add_identity(path)
-        self._path = path
+        self.add_influence(self._render)
+        self._kwargs = kwargs
+        self._path = self._tools.expand_path(path)
+
+    def _render(self):
+        with self._tools.cwd(fs.path.dirname(self._path)):
+            return self._tools.render_file(fs.path.basename(self._path), **self._kwargs)
 
     def run(self):
-        data = self._tools.render_file(self._path)
+        data = self._render()
         for output in self.outputs:
             self._tools.write_file(output, data, expand=False)
+
+
+class _JobTokens(object):
+    """
+    Tokens that limit the number of subtasks that run at the same time.
+
+    Without a jobserver, a fixed number of tokens is handed out. With a
+    jobserver, the task holds an implicit token, like make, and reads one
+    more token from the jobserver for each additional subtask. Tokens are
+    written back when the subtasks finish.
+    """
+
+    _IMPLICIT = b""
+
+    def __init__(self, tools):
+        self._lock = RLock()
+        self._implicit = True
+        self._fd = None
+        self._available = tools.thread_count()
+        path = self._jobserver_path(tools)
+        if path:
+            self._fd = os.open(path, os.O_RDWR | os.O_NONBLOCK)
+
+    @staticmethod
+    def _jobserver_path(tools):
+        # The last option wins, like in make
+        paths = re.findall(r"(?:^|\s)--jobserver-auth=fifo:(\S+)", tools.getenv("MAKEFLAGS") or "")
+        if not paths:
+            return None
+        path = tools.expand_path(paths[-1])
+        try:
+            mode = os.stat(path).st_mode
+        except OSError:
+            return None
+        if not stat.S_ISFIFO(mode) and not stat.S_ISCHR(mode):
+            return None
+        return path
+
+    def acquire(self):
+        """ Returns a token, or None if none is available. """
+        with self._lock:
+            if self._fd is None:
+                if self._available <= 0:
+                    return None
+                self._available -= 1
+                return self._IMPLICIT
+            if self._implicit:
+                self._implicit = False
+                return self._IMPLICIT
+            try:
+                return os.read(self._fd, 1) or None
+            except BlockingIOError:
+                return None
+
+    def release(self, token):
+        with self._lock:
+            if self._fd is None:
+                self._available += 1
+            elif token is self._IMPLICIT:
+                self._implicit = True
+            else:
+                os.write(self._fd, token)
+
+    def close(self):
+        if self._fd is not None:
+            os.close(self._fd)
+            self._fd = None
 
 
 class MultiTask(Task):
@@ -2265,37 +2368,55 @@ class MultiTask(Task):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._subtasks = set()
-        self._subtasks_by_output = {}
+        self._producers = {}
+        self._inputs = {}
 
     def _add_subtask(self, subtask):
         self._subtasks.add(subtask)
 
         for output in subtask.outputs:
-            if output in self._subtasks_by_output:
-                othersubtask = self._subtasks_by_output
+            othersubtask = self._producers.get(output)
+            if othersubtask is not None:
                 raise_task_error(
                     self,
                     "'{}' is generated by both '{}' and '{}'",
-                    output, subtask.command, othersubtask.command)
-            self._subtasks_by_output[output] = subtask
+                    output, othersubtask, subtask)
+            self._producers[output] = subtask
 
         return subtask
 
     def _find_subtask(self, output):
-        return self._subtasks_by_output.get(output)
+        return self._producers.get(output) or self._inputs.get(output)
 
     def _add_input(self, input):
         raise_task_error_if(not input, self, "Input is None")
-        if not isinstance(input, SubTask):
-            inputsubtask = self._find_subtask(input)
-            if inputsubtask:
-                return inputsubtask
-            inputsubtask = Input(self, input)
-        else:
-            inputsubtask = input
-        self._subtasks.add(inputsubtask)
-        self._subtasks_by_output[input] = inputsubtask
-        return inputsubtask
+        if isinstance(input, SubTask):
+            self._subtasks.add(input)
+            return input
+        subtask = self._find_subtask(input)
+        if subtask is None:
+            # The file may be the output of a subtask that hasn't been
+            # declared yet. Inputs are resolved when the subtasks run.
+            subtask = Input(self, input)
+            self._inputs[input] = subtask
+        return subtask
+
+    def _resolve_inputs(self):
+        """ Replaces inputs with the subtasks that produce them. """
+        for subtask in list(self._subtasks):
+            deps = []
+            for dep in subtask._deps:
+                if isinstance(dep, Input):
+                    dep = self._producers.get(dep.outputs[0], dep)
+                deps.append(dep)
+            subtask._deps = utils.unique_list(deps)
+        # Inputs produced by subtasks are not scheduled themselves
+        self._subtasks = {
+            subtask for subtask in self._subtasks
+            if not isinstance(subtask, Input) or subtask.outputs[0] not in self._producers
+        }
+        for subtask in list(self._subtasks):
+            self._subtasks.update(subtask._deps)
 
     def _to_subtask_list(self, inputs):
         inputs = utils.as_list(inputs)
@@ -2358,6 +2479,7 @@ class MultiTask(Task):
         if mkdir:
             for output in outputs:
                 dirs.add(self.mkdirname(output, inputs=inputfiles, outputs=outputs, **kwargs))
+            dirs.discard(None)
 
         command = self.expand(command, inputs=inputfiles, outputs=outputs, **kwargs)
         subtask = CommandSubtask(self, command)
@@ -2428,7 +2550,7 @@ class MultiTask(Task):
               dirtask = self.mkdir("{outdir}/directory", outdir=tools.builddir())
         """
         path = self.expand(path, *args, **kwargs)
-        subtask = self._find_subtask(path)
+        subtask = self._producers.get(path)
         if not subtask:
             subtask = self.call(lambda subtask: self.tools.mkdir(path), [path])
         return subtask
@@ -2442,19 +2564,27 @@ class MultiTask(Task):
             kwargs: additional keyword values used to format the directory path string.
 
         Returns:
-            Subtask object.
+            Subtask object, or None if the path has no parent directory.
 
         Example:
 
             .. code-block:: python
 
               # Creates {outdir}/directory
-              dirtask = self.mkdir("{outdir}/directory/object.o", outdir=tools.builddir())
+              dirtask = self.mkdirname("{outdir}/directory/object.o", outdir=tools.builddir())
 
         """
         path = self.expand(path, *args, **kwargs)
         path = fs.path.dirname(path)
+        if not path:
+            return None
         return self.mkdir(path, *args, **kwargs)
+
+    def _add_output_dirs(self, subtask):
+        for output in subtask.outputs:
+            dirtask = self.mkdirname(output)
+            if dirtask is not None:
+                subtask.add_dependency(dirtask)
 
     def render(self, template, outputs, **kwargs):
         """
@@ -2485,6 +2615,7 @@ class MultiTask(Task):
         for output in outputs:
             output = self.tools.expand_relpath(output, self.joltdir, outputs=outputs, **kwargs)
             subtask.add_output(output)
+        self._add_output_dirs(subtask)
         self._add_subtask(subtask)
         return subtask
 
@@ -2510,15 +2641,16 @@ class MultiTask(Task):
         """
         template = self._to_subtask_list(template)
         templatefiles = self._to_output_files(template)
-        raise_task_error_if(len(templatefiles) > 1, "Can only render one template at a time")
+        raise_task_error_if(len(templatefiles) > 1, self, "Can only render one template at a time")
 
         outputs = utils.as_list(outputs)
         subtask = FileRenderSubtask(self, templatefiles[0], **kwargs)
         for output in outputs:
-            output = self.tools.expand_relpath(output, outputs=outputs, **kwargs)
+            output = self.tools.expand_relpath(output, self.joltdir, outputs=outputs, **kwargs)
             subtask.add_output(output)
         for input in templatefiles:
             subtask.add_dependency(input)
+        self._add_output_dirs(subtask)
         self._add_subtask(subtask)
         return subtask
 
@@ -2548,6 +2680,7 @@ class MultiTask(Task):
         This method should typically not be overridden in subclasses.
         """
         self.generate(deps, tools)
+        self._resolve_inputs()
 
         log.debug("About to start executing these subtasks:")
         for subtask in self._subtasks:
@@ -2558,84 +2691,119 @@ class MultiTask(Task):
                     for depout in dep.outputs:
                         log.debug("  {}: {}", subtaskout, depout)
 
-        subtasks = {}
-        deps = {}
+        # Subtasks and the dependencies they wait for
+        waiting = {subtask: list(subtask.dependencies) for subtask in self._subtasks}
 
-        # Build graph of inverse dependencies
+        # Subtasks and the subtasks that depend on them
+        dependents = {subtask: [] for subtask in self._subtasks}
         for subtask in self._subtasks:
-            if subtask not in subtasks:
-                subtasks[subtask] = []
-            if subtask not in deps:
-                deps[subtask] = []
             for dep in subtask.dependencies:
-                if dep not in deps:
-                    deps[dep] = []
-                deps[dep].append(subtask)
-                subtasks[subtask].append(dep)
+                dependents[dep].append(subtask)
+
+        def completed(subtask):
+            for dependent in dependents[subtask]:
+                if dependent in waiting:
+                    waiting[dependent].remove(subtask)
 
         # Prune up-to-date subtasks
-        for subtask in list(filter(lambda subtask: not subtask.is_outdated, subtasks.keys())):
+        for subtask in list(filter(lambda subtask: not subtask.is_outdated, waiting.keys())):
             log.debug("Pruning {}", subtask)
-            del subtasks[subtask]
-            for dep in deps[subtask]:
-                try:
-                    subtasks[dep].remove(subtask)
-                except KeyError:
-                    pass
+            del waiting[subtask]
+            completed(subtask)
 
         self.subtaskindex = 0
-        self.subtaskcount = len(subtasks)
+        self.subtaskcount = len(waiting)
 
         lock = RLock()
 
-        with ThreadPoolExecutor(max_workers=tools.cpu_count()) as pool:
-            futures = {}
+        def runner(subtask):
+            with lock:
+                self.subtaskindex += 1
+                log.info("[{}/{}] {}", self.subtaskindex, self.subtaskcount, str(subtask))
+            subtask.run()
 
-            while subtasks or futures:
-                completed = []
-                candidates = [subtask for subtask, deps in subtasks.items() if not deps]
+        tokens = _JobTokens(tools)
+        workers = max(1, tools.thread_count())
+        futures = {}
 
-                if not candidates and not futures:
-                    break
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            try:
+                while waiting or futures:
+                    ready = [subtask for subtask, deps in waiting.items() if not deps]
+                    if not ready and not futures:
+                        break
 
-                for subtask in candidates:
-                    del subtasks[subtask]
-                    if subtask.is_outdated:
-                        def runner(subtask):
-                            with lock:
-                                self.subtaskindex += 1
-                                log.info("[{}/{}] {}", self.subtaskindex, self.subtaskcount, str(subtask))
-                            subtask.run()
-                        futures[pool.submit(functools.partial(runner, subtask))] = subtask
-                    else:
-                        completed.append(subtask)
+                    starved = False
+                    for subtask in ready:
+                        if not subtask.is_outdated:
+                            del waiting[subtask]
+                            completed(subtask)
+                            continue
+                        token = tokens.acquire() if len(futures) < workers else None
+                        if token is None:
+                            starved = True
+                            break
+                        del waiting[subtask]
+                        futures[pool.submit(runner, subtask)] = (subtask, token)
 
-                for future in as_completed(futures.keys()):
-                    subtask = futures[future]
-                    del futures[future]
-                    completed.append(subtask)
+                    if not futures:
+                        continue
 
-                    try:
+                    # Poll the jobserver while subtasks are waiting for a token
+                    finished, _ = wait(
+                        futures.keys(),
+                        timeout=0.05 if starved and len(futures) < workers else None,
+                        return_when=FIRST_COMPLETED)
+
+                    for future in finished:
+                        subtask, token = futures.pop(future)
+                        tokens.release(token)
                         future.result()
                         subtask.set_uptodate()
-                    except Exception as e:
-                        for future in futures:
-                            future.cancel()
-                        raise e
-                    break
+                        completed(subtask)
+            finally:
+                # Wait for subtasks that were running when one failed and return their tokens
+                for future, (_, token) in futures.items():
+                    future.cancel()
+                    try:
+                        future.exception()
+                    except BaseException:
+                        pass
+                    tokens.release(token)
+                tokens.close()
 
-                for subtask in completed:
-                    for dep in deps[subtask]:
-                        subtasks[dep].remove(subtask)
+        if waiting:
+            log.debug("These remaining subtasks could not be started due to unresolved dependencies")
+            for subtask in waiting:
+                log.debug("  {}", str(subtask))
+                for dep in subtask.dependencies:
+                    log.debug("   - {}", str(dep))
 
-            if subtasks:
-                log.debug("These remaining subtasks could not be started due to unresolved dependencies")
-                for subtask in subtasks:
-                    log.debug("  {}", str(subtask))
-                    for dep in subtask.dependencies:
-                        log.debug("   - {}", str(dep))
+        raise_task_error_if(waiting, self, "Subtasks with unresolved dependencies could not be executed")
 
-            raise_task_error_if(subtasks, self, "Subtasks with unresolved dependencies could not be executed")
+    def _verify_influence(self, deps, artifact, tools, sources=None):
+        """ Verifies that input files and the files listed in depfiles of subtasks are influencing. """
+        sources = set(sources or [])
+        wsroot = tools.wsroot
+
+        def add(path):
+            path = fs.path.normpath(fs.path.join(self.joltdir, path))
+            if fs.is_relative_to(path, wsroot):
+                sources.add(path)
+
+        for subtask in self._subtasks:
+            if isinstance(subtask, Input):
+                add(subtask.path)
+            for depfile in subtask.depfiles:
+                try:
+                    depfile = tools.read_depfile(fs.path.join(self.joltdir, depfile))
+                except OSError:
+                    continue
+                for inputs in depfile.values():
+                    for input in inputs:
+                        add(input)
+
+        super()._verify_influence(deps, artifact, tools, sources)
 
     def inputs(self, jobs):
         return self._to_subtask_list(jobs)
