@@ -180,8 +180,9 @@ func TokenFromHeader(header string) string {
 		if err != nil {
 			return ""
 		}
-		_, password, _ := strings.Cut(string(decoded), ":")
-		return password
+		// The password field carries the token, not a password chosen by a user
+		_, token, _ := strings.Cut(string(decoded), ":")
+		return token
 	}
 	return ""
 }
