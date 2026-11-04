@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import os
+import re
 import sys
 import time
 sys.path.append(".")
@@ -11,11 +12,15 @@ from testsupport import JoltTest
 class CxxApi(JoltTest):
     name = "api/cxx"
 
+    def _compiled(self, r, filename):
+        """ Progress lines of subtasks that mention the file. Debug output lists all subtasks. """
+        return [line for line in r.splitlines() if re.search(r"\] \[\d+/\d+\] ", line) and filename in line]
+
     def assertCompiled(self, r, filename):
-        assert filename in r, f"{filename} was not compiled"
+        assert self._compiled(r, filename), f"{filename} was not compiled"
 
     def assertNotCompiled(self, r, filename):
-        assert filename not in r, f"{filename} was compiled"
+        assert not self._compiled(r, filename), f"{filename} was compiled"
 
     def _recipe(self):
         return "import jolt\nfrom jolt.plugins.cxx import Executable as CXXExecutable\nfrom jolt.plugins.cxx import Library as CXXLibrary\nfrom jolt.plugins.cxx import Compilation as CXXProject\n" + super()._recipe()
@@ -536,12 +541,12 @@ class CxxApi(JoltTest):
         r, e = self.jolt("-v build lib", return_stderr=True)
         self.assertCompiled(r, "precompiled.pch")
         self.assertCompiled(r, "main.cpp")
-        self.assertIn("! build/outputs-lib/precompiled.pch.gch", e)
+        self.assertIn("! build/outputs-lib-inc/precompiled.pch.gch", e)
 
         r, e = self.jolt("-v build exe", return_stderr=True)
         self.assertCompiled(r, "precompiled.pch")
         self.assertCompiled(r, "main.cpp")
-        self.assertIn("! build/outputs-exe/precompiled.pch.gch", e)
+        self.assertIn("! build/outputs-exe-inc/precompiled.pch.gch", e)
 
     def test_precompiled_header_multiple(self):
         """
@@ -602,7 +607,7 @@ class CxxApi(JoltTest):
         from jolt.plugins.conan import Conan2
 
         class Protobuf(Conan2):
-            packages = ["protobuf/3.19.2"]
+            packages = ["protobuf/3.21.9"]
 
         class Lib(CXXLibrary):
             protoflags = ["--error_format=msvs"]
