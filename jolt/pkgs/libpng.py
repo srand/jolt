@@ -1,4 +1,5 @@
 from jolt import attributes, BooleanParameter, Parameter
+from jolt import filesystem as fs
 from jolt.pkgs import cmake, compiler, zlib
 from jolt.plugins import cxxinfo, git, cmake
 from jolt.tasks import TaskRegistry
@@ -27,6 +28,29 @@ class Libpng(cmake.CMake):
         "PNG_TESTS=OFF",
         "PNG_TOOLS=OFF",
     ]
+
+    def run(self, deps, tools):
+        super().run(deps, tools)
+        if self.system == "windows":
+            # libpng only installs libpng.pc on Unix-like systems, but
+            # freetype2.pc requires it
+            pcdir = tools.expand_path(fs.path.join(tools.cmake().installdir, "jolt-prefix", "lib", "pkgconfig"))
+            tools.mkdir(pcdir)
+            tools.write_file(
+                fs.path.join(pcdir, "libpng.pc"),
+                """
+prefix=${{pcfiledir}}/../..
+exec_prefix=${{prefix}}
+libdir=${{prefix}}/lib
+includedir=${{prefix}}/include/libpng16
+
+Name: libpng
+Description: Loads and saves PNG files
+Version: {version}
+Requires: zlib
+Libs: -L${{libdir}} -llibpng16{shared[,_static]}
+Cflags: -I${{includedir}}
+""")
 
     def publish(self, artifact, tools):
         super().publish(artifact, tools)
