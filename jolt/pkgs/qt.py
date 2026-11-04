@@ -1,5 +1,5 @@
 from jolt import attributes, Parameter, BooleanParameter
-from jolt.pkgs import cmake, compiler, dbus, libglvnd, ninja, protobuf
+from jolt.pkgs import cmake, compiler, dbus, libglvnd, ninja, protobuf, x11
 from jolt.plugins import git, cmake
 from jolt.tasks import TaskRegistry
 
@@ -25,7 +25,8 @@ class Qt(cmake.CMake):
     requires_dbus_linux = ["dbus"]
     requires_git = ["git:path={buildroot}/git-qt,url=https://github.com/qt/qt5.git,rev=v{version},submodules=true"]
     requires_ninja = ["ninja"]
-    requires_linux_gl_true = ["libglvnd"]
+    requires_linux_gl_true = ["libglvnd", "libx11"]
+    """ Libraries for OpenGL on Linux. GLX is used through Xlib. """
     requires_protobuf = ["protobuf"]
     srcdir = "{git[qt5]}"
 
@@ -34,6 +35,18 @@ class Qt(cmake.CMake):
         "BUILD_qtopcua=OFF",
         "BUILD_qtwebengine={webengine[ON,OFF]}",
     ]
+
+    def run(self, deps, tools):
+        if self.system != "linux" or not self.gl:
+            return super().run(deps, tools)
+        # CMake's X11::X11 target only has the include directory of X11/X.h,
+        # which is in the protocol headers, not that of Xlib.h in libX11
+        cflags = tools.run("pkg-config --cflags x11").strip()
+        with tools.environ(
+            CFLAGS=cflags + " " + tools.getenv("CFLAGS", ""),
+            CXXFLAGS=cflags + " " + tools.getenv("CXXFLAGS", ""),
+        ):
+            super().run(deps, tools)
 
 
 TaskRegistry.get().add_task_class(Qt)
