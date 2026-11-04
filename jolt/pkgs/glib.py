@@ -1,6 +1,6 @@
 from jolt import attributes, Parameter
 from jolt.pkgs import compiler, libffi, meson, pcre2, zlib
-from jolt.plugins import git, meson
+from jolt.plugins import git, meson, pkgconfig
 from jolt.tasks import TaskRegistry
 
 
@@ -9,6 +9,7 @@ from jolt.tasks import TaskRegistry
 @attributes.requires("requires_pcre2")
 @attributes.requires("requires_zlib")
 @meson.requires()
+@pkgconfig.requires()
 @meson.options("options_{system}")
 @attributes.system
 @attributes.requires("requires_compiler")
