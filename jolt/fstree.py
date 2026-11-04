@@ -457,7 +457,7 @@ def _refresh_workspace_index():
                 # The tree hash of the workspace root
                 root_hash = process.stdout.read().decode().strip()
 
-        except Exception as exc:
+        except BaseException as exc:
             if process:
                 process.terminate()
             raise exc

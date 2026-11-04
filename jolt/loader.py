@@ -486,7 +486,7 @@ def export_workspace(tasks=None) -> common_pb.Workspace:
                             if event.get("type") in ["cache::add"]:
                                 progress.update(1)
 
-                except Exception as exc:
+                except BaseException as exc:
                     if process:
                         process.terminate()
                     raise exc
@@ -523,7 +523,7 @@ def export_workspace(tasks=None) -> common_pb.Workspace:
                         if event.get("type") in ["cache::push_object", "cache::push_tree"]:
                             progress.update(1)
 
-            except Exception as exc:
+            except BaseException as exc:
                 if process:
                     process.terminate()
                 raise exc
