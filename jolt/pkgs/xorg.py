@@ -247,6 +247,10 @@ class Xrandr(autotools.Autotools):
     requires_xrender = ["xorg/libxrender"]
     srcdir = "{fetch[src]}/libXrandr-{version}"
 
+    def publish(self, artifact, tools):
+        super().publish(artifact, tools)
+        artifact.environ.CMAKE_PREFIX_PATH.append(".")
+
 
 @attributes.requires("requires_macros")
 @attributes.requires("requires_renderproto")
@@ -264,6 +268,10 @@ class Xrender(autotools.Autotools):
     requires_src = ["fetch:alias=src,url=https://www.x.org/releases/individual/lib/libXrender-{version}.tar.gz"]
     requires_x11 = ["xorg/libx11"]
     srcdir = "{fetch[src]}/libXrender-{version}"
+
+    def publish(self, artifact, tools):
+        super().publish(artifact, tools)
+        artifact.environ.CMAKE_PREFIX_PATH.append(".")
 
 
 @attributes.requires("requires_git")
