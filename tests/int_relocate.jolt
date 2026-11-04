@@ -1,0 +1,480 @@
+import os
+import shutil
+import subprocess
+import sys
+import tempfile
+sys.path.append(".")
+
+from testsupport import JoltTest
+from jolt import cli  # noqa: F401, imports jolt modules in dependency order
+
+
+FOO_C = "int foo(void) { return 42; }\n"
+PROG_C = "int foo(void);\nint main(void) { return foo() == 42 ? 0 : 1; }\n"
+MAIN_C = "int main(void) { return 0; }\n"
+
+
+def write(path, content):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w") as f:
+        f.write(content)
+
+
+def cc(*args, cwd):
+    subprocess.run(["cc"] + list(args), cwd=cwd, check=True)
+
+
+def build_library(libdir, name="foo", soname_version="1", source=FOO_C, link=()):
+    """ Builds lib<name>.so.<version> with the symlink lib<name>.so in libdir. """
+    os.makedirs(libdir, exist_ok=True)
+    write(os.path.join(libdir, ".src", name + ".c"), source)
+    soname = "lib{}.so.{}".format(name, soname_version)
+    cc("-shared", "-fPIC", "-Wl,-soname," + soname, "-o", soname, ".src/" + name + ".c", *link, cwd=libdir)
+    os.symlink(soname, os.path.join(libdir, "lib{}.so".format(name)))
+    shutil.rmtree(os.path.join(libdir, ".src"))
+    return os.path.join(libdir, soname)
+
+
+class Tools(object):
+    def expand(self, value, *args, **kwargs):
+        return value
+
+
+class Strings(object):
+    def __init__(self, install_prefix=None):
+        self.install_prefix = install_prefix
+
+
+class Artifact(object):
+    def __init__(self, path, final_path=None, install_prefix=None, rpath=()):
+        from jolt.plugins import rpath as rpath_plugin
+        self.path = path
+        self.final_path = final_path or path
+        self.tools = Tools()
+        self.strings = Strings(install_prefix)
+        rpath_plugin.RpathProvider().create(self)
+        for folder in rpath:
+            self.rpath.append(folder)
+
+
+class Deps(object):
+    def __init__(self, *artifacts):
+        self._artifacts = artifacts
+
+    def items(self):
+        return [("main@dep{}".format(i), a) for i, a in enumerate(self._artifacts)]
+
+
+class Task(object):
+    selfsustained = False
+    bundle_runtime_libraries = False
+
+
+class Node(object):
+    def __init__(self, task=None, children=()):
+        self.task = task or Task()
+        self.children = list(children)
+
+
+class FakeBinary(object):
+    def __init__(self, format, install_name=None, needed=()):
+        self.format = format
+        self.is_library = install_name is not None
+        self.install_name = install_name
+        self.needed = list(needed)
+
+    def set_install_name(self, name):
+        self.install_name = name
+
+    def change_needed(self, old, new):
+        self.needed = [new if n == old else n for n in self.needed]
+
+
+class TempDirTest(JoltTest):
+    abstract = True
+
+    def setup(self, deps, tools):
+        super().setup(deps, tools)
+        self.root = tempfile.mkdtemp()
+
+    def cleanup(self):
+        shutil.rmtree(self.root, ignore_errors=True)
+        super().cleanup()
+
+    def path(self, *parts):
+        return os.path.join(self.root, *parts)
+
+
+class RelocateInternal(TempDirTest):
+    name = "int/relocate"
+
+    def test_relative_dir(self):
+        from jolt import relocate
+        self.assertEqual(relocate.relative_dir("elf", "/c/a/x-main/bin", "/c/a/x-main/lib"), "$ORIGIN/../lib")
+        self.assertEqual(relocate.relative_dir("macho", "/c/a/x-main/lib", "/c/a/x-main/lib"), "@loader_path")
+
+    def test_plan_prefix_and_dependency_rpaths(self):
+        from jolt import relocate
+        self.assertEqual(
+            relocate.plan_rpaths(
+                "macho", "bin/tool",
+                ["/jolt-prefix/lib", "/c/libffi/y-main/lib", "/home/u/build/src", "@loader_path/../share"],
+                "/jolt-prefix", "/c/glib/x-main", ["lib"], ["/c/libffi/y-main"], True),
+            ["@loader_path/../lib", "@loader_path/../../../libffi/y-main/lib", "@loader_path/../share"])
+
+    def test_plan_drops_missing_prefix_paths(self):
+        from jolt import relocate
+        os.makedirs(self.path("app", "lib"))
+        self.assertEqual(
+            relocate.plan_rpaths(
+                "elf", "bin/prog", ["/jolt-prefix/lib", "/jolt-prefix/lib/missing"],
+                "/jolt-prefix", self.path("app"), ["lib"], [], False),
+            ["$ORIGIN/../lib"])
+
+    def test_install_names_become_rpath(self):
+        from jolt import relocate
+        lib = FakeBinary("macho", "/jolt-prefix/lib/libffi.8.dylib")
+        tool = FakeBinary("macho", needed=["/jolt-prefix/lib/libffi.8.dylib", "/usr/lib/libSystem.B.dylib"])
+        other = FakeBinary("macho", "/usr/local/lib/libother.dylib")
+        relocate.rewrite_install_names([("lib/libffi.8.dylib", lib), ("bin/tool", tool), ("lib/libother.dylib", other)], "/jolt-prefix")
+        self.assertEqual(lib.install_name, "@rpath/libffi.8.dylib")
+        self.assertEqual(tool.needed, ["@rpath/libffi.8.dylib", "/usr/lib/libSystem.B.dylib"])
+        self.assertEqual(other.install_name, "/usr/local/lib/libother.dylib")
+
+    def test_find_binaries_skips_symlinks(self):
+        from jolt import relocate
+        lib = build_library(self.path("lib"), "z", "1.3.1")
+        os.rename(lib, self.path("lib", "libz.so.1.3.1"))
+        os.unlink(self.path("lib", "libz.so"))
+        os.symlink("libz.so.1.3.1", self.path("lib", "libz.so.1"))
+        os.symlink("libz.so.1", self.path("lib", "libz.so"))
+        write(self.path("lib", "pkgconfig", "zlib.pc"), "prefix=/jolt-prefix\n")
+        self.assertEqual(relocate.find_binaries(self.root), ["lib/libz.so.1.3.1"])
+
+    def test_relocate_elf_end_to_end(self):
+        from jolt import relocate
+        dep = self.path("cache", "foo", "y-main")
+        app = self.path("cache", "app", "x-main")
+        build_library(fs_join(dep, "lib"))
+        write(fs_join(app, "src", "prog.c"), PROG_C)
+        os.makedirs(fs_join(app, "bin"))
+        cc("-o", "bin/prog", "src/prog.c", "-L" + fs_join(dep, "lib"), "-lfoo",
+           "-Wl,-rpath," + fs_join(dep, "lib"), "-Wl,-rpath,/jolt-prefix/lib", cwd=app)
+        shutil.rmtree(fs_join(app, "src"))
+
+        relocate.relocate_artifact(
+            Node(), Artifact(app, install_prefix="/jolt-prefix"), Tools(),
+            Deps(Artifact(dep, rpath=["lib"])))
+
+        from jolt import binaries
+        self.assertEqual(binaries.open_binary(fs_join(app, "bin", "prog")).rpaths, ["$ORIGIN/../../../foo/y-main/lib"])
+
+        shutil.copytree(self.path("cache"), self.path("elsewhere"), symlinks=True)
+        shutil.rmtree(self.path("cache"))
+        self.assertEqual(subprocess.run([self.path("elsewhere", "app", "x-main", "bin", "prog")]).returncode, 0)
+
+    def test_relocate_holds_one_binary_at_a_time(self):
+        """ Parsed binaries take more memory than their files, and artifacts can hold GBs. """
+        import gc
+        import weakref
+        from unittest import mock
+        from jolt import binaries, relocate
+        for name in ["a", "b", "c"]:
+            build_library(self.path("lib"), name, source="int {}(void) {{ return 1; }}\n".format(name))
+
+        alive = []
+        most = [0]
+        real_open = binaries.open_binary
+
+        def open_binary(path):
+            gc.collect()
+            alive[:] = [ref for ref in alive if ref() is not None]
+            binary = real_open(path)
+            if binary is not None:
+                alive.append(weakref.ref(binary))
+            most[0] = max(most[0], len(alive))
+            return binary
+
+        with mock.patch("jolt.binaries.open_binary", open_binary):
+            relocate.relocate_artifact(Node(), Artifact(self.root, install_prefix="/jolt-prefix"), Tools(), Deps())
+        self.assertEqual(most[0], 1)
+
+    def test_appended_rpath_keeps_defaults(self):
+        """ Following the documented example, artifact.rpath.append(), must not drop lib. """
+        from jolt import relocate
+        build_library(self.path("lib"))
+        build_library(self.path("lib", "x86_64-linux-gnu"), "bar")
+        artifact = Artifact(self.root, install_prefix="/jolt-prefix", rpath=["lib/x86_64-linux-gnu"])
+        relocate.relocate_artifact(Node(), artifact, Tools(), Deps())
+        self.assertEqual(list(artifact.rpath), ["lib/x86_64-linux-gnu", "lib"])
+
+    def test_static_binary_untouched(self):
+        from jolt import relocate
+        app = self.path("app")
+        write(fs_join(app, "main.c"), MAIN_C)
+        os.makedirs(fs_join(app, "bin"))
+        if subprocess.run(["cc", "-static", "-o", "bin/prog", "main.c"], cwd=app).returncode != 0:
+            self.skip("static linking isn't available")
+        with open(fs_join(app, "bin", "prog"), "rb") as f:
+            before = f.read()
+
+        relocate.relocate_artifact(Node(), Artifact(app, install_prefix="/jolt-prefix"), Tools(), Deps())
+
+        with open(fs_join(app, "bin", "prog"), "rb") as f:
+            self.assertEqual(f.read(), before)
+
+
+def fs_join(*parts):
+    return os.path.join(*parts)
+
+
+class Alias(object):
+    def __init__(self, qualified_name, artifact_path=None, children=()):
+        self.qualified_name = qualified_name
+        self.children = list(children)
+        self.artifacts = [Artifact(artifact_path)] if artifact_path else []
+
+
+class Env(object):
+    def __init__(self, **env):
+        self.env = env
+
+    def getenv(self, key, default=None):
+        return self.env.get(key, default)
+
+
+class BundleInternal(TempDirTest):
+    name = "int/relocate/bundle"
+
+    def bundling_node(self, bundle_runtime=False, children=()):
+        task = Task()
+        task.selfsustained = True
+        task.bundle_runtime_libraries = bundle_runtime
+        node = Node(task, children)
+        node.tools = Env()
+        return node
+
+    def build_prog(self, app, *libdirs, libs=("foo",)):
+        write(fs_join(app, "src", "prog.c"), PROG_C)
+        os.makedirs(fs_join(app, "bin"), exist_ok=True)
+        args = ["-o", "bin/prog", "src/prog.c"]
+        for libdir in libdirs:
+            args += ["-L" + libdir, "-Wl,-rpath," + libdir]
+        args += ["-l" + lib for lib in libs]
+        cc(*args, cwd=app)
+        shutil.rmtree(fs_join(app, "src"))
+
+    def assert_rpaths_inside(self, root):
+        from jolt import binaries, relocate
+        for relpath in relocate.find_binaries(root):
+            binary = binaries.open_binary(fs_join(root, relpath))
+            for rpath in binary.rpaths:
+                self.assertTrue(rpath.startswith("$ORIGIN"), rpath)
+                resolved = os.path.normpath(rpath.replace("$ORIGIN", os.path.dirname(fs_join(root, relpath))))
+                self.assertTrue(resolved.startswith(os.path.normpath(root)), (relpath, rpath))
+
+    def test_bundle_copies_needed_and_transitive(self):
+        from jolt import relocate
+        bar = self.path("cache", "bar", "b-main")
+        foo = self.path("cache", "foo", "f-main")
+        app = self.path("cache", "app", "x-main")
+        build_library(fs_join(bar, "lib"), "bar", source="int bar(void) { return 42; }\n")
+        build_library(fs_join(foo, "lib"), "foo", source="int bar(void);\nint foo(void) { return bar(); }\n",
+                      link=("-L" + fs_join(bar, "lib"), "-lbar", "-Wl,-rpath," + fs_join(bar, "lib")))
+        self.build_prog(app, fs_join(foo, "lib"))
+
+        node = self.bundling_node()
+        artifact = Artifact(app, install_prefix="/jolt-prefix")
+        deps = Deps(Artifact(foo, rpath=["lib"]), Artifact(bar, rpath=["lib"]))
+        self.assertEqual(relocate.bundle_artifact(node, artifact, deps, False), ["lib/libbar.so.1", "lib/libfoo.so.1"])
+        self.assertIn("lib", list(artifact.rpath))
+
+        relocate.relocate_artifact(node, Artifact(app, install_prefix="/jolt-prefix"), Tools(), deps)
+        self.assert_rpaths_inside(app)
+
+        shutil.copytree(app, self.path("elsewhere"), symlinks=True)
+        shutil.rmtree(self.path("cache"))
+        self.assertEqual(subprocess.run([self.path("elsewhere", "bin", "prog")]).returncode, 0)
+
+    def test_bundle_recreates_symlink_chain(self):
+        from jolt import relocate
+        foo = self.path("cache", "foo", "f-main")
+        app = self.path("cache", "app", "x-main")
+        build_library(fs_join(foo, "lib"))
+        os.rename(fs_join(foo, "lib", "libfoo.so.1"), fs_join(foo, "lib", "libfoo.so.1.0"))
+        os.symlink("libfoo.so.1.0", fs_join(foo, "lib", "libfoo.so.1"))
+        self.build_prog(app, fs_join(foo, "lib"))
+
+        copied = relocate.bundle_artifact(self.bundling_node(), Artifact(app), Deps(Artifact(foo, rpath=["lib"])), False)
+
+        self.assertEqual(copied, ["lib/libfoo.so.1", "lib/libfoo.so.1.0"])
+        self.assertEqual(os.readlink(fs_join(app, "lib", "libfoo.so.1")), "libfoo.so.1.0")
+        self.assertFalse(os.path.islink(fs_join(app, "lib", "libfoo.so.1.0")))
+
+    def test_bundle_skips_toolchain_and_system_by_default(self):
+        from jolt import binaries, relocate
+        gcc = self.path("cache", "gcc", "g-main")
+        build_library(fs_join(gcc, "lib"))
+        self.build_prog(self.path("cache", "app", "x-main"), fs_join(gcc, "lib"))
+        shutil.copytree(self.path("cache", "app"), self.path("cache", "app2"), symlinks=True)
+        children = [Alias("virtual/compiler/c", children=[Alias("gcc", gcc)])]
+        deps = Deps(Artifact(gcc, rpath=["lib"]))
+
+        app = self.path("cache", "app", "x-main")
+        self.assertEqual(relocate.bundle_artifact(self.bundling_node(children=children), Artifact(app), deps, False), [])
+
+        app = self.path("cache", "app2", "x-main")
+        loader = os.path.basename(binaries.open_binary(fs_join(app, "bin", "prog")).interpreter)
+        copied = relocate.bundle_artifact(self.bundling_node(True, children), Artifact(app), deps, True)
+        self.assertIn("lib/libfoo.so.1", copied)
+        self.assertIn("lib/libc.so.6", copied)
+        self.assertIn("lib/" + loader, copied)
+
+    def test_bundle_windows_next_to_executables(self):
+        from unittest import mock
+        from jolt import relocate
+        dep = self.path("cache", "zlib", "z-main")
+        app = self.path("cache", "app", "x-main")
+        for path in [fs_join(dep, "bin", "zlib.dll"), fs_join(app, "bin", "app.exe"), fs_join(app, "tools", "t.exe")]:
+            write(path, "MZ")
+
+        def open_binary(path):
+            binary = FakeBinary("pe", needed=["KERNEL32.dll"] if path.endswith(".dll") else ["zlib.dll", "KERNEL32.dll"])
+            binary.path, binary.rpaths, binary.interpreter = path, [], None
+            return binary
+
+        with mock.patch("jolt.binaries.open_binary", open_binary), mock.patch("platform.system", return_value="Windows"):
+            copied = relocate.bundle_artifact(self.bundling_node(), Artifact(app), Deps(Artifact(dep, rpath=["bin"])), False)
+        self.assertEqual(copied, ["bin/zlib.dll", "tools/zlib.dll"])
+
+    def test_toolchain_roots(self):
+        from jolt import relocate
+        gmp = Alias("gmp", "/c/gmp/m-main")
+        gcc = Alias("gcc", "/c/gcc/g-main", [gmp])
+        alias = Alias("virtual/compiler/c", "/c/virtual_compiler_c/a-main", [gcc])
+        other = Alias("zlib", "/c/zlib/z-main")
+        node = Node(children=[alias, gcc, gmp, other])
+        self.assertEqual(relocate.toolchain_roots(node), {"/c/gmp/m-main", "/c/gcc/g-main", "/c/virtual_compiler_c/a-main"})
+
+    def test_toolchain_roots_through_transitive_alias(self):
+        """ The graph drops transitive aliases from children, but not from descendants. """
+        from jolt import relocate
+        gcc = Alias("gcc", "/c/gcc/g-main")
+        alias = Alias("virtual/compiler/c", "/c/virtual_compiler_c/a-main", [gcc])
+        alias.descendants = {gcc}
+        cpython = Alias("cpython/posix", "/c/cpython/p-main", [gcc])
+        node = Node(children=[cpython, gcc])
+        node.descendants = {cpython, alias, gcc}
+        self.assertEqual(relocate.toolchain_roots(node), {"/c/gcc/g-main", "/c/virtual_compiler_c/a-main"})
+
+    def test_bundle_holds_one_binary_at_a_time(self):
+        import gc
+        import weakref
+        from unittest import mock
+        from jolt import binaries, relocate
+        foo = self.path("cache", "foo", "f-main")
+        app = self.path("cache", "app", "x-main")
+        build_library(fs_join(foo, "lib"))
+        for name in ["a", "b"]:
+            build_library(fs_join(app, "lib"), name, source="int {}(void) {{ return 1; }}\n".format(name))
+        self.build_prog(app, fs_join(foo, "lib"))
+
+        alive = []
+        most = [0]
+        real_open = binaries.open_binary
+
+        def open_binary(path):
+            gc.collect()
+            alive[:] = [ref for ref in alive if ref() is not None]
+            binary = real_open(path)
+            if binary is not None:
+                alive.append(weakref.ref(binary))
+            most[0] = max(most[0], len(alive))
+            return binary
+
+        with mock.patch("jolt.binaries.open_binary", open_binary):
+            relocate.bundle_artifact(self.bundling_node(), Artifact(app), Deps(Artifact(foo, rpath=["lib"])), False)
+        self.assertEqual(most[0], 1)
+
+    def test_bundle_ignores_rpaths_outside_dependencies(self):
+        """ An rpath to /usr/local/lib or a build directory isn't a dependency. """
+        from jolt import relocate
+        host = self.path("host", "lib")
+        app = self.path("cache", "app", "x-main")
+        build_library(host)
+        self.build_prog(app, host)
+        self.assertEqual(relocate.bundle_artifact(self.bundling_node(), Artifact(app), Deps(), False), [])
+
+    def test_bundle_windows_without_executables(self):
+        """ A DLL-only artifact gets the DLLs of its dependencies in its own DLL folder. """
+        from unittest import mock
+        from jolt import relocate
+        dep = self.path("cache", "zlib", "z-main")
+        app = self.path("cache", "app", "x-main")
+        for path in [fs_join(dep, "bin", "zlib.dll"), fs_join(app, "bin", "app.dll")]:
+            write(path, "MZ")
+
+        def open_binary(path):
+            binary = FakeBinary("pe", needed=["KERNEL32.dll"] if path.endswith("zlib.dll") else ["zlib.dll"])
+            binary.path, binary.rpaths, binary.interpreter = path, [], None
+            return binary
+
+        with mock.patch("jolt.binaries.open_binary", open_binary), mock.patch("platform.system", return_value="Windows"):
+            copied = relocate.bundle_artifact(self.bundling_node(), Artifact(app), Deps(Artifact(dep, rpath=["bin"])), False)
+        self.assertEqual(copied, ["bin/zlib.dll"])
+
+
+MACHO = b"\xcf\xfa\xed\xfe"
+
+
+class FrameworkInternal(TempDirTest):
+    """ Qt and others install frameworks on macOS: lib/QtCore.framework/Versions/A/QtCore. """
+
+    name = "int/relocate/framework"
+
+    def framework(self, libdir, name="Foo"):
+        binary = fs_join(libdir, name + ".framework", "Versions", "A", name)
+        os.makedirs(os.path.dirname(binary))
+        with open(binary, "wb") as f:
+            f.write(MACHO)
+        write(fs_join(libdir, name + ".framework", "Versions", "A", "Resources", "Info.plist"), "<plist/>")
+        return binary
+
+    def test_default_rpath_includes_frameworks(self):
+        from unittest import mock
+        from jolt import relocate
+        self.framework(self.path("lib"))
+        with mock.patch("platform.system", return_value="Darwin"):
+            self.assertEqual(relocate.default_rpath(self.root), ["lib"])
+
+    def test_resolve_framework(self):
+        from jolt import relocate
+        binary = self.framework(self.path("lib"))
+        self.assertEqual(relocate.resolve_library("@rpath/Foo.framework/Versions/A/Foo", "macho", [self.path("lib")]), binary)
+
+    def test_install_name_in_framework(self):
+        from jolt import relocate
+        lib = FakeBinary("macho", "/jolt-prefix/lib/Foo.framework/Versions/A/Foo")
+        relocate.rewrite_install_names([("lib/Foo.framework/Versions/A/Foo", lib)], "/jolt-prefix", ["lib"])
+        self.assertEqual(lib.install_name, "@rpath/Foo.framework/Versions/A/Foo")
+
+    def test_bundle_copies_whole_framework(self):
+        from unittest import mock
+        from jolt import relocate
+        dep = self.path("cache", "qt", "q-main")
+        app = self.path("cache", "app", "x-main")
+        self.framework(fs_join(dep, "lib"))
+        os.makedirs(fs_join(app, "bin"))
+        with open(fs_join(app, "bin", "tool"), "wb") as f:
+            f.write(MACHO)
+
+        def open_binary(path):
+            needed = ["@rpath/Foo.framework/Versions/A/Foo"] if path.endswith("tool") else []
+            binary = FakeBinary("macho", needed=needed)
+            binary.path, binary.rpaths, binary.interpreter = path, [], None
+            return binary
+
+        with mock.patch("jolt.binaries.open_binary", open_binary), mock.patch("platform.system", return_value="Darwin"):
+            relocate.bundle_artifact(Node(), Artifact(app), Deps(Artifact(dep, rpath=["lib"])), False)
+        self.assertTrue(os.path.isfile(fs_join(app, "lib", "Foo.framework", "Versions", "A", "Foo")))
+        self.assertTrue(os.path.isfile(fs_join(app, "lib", "Foo.framework", "Versions", "A", "Resources", "Info.plist")))

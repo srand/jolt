@@ -1,0 +1,146 @@
+#!/usr/bin/python
+
+import json
+import os
+import shutil
+import subprocess
+import sys
+import tempfile
+sys.path.append(".")
+
+from testsupport import JoltTest
+from jolt import cli  # noqa: F401, imports jolt modules in dependency order
+from jolt import filesystem as fs
+
+
+# Braces are doubled: the test workspace files are written with brace expansion.
+RECIPE = """
+--- file: foo.c
+int foo(void) {{ return 42; }}
+---
+--- file: prog.c
+int foo(void);
+int main(void) {{ return foo() == 42 ? 0 : 1; }}
+---
+--- tasks:
+@attributes.relocate_binaries()
+class Foo(Task):
+    def run(self, deps, tools):
+        with tools.cwd(tools.builddir()):
+            tools.run("cc -shared -fPIC -Wl,-soname,libfoo.so.1 -o libfoo.so.1 {{joltdir}}/foo.c")
+            tools.symlink("libfoo.so.1", "libfoo.so")
+
+    def publish(self, artifact, tools):
+        with tools.cwd(tools.builddir()):
+            artifact.collect("libfoo.so*", "lib/", symlinks=True)
+
+
+@attributes.relocate_binaries()
+class Prog(Task):
+    requires = ["foo"]
+
+    def run(self, deps, tools):
+        print("LDFLAGS=" + tools.getenv("LDFLAGS", ""))
+        with tools.cwd(tools.builddir()):
+            tools.run("cc -o prog {{joltdir}}/prog.c -L{{0}}/lib -lfoo $LDFLAGS -Wl,-rpath,/jolt-prefix/lib", deps["foo"].path)
+
+    def publish(self, artifact, tools):
+        with tools.cwd(tools.builddir()):
+            artifact.collect("prog", "bin/")
+        artifact.strings.install_prefix = "/jolt-prefix"
+
+
+class Bundle(Prog):
+    selfsustained = True
+
+
+class OptOut(Prog):
+    relocate_binaries = False
+
+
+@attributes.relocate_binaries()
+class Own(Task):
+    def run(self, deps, tools):
+        with tools.cwd(tools.builddir()):
+            tools.run("cc -shared -fPIC -Wl,-soname,libfoo.so.1 -o libfoo.so.1 {{joltdir}}/foo.c")
+            tools.symlink("libfoo.so.1", "libfoo.so")
+            tools.run("cc -o prog {{joltdir}}/prog.c -L. -lfoo $LDFLAGS")
+
+    def publish(self, artifact, tools):
+        with tools.cwd(tools.builddir()):
+            artifact.collect("libfoo.so*", "lib/", symlinks=True)
+            artifact.collect("prog", "bin/")
+---
+"""
+
+
+def recipe(method):
+    method.__doc__ = RECIPE
+    return method
+
+
+class RelocateApi(JoltTest):
+    name = "api/relocate"
+
+    def artifact_path(self, output, task):
+        for location in self.artifacts(output):
+            if fs.path.sep + task + fs.path.sep in location:
+                return fs.path.join(self.ws, location)
+        self.fail("no artifact of {} in output".format(task))
+
+    def rpaths(self, path):
+        from jolt import binaries
+        return binaries.open_binary(path).rpaths
+
+    @recipe
+    def test_consumer_gets_relative_rpath(self):
+        r = self.build("prog")
+        rpaths = self.rpaths(fs.path.join(self.artifact_path(r, "prog"), "bin", "prog"))
+        self.assertTrue(rpaths, rpaths)
+        for rpath in rpaths:
+            self.assertTrue(rpath.startswith("$ORIGIN"), rpath)
+            self.assertNotIn("/jolt-prefix", rpath)
+        self.assertEqual(subprocess.run([fs.path.join(self.artifact_path(r, "prog"), "bin", "prog")]).returncode, 0)
+
+    @recipe
+    def test_selfsustained_bundles(self):
+        r = self.build("bundle")
+        path = self.artifact_path(r, "bundle")
+        self.assertTrue(os.path.exists(fs.path.join(path, "lib", "libfoo.so.1")))
+
+        copy = tempfile.mkdtemp()
+        try:
+            shutil.copytree(path, fs.path.join(copy, "bundle"), symlinks=True)
+            shutil.rmtree(fs.path.join(self.ws, "cache"))
+            self.assertEqual(subprocess.run([fs.path.join(copy, "bundle", "bin", "prog")]).returncode, 0)
+        finally:
+            shutil.rmtree(copy, ignore_errors=True)
+
+    @recipe
+    def test_opt_out(self):
+        r = self.build("optout")
+        self.assertNotIn("-Wl,-rpath", [line for line in r.splitlines() if "LDFLAGS=" in line][0])
+        self.assertEqual(self.rpaths(fs.path.join(self.artifact_path(r, "optout"), "bin", "prog")), ["/jolt-prefix/lib"])
+
+    @recipe
+    def test_relocation_doesnt_grow_elf(self):
+        """ LIEF moves .dynstr into a new segment when it grows, and strip breaks such files. """
+        r = self.build("own")
+        prog = fs.path.join(self.artifact_path(r, "own"), "bin", "prog")
+        self.assertEqual(self.rpaths(prog), ["$ORIGIN/../lib"])
+
+        reference = fs.path.join(self.ws, "reference")
+        subprocess.run(["cc", "-o", reference, fs.path.join(self.ws, "prog.c"), "-L" + fs.path.dirname(prog) + "/../lib", "-lfoo"], check=True)
+        self.assertEqual(self.load_segments(prog), self.load_segments(reference))
+
+    def load_segments(self, path):
+        out = subprocess.run(["readelf", "-lW", path], capture_output=True, text=True, check=True).stdout
+        return len([line for line in out.splitlines() if line.strip().startswith("LOAD")])
+
+    @recipe
+    def test_identity_includes_relocate_source(self):
+        r = self.build("prog")
+        with open(fs.path.join(self.artifact_path(r, "prog"), ".manifest.json")) as f:
+            influence = json.load(f)["influence"]
+        self.assertTrue(any("relocate.py" in line for line in influence), influence)
+        self.assertTrue(any("binaries.py" in line for line in influence), influence)

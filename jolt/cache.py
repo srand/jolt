@@ -545,6 +545,26 @@ class Artifact(object):
                 artifact.python.PATH.append("my_module")
     """
 
+    rpath = []
+    """ Folders with shared libraries that consumers load at runtime.
+
+    The folders are relative to the artifact root. Tasks decorated with
+    :func:`jolt.attributes.relocate_binaries`, which includes the CMake,
+    Autotools and Meson base classes, publish ``lib`` and ``lib64`` (``bin``
+    on Windows) automatically when they contain shared libraries.
+
+    Consumers that also relocate their binaries link with rpaths to these
+    folders on Linux and macOS, and find DLLs in them through ``PATH`` on
+    Windows. Self-sustained consumers copy the libraries they link to from
+    these folders.
+
+    Example:
+        .. code-block:: python
+
+            def publish(self, artifact, tools):
+                artifact.rpath.append("lib/x86_64-linux-gnu")
+    """
+
     strings = {}
     """ Artifact strings.
 

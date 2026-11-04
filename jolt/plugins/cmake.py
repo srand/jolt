@@ -55,6 +55,7 @@ def use_ninja():
     return decorate
 
 
+@attributes.relocate_binaries()
 @attributes.common_metadata()
 @options("options")
 class CMake(Task):

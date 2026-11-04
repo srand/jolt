@@ -348,7 +348,7 @@ def sections(alias=None):
 
 
 def plugins():
-    automatic = ["cxxinfo", "environ", "paths", "python", "strings"]
+    automatic = ["cxxinfo", "environ", "paths", "python", "rpath", "strings"]
     return sections() + automatic
 
 

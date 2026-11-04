@@ -1,0 +1,115 @@
+import os
+import sys
+from unittest import mock
+sys.path.append(".")
+
+from testsupport import JoltTest
+from jolt import cli  # noqa: F401, imports jolt modules in dependency order
+from jolt import filesystem as fs
+
+
+class Tools(object):
+    def __init__(self, **env):
+        self.env = dict(env)
+
+    def expand(self, value, *args, **kwargs):
+        return value
+
+    def getenv(self, key, default=None):
+        return self.env.get(key, default)
+
+    def setenv(self, key, value=None):
+        if value is None:
+            self.env.pop(key, None)
+        else:
+            self.env[key] = value
+
+
+class Artifact(object):
+    def __init__(self, path):
+        self.path = path
+        self.tools = Tools()
+        from jolt.plugins import rpath
+        rpath.RpathProvider().create(self)
+
+
+class Consumer(object):
+    relocate_binaries = True
+
+    def __init__(self, **env):
+        self.tools = Tools(**env)
+
+
+class RpathInternal(JoltTest):
+    name = "int/rpath"
+
+    def provider(self):
+        from jolt.plugins import rpath
+        return rpath.RpathProvider()
+
+    def artifact(self, path="/cache/zlib/x-main", folders=("lib",)):
+        artifact = Artifact(path)
+        for folder in folders:
+            artifact.rpath.append(folder)
+        return artifact
+
+    def test_format_parse_roundtrip(self):
+        artifact = self.artifact(folders=["lib", "lib64"])
+        content = {}
+        self.provider().format(artifact, content)
+        copy = Artifact("/cache/zlib/x-main")
+        self.provider().parse(copy, content)
+        self.assertEqual(list(copy.rpath), ["lib", "lib64"])
+
+    def test_apply_linux_adds_rpath_to_ldflags(self):
+        consumer = Consumer(LDFLAGS="-O2")
+        artifact = self.artifact()
+        with mock.patch("platform.system", return_value="Linux"):
+            self.provider().apply(consumer, artifact)
+            self.assertEqual(consumer.tools.getenv("LDFLAGS"), "-O2 -Wl,-rpath,/cache/zlib/x-main/lib")
+            self.provider().unapply(consumer, artifact)
+        self.assertEqual(consumer.tools.getenv("LDFLAGS"), "-O2")
+
+    def test_apply_darwin_adds_headerpad(self):
+        consumer = Consumer()
+        zlib = self.artifact()
+        ffi = self.artifact("/cache/libffi/y-main")
+        with mock.patch("platform.system", return_value="Darwin"):
+            self.provider().apply(consumer, zlib)
+            self.provider().apply(consumer, ffi)
+            flags = consumer.tools.getenv("LDFLAGS").split()
+            self.assertEqual(flags.count("-Wl,-rpath,/cache/zlib/x-main/lib"), 1)
+            self.assertEqual(flags.count("-Wl,-rpath,/cache/libffi/y-main/lib"), 1)
+            self.assertEqual(flags.count("-Wl,-headerpad_max_install_names"), 1)
+            self.provider().unapply(consumer, ffi)
+            self.provider().unapply(consumer, zlib)
+        self.assertIsNone(consumer.tools.getenv("LDFLAGS"))
+
+    def test_apply_windows_adds_path(self):
+        consumer = Consumer(PATH="/usr/bin", LDFLAGS="-O2")
+        artifact = self.artifact(folders=["bin"])
+        with mock.patch("platform.system", return_value="Windows"):
+            self.provider().apply(consumer, artifact)
+            paths = consumer.tools.getenv("PATH").split(os.pathsep)
+            self.assertEqual(paths[0], fs.path.join("/cache/zlib/x-main", "bin"))
+            self.assertEqual(consumer.tools.getenv("LDFLAGS"), "-O2")
+            self.provider().unapply(consumer, artifact)
+        self.assertEqual(consumer.tools.getenv("PATH"), "/usr/bin")
+
+    def test_apply_without_decorator_does_nothing(self):
+        consumer = Consumer(LDFLAGS="-O2", PATH="/usr/bin")
+        consumer.relocate_binaries = False
+        artifact = self.artifact()
+        for system in ["Linux", "Darwin", "Windows"]:
+            with mock.patch("platform.system", return_value=system):
+                self.provider().apply(consumer, artifact)
+                self.assertEqual(consumer.tools.env, {"LDFLAGS": "-O2", "PATH": "/usr/bin"})
+                self.provider().unapply(consumer, artifact)
+
+    def test_apply_never_sets_ld_library_path(self):
+        consumer = Consumer()
+        artifact = self.artifact()
+        with mock.patch("platform.system", return_value="Linux"):
+            self.provider().apply(consumer, artifact)
+            self.assertIsNone(consumer.tools.getenv("LD_LIBRARY_PATH"))
+            self.provider().unapply(consumer, artifact)

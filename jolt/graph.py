@@ -892,7 +892,8 @@ class TaskProxy(object):
                                     # Run task
                                     try:
                                         hooks.task_prerun(self, context, self.tools)
-                                        with self.tools.timeout(seconds=config.getint("jolt", "task_timeout")):
+                                        with self.tools.timeout(seconds=config.getint("jolt", "task_timeout")), \
+                                                self._relocation_environment():
                                             self.task.run(context, self.tools)
                                     finally:
                                         hooks.task_postrun(self, context, self.tools)
@@ -972,11 +973,20 @@ class TaskProxy(object):
                 with hooks.task_run(extension):
                     extension.run(env, force_upload, force_build or executed)
 
+    def _relocation_environment(self):
+        if not getattr(self.task, "relocate_binaries", False):
+            return nullcontext()
+        from jolt import relocate
+        return relocate.build_environment(self.tools)
+
     def publish(self, context, artifact, buildlog=None):
         hooks.task_prepublish(self, artifact, self.tools)
         publish = self.task.publish if artifact.is_main() else \
             getattr(self.task, "publish_" + artifact.name)
         publish(artifact, self.tools)
+        if artifact.is_main() and getattr(self.task, "relocate_binaries", False):
+            from jolt import relocate
+            relocate.relocate_artifact(self, artifact, self.tools, context)
         self.task._verify_influence(context, artifact, self.tools)
         if artifact.is_main() and buildlog:
             with open(fs.path.join(artifact.path, ".build.log"), "w") as f:

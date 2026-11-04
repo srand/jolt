@@ -1,6 +1,7 @@
 from jolt import Task, attributes, utils
 
 
+@attributes.relocate_binaries()
 @attributes.common_metadata()
 class Autotools(Task):
     """ Base class for Autotools-based build tasks. """

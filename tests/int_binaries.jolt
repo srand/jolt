@@ -1,0 +1,109 @@
+import os
+import shutil
+import stat
+import subprocess
+import sys
+import tempfile
+sys.path.append(".")
+
+from testsupport import JoltTest
+from jolt import cli  # noqa: F401, imports jolt modules in dependency order
+
+
+FOO_C = "int foo(void) { return 42; }\n"
+PROG_C = "int foo(void);\nint main(void) { return foo() == 42 ? 0 : 1; }\n"
+
+
+def cc(*args, cwd):
+    subprocess.run(["cc"] + list(args), cwd=cwd, check=True)
+
+
+def build_fixtures(root):
+    """
+    Builds lib/libfoo.so.1 (with the symlink libfoo.so), bin/prog linked to it
+    with the rpath /jolt-prefix/lib, foo.o and libfoo.a.
+    """
+    os.makedirs(os.path.join(root, "lib"))
+    os.makedirs(os.path.join(root, "bin"))
+    with open(os.path.join(root, "foo.c"), "w") as f:
+        f.write(FOO_C)
+    with open(os.path.join(root, "prog.c"), "w") as f:
+        f.write(PROG_C)
+    cc("-shared", "-fPIC", "-Wl,-soname,libfoo.so.1", "-o", "lib/libfoo.so.1", "foo.c", cwd=root)
+    os.symlink("libfoo.so.1", os.path.join(root, "lib", "libfoo.so"))
+    cc("-o", "bin/prog", "prog.c", "-Llib", "-lfoo", "-Wl,-rpath,/jolt-prefix/lib", cwd=root)
+    cc("-c", "-o", "foo.o", "foo.c", cwd=root)
+    subprocess.run(["ar", "rcs", "libfoo.a", "foo.o"], cwd=root, check=True)
+
+
+class BinariesInternal(JoltTest):
+    name = "int/binaries"
+
+    def setup(self, deps, tools):
+        super().setup(deps, tools)
+        self.root = tempfile.mkdtemp()
+        build_fixtures(self.root)
+
+    def cleanup(self):
+        shutil.rmtree(self.root, ignore_errors=True)
+        super().cleanup()
+
+    def path(self, *parts):
+        return os.path.join(self.root, *parts)
+
+    def test_reads_elf(self):
+        from jolt import binaries
+        prog = binaries.open_binary(self.path("bin", "prog"))
+        self.assertEqual((prog.format, prog.is_library), ("elf", False))
+        self.assertIn("libfoo.so.1", prog.needed)
+        self.assertEqual(prog.rpaths, ["/jolt-prefix/lib"])
+        self.assertTrue(prog.interpreter.startswith("/"))
+        self.assertIsNone(prog.install_name)
+
+        lib = binaries.open_binary(self.path("lib", "libfoo.so.1"))
+        self.assertEqual((lib.format, lib.is_library), ("elf", True))
+
+    def test_set_rpaths_roundtrip(self):
+        from jolt import binaries
+        prog = binaries.open_binary(self.path("bin", "prog"))
+        prog.set_rpaths(["$ORIGIN/../lib"])
+        self.assertTrue(prog.save())
+
+        prog = binaries.open_binary(self.path("bin", "prog"))
+        self.assertEqual(prog.rpaths, ["$ORIGIN/../lib"])
+        self.assertEqual(subprocess.run([self.path("bin", "prog")]).returncode, 0)
+
+    def test_save_unmodified_writes_nothing(self):
+        from jolt import binaries
+        path = self.path("bin", "prog")
+        with open(path, "rb") as f:
+            before = f.read()
+        mtime = os.stat(path).st_mtime_ns
+
+        self.assertFalse(binaries.open_binary(path).save())
+
+        with open(path, "rb") as f:
+            self.assertEqual(f.read(), before)
+        self.assertEqual(os.stat(path).st_mtime_ns, mtime)
+
+    def test_read_only_file_keeps_mode(self):
+        from jolt import binaries
+        path = self.path("lib", "libfoo.so.1")
+        os.chmod(path, 0o555)
+
+        lib = binaries.open_binary(path)
+        lib.set_rpaths(["$ORIGIN"])
+        self.assertTrue(lib.save())
+
+        self.assertEqual(stat.S_IMODE(os.stat(path).st_mode), 0o555)
+        self.assertEqual(binaries.open_binary(path).rpaths, ["$ORIGIN"])
+
+    def test_ignores_objects_archives_scripts_symlinks(self):
+        from jolt import binaries
+        with open(self.path("script.sh"), "w") as f:
+            f.write("#!/bin/sh\necho hello\n")
+        with open(self.path("garbage"), "wb") as f:
+            f.write(b"\x7fELF" + b"\x00" * 12 + b"garbage")
+
+        for name in ["foo.o", "libfoo.a", "script.sh", "garbage", "lib/libfoo.so"]:
+            self.assertIsNone(binaries.open_binary(self.path(name)), name)

@@ -15,6 +15,7 @@ def options(attrib):
     return utils.concat_attributes("options", attrib)
 
 
+@attributes.relocate_binaries()
 @options("options")
 @attributes.common_metadata()
 class Meson(Task):

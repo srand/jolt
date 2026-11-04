@@ -5,6 +5,7 @@ class All(Alias):
     requires = [
         "api/artifact",
         "api/artifact/environ",
+        "api/relocate",
         "api/fetch",
         "api/git",
         "api/ninja",
@@ -31,6 +32,7 @@ class All(Alias):
         # "ext/podman",  -- cannot run inside CI container
         "ext/symlinks",
         "flake8",
+        "int/binaries",
         "int/git",
         "int/influence",
         "int/jobserver/k8s",
@@ -38,6 +40,10 @@ class All(Alias):
         "int/log",
         "int/login",
         "int/pkgs",
+        "int/relocate",
+        "int/relocate/bundle",
+        "int/relocate/framework",
+        "int/rpath",
         "int/selfdeploy",
         "int/tools",
         "int/utils",

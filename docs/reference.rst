@@ -26,7 +26,7 @@ Artifact
 .. reference-artifact-start
 
 .. autoclass:: jolt.Artifact
-   :members: cmake, collect, copy, cxxinfo, environ, path, paths, python, final_path, strings
+   :members: cmake, collect, copy, cxxinfo, environ, path, paths, python, final_path, rpath, strings
 
 .. reference-artifact-end
 
@@ -66,7 +66,7 @@ Decorators
 .. reference-decorators-start
 
 .. autoclass:: jolt.attributes
-   :members: artifact, artifact_upload, attribute, common_metadata, environ, load, requires, system, timeout
+   :members: artifact, artifact_upload, attribute, common_metadata, environ, load, relocate_binaries, requires, system, timeout
 
 .. reference-decorators-end
 

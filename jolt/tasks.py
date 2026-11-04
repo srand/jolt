@@ -28,6 +28,7 @@ from jolt.expires import Immediately
 from jolt.influence import FileInfluence, TaintInfluenceProvider
 from jolt.influence import TaskClassSourceInfluence
 from jolt.influence import CallbackInfluence
+from jolt.influence import StringInfluence
 from jolt.influence import attribute as attribute_influence
 from jolt.influence import environ as environ_influence
 from jolt.influence import source as source_influence
@@ -1274,6 +1275,68 @@ class attributes:
 
             cls.publish = publish
 
+            return cls
+
+        return decorate
+
+    @staticmethod
+    def relocate_binaries(bundle_runtime=False):
+        """
+        Decorator making the binaries in published artifacts relocatable.
+
+        After the task has published its artifact, the shared library
+        references of its executables and shared libraries are rewritten so
+        that the artifact works from any cache location:
+
+            - On macOS, install names in the install prefix become
+              ``@rpath/<name>``.
+            - On Linux and macOS, rpaths into the install prefix and into the
+              artifacts of dependencies become relative to each binary
+              (``$ORIGIN``, ``@loader_path``). Other absolute rpaths, such as
+              into the build directory, are removed.
+            - Folders with shared libraries are published in
+              ``artifact.rpath`` (``lib`` and ``lib64``, ``bin`` on Windows).
+
+        While the task runs, the ``artifact.rpath`` folders of its
+        dependencies are added to ``LDFLAGS`` as rpaths on Linux and macOS,
+        and to ``PATH`` on Windows. ``LD_LIBRARY_PATH`` is not used.
+
+        A self-sustained task gets copies of the shared libraries its
+        binaries link to from its dependencies, in ``lib`` or, on Windows,
+        next to each executable. Libraries of the operating system are never
+        copied. Libraries of the toolchain, the C library and the dynamic
+        loader are only copied when ``bundle_runtime`` is true. A bundled
+        dynamic loader must be called explicitly to run a program.
+
+        On Windows, Python extension modules and plugins in subfolders find
+        DLLs only next to themselves or the executable, not through ``PATH``.
+
+        The decorator is used by the CMake, Autotools and Meson base classes.
+        A task can opt out by setting ``relocate_binaries = False``.
+
+        Args:
+            bundle_runtime (boolean): Also bundle runtime libraries in
+                self-sustained artifacts. Sets the task attribute
+                ``bundle_runtime_libraries``.
+        """
+        # The relocation code is outside the workspace, where file influence
+        # doesn't reach. Its hash changes the identity of relocated tasks.
+        jolt_dir = fs.path.dirname(fs.path.abspath(__file__))
+        code = "\n".join(
+            utils.hashfile(fs.path.join(jolt_dir, name)) + ": " + name
+            for name in ["binaries.py", "relocate.py"])
+
+        def decorate(cls):
+            cls.relocate_binaries = True
+            cls.bundle_runtime_libraries = bundle_runtime
+            _old_influence = cls._influence
+
+            def _influence(self, *args, **kwargs):
+                influence = _old_influence(self, *args, **kwargs)
+                influence.append(StringInfluence(code))
+                return influence
+
+            cls._influence = _influence
             return cls
 
         return decorate
