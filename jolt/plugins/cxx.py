@@ -71,7 +71,7 @@ class GnuToolchain(object):
         kwargs["gnu_as"] = self._gnu_tool("AS", self.gnu_as)
 
         kwargs["asflags"] = kwargs.pop("asflags", self._asflags())
-        kwargs["asflags_environ"] = kwargs.pop("asflags_environ", self.tools.getenv("ASFLAGS"))
+        kwargs["asflags_environ"] = kwargs.pop("asflags_environ", self.tools.getenv("ASFLAGS", ""))
         kwargs["asflags_imported"] = kwargs.pop("asflags_imported", self._import_listattr("asflags"))
         return self.gnu_compile_generic(self.gnu_compile_asm_cmd, sources, **kwargs)
 
@@ -79,7 +79,7 @@ class GnuToolchain(object):
         kwargs["gnu_as"] = self._gnu_tool("AS", self.gnu_as)
 
         kwargs["asflags"] = kwargs.pop("asflags", self._asflags())
-        kwargs["asflags_environ"] = kwargs.pop("asflags_environ", self.tools.getenv("ASFLAGS"))
+        kwargs["asflags_environ"] = kwargs.pop("asflags_environ", self.tools.getenv("ASFLAGS", ""))
         kwargs["asflags_imported"] = kwargs.pop("asflags_imported", self._import_listattr("asflags"))
         kwargs["incpaths"] = ["{outdir_rel}"] + kwargs.pop("incpaths", self._task_incpaths())
         kwargs["incpaths_imported"] = kwargs.pop("incpaths_imported", self._imported_incpaths())
@@ -91,7 +91,7 @@ class GnuToolchain(object):
         kwargs["gnu_cc"] = self._gnu_tool("CC", self.gnu_cc)
 
         kwargs["cflags"] = kwargs.pop("cflags", self._cflags())
-        kwargs["cflags_environ"] = kwargs.pop("cflags_environ", self.tools.getenv("CFLAGS"))
+        kwargs["cflags_environ"] = kwargs.pop("cflags_environ", self.tools.getenv("CFLAGS", ""))
         kwargs["cflags_imported"] = kwargs.pop("cflags_imported", self._import_listattr("cflags"))
         kwargs["incpaths"] = ["{outdir_rel}"] + kwargs.pop("incpaths", self._task_incpaths())
         kwargs["incpaths_imported"] = kwargs.pop("incpaths_imported", self._imported_incpaths())
@@ -103,7 +103,7 @@ class GnuToolchain(object):
         kwargs["gnu_cxx"] = self._gnu_tool("CXX", self.gnu_cxx)
 
         kwargs["cxxflags"] = kwargs.pop("cxxflags", self._cxxflags())
-        kwargs["cxxflags_environ"] = kwargs.pop("cxxflags_environ", self.tools.getenv("CXXFLAGS"))
+        kwargs["cxxflags_environ"] = kwargs.pop("cxxflags_environ", self.tools.getenv("CXXFLAGS", ""))
         kwargs["cxxflags_imported"] = kwargs.pop("cxxflags_imported", self._import_listattr("cxxflags"))
         kwargs["incpaths"] = ["{outdir_rel}"] + kwargs.pop("incpaths", self._task_incpaths())
         kwargs["incpaths_imported"] = kwargs.pop("incpaths_imported", self._imported_incpaths())
@@ -120,7 +120,7 @@ class GnuToolchain(object):
 
         kwargs["gnu_cxx"] = self._gnu_tool("CXX", self.gnu_cxx)
         kwargs["cxxflags"] = kwargs.pop("cxxflags", self._cxxflags())
-        kwargs["cxxflags_environ"] = kwargs.pop("cxxflags_environ", self.tools.getenv("CXXFLAGS"))
+        kwargs["cxxflags_environ"] = kwargs.pop("cxxflags_environ", self.tools.getenv("CXXFLAGS", ""))
         kwargs["cxxflags_imported"] = kwargs.pop("cxxflags_imported", self._import_listattr("cxxflags"))
         kwargs["incpaths"] = ["{outdir_rel}"] + kwargs.pop("incpaths", self._task_incpaths())
         kwargs["incpaths_imported"] = kwargs.pop("incpaths_imported", self._imported_incpaths())
@@ -154,7 +154,7 @@ class GnuToolchain(object):
         kwargs["gnu_ld"] = self._gnu_tool("CXX", self.gnu_ld)
 
         kwargs["ldflags"] = kwargs.pop("ldflags", self._ldflags())
-        kwargs["ldflags_environ"] = kwargs.pop("ldflags_environ", self.tools.getenv("LDFLAGS"))
+        kwargs["ldflags_environ"] = kwargs.pop("ldflags_environ", self.tools.getenv("LDFLAGS", ""))
         kwargs["ldflags_imported"] = kwargs.pop("ldflags_imported", self._import_listattr("ldflags"))
 
         kwargs["libpaths"] = kwargs.pop("libpaths", self._libpaths())
