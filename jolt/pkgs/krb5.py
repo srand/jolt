@@ -6,6 +6,8 @@ from jolt.tasks import TaskRegistry
 
 @attributes.requires("requires_bison")
 @attributes.requires("requires_src")
+@attributes.system
+@autotools.options("options_{system}")
 @cxxinfo.publish(libraries=["gssapi_krb5", "krb5", "k5crypto", "com_err"])
 @attributes.requires("requires_compiler")
 class Krb5(autotools.Autotools):
@@ -32,6 +34,17 @@ class Krb5(autotools.Autotools):
         "--without-lmdb",
     ]
     """ Options passed to the ``configure`` script. The configuration of the system is used at runtime. """
+    options_darwin = [
+        # The tools define variables that the static libraries also define
+        "CFLAGS='-O2 -fcommon'",
+        "--disable-shared",
+        "--enable-static",
+    ]
+    """
+    Static libraries: the install names of the shared libraries on macOS are in
+    /jolt-prefix, and programs linked with them can't load them, also those that
+    configure runs.
+    """
 
     @property
     def _major_minor(self):
@@ -42,6 +55,13 @@ class Krb5(autotools.Autotools):
         # The prefix in krb5-config must follow the artifact when it is relocated
         with tools.cwd(tools.autotools().installdir, "jolt-prefix", "bin"):
             tools.replace_in_file("krb5-config", "prefix=/jolt-prefix", 'prefix="$(cd "$(dirname "$0")/.." && pwd)"')
+        if self.system == "darwin":
+            # Consumers of the static libraries must link the libraries they require
+            with tools.cwd(tools.autotools().installdir, "jolt-prefix", "bin"):
+                tools.replace_in_file("krb5-config", '-lkrb5 -lk5crypto -lcom_err"', '-lkrb5 -lk5crypto -lcom_err -lkrb5support $LIBS $DL_LIB"')
+            with tools.cwd(tools.autotools().installdir, "jolt-prefix", "lib", "pkgconfig"):
+                tools.replace_in_file("mit-krb5-gssapi.pc", "Requires.private:", "Requires:")
+                tools.replace_in_file("mit-krb5.pc", "\nLibs.private: -lkrb5support", " -lkrb5support -lresolv")
 
     def publish(self, artifact, tools):
         super().publish(artifact, tools)
