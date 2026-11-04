@@ -1,12 +1,13 @@
 from jolt import attributes, BooleanParameter, Parameter
 from jolt.pkgs import compiler, freetype
-from jolt.plugins import cxxinfo, git, meson
+from jolt.plugins import cxxinfo, git, meson, pkgconfig
 from jolt.tasks import TaskRegistry
 
 
 @attributes.requires("requires_freetype")
 @attributes.requires("requires_git")
 @meson.requires()
+@pkgconfig.requires()
 @cxxinfo.publish(incpaths=["include/harfbuzz"], libraries=["harfbuzz"])
 @attributes.requires("requires_compiler")
 class Harfbuzz(meson.Meson):
