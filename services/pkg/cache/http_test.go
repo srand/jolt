@@ -67,6 +67,31 @@ func TestHttpFileInSubdirectory(t *testing.T) {
 	assert.Equal(t, data, response.Body.Bytes())
 }
 
+// Clients join a task name that ends with a slash and the file name with
+// another slash. Such paths must not be redirected: a redirected upload
+// can't resend a streamed body, and an empty file was stored instead.
+func TestHttpFileWithDoubleSlash(t *testing.T) {
+	c := newTestCache(t).Cache
+	handler := NewHttpHandler(c, nil)
+	data := []byte("file content")
+	path := "/files/task//file.tar.zst"
+
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, httptest.NewRequest(http.MethodPut, path, bytes.NewReader(data)))
+	assert.Equal(t, http.StatusCreated, response.Code)
+
+	response = httptest.NewRecorder()
+	handler.ServeHTTP(response, httptest.NewRequest(http.MethodHead, path, nil))
+	assert.Equal(t, http.StatusOK, response.Code)
+
+	for _, path := range []string{path, "/files/task/file.tar.zst"} {
+		response = httptest.NewRecorder()
+		handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, path, nil))
+		assert.Equal(t, http.StatusOK, response.Code, path)
+		assert.Equal(t, data, response.Body.Bytes(), path)
+	}
+}
+
 func TestHttpFindObjects(t *testing.T) {
 	c := newTestCache(t).Cache
 	handler := NewHttpHandler(c, nil)

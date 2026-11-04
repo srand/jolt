@@ -7,6 +7,8 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path"
+	"strings"
 
 	"github.com/srand/jolt/scheduler/pkg/log"
 	"github.com/srand/jolt/scheduler/pkg/utils"
@@ -296,7 +298,25 @@ func NewHttpHandler(cache Cache, service CacheGrpcService) http.Handler {
 		w.Write([]byte(metrics))
 	})
 
-	return utils.HttpLogger(mux)
+	return utils.HttpLogger(cleanPath(mux))
+}
+
+// cleanPath removes duplicate slashes and dot elements from request paths.
+// http.ServeMux would otherwise redirect such paths, which clients
+// that stream uploads can't follow without losing the body.
+func cleanPath(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		cleaned := path.Clean("/" + r.URL.Path)
+		if strings.HasSuffix(r.URL.Path, "/") && cleaned != "/" {
+			cleaned += "/"
+		}
+		if cleaned != r.URL.Path {
+			r = r.Clone(r.Context())
+			r.URL.Path = cleaned
+			r.URL.RawPath = ""
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 // Formats statistics of HasTree requests as metrics.
