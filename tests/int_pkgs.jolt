@@ -102,3 +102,14 @@ class PkgsInternal(JoltTest):
         self.assertTargetParameter(gcc.Gcc, "aarch64-none-eabi", valid=False)
         self.assertTargetParameter(gcc.GccGlibc, "aarch64-linux-musl", valid=False)
         self.assertTargetParameter(gcc.GccMusl, "aarch64-linux-gnu", valid=False)
+
+    def test_shared_library_tasks_relocate_binaries(self):
+        """ Plain tasks that build shared libraries must relocate them like the build system base classes. """
+        from jolt.pkgs import boost, cpython, libcap, libudev_zero, mesa, openssl, sqlite, xorg
+        classes = [
+            boost.Boost, cpython.CPythonEmbed, cpython.CPythonExtend, libcap.Libcap,
+            libudev_zero.LibudevZero, mesa.Mesa, openssl.OpenSSL, sqlite.SQLiteWin32, xorg.LibX11Xcb,
+        ]
+        for cls in classes:
+            with self.subTest(task=cls.__name__):
+                self.assertTrue(getattr(cls, "relocate_binaries", False), cls.__name__)

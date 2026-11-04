@@ -6,6 +6,7 @@ from jolt.tasks import Task, TaskRegistry
 from jolt.error import raise_task_error_if
 
 
+@attributes.relocate_binaries()
 @attributes.common_metadata()
 @attributes.requires("requires_git")
 @attributes.requires("requires_icu_{icu[on,off]}")

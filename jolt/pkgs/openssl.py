@@ -7,6 +7,7 @@ from jolt.tasks import ListParameter, TaskRegistry
 @attributes.requires("requires_git")
 @attributes.requires("requires_perl")
 @attributes.requires("requires_{system}_nasm")
+@attributes.relocate_binaries()
 @attributes.common_metadata()
 @attributes.system
 @cxxinfo.publish(libraries=["ssl", "crypto"])

@@ -22,6 +22,7 @@ from jolt.tasks import TaskRegistry
 @attributes.requires("requires_spirv_llvm")
 @attributes.requires("requires_wayland")
 @attributes.requires("requires_xrandr")
+@attributes.relocate_binaries()
 @attributes.common_metadata()
 @attributes.requires("requires_compiler")
 class Mesa(Task):

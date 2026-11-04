@@ -20,6 +20,7 @@ class SQLitePosix(autotools.Autotools):
     ]
 
 
+@attributes.relocate_binaries()
 @attributes.common_metadata()
 @attributes.requires("requires_git")
 @cxxinfo.publish(libraries=["sqlite3"])

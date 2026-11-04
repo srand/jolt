@@ -169,6 +169,7 @@ class CPython(Alias):
     requires_windows = ["cpython/win32:version={version}"]
 
 
+@attributes.relocate_binaries()
 @pkgconfig.to_cxxinfo("python3-embed")
 @attributes.common_metadata()
 @attributes.system
@@ -187,6 +188,7 @@ class CPythonEmbed(Task):
             artifact.collect("*", symlinks=True)
 
 
+@attributes.relocate_binaries()
 @pkgconfig.to_cxxinfo("python3")
 @attributes.common_metadata()
 @attributes.system

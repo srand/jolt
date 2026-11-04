@@ -372,6 +372,7 @@ class Libx11(autotools.Autotools):
         artifact.environ.CMAKE_PREFIX_PATH.append(".")
 
 
+@attributes.relocate_binaries()
 @attributes.requires("requires_libx11")
 @attributes.requires("requires_libxcb")
 @attributes.common_metadata()

@@ -4,6 +4,7 @@ from jolt.tasks import BooleanParameter, TaskRegistry
 from jolt.pkgs import compiler
 
 
+@attributes.relocate_binaries()
 @attributes.common_metadata()
 @attributes.requires("requires_src")
 @cxxinfo.publish(libraries=["cap", "psx"])
