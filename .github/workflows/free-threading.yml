@@ -20,6 +20,9 @@ on:
       - "setup.py"
       - ".github/workflows/free-threading.yml"
 
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest
