@@ -2,6 +2,7 @@ import contextlib
 import glob
 import os
 import sys
+from unittest import mock
 sys.path.append(".")
 
 from testsupport import JoltTest
@@ -36,6 +37,25 @@ class Task(object):
     extra_files = []
 
 
+class Distribution(object):
+    def __init__(self, name, version, requires=None):
+        self.name = name
+        self.version = version
+        self.requires = requires
+
+
+def distributions(*dists):
+    dists = {dist.name: dist for dist in dists}
+
+    def distribution(name):
+        try:
+            return dists[name]
+        except KeyError:
+            raise selfdeploy.importlib_metadata.PackageNotFoundError(name)
+
+    return mock.patch.object(selfdeploy.importlib_metadata, "distribution", distribution)
+
+
 class SelfDeployInternal(JoltTest):
     name = "int/selfdeploy"
 
@@ -49,3 +69,42 @@ class SelfDeployInternal(JoltTest):
                 if "__pycache__" not in path
             }
         self.assertEqual(modules - artifact.files, set())
+
+    def test_dependencies_pin_requirements_of_jolt(self):
+        with distributions(
+            Distribution("jolt", "1.0", [
+                "click>=8.1",
+                "keyrings.alt",
+                "zstandard; python_version < \"3.14\"",
+                "conan>=2.0; extra == \"conan\"",
+            ]),
+            Distribution("click", "8.2.0", ["colorama; platform_system == \"Windows\""]),
+            Distribution("keyrings.alt", "5.0"),
+            Distribution("zstandard", "0.23.0"),
+            Distribution("colorama", "0.4.6"),
+            Distribution("conan", "2.1"),
+        ):
+            self.assertEqual(
+                selfdeploy.resolve_dependencies(["jolt"]),
+                [
+                    "click==8.2.0",
+                    "keyrings.alt==5.0",
+                    "zstandard==0.23.0; python_version < \"3.14\"",
+                ])
+
+    def test_dependencies_keep_requirements_not_installed(self):
+        with distributions(Distribution("jolt", "1.0", ["click>=8.1", "zstandard; python_version < \"3.14\""])):
+            self.assertEqual(
+                selfdeploy.resolve_dependencies(["jolt"]),
+                ["click>=8.1", "zstandard; python_version < \"3.14\""])
+
+    def test_dependencies_include_extra_requirements(self):
+        with distributions(
+            Distribution("jolt", "1.0", ["click"]),
+            Distribution("click", "8.2.0"),
+            Distribution("requests", "2.32.5", ["urllib3"]),
+            Distribution("urllib3", "2.5.0"),
+        ):
+            self.assertEqual(
+                selfdeploy.resolve_dependencies(["jolt", "requests", "allure-python-commons>=2"]),
+                ["allure-python-commons>=2", "click==8.2.0", "requests==2.32.5"])

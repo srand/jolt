@@ -1,5 +1,6 @@
 from importlib import metadata as importlib_metadata
 import os
+import re
 
 from jolt import config
 from jolt import filesystem as fs
@@ -94,33 +95,53 @@ class Jolt(Task):
                     artifact.collect(fs.path.basename(e))
 
 
+def _parse_requirement(requirement):
+    """ Returns the project name and environment marker of a requirement. """
+    spec, _, marker = requirement.partition(";")
+    name = re.match(r"[A-Za-z0-9._-]*", spec.strip()).group(0)
+    return name, marker.strip()
+
+
+def _pin_requirement(requirement):
+    """ Pins a requirement to the installed version, keeping its environment marker. """
+    name, marker = _parse_requirement(requirement)
+    try:
+        dist = importlib_metadata.distribution(name)
+    except Exception:
+        # Not installed here, let pip on the worker choose a version
+        return requirement.strip()
+    pin = f"{dist.name}=={dist.version}"
+    return f"{pin}; {marker}" if marker else pin
+
+
+def resolve_dependencies(packages):
+    """
+    Pins the requirements of Jolt and additional packages to the installed versions.
+
+    Only direct requirements are pinned, so that pip is free to resolve
+    transitive requirements. Optional requirements of Jolt are left out.
+    """
+    requirements = []
+    for package in packages:
+        if package != "jolt":
+            requirements.append(package)
+            continue
+        try:
+            dist = importlib_metadata.distribution("jolt")
+        except Exception:
+            log.warning("[SelfDeploy] Jolt is not installed, its requirements are not pinned")
+            continue
+        for requirement in dist.requires or []:
+            _, marker = _parse_requirement(requirement)
+            if not re.search(r"\bextra\b", marker):
+                requirements.append(requirement)
+
+    return list(sorted({_pin_requirement(requirement) for requirement in requirements}))
+
+
 @utils.cached.method
 def get_dependencies(packages=None):
-    reqs = packages or ["jolt"]
-    pkgs = {}
-    skip = set()
-
-    while reqs:
-        req = reqs.pop()
-
-        try:
-            dist = importlib_metadata.distribution(req)
-        except (ImportError, importlib_metadata.PackageNotFoundError):
-            dist = None
-        except Exception:
-            dist = None
-        if dist is None:
-            skip.add(req)
-            continue
-
-        pkgs[req] = f"{dist.name}=={dist.version}"
-
-    try:
-        del pkgs["jolt"]
-    except KeyError:
-        pass
-
-    return list(sorted(pkgs.values()))
+    return resolve_dependencies(packages or ["jolt"])
 
 
 @utils.cached.method
