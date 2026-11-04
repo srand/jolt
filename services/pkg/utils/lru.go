@@ -76,6 +76,25 @@ func (lru *LRU[E]) Add(item E) {
 	lru.mu.Lock()
 	defer lru.mu.Unlock()
 
+	lru.add(item)
+}
+
+// AddWith calls fn and adds the item if fn succeeds, without letting
+// evictions run in between. Use it to move a file into place that
+// replaces an item of the same path: eviction of the old item would
+// otherwise remove the new file.
+func (lru *LRU[E]) AddWith(item E, fn func() error) error {
+	lru.mu.Lock()
+	defer lru.mu.Unlock()
+
+	if err := fn(); err != nil {
+		return err
+	}
+	lru.add(item)
+	return nil
+}
+
+func (lru *LRU[E]) add(item E) {
 	// If CacheItem is already in cache, move it to front.
 	if ee, ok := lru.cacheMap[item.Path()]; ok {
 		lru.cacheList.MoveToFront(ee)

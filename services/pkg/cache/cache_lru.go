@@ -281,23 +281,27 @@ func (c *lruCache) fileClosed(file *lruFile, err error) error {
 		return err
 	}
 
-	err = c.fs.Rename(file.file.Name(), file.path)
+	info, err := c.fs.Stat(file.file.Name())
 	if err != nil {
 		c.fs.Remove(file.file.Name())
 		return err
 	}
 
-	info, err := c.fs.Stat(file.path)
-	if err != nil {
-		c.fs.Remove(file.path)
-		return err
-	}
-
-	c.lru.Add(&lruItem{
+	item := &lruItem{
 		access: time.Now(),
 		path:   file.path,
 		size:   info.Size(),
+	}
+
+	// Replace the file and its entry together, so that eviction of an
+	// older entry of the same path can't remove the new file
+	err = c.lru.AddWith(item, func() error {
+		return c.fs.Rename(file.file.Name(), file.path)
 	})
+	if err != nil {
+		c.fs.Remove(file.file.Name())
+		return err
+	}
 
 	return nil
 }
