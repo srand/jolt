@@ -1,0 +1,78 @@
+#!/usr/bin/python
+
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+import os
+import sys
+import threading
+from types import SimpleNamespace
+sys.path.append(".")
+
+from testsupport import JoltTest
+from jolt import cli  # noqa: F401, imports jolt modules in dependency order
+
+
+class RedirectingServer(object):
+    """ Answers every PUT with a redirect and records the requests. """
+
+    def __init__(self):
+        self.requests = []
+        server = self
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_PUT(self):
+                server.requests.append((self.path, self._read_body()))
+                self.send_response(307)
+                self.send_header("Location", "/redirected" + self.path)
+                self.send_header("Content-Length", "0")
+                self.end_headers()
+
+            def _read_body(self):
+                if self.headers.get("Transfer-Encoding") != "chunked":
+                    return self.rfile.read(int(self.headers.get("Content-Length", 0)))
+                body = b""
+                while True:
+                    size = int(self.rfile.readline().strip(), 16)
+                    body += self.rfile.read(size)
+                    self.rfile.readline()
+                    if size == 0:
+                        return body
+
+            def log_message(self, *args):
+                pass
+
+        self._httpd = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        self.url = "http://127.0.0.1:{}".format(self._httpd.server_address[1])
+        self._thread = threading.Thread(target=self._httpd.serve_forever, daemon=True)
+        self._thread.start()
+
+    def stop(self):
+        self._httpd.shutdown()
+        self._httpd.server_close()
+
+
+class HttpInternal(JoltTest):
+    name = "int/http"
+
+    def test_url_of_task_name_with_trailing_slash(self):
+        """ The cache redirected paths with "//", and redirected uploads were stored empty. """
+        artifact = SimpleNamespace(
+            tools=self.tools,
+            task=SimpleNamespace(name="task/"),
+            get_archive_path=lambda: "/cache/task/file.tar.zst")
+        # Imported here: importing the plugin while recipes load would
+        # register it as a storage provider of the test run itself
+        from jolt.plugins import http
+        url = http.Http(None)._get_url(artifact)
+        self.assertNotIn("//", url.split("://", 1)[1])
+        self.assertTrue(url.endswith("/task/file.tar.zst"), url)
+
+    def test_upload_does_not_follow_redirects(self):
+        """ A streamed body can't be sent again, so a redirected upload would be empty. """
+        server = RedirectingServer()
+        try:
+            path = os.path.join(self.tools.builddir("upload"), "file.tar.zst")
+            self.tools.write_file(path, "content")
+            self.assertFalse(self.tools.upload(path, server.url + "/files/file.tar.zst", exceptions=False))
+            self.assertEqual(server.requests, [("/files/file.tar.zst", b"content")])
+        finally:
+            server.stop()

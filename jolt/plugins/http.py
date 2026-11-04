@@ -61,10 +61,13 @@ class Http(cache.StorageProvider):
         return HTTPBasicAuth(username, password)
 
     def _get_url(self, artifact):
+        # Empty path elements, as from names that end with a slash, made
+        # the cache redirect requests, and redirected uploads were empty
+        name = "/".join(part for part in artifact.task.name.split("/") if part)
         return artifact.tools.expand(
             "{uri}/{name}/{file}",
             uri=self._uri,
-            name=artifact.task.name,
+            name=name,
             file=fs.path.basename(artifact.get_archive_path()))
 
     @utils.retried.on_exception((RequestException, JoltError))

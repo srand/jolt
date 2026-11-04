@@ -2647,7 +2647,8 @@ class Tools(object):
         Alternatively, the auth parameter can be used to provide an authentication
         object that is passed to the requests.get() function.
 
-        Throws a JoltError exception on failure.
+        Throws a JoltError exception on failure. Redirects are not followed,
+        since the file is streamed and can't be sent again.
 
         Args:
            pathname (str): Name/path of file to be uploaded.
@@ -2687,6 +2688,8 @@ class Tools(object):
                 pbar.update(len(data))
                 return data
 
+            # The streamed body can't be sent again, so a redirected upload would be empty
+            kwargs.setdefault("allow_redirects", False)
             response = http_session.put(url, data=iter(read, b''), auth=auth, **kwargs)
             raise_error_if(
                 exceptions and response.status_code not in [201, 204],
