@@ -167,6 +167,10 @@ class Xext(autotools.Autotools):
     requires_xproto = ["xorg/xproto"]
     srcdir = "{fetch[src]}/libXext-{version}"
 
+    def publish(self, artifact, tools):
+        super().publish(artifact, tools)
+        artifact.environ.CMAKE_PREFIX_PATH.append(".")
+
 
 @attributes.requires("requires_macros")
 @attributes.requires("requires_src")
@@ -194,6 +198,10 @@ class Xproto(autotools.Autotools):
     requires_src = ["fetch:alias=src,url=https://www.x.org/releases/individual/proto/xproto-{version}.tar.gz"]
     srcdir = "{fetch[src]}/xproto-{version}"
     install_threads = 1  # install-sh races creating doc directories
+
+    def publish(self, artifact, tools):
+        super().publish(artifact, tools)
+        artifact.environ.CMAKE_PREFIX_PATH.append(".")
 
 
 @attributes.requires("requires_macros")
@@ -351,6 +359,10 @@ class Libx11(autotools.Autotools):
     requires_xtrans = ["xorg/xtrans"]
     srcdir = "{fetch[src]}/libX11-{version}"
 
+    def publish(self, artifact, tools):
+        super().publish(artifact, tools)
+        artifact.environ.CMAKE_PREFIX_PATH.append(".")
+
 
 @attributes.requires("requires_libx11")
 @attributes.requires("requires_libxcb")
@@ -388,6 +400,10 @@ class Xorgproto(meson.Meson):
     requires_compiler = ["virtual/compiler/c"]
     requires_src = ["fetch:alias=src,url=https://www.x.org/releases/individual/proto/xorgproto-{version}.tar.xz"]
     srcdir = "{fetch[src]}/xorgproto-{version}"
+
+    def publish(self, artifact, tools):
+        super().publish(artifact, tools)
+        artifact.environ.CMAKE_PREFIX_PATH.append(".")
 
 
 @attributes.requires("requires_macros")
