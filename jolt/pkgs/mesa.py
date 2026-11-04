@@ -1,11 +1,12 @@
 from jolt import attributes, Parameter, Task
-from jolt.pkgs import cbindgen, compiler, glslang, libdrm, libexpat, libglvnd, libva, x11
+from jolt.pkgs import cbindgen, compiler, elfutils, glslang, libdrm, libexpat, libglvnd, libva, x11
 from jolt.pkgs import meson, rust, spirv_llvm, wayland, wayland_protocols
 from jolt.plugins import git
 from jolt.tasks import TaskRegistry
 
 
 @attributes.requires("requires_cbindgen")
+@attributes.requires("requires_elfutils")
 @attributes.requires("requires_expat")
 @attributes.requires("requires_git")
 @attributes.requires("requires_glslang")
@@ -29,6 +30,8 @@ class Mesa(Task):
 
     requires_compiler = ["virtual/compiler/c", "virtual/compiler/cxx"]
     requires_cbindgen = ["cbindgen"]
+    requires_elfutils = ["elfutils"]
+    """ libelf, used by the AMD drivers. """
     requires_expat = ["libexpat:pic=true"]
     requires_git = ["git:url=https://gitlab.freedesktop.org/mesa/mesa.git,rev=mesa-{version}"]
     requires_glslang = ["glslang"]
