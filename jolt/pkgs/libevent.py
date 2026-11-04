@@ -7,6 +7,7 @@ from jolt.tasks import TaskRegistry
 
 @attributes.requires("requires_git")
 @attributes.requires("requires_ssl")
+@attributes.system
 @cmake.requires()
 @cmake.use_ninja()
 @pkgconfig.requires()
@@ -20,6 +21,15 @@ class LibEvent(cmake.CMake):
     requires_git = ["git:url=https://github.com/libevent/libevent.git,rev=release-{version}-stable"]
     requires_ssl = ["openssl"]
     srcdir = "{git[libevent]}"
+
+    def run(self, deps, tools):
+        if self.system != "windows":
+            return super().run(deps, tools)
+        # The static libcrypto uses the certificate store of Windows, but
+        # libevent links event_openssl with OPENSSL_LIBRARIES of FindOpenSSL,
+        # which doesn't name crypt32
+        with tools.environ(LDFLAGS="crypt32.lib " + tools.getenv("LDFLAGS", "")):
+            super().run(deps, tools)
 
     def publish(self, artifact, tools):
         super().publish(artifact, tools)
