@@ -11,6 +11,7 @@ from jolt import cache
 from jolt import cli
 from jolt import colors
 from jolt import config
+from jolt import fstree
 from jolt import hooks
 from jolt import loader
 from jolt import log
@@ -693,6 +694,10 @@ def executor(ctx, worker, build, request):
     tasks = loader.JoltLoader.get().load()
     for cls in tasks:
         TaskRegistry.get().add_task_class(cls)
+
+    # The worker checked out the tree with the index, so this only checks file status
+    if request.environment.workspace.tree:
+        fstree.get_workspace_index()
 
     # Create the
     acache = cache.ArtifactCache.get(options)
