@@ -5,9 +5,11 @@ class All(Alias):
     requires = [
         "api/artifact",
         "api/artifact/environ",
+        "api/cxx",
         "api/relocate",
         "api/fetch",
         "api/git",
+        "api/multitask",
         "api/ninja",
         "api/ninja/coverage",
         "api/task",
