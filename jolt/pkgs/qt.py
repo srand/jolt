@@ -30,6 +30,8 @@ class Qt(cmake.CMake):
     srcdir = "{git[qt5]}"
 
     options = [
+        # Qt OPC UA accesses ASN1_TIME directly, which is opaque in OpenSSL 4
+        "BUILD_qtopcua=OFF",
         "BUILD_qtwebengine={webengine[ON,OFF]}",
     ]
 
