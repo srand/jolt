@@ -37,6 +37,9 @@ class Krb5(autotools.Autotools):
     options_darwin = [
         # The tools define variables that the static libraries also define
         "CFLAGS='-O2 -fcommon'",
+        # The macOS credential cache of the static libkrb5 calls the Kerberos
+        # framework, which only the shared libraries link with
+        "LIBS='-framework Kerberos'",
         "--disable-shared",
         "--enable-static",
     ]
@@ -61,7 +64,7 @@ class Krb5(autotools.Autotools):
                 tools.replace_in_file("krb5-config", '-lkrb5 -lk5crypto -lcom_err"', '-lkrb5 -lk5crypto -lcom_err -lkrb5support $LIBS $DL_LIB"')
             with tools.cwd(tools.autotools().installdir, "jolt-prefix", "lib", "pkgconfig"):
                 tools.replace_in_file("mit-krb5-gssapi.pc", "Requires.private:", "Requires:")
-                tools.replace_in_file("mit-krb5.pc", "\nLibs.private: -lkrb5support", " -lkrb5support -lresolv")
+                tools.replace_in_file("mit-krb5.pc", "\nLibs.private: -lkrb5support", " -lkrb5support -lresolv -framework Kerberos")
 
     def publish(self, artifact, tools):
         super().publish(artifact, tools)
