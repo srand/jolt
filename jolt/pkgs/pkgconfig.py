@@ -38,10 +38,7 @@ class PkgConfWin32(meson.Meson):
     requires_compiler = ["virtual/compiler/c"]
     requires_git = ["git:url=https://github.com/pkgconf/pkgconf.git,rev=pkgconf-{version}"]
     srcdir = "{git[pkgconf]}"
-    options = [
-        "default_library=static",
-        "tests=disabled",
-    ]
+    options = ["default_library=static"]
 
     def publish(self, artifact, tools):
         super().publish(artifact, tools)
@@ -49,7 +46,7 @@ class PkgConfWin32(meson.Meson):
 
         # Install pkg-config copy
         with tools.cwd(artifact.path, "bin"):
-            tools.copy("pkgconf", "pkg-config")
+            tools.copy("pkgconf.exe", "pkg-config.exe")
 
 
 @attributes.requires("requires_{system}")
