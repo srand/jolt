@@ -232,6 +232,19 @@ class TaskApi(JoltTest):
         with self.assertRaises(Exception, msg="multiple tasks extended"):
             self.jolt("build extended")
 
+    def test_publish_without_influence(self):
+        """
+        --- file: file.txt
+        --- tasks:
+        class Example(Task):
+            def publish(self, artifact, tools):
+                artifact.collect("file.txt")
+        ---
+        """
+        with self.assertRaises(Exception):
+            self.build("example")
+        self.assertIn("Task is missing source influence", self.lastLog())
+
     def test_publish_files(self):
         """
         --- file: file.txt

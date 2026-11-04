@@ -1805,10 +1805,13 @@ class TaskBase(object):
                 continue
             sources = {source for source in sources if not ip.is_influenced_by(self, source)}
 
+        # The filters above are lazy when the task has no file influence
+        sources = set(sources)
+
         for source in sources:
             log.warning("Missing influence: {} ({})", source, self.name)
 
-        raise_task_error_if(set(sources), self, "Task is missing source influence")
+        raise_task_error_if(sources, self, "Task is missing source influence")
 
     def _get_export_objects(self):
         return self._exports
