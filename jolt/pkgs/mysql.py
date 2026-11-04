@@ -1,4 +1,5 @@
 from jolt import attributes, BooleanParameter, Parameter
+from jolt import filesystem as fs
 from jolt.pkgs import boost, compiler, curl, cyrus_sasl, krb5, libedit, libtirpc, libudev_zero, lz4, openldap, openssl, rapidjson, zlib, zstd
 from jolt.plugins import cmake, cxxinfo, git, pkgconfig
 from jolt.tasks import TaskRegistry
@@ -56,6 +57,15 @@ class MySQLBase(cmake.CMake):
             "CMAKE_CXX_STANDARD_LIBRARIES='{}'".format(sasl_libs),
             "WITH_LDAP=" + self.tools.run("pkg-config --variable=prefix ldap", output=False).strip(),
         ]
+
+    @property
+    def _options_windows(self):
+        """
+        The static zstd library, which is named zstd_static on Windows. MySQL
+        only looks for zstd.
+        """
+        zstd = fs.path.join(self.deps["zstd"].path, "lib", "zstd_static.lib")
+        return ["ZSTD_SYSTEM_LIBRARY=" + zstd.replace("\\", "/")]
 
     def run(self, deps, tools):
         if self.system != "linux":
