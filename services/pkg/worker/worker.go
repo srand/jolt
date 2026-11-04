@@ -2,13 +2,13 @@ package worker
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"os/exec"
-	"path"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -24,6 +24,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
+	"lukechampine.com/blake3"
 )
 
 // The worker data
@@ -195,7 +196,15 @@ func (w *worker) run() error {
 
 				if request.Build.Environment.Workspace.Tree != "" {
 					log.Info("Deploying workspace tree", request.Build.Environment.Workspace.Tree, "for", request.Build.Environment.Workspace.Name)
-					pathHash, _ := utils.Sha1String(filepath.Join(w.cachePath(), "indexes", request.Build.Environment.Workspace.Name))
+					indexPath, err := w.workspaceIndexPath(request.Build.Environment.Workspace.Name)
+					if err != nil {
+						log.Error("Failed to create workspace index directory:", err)
+						reply(protocol.WorkerUpdate_DEPLOY_FAILED, err)
+						os.RemoveAll(currentBuildFile)
+						currentBuildFile = ""
+						currentClient = nil
+						continue
+					}
 					fstreeArgs := []string{
 						"fstree",
 						"pull-checkout",
@@ -204,7 +213,7 @@ func (w *worker) run() error {
 						"--ignore",
 						".joltignore",
 						"--index",
-						path.Join(w.cwd, ".indexes", pathHash),
+						indexPath,
 						"--remote",
 						w.config.CacheGrpcUri,
 						"--threads",
@@ -470,6 +479,23 @@ func (w *worker) activateVEnvPath(clientDigest string) string {
 		return filepath.Join(w.vEnvPath(clientDigest), "Scripts", "activate.bat")
 	}
 	return filepath.Join(w.vEnvPath(clientDigest), "bin", "activate")
+}
+
+// Returns the path of the fstree index that Jolt uses for the workspace,
+// see workspace_index_files() in jolt/fstree.py, and creates its directory.
+func (w *worker) workspaceIndexPath(name string) (string, error) {
+	// Jolt hashes the workspace path from getcwd(), which resolves symlinks
+	cwd, err := filepath.EvalSymlinks(w.cwd)
+	if err != nil {
+		cwd = w.cwd
+	}
+	sum := blake3.Sum256([]byte(filepath.Join(cwd, name)))
+	digest := hex.EncodeToString(sum[:])
+	dir := filepath.Join(w.cachePath(), "indexes", digest[:2])
+	if err := os.MkdirAll(dir, 0777); err != nil {
+		return "", err
+	}
+	return filepath.Join(dir, digest[2:]), nil
 }
 
 func (w *worker) cachePath() string {
