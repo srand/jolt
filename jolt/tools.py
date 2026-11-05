@@ -56,7 +56,7 @@ from jinja2.utils import missing
 from requests import Session
 from requests.auth import AuthBase, HTTPBasicAuth
 from requests.exceptions import RequestException
-from urllib.parse import urlparse, urlunparse
+from urllib.parse import urljoin, urlparse, urlunparse
 
 
 from jolt import cache
@@ -65,7 +65,7 @@ from jolt import log
 from jolt import utils
 from jolt import config
 from jolt.error import JoltCommandError, JoltError, JoltTimeoutError
-from jolt.error import raise_error_if
+from jolt.error import raise_error, raise_error_if
 from jolt.error import raise_task_error, raise_task_error_if
 
 
@@ -76,6 +76,9 @@ READER_JOIN_TIMEOUT = 1
 # that an archive can be made ahead of its upload
 STREAM_CHUNK_SIZE = 65536
 STREAM_QUEUE_SIZE = 16
+
+# Redirects of uploads that are followed, with the method kept
+UPLOAD_REDIRECTS = [301, 302, 307, 308]
 
 
 http_session = Session()
@@ -746,6 +749,14 @@ class _Tarfile(tarfile.TarFile):
         if self.__ignore_owner:
             return
         return super().chown(*args, **kwargs)
+
+
+def _redact_url(url):
+    """ Replaces the password in a URL, if any, for logs. """
+    url_parsed = urlparse(url)
+    if url_parsed.password:
+        url_parsed = url_parsed._replace(netloc=url_parsed.netloc.replace(url_parsed.password, "****"))
+    return urlunparse(url_parsed)
 
 
 class _StreamCancelled(Exception):
@@ -1536,11 +1547,7 @@ class Tools(object):
         if auth is None and url_parsed.username and url_parsed.password:
             auth = HTTPBasicAuth(url_parsed.username, url_parsed.password)
 
-        # Redact password from URL if present
-        if url_parsed.password:
-            url_parsed = url_parsed._replace(netloc=url_parsed.netloc.replace(url_parsed.password, "****"))
-
-        return url, auth, urlunparse(url_parsed)
+        return url, auth, _redact_url(url)
 
     @contextmanager
     def environ(self, **kwargs):
@@ -2848,8 +2855,8 @@ class Tools(object):
         Alternatively, the auth parameter can be used to provide an authentication
         object that is passed to the requests.get() function.
 
-        Throws a JoltError exception on failure. Redirects are not followed,
-        since the file is streamed and can't be sent again.
+        Throws a JoltError exception on failure. Redirects are followed by
+        sending the file again, unless ``allow_redirects=False`` is passed.
 
         Args:
            pathname (str): Name/path of file to be uploaded.
@@ -2866,6 +2873,8 @@ class Tools(object):
 
         with open(pathname, 'rb') as fileobj:
             def read(pbar):
+                # From the start for each redirect
+                fileobj.seek(0)
                 for data in iter(lambda: fileobj.read(STREAM_CHUNK_SIZE), b''):
                     pbar.update(len(data))
                     yield data
@@ -2877,7 +2886,8 @@ class Tools(object):
         Uploads a directory as a tar.zst archive while the archive is made.
 
         The archive is never stored. If it can't be made, the upload
-        is aborted before it completes. Redirects are not followed.
+        is aborted before it completes. Redirects are followed by making
+        the archive again, unless ``allow_redirects=False`` is passed.
 
         Args:
            pathname (str): Directory to archive.
@@ -2914,17 +2924,34 @@ class Tools(object):
         """
         url, auth, url_cleaned = self._http_url(url, auth)
 
+        # Redirects are followed here with a new body. Requests would
+        # send the consumed body again, and the upload would be empty.
+        follow_redirects = kwargs.pop("allow_redirects", True)
+
         with log.progress("Uploading " + utils.shorten(name), size, "B") as pbar:
             log.verbose("{} -> {}", source, url_cleaned)
 
-            # The streamed body can't be sent again, so a redirected upload would be empty
-            kwargs.setdefault("allow_redirects", False)
-            body = chunks(pbar)
-            try:
-                response = http_session.put(url, data=body, auth=auth, **kwargs)
-            finally:
-                # Stops the producer of the chunks if the upload failed
-                body.close()
+            for _ in range(http_session.max_redirects + 1):
+                body = chunks(pbar)
+                try:
+                    response = http_session.put(url, data=body, auth=auth, allow_redirects=False, **kwargs)
+                finally:
+                    # Stops the producer of the chunks if the upload failed
+                    body.close()
+
+                location = response.headers.get("location")
+                if not follow_redirects or response.status_code not in UPLOAD_REDIRECTS or not location:
+                    break
+
+                redirect = urljoin(response.url, location)
+                if http_session.should_strip_auth(url, redirect):
+                    auth = None
+                url, url_cleaned = redirect, _redact_url(redirect)
+                log.verbose("Redirected to {}", url_cleaned)
+                pbar.reset()
+            else:
+                raise_error(f"Upload to '{url_cleaned}' was redirected too many times")
+
             raise_error_if(
                 exceptions and response.status_code not in [201, 204],
                 f"Upload to '{url_cleaned}' failed with status '{response.status_code}'")

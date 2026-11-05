@@ -12,6 +12,7 @@ sys.path.append(".")
 from testsupport import JoltTest
 from jolt import cli  # noqa: F401, imports jolt modules in dependency order
 from jolt.error import JoltError
+from requests.auth import HTTPBasicAuth
 
 
 def read_body(handler):
@@ -44,17 +45,34 @@ class Server(object):
 
 
 class RedirectingServer(Server):
-    """ Answers every PUT with a redirect and records the requests. """
+    """
+    Redirects PUT requests to /redirected<path>, where they are stored, and records the requests.
 
-    def __init__(self):
+    Args:
+        status: Status of the redirects.
+        host: Host name to redirect to, instead of a relative location.
+        loop: Redirect every request to its own path.
+    """
+
+    def __init__(self, status=307, host=None, loop=False):
         self.requests = []
+        self.files = {}
+        self.redirect_base = ""
         server = self
 
         class Handler(BaseHTTPRequestHandler):
+            protocol_version = "HTTP/1.1"
+
             def do_PUT(self):
-                server.requests.append((self.path, read_body(self)[0]))
-                self.send_response(307)
-                self.send_header("Location", "/redirected" + self.path)
+                body = read_body(self)[0]
+                server.requests.append((self.path, body, self.headers.get("Authorization")))
+                if self.path.startswith("/redirected/") and not loop:
+                    server.files[self.path] = body
+                    self.send_response(201)
+                else:
+                    self.send_response(status)
+                    location = self.path if loop else "/redirected" + self.path
+                    self.send_header("Location", server.redirect_base + location)
                 self.send_header("Content-Length", "0")
                 self.end_headers()
 
@@ -62,6 +80,8 @@ class RedirectingServer(Server):
                 pass
 
         super().__init__(Handler)
+        if host:
+            self.redirect_base = self.url.replace("127.0.0.1", host)
 
 
 class StorageServer(Server):
@@ -148,14 +168,65 @@ class HttpInternal(JoltTest):
         self.assertNotIn("//", url.split("://", 1)[1])
         self.assertTrue(url.endswith("/task/file.tar.zst"), url)
 
-    def test_upload_does_not_follow_redirects(self):
-        """ A streamed body can't be sent again, so a redirected upload would be empty. """
+    def _upload_file(self):
+        path = os.path.join(self._dir("upload"), "file.tar.zst")
+        self.tools.write_file(path, "content")
+        return path
+
+    def test_upload_follows_redirects(self):
+        """ The file is sent again to the new location, with the method kept. """
+        for status in [301, 302, 307, 308]:
+            server = RedirectingServer(status)
+            try:
+                self.assertTrue(self.tools.upload(self._upload_file(), server.url + "/files/file.tar.zst"))
+                self.assertEqual(
+                    [(path, body) for path, body, _ in server.requests],
+                    [("/files/file.tar.zst", b"content"), ("/redirected/files/file.tar.zst", b"content")],
+                    status)
+            finally:
+                server.stop()
+
+    def test_upload_redirects_disabled(self):
         server = RedirectingServer()
         try:
-            path = os.path.join(self.tools.builddir("upload"), "file.tar.zst")
-            self.tools.write_file(path, "content")
-            self.assertFalse(self.tools.upload(path, server.url + "/files/file.tar.zst", exceptions=False))
-            self.assertEqual(server.requests, [("/files/file.tar.zst", b"content")])
+            self.assertFalse(self.tools.upload(
+                self._upload_file(), server.url + "/files/file.tar.zst", exceptions=False, allow_redirects=False))
+            self.assertEqual(len(server.requests), 1)
+        finally:
+            server.stop()
+
+    def test_upload_redirect_to_other_host_drops_auth(self):
+        server = RedirectingServer(host="localhost")
+        try:
+            self.assertTrue(self.tools.upload(
+                self._upload_file(), server.url + "/files/file.tar.zst", auth=HTTPBasicAuth("user", "secret")))
+            self.assertTrue(server.requests[0][2].startswith("Basic "))
+            self.assertEqual(server.requests[1][:2], ("/redirected/files/file.tar.zst", b"content"))
+            self.assertIsNone(server.requests[1][2])
+        finally:
+            server.stop()
+
+    def test_upload_redirect_loop(self):
+        server = RedirectingServer(loop=True)
+        try:
+            with self.assertRaises(JoltError):
+                self.tools.upload(self._upload_file(), server.url + "/files/file.tar.zst")
+        finally:
+            server.stop()
+
+    def test_upload_archive_follows_redirects(self):
+        """ The archive is made again for the new location. """
+        server = RedirectingServer()
+        try:
+            tree = self._make_tree(self._dir("tree"))
+            self.assertTrue(self.tools._upload_archive(tree, server.url + "/files/file.tar.zst"))
+
+            archive = os.path.join(self._dir("archive"), "file.tar.zst")
+            with open(archive, "wb") as f:
+                f.write(server.files["/redirected/files/file.tar.zst"])
+            extracted = self._dir("extracted")
+            self.tools.extract(archive, extracted)
+            self._assertTree(extracted)
         finally:
             server.stop()
 
