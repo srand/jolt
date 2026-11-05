@@ -71,6 +71,30 @@ class ListCli(JoltTest):
         self.assertIn("task3", r)
         self.assertNotIn("task4", r)
 
+    def test_list_resource_requirements(self):
+        """
+        --- tasks:
+        class Task1(Task):
+            pass
+        class Res1(Resource):
+            requires = ["task1"]
+        class Task2(Task):
+            requires = ["res1"]
+        class Task3(Task):
+            requires = ["res1", "task2"]
+        ---
+        """
+        r = self.jolt("list -a task3")
+        self.assertIn("task1", r)
+        self.assertIn("res1", r)
+        self.assertIn("task2", r)
+        self.assertNotIn("task3", r)
+
+        r = self.jolt("list -a task3 -r task1")
+        self.assertIn("res1", r)
+        self.assertIn("task2", r)
+        self.assertIn("task3", r)
+
     def test_list_reverse(self):
         """
         --- tasks:

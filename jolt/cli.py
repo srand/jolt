@@ -882,12 +882,14 @@ def _list(ctx, task=None, all=False, reverse=None):
     iterator = dag.predecessors if reverse else dag.successors
 
     tasklist = set()
+    visited = set(nodes)
     while nodes:
         node = nodes.pop()
         for task in iterator(node):
-            if all and task.short_qualified_name not in tasklist:
-                new_node = dag.get_task(task.qualified_name)
-                nodes.append(new_node)
+            # Resources have one node per owner, so names aren't unique
+            if all and task not in visited:
+                visited.add(task)
+                nodes.append(task)
             tasklist.add(task.short_qualified_name)
 
     for task in sorted(list(tasklist)):
