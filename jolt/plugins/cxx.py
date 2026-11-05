@@ -274,10 +274,6 @@ def protobuf():
             protoflags = []
             protogenerator = "cpp"
 
-            def run(self, deps, tools):
-                self.protoc = self._gnu_tool("PROTOC", self.protoc)
-                super().run(deps, tools)
-
             def context(self, input=None, **kwargs):
                 kwargs = copy(kwargs)
 
@@ -366,6 +362,9 @@ def protobuf():
                 return self._compile_proto(inputs, **kwargs)
 
             def _compile_proto(self, inputs, **kwargs):
+                if "protoc" not in kwargs:
+                    kwargs["protoc"] = self._gnu_tool("PROTOC", self.protoc)
+
                 jobs = []
 
                 for input in inputs:
