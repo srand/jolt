@@ -1169,6 +1169,28 @@ class StorageProvider(object):
         """
         return False
 
+    def download_stream(self, artifact: Artifact, force: bool = False) -> bool:
+        """
+        Download an artifact and extract it while downloading.
+
+        Optional. Providers that implement it extract the DEFAULT_ARCHIVE_TYPE
+        archive into the directory returned by the artifact's
+        :func:`~jolt.Artifact.get_temporary_path` method without storing the
+        archive. Otherwise, the cache downloads with :func:`download` and
+        extracts the archive afterwards.
+
+        Files of failed attempts must be removed before the download is retried.
+
+        Args:
+            artifact (Artifact): The artifact to download.
+            force (bool, optional): As for :func:`download`.
+
+        Returns:
+            bool: True if the download was successful, False otherwise.
+
+        """
+        raise NotImplementedError()
+
     def download_enabled(self) -> bool:
         """ Return True if downloading is enabled. Default is True. """
         return True
@@ -1198,6 +1220,26 @@ class StorageProvider(object):
 
         """
         return False
+
+    def upload_stream(self, artifact: Artifact, force: bool = False) -> bool:
+        """
+        Upload an artifact while it is archived.
+
+        Optional. Providers that implement it archive the directory of the
+        artifact, :attr:`~jolt.Artifact.path`, in the
+        DEFAULT_ARCHIVE_TYPE format while uploading, without
+        storing the archive. Otherwise, the cache archives the artifact
+        before uploading with :func:`upload`.
+
+        Args:
+            artifact (Artifact): The artifact to upload.
+            force (bool, optional): As for :func:`upload`.
+
+        Returns:
+            bool: True if the upload was successful, False otherwise.
+
+        """
+        raise NotImplementedError()
 
     def upload_enabled(self) -> bool:
         """ Return True if uploading is enabled. Default is True. """
@@ -1252,6 +1294,12 @@ class StorageProvider(object):
                 missing.add(artifact)
 
         return list(present), list(missing)
+
+
+def _implements(provider, method):
+    """ True if a storage provider implements an optional method. """
+    impl = getattr(type(provider), method, None)
+    return impl is not None and impl is not getattr(StorageProvider, method)
 
 
 class StorageProviderFactory(StorageProvider):
@@ -1633,6 +1681,19 @@ class ArtifactCache(StorageProvider):
         finally:
             fs.unlink(archive, ignore_errors=True)
 
+    def _fs_download_stream(self, provider, artifact, force):
+        """ Downloads an artifact with a provider that extracts it while downloading. """
+        fs.rmtree(artifact.temporary_path, ignore_errors=True)
+        try:
+            if provider.download_stream(artifact, force):
+                artifact._read_manifest(temporary=True)
+                return True
+        except BaseException as e:
+            fs.rmtree(artifact.temporary_path, ignore_errors=True)
+            raise e
+        fs.rmtree(artifact.temporary_path, ignore_errors=True)
+        return False
+
     def _fs_delete_artifact(self, identity, task_name, onerror=None):
         fs.rmtree(self._fs_get_artifact_path(identity, task_name), ignore_errors=True, onerror=onerror)
         fs.rmtree(self._fs_get_artifact_tmppath(identity, task_name), ignore_errors=True, onerror=onerror)
@@ -1887,8 +1948,14 @@ class ArtifactCache(StorageProvider):
                 artifact._info("Download skipped, already in local cache")
                 return True
             for provider in self._storage_providers:
-                if provider.download(artifact, force):
+                if _implements(provider, "download_stream"):
+                    downloaded = self._fs_download_stream(provider, artifact, force)
+                elif provider.download(artifact, force):
                     self._fs_decompress_artifact(artifact)
+                    downloaded = True
+                else:
+                    downloaded = False
+                if downloaded:
                     self.commit(artifact, temporary=True)
                     return True
         return len(self._storage_providers) == 0
@@ -1911,8 +1978,16 @@ class ArtifactCache(StorageProvider):
                 not artifact.is_uploadable(), artifact.task,
                 "Artifact was modified locally by another process and can no longer be uploaded, try again ({})", artifact._log_name)
             if self._storage_providers:
-                with self._fs_compress_artifact(artifact):
-                    return all([provider.upload(artifact, force) for provider in self._storage_providers])
+                raise_task_error_if(
+                    artifact.is_temporary(), artifact.task,
+                    "Can't upload an unpublished task artifact ({})", artifact._log_name)
+                streaming = [p for p in self._storage_providers if _implements(p, "upload_stream")]
+                archiving = [p for p in self._storage_providers if p not in streaming]
+                results = [provider.upload_stream(artifact, force) for provider in streaming]
+                if archiving:
+                    with self._fs_compress_artifact(artifact):
+                        results += [provider.upload(artifact, force) for provider in archiving]
+                return all(results)
         return len(self._storage_providers) == 0
 
     def location(self, artifact):

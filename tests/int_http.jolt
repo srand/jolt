@@ -2,45 +2,38 @@
 
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import os
+import shutil
 import sys
 import threading
+import time
 from types import SimpleNamespace
 sys.path.append(".")
 
 from testsupport import JoltTest
 from jolt import cli  # noqa: F401, imports jolt modules in dependency order
+from jolt.error import JoltError
 
 
-class RedirectingServer(object):
-    """ Answers every PUT with a redirect and records the requests. """
+def read_body(handler):
+    """ Reads the body of a request. Returns the body and whether it was complete. """
+    if handler.headers.get("Transfer-Encoding") != "chunked":
+        return handler.rfile.read(int(handler.headers.get("Content-Length", 0))), True
+    body = b""
+    while True:
+        line = handler.rfile.readline().strip()
+        if not line:
+            # The client closed the connection before the last chunk
+            return body, False
+        size = int(line, 16)
+        body += handler.rfile.read(size)
+        handler.rfile.readline()
+        if size == 0:
+            return body, True
 
-    def __init__(self):
-        self.requests = []
-        server = self
 
-        class Handler(BaseHTTPRequestHandler):
-            def do_PUT(self):
-                server.requests.append((self.path, self._read_body()))
-                self.send_response(307)
-                self.send_header("Location", "/redirected" + self.path)
-                self.send_header("Content-Length", "0")
-                self.end_headers()
-
-            def _read_body(self):
-                if self.headers.get("Transfer-Encoding") != "chunked":
-                    return self.rfile.read(int(self.headers.get("Content-Length", 0)))
-                body = b""
-                while True:
-                    size = int(self.rfile.readline().strip(), 16)
-                    body += self.rfile.read(size)
-                    self.rfile.readline()
-                    if size == 0:
-                        return body
-
-            def log_message(self, *args):
-                pass
-
-        self._httpd = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+class Server(object):
+    def __init__(self, handler):
+        self._httpd = ThreadingHTTPServer(("127.0.0.1", 0), handler)
         self.url = "http://127.0.0.1:{}".format(self._httpd.server_address[1])
         self._thread = threading.Thread(target=self._httpd.serve_forever, daemon=True)
         self._thread.start()
@@ -50,8 +43,97 @@ class RedirectingServer(object):
         self._httpd.server_close()
 
 
+class RedirectingServer(Server):
+    """ Answers every PUT with a redirect and records the requests. """
+
+    def __init__(self):
+        self.requests = []
+        server = self
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_PUT(self):
+                server.requests.append((self.path, read_body(self)[0]))
+                self.send_response(307)
+                self.send_header("Location", "/redirected" + self.path)
+                self.send_header("Content-Length", "0")
+                self.end_headers()
+
+            def log_message(self, *args):
+                pass
+
+        super().__init__(Handler)
+
+
+class StorageServer(Server):
+    """
+    Stores the files of complete PUT requests and serves them with GET.
+
+    Files in truncated are served with a Content-Length that matches the
+    shortened body. Incomplete uploads are recorded in aborted.
+    """
+
+    def __init__(self):
+        self.files = {}
+        self.truncated = set()
+        self.aborted = []
+        server = self
+
+        class Handler(BaseHTTPRequestHandler):
+            protocol_version = "HTTP/1.1"
+
+            def do_PUT(self):
+                body, complete = read_body(self)
+                if not complete:
+                    server.aborted.append(self.path)
+                    self.close_connection = True
+                    return
+                server.files[self.path] = body
+                self.send_response(201)
+                self.send_header("Content-Length", "0")
+                self.end_headers()
+
+            def do_GET(self):
+                body = server.files.get(self.path)
+                if body is None:
+                    self.send_response(404)
+                    self.send_header("Content-Length", "0")
+                    self.end_headers()
+                    return
+                if self.path in server.truncated:
+                    body = body[:len(body) // 2]
+                self.send_response(200)
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+
+            def log_message(self, *args):
+                pass
+
+        super().__init__(Handler)
+
+
 class HttpInternal(JoltTest):
     name = "int/http"
+
+    def _dir(self, name):
+        """ Empty directory of the test method. """
+        path = os.path.join(self.tools.builddir(self._testMethodName), name)
+        shutil.rmtree(path, ignore_errors=True)
+        os.makedirs(path)
+        return path
+
+    def _make_tree(self, path):
+        """ Creates a directory with files, a subdirectory and a symlink. """
+        self.tools.write_file(os.path.join(path, "a.txt"), "a")
+        os.makedirs(os.path.join(path, "sub"))
+        self.tools.write_file(os.path.join(path, "sub", "b.txt"), "b" * 300000)
+        os.symlink("a.txt", os.path.join(path, "link"))
+        return path
+
+    def _assertTree(self, path):
+        self.assertEqual(self.tools.read_file(os.path.join(path, "a.txt")), "a")
+        self.assertEqual(self.tools.read_file(os.path.join(path, "sub", "b.txt")), "b" * 300000)
+        self.assertEqual(os.readlink(os.path.join(path, "link")), "a.txt")
 
     def test_url_of_task_name_with_trailing_slash(self):
         """ The cache redirected paths with "//", and redirected uploads were stored empty. """
@@ -74,5 +156,87 @@ class HttpInternal(JoltTest):
             self.tools.write_file(path, "content")
             self.assertFalse(self.tools.upload(path, server.url + "/files/file.tar.zst", exceptions=False))
             self.assertEqual(server.requests, [("/files/file.tar.zst", b"content")])
+        finally:
+            server.stop()
+
+    def test_upload_archive(self):
+        """ A directory is uploaded as a tar.zst archive while it is compressed. """
+        server = StorageServer()
+        try:
+            tree = self._make_tree(self._dir("tree"))
+            self.assertTrue(self.tools._upload_archive(tree, server.url + "/files/file.tar.zst"))
+
+            archive = os.path.join(self._dir("archive"), "file.tar.zst")
+            with open(archive, "wb") as f:
+                f.write(server.files["/files/file.tar.zst"])
+            extracted = self._dir("extracted")
+            self.tools.extract(archive, extracted)
+            self._assertTree(extracted)
+        finally:
+            server.stop()
+
+    def test_upload_archive_aborts_on_error(self):
+        """ The upload ends without its last chunk if the archive can't be made, so it isn't stored. """
+        if os.geteuid() == 0:
+            self.skipTest("root can read any file")
+        server = StorageServer()
+        tree = self._make_tree(self._dir("tree"))
+        unreadable = os.path.join(tree, "sub", "b.txt")
+        os.chmod(unreadable, 0)
+        try:
+            with self.assertRaises(JoltError):
+                self.tools._upload_archive(tree, server.url + "/files/file.tar.zst")
+            # The server may still be reading the request when the client gives up
+            for _ in range(100):
+                if server.aborted:
+                    break
+                time.sleep(0.05)
+            self.assertEqual(server.files, {})
+            self.assertEqual(server.aborted, ["/files/file.tar.zst"])
+        finally:
+            os.chmod(unreadable, 0o644)
+            server.stop()
+
+    def test_download_archive(self):
+        """ A tar.zst archive is extracted while it is downloaded. """
+        server = StorageServer()
+        try:
+            tree = self._make_tree(self._dir("tree"))
+            archive = self.tools.archive(tree, os.path.join(self._dir("archive"), "file.tar.zst"))
+            with open(archive, "rb") as f:
+                server.files["/files/file.tar.zst"] = f.read()
+
+            extracted = self._dir("extracted")
+            self.assertTrue(self.tools._download_archive(server.url + "/files/file.tar.zst", extracted))
+            self._assertTree(extracted)
+        finally:
+            server.stop()
+
+    def test_download_archive_missing(self):
+        """ A missing archive isn't an error without exceptions, and nothing is extracted. """
+        server = StorageServer()
+        try:
+            extracted = self._dir("extracted")
+            self.assertFalse(self.tools._download_archive(
+                server.url + "/files/file.tar.zst", extracted, exceptions=False))
+            self.assertEqual(os.listdir(extracted), [])
+        finally:
+            server.stop()
+
+    def test_download_archive_truncated(self):
+        """ A truncated archive fails to download, also when its length matches the response. """
+        server = StorageServer()
+        try:
+            tree = self._make_tree(self._dir("tree"))
+            # Random content doesn't compress, so half of the archive ends inside a file
+            self.tools.write_file(os.path.join(tree, "random"), os.urandom(300000).hex())
+            archive = self.tools.archive(tree, os.path.join(self._dir("archive"), "file.tar.zst"))
+            with open(archive, "rb") as f:
+                server.files["/files/file.tar.zst"] = f.read()
+            server.truncated.add("/files/file.tar.zst")
+
+            with self.assertRaises(JoltError):
+                self.tools._download_archive(
+                    server.url + "/files/file.tar.zst", self._dir("extracted"), exceptions=False)
         finally:
             server.stop()

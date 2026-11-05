@@ -6,6 +6,7 @@ import gzip
 import json
 import lzma
 import mmap
+import queue
 import subprocess
 import os
 import platform
@@ -54,6 +55,7 @@ from jinja2.runtime import Context
 from jinja2.utils import missing
 from requests import Session
 from requests.auth import AuthBase, HTTPBasicAuth
+from requests.exceptions import RequestException
 from urllib.parse import urlparse, urlunparse
 
 
@@ -62,13 +64,18 @@ from jolt import filesystem as fs
 from jolt import log
 from jolt import utils
 from jolt import config
-from jolt.error import JoltCommandError, JoltTimeoutError
+from jolt.error import JoltCommandError, JoltError, JoltTimeoutError
 from jolt.error import raise_error_if
 from jolt.error import raise_task_error, raise_task_error_if
 
 
 SUPPORTED_ARCHIVE_TYPES = [".tar", ".tar.bz2", ".tar.gz", ".tgz", ".tar.xz", ".tar.zst", ".zip"]
 READER_JOIN_TIMEOUT = 1
+
+# Size of the chunks of streamed transfers, and the number of chunks
+# that an archive can be made ahead of its upload
+STREAM_CHUNK_SIZE = 65536
+STREAM_QUEUE_SIZE = 16
 
 
 http_session = Session()
@@ -741,6 +748,82 @@ class _Tarfile(tarfile.TarFile):
         return super().chown(*args, **kwargs)
 
 
+class _StreamCancelled(Exception):
+    """ Raised in the producer of a stream when its consumer is gone. """
+
+
+class _QueueWriter(object):
+    """ File object that hands what is written to a consumer, in chunks through a bounded queue. """
+
+    def __init__(self, chunks, cancelled):
+        self._chunks = chunks
+        self._cancelled = cancelled
+        self._buffer = bytearray()
+
+    def write(self, data):
+        self._buffer += data
+        if len(self._buffer) >= STREAM_CHUNK_SIZE:
+            self.flush()
+        return len(data)
+
+    def flush(self):
+        if self._buffer:
+            self.put(bytes(self._buffer))
+            self._buffer.clear()
+
+    def close(self):
+        self.flush()
+
+    def put(self, item):
+        while not self._cancelled.is_set():
+            try:
+                self._chunks.put(item, timeout=0.1)
+                return
+            except queue.Full:
+                pass
+        raise _StreamCancelled()
+
+
+class _CountingWriter(object):
+    """ File object that counts the bytes written through it to another file object. """
+
+    def __init__(self):
+        self.fileobj = None
+        self.count = 0
+
+    def write(self, data):
+        self.count += len(data)
+        return self.fileobj.write(data)
+
+
+class _ChunkReader(object):
+    """ File object that reads from an iterator of chunks. """
+
+    def __init__(self, chunks, progress=None):
+        self._chunks = chunks
+        self._buffer = bytearray()
+        self._progress = progress
+        self.count = 0
+
+    def read(self, size=-1):
+        while size < 0 or len(self._buffer) < size:
+            chunk = next(self._chunks, None)
+            if chunk is None:
+                break
+            self._buffer += chunk
+            self.count += len(chunk)
+            if self._progress:
+                self._progress(len(chunk))
+        if size < 0:
+            size = len(self._buffer)
+        data = bytes(self._buffer[:size])
+        del self._buffer[:size]
+        return data
+
+    def close(self):
+        pass
+
+
 class JinjaTaskContext(Context):
     """
     Helper context for Jinja templates.
@@ -945,15 +1028,72 @@ class Tools(object):
                     tar.add(rootdir, ".")
         return filename
 
+    def _archive_chunks(self, pathname, progress=None):
+        """
+        Generates the chunks of a tar.zst archive of a directory while it is made.
+
+        The archive is made in a thread, a bounded number of chunks ahead of
+        the consumer. Errors raise JoltError in the consumer. Closing the
+        generator stops the thread.
+
+        Args:
+            pathname (str): Directory to archive.
+            progress (callable, optional): Called with the number of archived
+                bytes, before compression, that each chunk adds.
+        """
+        chunks = queue.Queue(maxsize=STREAM_QUEUE_SIZE)
+        cancelled = threading.Event()
+        writer = _QueueWriter(chunks, cancelled)
+        counting = _CountingWriter()
+        compressor = ZstdCompressor(threads=self.thread_count())
+        done = object()
+
+        def produce():
+            try:
+                with compressor.stream_writer(writer) as stream:
+                    counting.fileobj = stream
+                    with tarfile.open(mode="w|", fileobj=counting) as tar:
+                        tar.add(pathname, ".")
+                writer.close()
+                writer.put(done)
+            except _StreamCancelled:
+                pass
+            except BaseException as e:
+                try:
+                    writer.put(e)
+                except _StreamCancelled:
+                    pass
+
+        thread = threading.Thread(target=produce, name="archive", daemon=True)
+        thread.start()
+        reported = 0
+        try:
+            while True:
+                item = chunks.get()
+                if isinstance(item, BaseException):
+                    raise JoltError(f"Failed to archive '{pathname}': {item}") from item
+                if progress:
+                    progress(counting.count - reported)
+                    reported = counting.count
+                if item is done:
+                    return
+                yield item
+        finally:
+            cancelled.set()
+            thread.join()
+
     def _extract_tarzstd(self, filename, pathname, files=None):
         with open(filename, 'rb') as zstd_file:
-            with ZstdFile(zstd_file) as stream:
-                with tarfile.open(mode="r|", fileobj=stream) as tar:
-                    if files:
-                        for file in files:
-                            tar.extract(file, pathname)
-                    else:
-                        tar.extractall(pathname)
+            self._extract_tarzstd_stream(zstd_file, pathname, files)
+
+    def _extract_tarzstd_stream(self, fileobj, pathname, files=None):
+        with ZstdFile(fileobj) as stream:
+            with tarfile.open(mode="r|", fileobj=stream) as tar:
+                if files:
+                    for file in files:
+                        tar.extract(file, pathname)
+                else:
+                    tar.extractall(pathname)
 
     def archive(self, pathname, filename):
         """ Creates a (compressed) archive.
@@ -1298,23 +1438,8 @@ class Tools(object):
 
         """
 
-        url = self.expand(url)
+        url, auth, url_cleaned = self._http_url(url, auth)
         pathname = self.expand_path(pathname)
-
-        url_parsed = urlparse(url)
-        raise_task_error_if(
-            not url_parsed.scheme or not url_parsed.netloc,
-            self._task,
-            "Invalid URL: '{}'", url)
-
-        if auth is None and url_parsed.username and url_parsed.password:
-            auth = HTTPBasicAuth(url_parsed.username, url_parsed.password)
-
-        # Redact password from URL if present
-        if url_parsed.password:
-            url_parsed = url_parsed._replace(netloc=url_parsed.netloc.replace(url_parsed.password, "****"))
-
-        url_cleaned = urlunparse(url_parsed)
 
         try:
             response = http_session.get(url, stream=True, auth=auth, **kwargs)
@@ -1340,6 +1465,82 @@ class Tools(object):
         except Exception as e:
             utils.call_and_catch(self.unlink, pathname)
             raise e
+
+    def _download_archive(self, url, pathname, exceptions=True, auth=None, **kwargs):
+        """
+        Downloads a tar.zst archive and extracts it into a directory while downloading.
+
+        The archive is never stored. If the download fails, files that were
+        already extracted are left in the directory.
+
+        Args:
+           url (str): URL of the archive.
+           pathname (str): Directory to extract the archive into.
+           exceptions (bool): Raise an error if the server doesn't have the archive.
+           auth (requests.auth.AuthBase, optional): Authentication helper.
+           kwargs (optional): Additional keyword arguments passed on
+               directly to ``requests.get()``.
+
+        Returns:
+            True if the archive was extracted, False if the server didn't have it.
+
+        Raises:
+            RequestException: On network errors.
+            JoltError: If the archive is truncated or can't be extracted.
+        """
+        url, auth, url_cleaned = self._http_url(url, auth)
+        pathname = self.expand_path(pathname)
+        name = fs.path.basename(urlparse(url).path)
+
+        with http_session.get(url, stream=True, auth=auth, **kwargs) as response:
+            if response.status_code != 200:
+                raise_error_if(
+                    exceptions,
+                    f"Download from '{url_cleaned}' failed with status '{response.status_code}'")
+                return False
+
+            size = int(response.headers.get('content-length', 0))
+            with log.progress("Downloading {0}".format(utils.shorten(name)), size, "B") as pbar:
+                log.verbose("{} -> {}", url_cleaned, pathname)
+                reader = _ChunkReader(response.iter_content(chunk_size=STREAM_CHUNK_SIZE), pbar.update)
+                try:
+                    fs.makedirs(pathname)
+                    self._extract_tarzstd_stream(reader, pathname)
+                    # Read the padding after the end of the archive
+                    while reader.read(STREAM_CHUNK_SIZE):
+                        pass
+                except RequestException:
+                    raise
+                except Exception as e:
+                    raise JoltError(f"Failed to extract download from '{url_cleaned}': {e}") from e
+                raise_error_if(
+                    size != 0 and size > reader.count,
+                    f"Downloaded file was truncated to {reader.count}/{size} bytes: {name}")
+        return True
+
+    def _http_url(self, url, auth=None):
+        """
+        Expands and checks a URL for a request.
+
+        Returns:
+            The URL, the authentication to use, which comes from the URL
+            if not given, and the URL with its password redacted for logs.
+        """
+        url = self.expand(url)
+        url_parsed = urlparse(url)
+        raise_task_error_if(
+            not url_parsed.scheme or not url_parsed.netloc,
+            self._task,
+            "Invalid URL: '{}'", url)
+
+        if auth is None and url_parsed.username and url_parsed.password:
+            auth = HTTPBasicAuth(url_parsed.username, url_parsed.password)
+
+        # Redact password from URL if present
+        if url_parsed.password:
+            url_parsed = url_parsed._replace(netloc=url_parsed.netloc.replace(url_parsed.password, "****"))
+
+        return url, auth, urlunparse(url_parsed)
 
     @contextmanager
     def environ(self, **kwargs):
@@ -2660,37 +2861,70 @@ class Tools(object):
 
         """
         pathname = self.expand_path(pathname)
-        url = self.expand(url)
         name = fs.path.basename(pathname)
         size = self.file_size(pathname)
 
-        url_parsed = urlparse(url)
-        raise_task_error_if(
-            not url_parsed.scheme or not url_parsed.netloc,
-            self._task,
-            "Invalid URL: '{}'", url)
+        with open(pathname, 'rb') as fileobj:
+            def read(pbar):
+                for data in iter(lambda: fileobj.read(STREAM_CHUNK_SIZE), b''):
+                    pbar.update(len(data))
+                    yield data
 
-        if auth is None and url_parsed.username and url_parsed.password:
-            auth = HTTPBasicAuth(url_parsed.username, url_parsed.password)
+            return self._put(pathname, url, name, size, read, exceptions, auth, **kwargs)
 
-        # Redact password from URL if present
-        if url_parsed.password:
-            url_parsed = url_parsed._replace(netloc=url_parsed.netloc.replace(url_parsed.password, "****"))
+    def _upload_archive(self, pathname, url, size=0, exceptions=True, auth=None, **kwargs):
+        """
+        Uploads a directory as a tar.zst archive while the archive is made.
 
-        url_cleaned = urlunparse(url_parsed)
+        The archive is never stored. If it can't be made, the upload
+        is aborted before it completes. Redirects are not followed.
 
-        with log.progress("Uploading " + utils.shorten(name), size, "B") as pbar, \
-             open(pathname, 'rb') as fileobj:
-            log.verbose("{} -> {}", pathname, url_cleaned)
+        Args:
+           pathname (str): Directory to archive.
+           url (str): Destination URL.
+           size (int, optional): Total size of the files, for the progress,
+               which counts the archived bytes before compression.
+           exceptions (bool): Raise an error if the server rejects the upload.
+           auth (requests.auth.AuthBase, optional): Authentication helper.
+           kwargs (optional): Additional keyword arguments passed on
+               directly to ``requests.put()``.
 
-            def read():
-                data = fileobj.read(4096)
-                pbar.update(len(data))
-                return data
+        Raises:
+            RequestException: On network errors.
+            JoltError: If the archive can't be made.
+        """
+        pathname = self.expand_path(pathname)
+        name = fs.path.basename(urlparse(self.expand(url)).path)
+        return self._put(
+            pathname, url, name, size,
+            lambda pbar: self._archive_chunks(pathname, pbar.update),
+            exceptions, auth, **kwargs)
+
+    def _put(self, source, url, name, size, chunks, exceptions=True, auth=None, **kwargs):
+        """
+        Uploads chunks using HTTP PUT.
+
+        Args:
+            source (str): What is uploaded, for logs.
+            url (str): Destination URL.
+            name (str): Name in the progress bar.
+            size (int): Total of the progress.
+            chunks (callable): Called with the progress bar, returns
+                an iterator of the chunks to upload.
+        """
+        url, auth, url_cleaned = self._http_url(url, auth)
+
+        with log.progress("Uploading " + utils.shorten(name), size, "B") as pbar:
+            log.verbose("{} -> {}", source, url_cleaned)
 
             # The streamed body can't be sent again, so a redirected upload would be empty
             kwargs.setdefault("allow_redirects", False)
-            response = http_session.put(url, data=iter(read, b''), auth=auth, **kwargs)
+            body = chunks(pbar)
+            try:
+                response = http_session.put(url, data=body, auth=auth, **kwargs)
+            finally:
+                # Stops the producer of the chunks if the upload failed
+                body.close()
             raise_error_if(
                 exceptions and response.status_code not in [201, 204],
                 f"Upload to '{url_cleaned}' failed with status '{response.status_code}'")

@@ -85,8 +85,39 @@ class Http(cache.StorageProvider):
             timeout=TIMEOUT,
             verify=self._verify)
 
+    @utils.retried.on_exception((RequestException, JoltError))
+    def download_stream(self, artifact, force=False):
+        if self._disabled:
+            return False
+        if not self._download and not force:
+            return False
+        # Files of a failed attempt
+        fs.rmtree(artifact.temporary_path, ignore_errors=True)
+        return artifact.tools._download_archive(
+            self._get_url(artifact),
+            artifact.temporary_path,
+            exceptions=False,
+            auth=self._get_auth(),
+            timeout=TIMEOUT,
+            verify=self._verify)
+
     def download_enabled(self):
         return not self._disabled and self._download
+
+    @utils.retried.on_exception((RequestException))
+    def upload_stream(self, artifact, force=False):
+        if self._disabled:
+            return True
+        if not self._upload and not force:
+            return True
+        return artifact.tools._upload_archive(
+            artifact.path,
+            self._get_url(artifact),
+            size=artifact.get_size(),
+            exceptions=False,
+            auth=self._get_auth(),
+            timeout=TIMEOUT,
+            verify=self._verify)
 
     @utils.retried.on_exception((RequestException))
     def upload(self, artifact, force=False):
