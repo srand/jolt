@@ -252,12 +252,14 @@ class MachOBinary(Binary):
         if rpaths == self.rpaths:
             return
         for index, binary in enumerate(self._slices):
-            old = list(binary.rpaths)
+            old = [c.path for c in binary.rpaths]
             grow = sum(16 + self._command_size(p) for p in rpaths) - \
-                sum(16 + self._command_size(c.path) for c in old)
+                sum(16 + self._command_size(p) for p in old)
             self._check_space(index, grow)
-            for command in old:
-                binary.remove(command)
+            # Removed by type: a Python object of a removed command refers
+            # to freed memory, and nanobind aborts the process when such
+            # objects are released
+            binary.remove(lief.MachO.LoadCommand.TYPE.RPATH)
             for path in rpaths:
                 binary.add(lief.MachO.RPathCommand.create(path))
         self.modified = True

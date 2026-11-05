@@ -1,6 +1,7 @@
 import os
 import shutil
 import stat
+import struct
 import subprocess
 import sys
 import tempfile
@@ -49,6 +50,30 @@ def build_fixtures(tools, root):
     cc(tools, "-o", "bin/prog", "prog.c", "-Llib", "-lfoo", "-Wl,-rpath,/jolt-prefix/lib", cwd=root)
     cc(tools, "-c", "-o", "foo.o", "foo.c", cwd=root)
     subprocess.run(["ar", "rcs", "libfoo.a", "foo.o"], cwd=root, check=True)
+
+
+def _macho_string_command(cmd, header, string):
+    data = string.encode() + b"\0"
+    size = (len(header) + 8 + len(data) + 7) // 8 * 8
+    return struct.pack("<II", cmd, size) + header + data.ljust(size - 8 - len(header), b"\0")
+
+
+def macho_dylib(install_name, rpaths):
+    """
+    A minimal x86_64 Mach-O dylib with an install name and rpaths, which
+    can't be linked on Linux.
+    """
+    text_offset = 0x1000
+    section = struct.pack(
+        "<16s16sQQIIIIIIII", b"__text", b"__TEXT", 0, 16, text_offset, 4, 0, 0, 0x80000400, 0, 0, 0)
+    segment = struct.pack(
+        "<II16sQQQQiiII", 0x19, 72 + len(section), b"__TEXT", 0, 0x2000, 0, 0x2000, 5, 5, 1, 0) + section
+    commands = [segment]
+    commands += [_macho_string_command(0xd, struct.pack("<IIII", 24, 2, 0x10000, 0x10000), install_name)]
+    commands += [_macho_string_command(0x8000001c, struct.pack("<I", 12), rpath) for rpath in rpaths]
+    body = b"".join(commands)
+    header = struct.pack("<IiiIIIII", 0xfeedfacf, 0x01000007, 3, 6, len(commands), len(body), 0x100085, 0)
+    return ((header + body).ljust(text_offset, b"\0") + b"\xc3" * 16).ljust(0x2000, b"\0")
 
 
 class BinariesInternal(JoltTest):
@@ -112,6 +137,48 @@ class BinariesInternal(JoltTest):
 
         self.assertEqual(stat.S_IMODE(os.stat(path).st_mode), 0o555)
         self.assertEqual(binaries.open_binary(path).rpaths, ["$ORIGIN"])
+
+    def test_macho_roundtrip(self):
+        from jolt import binaries
+        path = self.path("libfoo.dylib")
+        with open(path, "wb") as f:
+            f.write(macho_dylib("/jolt-prefix/lib/libfoo.dylib", ["/jolt-prefix/lib", "/other"]))
+
+        lib = binaries.open_binary(path)
+        self.assertEqual((lib.format, lib.is_library), ("macho", True))
+        self.assertEqual(lib.install_name, "/jolt-prefix/lib/libfoo.dylib")
+        self.assertEqual(lib.rpaths, ["/jolt-prefix/lib", "/other"])
+        lib.set_install_name("@rpath/libfoo.dylib")
+        lib.set_rpaths(["@loader_path"])
+        self.assertTrue(lib.save())
+
+        lib = binaries.open_binary(path)
+        self.assertEqual(lib.install_name, "@rpath/libfoo.dylib")
+        self.assertEqual(lib.rpaths, ["@loader_path"])
+
+    def test_macho_replaced_rpaths_dont_crash(self):
+        """
+        Replacing the rpaths of Mach-O files aborted the process: Python
+        objects of the removed commands referred to freed memory.
+        """
+        template = self.path("template.dylib")
+        with open(template, "wb") as f:
+            f.write(macho_dylib("/jolt-prefix/lib/libfoo.dylib", ["/jolt-prefix/lib", "/other"]))
+        script = (
+            "import shutil, sys\n"
+            "from jolt import binaries\n"
+            "for i in range(200):\n"
+            "    shutil.copyfile(sys.argv[1], sys.argv[2])\n"
+            "    lib = binaries.open_binary(sys.argv[2])\n"
+            "    lib.set_rpaths(['@loader_path/../lib%d' % i])\n"
+            "    lib.save()\n"
+        )
+        import jolt
+        env = dict(os.environ, PYTHONPATH=os.path.dirname(os.path.dirname(jolt.__file__)))
+        result = subprocess.run(
+            [sys.executable, "-c", script, template, self.path("libfoo.dylib")],
+            env=env, capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_ignores_objects_archives_scripts_symlinks(self):
         from jolt import binaries
