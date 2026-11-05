@@ -9,8 +9,9 @@ from jolt.tasks import TaskRegistry
 @attributes.requires("requires_zlib")
 @cmake.requires()
 @cmake.use_ninja()
-@cxxinfo.publish(libraries=["pcre2-posix", "pcre2-8", "pcre2-16", "pcre2-32"])
+@cxxinfo.publish()
 @attributes.requires("requires_compiler")
+@attributes.system
 class Pcre2(cmake.CMake):
     """ Perl compatible regular expressions, for 8, 16 and 32-bit code units """
 
@@ -38,14 +39,30 @@ class Pcre2(cmake.CMake):
         "PCRE2_SUPPORT_LIBZ=ON",
     ]
 
+    @property
+    def _library_suffix(self):
+        """ MSVC builds name the static libraries pcre2-8-static.lib and so on. """
+        return "-static" if self.system == "windows" and not self.shared else ""
+
     def run(self, deps, tools):
         super().run(deps, tools)
+        if self._library_suffix:
+            # The pkg-config files name the libraries without the suffix
+            with tools.cwd(tools.cmake().installdir, "jolt-prefix", "lib", "pkgconfig"):
+                for lib in ["8", "16", "32", "posix"]:
+                    tools.replace_in_file(
+                        f"libpcre2-{lib}.pc",
+                        rf"-lpcre2-{lib}(?![\w-])",
+                        f"-lpcre2-{lib}{self._library_suffix}",
+                        regex=True)
         # The prefix in pcre2-config must follow the artifact when it is relocated
         with tools.cwd(tools.cmake().installdir, "jolt-prefix", "bin"):
             tools.replace_in_file("pcre2-config", "prefix=/jolt-prefix", 'prefix="$(cd "$(dirname "$0")/.." && pwd)"')
 
     def publish(self, artifact, tools):
         super().publish(artifact, tools)
+        for lib in ["posix", "8", "16", "32"]:
+            artifact.cxxinfo.libraries.append(f"pcre2-{lib}{self._library_suffix}")
         if self.shared:
             artifact.environ.LD_LIBRARY_PATH.append("lib")
         else:
