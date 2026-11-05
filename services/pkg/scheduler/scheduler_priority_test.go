@@ -2,6 +2,7 @@ package scheduler
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -100,6 +101,42 @@ func TestBuildPriorityOrder(t *testing.T) {
 	assert.True(t, buildEqualityFunc(low, build("low", 5, now.Add(time.Hour))))
 	assert.False(t, buildEqualityFunc(low, twin))
 	assert.False(t, buildEqualityFunc(twin, low))
+}
+
+// A free worker must go to the oldest build it can serve, even when the
+// oldest ready builds have no task for it.
+func TestWorkerGoesToOldestCompatibleBuild(t *testing.T) {
+	scheduler := NewPriorityScheduler()
+	start := time.Now()
+
+	builds := make([]*priorityBuild, 8)
+	for i := range builds {
+		builds[i] = scheduler.NewBuild(fmt.Sprint("build", i), &protocol.BuildRequest{Environment: &protocol.BuildEnvironment{}}).(*priorityBuild)
+		builds[i].scheduledAt = start.Add(time.Duration(i) * time.Second)
+		defer builds[i].Close()
+	}
+
+	// Enqueue newest first, so that the heap's array isn't in priority order
+	for i := len(builds) - 1; i >= 0; i-- {
+		properties := []string{}
+		if i < 3 {
+			properties = append(properties, "label=other")
+		}
+		task := addTask(builds[i], "task", properties...)
+		observer, err := scheduler.ScheduleBuild(builds[i])
+		assert.NoError(t, err)
+		defer observer.Close()
+		taskObserver, err := scheduler.ScheduleTask(builds[i].Id(), task.Identity())
+		assert.NoError(t, err)
+		defer taskObserver.Close()
+	}
+
+	worker, err := scheduler.NewWorker(NewPlatformWithDefaults(), NewPlatform())
+	assert.NoError(t, err)
+	defer worker.Close()
+
+	scheduler.selectTaskAndWorker()
+	assert.Equal(t, builds[3].Id(), (<-worker.Builds()).Id())
 }
 
 func TestTaskSelection(t *testing.T) {

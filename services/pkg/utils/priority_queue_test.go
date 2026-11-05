@@ -72,6 +72,22 @@ func TestPriorityQueueContainsAndLen(t *testing.T) {
 	assert.Equal(t, 0, pq.Len())
 }
 
+func TestPriorityQueueSorted(t *testing.T) {
+	pq := NewPriorityQueue[int](
+		func(a, b any) int { return a.(int) - b.(int) },
+		func(a, b any) bool { return a.(int) == b.(int) },
+	)
+	for i := 7; i >= 0; i-- {
+		pq.Push(i)
+	}
+
+	// The heap layout is only partially ordered
+	assert.NotEqual(t, []int{0, 1, 2, 3, 4, 5, 6, 7}, pq.Items())
+	assert.Equal(t, []int{0, 1, 2, 3, 4, 5, 6, 7}, pq.Sorted())
+	assert.Equal(t, 8, pq.Len(), "sorting leaves the queue intact")
+	assert.Equal(t, 0, pq.Pop())
+}
+
 func TestPriorityQueueReorder(t *testing.T) {
 	// Items whose priority changes are put in order by Reorder.
 	priority := map[string]int{"a": 1, "b": 2, "c": 3}

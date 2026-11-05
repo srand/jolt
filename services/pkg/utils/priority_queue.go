@@ -1,6 +1,9 @@
 package utils
 
-import "container/heap"
+import (
+	"container/heap"
+	"slices"
+)
 
 // Compares the priority of items in a priority queue.
 type PriorityFunc[T any] func(a, b any) int
@@ -63,9 +66,18 @@ func (pq *PriorityQueue[T]) Contains(item T) bool {
 	return false
 }
 
-// Returns the items in the priority queue as a list.
+// Returns the items in the priority queue as a list, in heap order.
 func (pq *PriorityQueue[T]) Items() []T {
 	return pq.heap.Items()
+}
+
+// Returns a copy of the items in priority order, highest priority first.
+func (pq *PriorityQueue[T]) Sorted() []T {
+	items := slices.Clone(pq.heap.items)
+	slices.SortStableFunc(items, func(a, b T) int {
+		return pq.heap.compare(a, b)
+	})
+	return items
 }
 
 // Reorders the priority queue.

@@ -391,12 +391,15 @@ func (s *priorityScheduler) selectTaskAndWorker() {
 
 	var assignments []assignment = make([]assignment, 0)
 
+	// The heap's backing array is only ordered at its root.
+	builds := s.readyBuilds.Sorted()
+
 	// Assign tasks to workers.
 	// Workers are selected in a round-robin fashion.
 	// Tasks are selected in priority order.
 	for _, worker := range s.availWorkers {
 		// Select tasks for worker
-		for _, build := range s.readyBuilds.Items() {
+		for _, build := range builds {
 			if !build.HasCompatibleTask(worker) {
 				continue
 			}
