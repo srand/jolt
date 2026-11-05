@@ -247,6 +247,10 @@ class OpenSSL(Task):
                 tools.run("perl {srcdir}/Configure --prefix={installdir} --openssldir=ssl no-tests {shared[,no-shared]} {target}")
                 tools.run("nmake")
                 tools.run("nmake install")
+                if not self.shared:
+                    # Static builds disable uplink, so applink.c isn't
+                    # installed, but MySQL requires it on Windows
+                    tools.copy("{srcdir}/ms/applink.c", "{installdir}/include/openssl/")
             else:
                 # Use the system's CA certificates and configuration. Only
                 # the software is installed, not the system directories.
