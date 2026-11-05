@@ -39,7 +39,7 @@ class MySQLBase(cmake.CMake):
     requires_linux_libudev = ["libudev-zero"]
     requires_lz4 = ["lz4"]
     requires_rapidjson = ["rapidjson"]
-    requires_src = ["git:url=https://github.com/mysql/mysql-server,path={buildroot}/git-mysql,rev=mysql-{version},submodules=true"]
+    requires_src = ["git:clean=true,url=https://github.com/mysql/mysql-server,path={buildroot}/git-mysql,rev=mysql-{version},submodules=true"]
     requires_ssl = ["openssl"]
     requires_zlib = ["zlib"]
     requires_zstd = ["zstd"]
@@ -68,6 +68,15 @@ class MySQLBase(cmake.CMake):
         return ["ZSTD_SYSTEM_LIBRARY=" + zstd.replace("\\", "/")]
 
     def run(self, deps, tools):
+        if self.system == "windows":
+            # MySQL copies the OpenSSL DLLs on Windows and refuses static
+            # libraries, which need crypt32 instead. The DLL names it knows
+            # are those of OpenSSL 1.1 and 3, not 4.
+            with tools.cwd(self.srcdir, "cmake"):
+                tools.replace_in_file(
+                    "ssl.cmake",
+                    'MESSAGE(FATAL_ERROR "Cannot find SSL dynamic libraries")',
+                    "LINK_LIBRARIES(crypt32)")
         if self.system != "linux":
             return super().run(deps, tools)
         # libudev.h and sasl/sasl.h are looked for with check_include_file, which ignores pkg-config
