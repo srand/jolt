@@ -2,6 +2,7 @@
 
 from copy import copy, deepcopy
 import functools
+import inspect
 import os
 import re
 
@@ -87,36 +88,28 @@ class JoltTest(Test):
     storage = None
     indent = 8
 
+    def _doc(self):
+        """ Docstring of the test method, dedented like Python 3.13 and later do. """
+        return inspect.cleandoc(self._testMethodDoc or "")
+
     def _files(self):
-        if not self._testMethodDoc:
+        doc = self._doc()
+        if not doc:
             return ""
-        if os.sys.version_info >= (3, 13):
-            lines = re.findall(r"--- file: ([^\n]*)\n(.*?)(?=---)", self._testMethodDoc, re.M|re.DOTALL)
-            return [(name, content) for name, content in lines]
-        else:
-            lines = re.findall(r"--- file: ([^\n]*)\n(.*?)(?=---)", self._testMethodDoc, re.M|re.DOTALL)
-            return [(name, "\n".join([l[8:] for l in content.splitlines()])) for name, content in lines]
+        return re.findall(r"--- file: ([^\n]*)\n(.*?)(?=---)", doc, re.M|re.DOTALL)
 
     def _recipe(self):
-        if not self._testMethodDoc:
+        doc = self._doc()
+        if not doc:
             return ""
-        if os.sys.version_info >= (3, 13):
-            lines = "".join(re.findall(r"--- tasks:\n(.*?)\n---", self._testMethodDoc, re.M|re.DOTALL))
-            return "\n".join([l[0:] for l in lines.splitlines()])
-        else:
-            lines = "".join(re.findall(r"--- tasks:\n(.*?)\n        ---", self._testMethodDoc, re.M|re.DOTALL))
-            return "\n".join([l[8:] for l in lines.splitlines()])
+        return "".join(re.findall(r"--- tasks:\n(.*?)\n---", doc, re.M|re.DOTALL))
 
     def _config(self):
-        if not self._testMethodDoc:
+        doc = self._doc()
+        if not doc:
             return ""
         common = "\n[jolt]\ncachedir={}/cache\n".format(self.ws)
-        if os.sys.version_info >= (3, 13):
-            lines = "".join(re.findall(r"--- config:\n(.*?)---", self._testMethodDoc, re.M|re.DOTALL))
-            return common + "\n".join([l[0:] for l in lines.splitlines()])
-        else:
-            lines = "".join(re.findall(r"--- config:\n(.*?)---", self._testMethodDoc, re.M|re.DOTALL))
-            return common + "\n".join([l[8:] for l in lines.splitlines()])
+        return common + "".join(re.findall(r"--- config:\n(.*?)---", doc, re.M|re.DOTALL))
 
     def _network_config(self):
         return self.deps["deployment"].strings.config \
