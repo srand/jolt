@@ -57,7 +57,10 @@ jobs:
       - name: Free disk space
         if: runner.os == 'Linux'
         run: |
-          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL \
+            /usr/local/.ghcup /usr/share/swift /usr/local/share/boost /usr/local/share/chromium \
+            /usr/local/share/powershell /usr/lib/jvm /opt/microsoft /opt/google /opt/az
+          sudo docker image prune --all --force > /dev/null || true
           df -h /
 
       - name: Set up Python
@@ -117,9 +120,11 @@ jobs:
         working-directory: examples/pkgs
         # Leaves time to save the cache before the job is stopped
         timeout-minutes: 330
+        # Build directories are removed after each task, they aren't kept
+        # between runs and the largest packages don't fit on the disk with them
         run: |
           set -o pipefail
-          jolt -c jolt.cachedir="$JOLT_CACHE" -c jolt.cachesize=1T -c cache.http_uri="$JOLT_CACHE_HTTP_URI" -c cache.grpc_uri="$JOLT_CACHE_GRPC_URI" build -k default 2>&1 | tee "$RUNNER_TEMP/jolt.log"
+          jolt -c jolt.cachedir="$JOLT_CACHE" -c jolt.cachesize=1T -c jolt.incremental_dirs=false -c cache.http_uri="$JOLT_CACHE_HTTP_URI" -c cache.grpc_uri="$JOLT_CACHE_GRPC_URI" build -k default 2>&1 | tee "$RUNNER_TEMP/jolt.log"
 
       - name: Summarize
         if: always()
@@ -136,6 +141,10 @@ jobs:
             else
               echo "The build didn't finish, see the log."
             fi
+            echo "Free disk space:"
+            echo '```'
+            df -h "$GITHUB_WORKSPACE" | tail -1
+            echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload log
