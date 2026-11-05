@@ -14,11 +14,26 @@ FOO_C = "int foo(void) { return 42; }\n"
 PROG_C = "int foo(void);\nint main(void) { return foo() == 42 ? 0 : 1; }\n"
 
 
-def cc(*args, cwd):
-    subprocess.run(["cc"] + list(args), cwd=cwd, check=True)
+def cc(tools, *args, cwd):
+    """
+    Compiles with the environment of the task, as other tests do.
+
+    A bare cc in the environment of the Jolt process couldn't find cc1 in
+    CI, which other tests didn't reproduce. The compiler setup is printed
+    if it fails again.
+    """
+    with tools.cwd(cwd):
+        try:
+            tools.run("cc " + " ".join(args), output_on_error=True)
+        except Exception:
+            tools.run(
+                "command -v cc; readlink -f \"$(command -v cc)\"; cc -print-prog-name=cc1; "
+                "cc -print-search-dirs | head -2; env | grep -E '^(PATH|GCC_|COMPILER_PATH|LIBRARY_PATH)'; true",
+                output=True)
+            raise
 
 
-def build_fixtures(root):
+def build_fixtures(tools, root):
     """
     Builds lib/libfoo.so.1 (with the symlink libfoo.so), bin/prog linked to it
     with the rpath /jolt-prefix/lib, foo.o and libfoo.a.
@@ -29,10 +44,10 @@ def build_fixtures(root):
         f.write(FOO_C)
     with open(os.path.join(root, "prog.c"), "w") as f:
         f.write(PROG_C)
-    cc("-shared", "-fPIC", "-Wl,-soname,libfoo.so.1", "-o", "lib/libfoo.so.1", "foo.c", cwd=root)
+    cc(tools, "-shared", "-fPIC", "-Wl,-soname,libfoo.so.1", "-o", "lib/libfoo.so.1", "foo.c", cwd=root)
     os.symlink("libfoo.so.1", os.path.join(root, "lib", "libfoo.so"))
-    cc("-o", "bin/prog", "prog.c", "-Llib", "-lfoo", "-Wl,-rpath,/jolt-prefix/lib", cwd=root)
-    cc("-c", "-o", "foo.o", "foo.c", cwd=root)
+    cc(tools, "-o", "bin/prog", "prog.c", "-Llib", "-lfoo", "-Wl,-rpath,/jolt-prefix/lib", cwd=root)
+    cc(tools, "-c", "-o", "foo.o", "foo.c", cwd=root)
     subprocess.run(["ar", "rcs", "libfoo.a", "foo.o"], cwd=root, check=True)
 
 
@@ -42,7 +57,7 @@ class BinariesInternal(JoltTest):
     def setup(self, deps, tools):
         super().setup(deps, tools)
         self.root = tempfile.mkdtemp()
-        build_fixtures(self.root)
+        build_fixtures(tools, self.root)
 
     def cleanup(self):
         shutil.rmtree(self.root, ignore_errors=True)
