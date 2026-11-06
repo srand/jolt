@@ -81,6 +81,13 @@ class MySQLBase(cmake.CMake):
                     "ssl.cmake",
                     'MESSAGE(FATAL_ERROR "Cannot find SSL dynamic libraries")',
                     "LINK_LIBRARIES(crypt32)")
+            # The bundled libfido2 uses HMAC functions that OpenSSL 3 deprecated.
+            # It disables the warning, but /sdl of MySQL turns it into an error.
+            with tools.environ(
+                CFLAGS="/DOPENSSL_SUPPRESS_DEPRECATED " + tools.getenv("CFLAGS", ""),
+                CXXFLAGS="/DOPENSSL_SUPPRESS_DEPRECATED " + tools.getenv("CXXFLAGS", ""),
+            ):
+                return super().run(deps, tools)
         if self.system != "linux":
             return super().run(deps, tools)
         # libudev.h and sasl/sasl.h are looked for with check_include_file, which ignores pkg-config
