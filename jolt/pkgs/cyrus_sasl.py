@@ -46,12 +46,14 @@ class CyrusSasl(autotools.Autotools):
                 "lib/dlopen.c",
                 '#include "saslint.h"\n\n#ifndef PIC\n',
                 '#include "saslint.h"\n\n#undef PIC\n#ifndef PIC\n')
-        # OpenSSL is looked for with header and library checks, which ignore pkg-config.
+        # OpenSSL and GSSAPI are looked for with header and library checks, which
+        # ignore pkg-config. Without the headers of krb5, the GSSAPI headers of the
+        # macOS SDK are used, which lack the MIT extensions that the mechanism uses.
         # The code predates C23, and cram.c lacks a declaration of time(). The
         # built-in mechanisms are compiled without libtool, which adds -fPIC.
         with tools.environ(
             CFLAGS="-O2 -fPIC -std=gnu17 -Wno-error=implicit-function-declaration " + tools.getenv("CFLAGS", ""),
-            CPPFLAGS=tools.run("pkg-config --cflags openssl").strip() + " " + tools.getenv("CPPFLAGS", ""),
+            CPPFLAGS=tools.run("pkg-config --cflags krb5-gssapi openssl").strip() + " " + tools.getenv("CPPFLAGS", ""),
             LDFLAGS=tools.run("pkg-config --libs-only-L openssl").strip() + " " + tools.getenv("LDFLAGS", ""),
             # The utilities link with the built-in mechanisms and their libraries
             LIBS=tools.run("pkg-config --libs krb5-gssapi libcrypto").strip() + " " + tools.getenv("LIBS", ""),
