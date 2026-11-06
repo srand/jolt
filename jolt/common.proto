@@ -184,6 +184,12 @@ message Workspace {
     // Workspace build directory, relative to rootdir.
     // This is where temporary intermediate build output is stored.
     string builddir = 7;
+
+    // Patterns of paths not in the workspace tree, in addition to those of
+    // the .joltignore file in the tree, with the syntax of its lines.
+    // The tree was written without them, and checking it out must be given
+    // them too, or what they match is removed from the workspace.
+    repeated string ignore_patterns = 8;
 }
 
 // Description of the Jolt client that initiated the build.

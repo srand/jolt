@@ -367,28 +367,58 @@ def _excluded_paths(loader):
 
 
 def _ignore_patterns(root, paths):
-    patterns = []
-    joltignore = os.path.join(root, ".joltignore")
-    if os.path.exists(joltignore):
-        with open(joltignore) as f:
-            patterns = f.read().splitlines()
+    """
+    Returns the patterns of what Jolt does not index, besides .joltignore.
+
+    Paths are relative to the root of the workspace, so that the patterns
+    apply wherever the workspace tree is checked out.
+    """
     # Git metadata changes when jolt inspects repositories
-    patterns.append(".git")
+    patterns = [".git"]
     for path in paths:
         relpath = os.path.relpath(path, root)
         if relpath != os.curdir and not relpath.startswith(os.pardir):
             patterns.append("/" + relpath.replace(os.sep, "/") + "/")
-    return "\n".join(patterns) + "\n"
+    return patterns
+
+
+def workspace_ignore_patterns():
+    """
+    Returns the patterns of what Jolt does not index in the workspace,
+    besides those of .joltignore.
+
+    They ignore .git, the build and cache directories and the directories
+    added with :func:`add_ignored_path`.
+    """
+    from jolt.loader import JoltLoader
+
+    loader = JoltLoader.get()
+    root = loader.workspace_path
+    raise_error_if(not root, "No workspace present")
+    return _ignore_patterns(root, _excluded_paths(loader))
+
+
+def ignore_args(patterns):
+    """
+    Returns the arguments that make fstree ignore the patterns of .joltignore
+    and the given ones.
+
+    The patterns of .joltignore are read from the tree, which keeps the file,
+    so that a checkout of the tree finds them there too. The given patterns
+    come after them, so that the file cannot re-include what they ignore.
+    """
+    args = ["--ignore", ".joltignore"]
+    for pattern in patterns:
+        args += ["--ignore-pattern", pattern]
+    return args
 
 
 @contextmanager
 def workspace_index_files():
     """
-    Locks the index of the workspace and yields the paths of the index
-    file and the ignore file to pass to fstree.
-
-    The ignore file contains the patterns of .joltignore, .git, the build
-    and cache directories and directories added with :func:`add_ignored_path`.
+    Locks the index of the workspace and yields the path of the index file
+    and the patterns of :func:`workspace_ignore_patterns`, to pass to fstree
+    with :func:`ignore_args`.
     """
     from jolt.loader import JoltLoader
 
@@ -400,22 +430,12 @@ def workspace_index_files():
     roothash = utils.hashstring(root)
     indexdir = os.path.join(cachedir, "indexes", roothash[:2])
     indexfile = os.path.join(indexdir, roothash[2:])
-    ignorefile = indexfile + ".ignore"
     fs.makedirs(indexdir)
 
-    ignores = _ignore_patterns(root, _excluded_paths(loader))
+    patterns = workspace_ignore_patterns()
 
     with fasteners.InterProcessLock(indexfile + ".lock"):
-        try:
-            with open(ignorefile) as f:
-                stale = f.read() != ignores
-        except FileNotFoundError:
-            stale = True
-        if stale:
-            with open(ignorefile, "w") as f:
-                f.write(ignores)
-
-        yield indexfile, ignorefile
+        yield indexfile, patterns
 
 
 def _refresh_workspace_index():
@@ -433,12 +453,12 @@ def _refresh_workspace_index():
     jobserver_path = os.getenv("JOLT_JOBSERVER_PATH")
     jobserver_args = ["--jobserver-path", jobserver_path] if jobserver_path else []
 
-    with workspace_index_files() as (indexfile, ignorefile):
+    with workspace_index_files() as (indexfile, ignore_patterns):
         process = None
         try:
             with log.progress("Indexing workspace", count=None, unit="objects", estimates=False) as progress:
                 process = subprocess.Popen(
-                    [executable, "write-tree", "--json", "--cache", cachedir, "--ignore", ignorefile,
+                    [executable, "write-tree", "--json", "--cache", cachedir] + ignore_args(ignore_patterns) + [
                      "--index", indexfile, "--threads", str(t.thread_count())] + jobserver_args + [root],
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,

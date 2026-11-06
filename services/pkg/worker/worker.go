@@ -205,28 +205,7 @@ func (w *worker) run() error {
 						currentClient = nil
 						continue
 					}
-					fstreeArgs := []string{
-						"fstree",
-						"pull-checkout",
-						"--cache",
-						w.cachePath(),
-						"--ignore",
-						".joltignore",
-						"--index",
-						indexPath,
-						"--remote",
-						w.config.CacheGrpcUri,
-						"--threads",
-						fmt.Sprint(w.config.ThreadCount),
-					}
-					if jobserverPath := os.Getenv("JOLT_JOBSERVER_PATH"); jobserverPath != "" {
-						fstreeArgs = append(fstreeArgs, "--jobserver-path", jobserverPath)
-					}
-					fstreeArgs = append(
-						fstreeArgs,
-						request.Build.Environment.Workspace.Tree,
-						request.Build.Environment.Workspace.Name,
-					)
+					fstreeArgs := w.checkoutArgs(request.Build.Environment.Workspace, indexPath, os.Getenv("JOLT_JOBSERVER_PATH"))
 					err = w.runCmd(w.cwd, fstreeArgs...)
 					if err != nil {
 						log.Error("Failed to deploy workspace tree:", err)
@@ -483,6 +462,37 @@ func (w *worker) activateVEnvPath(clientDigest string) string {
 
 // Returns the path of the fstree index that Jolt uses for the workspace,
 // see workspace_index_files() in jolt/fstree.py, and creates its directory.
+// Returns the command line that pulls the workspace tree and checks it out.
+// It ignores what the client wrote the tree without, the patterns of the
+// .joltignore file in the tree and those of the workspace, so that the
+// checkout keeps those paths rather than removing them.
+func (w *worker) checkoutArgs(workspace *protocol.Workspace, indexPath, jobserverPath string) []string {
+	args := []string{
+		"fstree",
+		"pull-checkout",
+		"--cache",
+		w.cachePath(),
+		"--ignore",
+		".joltignore",
+	}
+	// Older fstree versions lack the option, so it is only given if needed
+	for _, pattern := range workspace.IgnorePatterns {
+		args = append(args, "--ignore-pattern", pattern)
+	}
+	args = append(args,
+		"--index",
+		indexPath,
+		"--remote",
+		w.config.CacheGrpcUri,
+		"--threads",
+		fmt.Sprint(w.config.ThreadCount),
+	)
+	if jobserverPath != "" {
+		args = append(args, "--jobserver-path", jobserverPath)
+	}
+	return append(args, workspace.Tree, workspace.Name)
+}
+
 func (w *worker) workspaceIndexPath(name string) (string, error) {
 	// Jolt hashes the workspace path from getcwd(), which resolves symlinks
 	cwd, err := filepath.EvalSymlinks(w.cwd)

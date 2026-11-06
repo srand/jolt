@@ -4,6 +4,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/srand/jolt/scheduler/pkg/protocol"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -19,4 +20,35 @@ func TestWorkspaceIndexPathMatchesJolt(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, filepath.Join(cache, "indexes", "fc", "57375c36f4b1020c37cea144e13327e496315c930d357a8a12fc8859d2f1ae"), index)
 	assert.DirExists(t, filepath.Dir(index))
+}
+
+func TestCheckoutArgsIgnorePatterns(t *testing.T) {
+	w := &worker{
+		config: &WorkerConfig{CacheDir: "/cache", CacheGrpcUri: "tcp://cache:9090", ThreadCount: 4},
+	}
+
+	// The checkout ignores what the client wrote the tree without
+	workspace := &protocol.Workspace{
+		Name:           "monorepo",
+		Tree:           "blake3:1234",
+		IgnorePatterns: []string{".git", "/build/"},
+	}
+	assert.Equal(t, []string{
+		"fstree", "pull-checkout", "--cache", "/cache",
+		"--ignore", ".joltignore",
+		"--ignore-pattern", ".git", "--ignore-pattern", "/build/",
+		"--index", "/index", "--remote", "tcp://cache:9090", "--threads", "4",
+		"--jobserver-path", "/jobserver",
+		"blake3:1234", "monorepo",
+	}, w.checkoutArgs(workspace, "/index", "/jobserver"))
+
+	// Without patterns, from an older client, the option is left out, so
+	// that older fstree versions work as before
+	workspace.IgnorePatterns = nil
+	assert.Equal(t, []string{
+		"fstree", "pull-checkout", "--cache", "/cache",
+		"--ignore", ".joltignore",
+		"--index", "/index", "--remote", "tcp://cache:9090", "--threads", "4",
+		"blake3:1234", "monorepo",
+	}, w.checkoutArgs(workspace, "/index", ""))
 }
