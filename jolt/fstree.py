@@ -458,8 +458,7 @@ def _refresh_workspace_index():
         try:
             with log.progress("Indexing workspace", count=None, unit="objects", estimates=False) as progress:
                 process = subprocess.Popen(
-                    [executable, "write-tree", "--json", "--cache", cachedir] + ignore_args(ignore_patterns) + [
-                     "--index", indexfile, "--threads", str(t.thread_count())] + jobserver_args + [root],
+                    [executable, "write-tree", "--json", "--cache", cachedir] + ignore_args(ignore_patterns) + ["--index", indexfile, "--threads", str(t.thread_count())] + jobserver_args + [root],
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
                     cwd=root)
