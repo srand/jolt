@@ -480,6 +480,7 @@ def build(ctx, task, network, keep_going, default, local,
         _interrupted(queue, executors)
     finally:
         queue.shutdown()
+        executors.close_session(session)
 
         for task in goal_tasks:
             for artifact in task.artifacts:

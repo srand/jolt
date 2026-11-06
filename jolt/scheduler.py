@@ -451,6 +451,11 @@ class ExecutorRegistry(object):
         """ Creates a session for all factories. """
         return {factory: factory.create_session(graph) for factory in self._factories}
 
+    def close_session(self, session):
+        """ Closes the sessions of all factories. """
+        for factory, factory_session in session.items():
+            factory.close_session(factory_session)
+
     def create_skipper(self, task):
         """ Creates an executor that skips a task. """
         return SkipTask(self._concurrent_factory, task)
@@ -650,6 +655,9 @@ class NetworkExecutorFactory(ExecutorFactory):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+
+    def close_session(self, session):
+        pass
 
     def create(self, session, task):
         raise NotImplementedError()

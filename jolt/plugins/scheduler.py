@@ -502,6 +502,11 @@ class RemoteSession(object):
         self.build = None
         self.build_id = None
 
+    def close(self):
+        """ Close the session and terminate its open response streams. """
+        self.clear_build_request()
+        self.channel.close()
+
     def cancel(self):
         """ Send a cancel request to the scheduler. """
 
@@ -555,6 +560,9 @@ class RemoteExecutionFactory(NetworkExecutorFactory):
         session = RemoteSession(self)
         session.initialize(graph)
         return session
+
+    def close_session(self, session):
+        session.close()
 
     def create(self, session, task):
         """ Create an executor for the given task. """
@@ -803,5 +811,8 @@ def executor(ctx, worker, build, request):
         log.set_level(log.EXCEPTION)
         log.exception(e)
         raise e
+
+    finally:
+        channel.close()
 
     log.info("Exiting")
