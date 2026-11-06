@@ -45,16 +45,20 @@ class MySQLBase(cmake.CMake):
     requires_zstd = ["zstd"]
     srcdir = "{git[mysql-server]}"
 
+    _options_darwin = ["WITH_EDITLINE=system"]
+    """ Editline from its package. MySQL doesn't use it on Windows. """
+
     @property
     def _options_linux(self):
         """
-        LDAP from its package, which the search of the system would miss, and the
+        Editline and LDAP from their packages, which the search of the system would miss, and the
         libraries of the static SASL library, which MySQL doesn't link with.
         """
         sasl_libs = self.tools.run("pkg-config --libs libsasl2", output=False).strip()
         return [
             "CMAKE_C_STANDARD_LIBRARIES='{}'".format(sasl_libs),
             "CMAKE_CXX_STANDARD_LIBRARIES='{}'".format(sasl_libs),
+            "WITH_EDITLINE=system",
             "WITH_LDAP=" + self.tools.run("pkg-config --variable=prefix ldap", output=False).strip(),
         ]
 
@@ -95,7 +99,6 @@ class LibMySQLClient(MySQLBase):
     options = [
         "BUILD_SHARED_LIBS={shared[ON,OFF]}",
         "WITH_CURL=system",
-        "WITH_EDITLINE=system",
         "WITH_LZ4=system",
         "WITH_RAPIDJSON=system",
         "WITH_SSL=system",
