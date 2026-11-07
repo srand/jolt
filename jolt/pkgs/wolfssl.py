@@ -24,7 +24,6 @@ class WolfSsl(cmake.CMake):
         "CMAKE_POSITION_INDEPENDENT_CODE={pic[ON,OFF]}",
         "WOLFSSL_CRYPT_TESTS=no",
         "WOLFSSL_EXAMPLES=no",
-        "WOLFSSL_REPRODUCIBLE_BUILD=yes",
     ]
 
     def run(self, deps, tools):
