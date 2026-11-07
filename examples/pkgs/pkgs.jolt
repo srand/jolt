@@ -106,6 +106,7 @@ from jolt.pkgs import make
 from jolt.pkgs import mbedtls
 from jolt.pkgs import mesa
 from jolt.pkgs import meson
+from jolt.pkgs import mosquitto
 from jolt.pkgs import mpc
 from jolt.pkgs import mpfr
 from jolt.pkgs import mstch
@@ -331,6 +332,7 @@ class Default(Alias):
         "libyaml",
         "m4",
         "make",
+        "mosquitto",
         "mpc",
         "mpfr",
         "ncurses",
