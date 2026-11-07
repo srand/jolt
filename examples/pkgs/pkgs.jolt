@@ -153,6 +153,7 @@ from jolt.pkgs import vulkan_headers
 from jolt.pkgs import vulkan_loader
 from jolt.pkgs import wayland
 from jolt.pkgs import wayland_protocols
+from jolt.pkgs import wolfssl
 from jolt.pkgs import xerces_c
 from jolt.pkgs import x11
 from jolt.pkgs import xorg
@@ -282,6 +283,7 @@ class Default(Alias):
         "virtual/perl",
         "virtual/ssl",
         "vulkan-headers",
+        "wolfssl",
         "xerces-c",
         "xz",
         "yaml-cpp",
