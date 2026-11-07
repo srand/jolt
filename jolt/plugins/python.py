@@ -252,7 +252,7 @@ def requires(python=True):
     def decorate(cls):
         if python:
             cls = attributes.requires("requires_python")(cls)
-            cls.requires_python = ["cpython"]
+            cls.requires_python = ["virtual/python"]
 
         return cls
 

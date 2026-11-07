@@ -1,4 +1,8 @@
-from jolt import attributes, Alias, BooleanParameter, Parameter, Task
+import shutil
+import subprocess
+
+from jolt import attributes, influence, Alias, BooleanParameter, Parameter, Task
+from jolt.error import raise_task_error_if
 from jolt import filesystem as fs
 from jolt.pkgs import compiler, libffi, sqlite, ssl, xz, zlib, zstd
 from jolt.plugins import autotools, git, pkgconfig
@@ -169,6 +173,48 @@ class CPython(Alias):
     requires_windows = ["cpython/win32:version={version}"]
 
 
+@attributes.system
+@influence.attribute("system")
+@influence.attribute("python_version")
+class HostPython(Task):
+    """
+    The Python interpreter of the build host.
+
+    Override ``virtual/python`` with this task to build Python environments
+    from the host's Python instead of building CPython. The version of the
+    host's Python is part of the identity of the task.
+    """
+
+    name = "cpython/host"
+    executable = "python3"
+    """ Python executable to look for in PATH. """
+
+    @property
+    def python_version(self):
+        path = shutil.which(self.executable)
+        if not path:
+            return None
+        try:
+            return subprocess.run([path, "--version"], capture_output=True, text=True, timeout=60).stdout.strip()
+        except (OSError, subprocess.SubprocessError):
+            return None
+
+    def run(self, deps, tools):
+        raise_task_error_if(not self.python_version, self, f"{self.executable} is not installed on the host system.")
+
+
+class VirtualPython(Alias):
+    """
+    The Python interpreter that Python environments and builds use.
+
+    Selects CPython built by Jolt. It can be overridden with ``cpython/host``
+    to use the Python of the build host.
+    """
+
+    name = "virtual/python"
+    requires = ["cpython"]
+
+
 @attributes.relocate_binaries()
 @pkgconfig.to_cxxinfo("python3-embed")
 @attributes.common_metadata()
@@ -212,3 +258,5 @@ TaskRegistry.get().add_task_class(CPythonWin32)
 TaskRegistry.get().add_task_class(CPython)
 TaskRegistry.get().add_task_class(CPythonEmbed)
 TaskRegistry.get().add_task_class(CPythonExtend)
+TaskRegistry.get().add_task_class(HostPython)
+TaskRegistry.get().add_task_class(VirtualPython)
