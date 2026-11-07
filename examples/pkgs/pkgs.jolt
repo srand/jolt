@@ -100,6 +100,7 @@ from jolt.pkgs import lz4
 from jolt.pkgs import m4
 from jolt.pkgs import magic_enum
 from jolt.pkgs import make
+from jolt.pkgs import mbedtls
 from jolt.pkgs import mesa
 from jolt.pkgs import meson
 from jolt.pkgs import mpc
@@ -237,6 +238,7 @@ class Default(Alias):
         "lua",
         "lz4",
         "magic_enum",
+        "mbedtls",
         "meson",
         "mstch",
         "nasm",
