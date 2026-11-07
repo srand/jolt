@@ -61,6 +61,19 @@ class PkgConf(Alias):
     requires_windows = ["pkgconf/win32:version={version}"]
 
 
+class VirtualPkgConf(Alias):
+    """
+    The pkg-config implementation that builds use.
+
+    Selects pkgconf. It can be overridden with another task that publishes
+    a ``pkg-config`` program and sets ``PKG_CONFIG``.
+    """
+
+    name = "virtual/pkgconf"
+    requires = ["pkgconf"]
+
+
 TaskRegistry.get().add_task_class(PkgConf)
+TaskRegistry.get().add_task_class(VirtualPkgConf)
 TaskRegistry.get().add_task_class(PkgConfPosix)
 TaskRegistry.get().add_task_class(PkgConfWin32)
