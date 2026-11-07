@@ -24,7 +24,7 @@ class Pcre2(cmake.CMake):
     requires_bzip2 = ["libbzip2"]
     """ Compression library used by pcre2grep. """
     requires_src = ["fetch:alias=src,url=https://github.com/PCRE2Project/pcre2/releases/download/pcre2-{version}/pcre2-{version}.tar.bz2"]
-    requires_zlib = ["zlib"]
+    requires_zlib = ["virtual/zlib"]
     """ Compression library used by pcre2grep. """
     srcdir = "{fetch[src]}/pcre2-{version}"
     options = [

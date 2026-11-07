@@ -23,7 +23,7 @@ class CapnProto(cmake.CMake):
     requires_compiler = ["virtual/compiler/c", "virtual/compiler/cxx"]
     requires_git = ["git:url=https://github.com/capnproto/capnproto.git,rev=v{version}"]
     requires_ssl_on = ["virtual/ssl:pic={pic},shared={shared}"]
-    requires_zlib_on = ["zlib:pic={pic},shared={shared}"]
+    requires_zlib_on = ["virtual/zlib:pic={pic},shared={shared}"]
     srcdir = "{git[capnproto]}/c++"
     # OpenSSL and zlib are used if found on the build host unless disabled.
     options = [

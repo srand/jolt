@@ -1,5 +1,5 @@
 from jolt import attributes, Parameter
-from jolt.pkgs import compiler, krb5, openssl
+from jolt.pkgs import compiler, krb5, ssl
 from jolt.plugins import autotools, cxxinfo, fetch, pkgconfig
 from jolt.tasks import TaskRegistry
 
@@ -21,7 +21,7 @@ class CyrusSasl(autotools.Autotools):
     name = "cyrus-sasl"
     version = Parameter("2.1.28", help="Cyrus SASL version.")
     requires_compiler = ["virtual/compiler/c"]
-    requires_libs = ["krb5", "openssl"]
+    requires_libs = ["krb5", "virtual/ssl"]
     """ Libraries used by the GSSAPI and other mechanisms. """
     requires_src = ["fetch:alias=src,url=https://github.com/cyrusimap/cyrus-sasl/releases/download/cyrus-sasl-{version}/cyrus-sasl-{version}.tar.gz"]
     srcdir = "{fetch[src]}/cyrus-sasl-{version}"

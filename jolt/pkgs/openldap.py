@@ -1,5 +1,5 @@
 from jolt import attributes, BooleanParameter, Parameter
-from jolt.pkgs import compiler, cyrus_sasl, openssl
+from jolt.pkgs import compiler, cyrus_sasl, ssl
 from jolt.plugins import autotools, cxxinfo, fetch, pkgconfig
 from jolt.tasks import TaskRegistry
 
@@ -17,7 +17,7 @@ class OpenLDAP(autotools.Autotools):
     version = Parameter("2.6.16", help="OpenLDAP version.")
     shared = BooleanParameter(False, help="Build shared libraries.")
     requires_compiler = ["virtual/compiler/c"]
-    requires_libs = ["cyrus-sasl", "openssl"]
+    requires_libs = ["cyrus-sasl", "virtual/ssl"]
     """ Libraries used for SASL authentication and TLS. """
     requires_src = ["fetch:alias=src,url=https://www.openldap.org/software/download/OpenLDAP/openldap-release/openldap-{version}.tgz"]
     srcdir = "{fetch[src]}/openldap-{version}"

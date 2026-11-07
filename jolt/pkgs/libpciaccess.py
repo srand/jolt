@@ -1,5 +1,5 @@
 from jolt import attributes, Parameter
-from jolt.pkgs import compiler, meson
+from jolt.pkgs import compiler, meson, zlib
 from jolt.plugins import git, meson
 from jolt.tasks import TaskRegistry
 
@@ -13,7 +13,7 @@ class Libpciaccess(meson.Meson):
     version = Parameter("0.19", help="libpciaccess version.")
     requires_compiler = ["virtual/compiler/c"]
     requires_git = ["git:url=https://gitlab.freedesktop.org/xorg/lib/libpciaccess.git,rev=libpciaccess-{version}"]
-    requires_zlib = ["zlib:pic=true"]
+    requires_zlib = ["virtual/zlib:pic=true"]
     srcdir = "{git[libpciaccess]}"
 
 

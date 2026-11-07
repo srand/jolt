@@ -1,7 +1,7 @@
 from jolt import attributes, BooleanParameter, Parameter
 from jolt.tasks import TaskRegistry
 from jolt.plugins import cmake, cxxinfo, git
-from jolt.pkgs import bzip2, compiler, libexpat, lz4, openssl, xz, zlib, zstd
+from jolt.pkgs import bzip2, compiler, libexpat, lz4, ssl, xz, zlib, zstd
 
 
 @attributes.requires("requires_bzip2")
@@ -25,9 +25,9 @@ class Libarchive(cmake.CMake):
     requires_git = ["git:url=https://github.com/libarchive/libarchive.git,rev=v{version}"]
     requires_expat = ["libexpat"]
     requires_lz4 = ["lz4"]
-    requires_openssl = ["openssl"]
+    requires_openssl = ["virtual/ssl"]
     requires_xz = ["xz"]
-    requires_zlib = ["zlib"]
+    requires_zlib = ["virtual/zlib"]
     requires_zstd = ["zstd"]
     srcdir = "{git[libarchive]}"
     options = [

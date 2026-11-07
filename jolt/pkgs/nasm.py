@@ -16,7 +16,7 @@ class NASM(Task):
         "git:url=https://github.com/netwide-assembler/nasm.git,rev=nasm-{version}",
         "virtual/compiler/c",
         "virtual/perl",
-        "zlib",
+        "virtual/zlib",
     ]
     """ Requirements of the source build. On Windows, the official build is downloaded instead. """
     requires_source_linux = requires_source_darwin

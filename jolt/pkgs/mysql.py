@@ -1,6 +1,6 @@
 from jolt import attributes, BooleanParameter, Parameter
 from jolt import filesystem as fs
-from jolt.pkgs import boost, compiler, curl, cyrus_sasl, krb5, libedit, libtirpc, libudev_zero, lz4, openldap, openssl, rapidjson, zlib, zstd
+from jolt.pkgs import boost, compiler, curl, cyrus_sasl, krb5, libedit, libtirpc, libudev_zero, lz4, openldap, rapidjson, ssl, zlib, zstd
 from jolt.plugins import cmake, cxxinfo, git, pkgconfig
 from jolt.tasks import TaskRegistry
 
@@ -40,8 +40,8 @@ class MySQLBase(cmake.CMake):
     requires_lz4 = ["lz4"]
     requires_rapidjson = ["rapidjson"]
     requires_src = ["git:clean=true,url=https://github.com/mysql/mysql-server,path={buildroot}/git-mysql,rev=mysql-{version},submodules=true"]
-    requires_ssl = ["openssl"]
-    requires_zlib = ["zlib"]
+    requires_ssl = ["virtual/ssl"]
+    requires_zlib = ["virtual/zlib"]
     requires_zstd = ["zstd"]
     srcdir = "{git[mysql-server]}"
 

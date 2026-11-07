@@ -21,7 +21,7 @@ class GLib(meson.Meson):
     requires_libffi_darwin = ["libffi"]
     requires_libffi_linux = requires_libffi_darwin
     requires_pcre2 = ["pcre2:pic=true"]
-    requires_zlib = ["zlib:pic=true"]
+    requires_zlib = ["virtual/zlib:pic=true"]
     srcdir = "{git[glib]}"
     options = [
         "documentation=false",

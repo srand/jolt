@@ -1,5 +1,5 @@
 from jolt import attributes, BooleanParameter, Parameter
-from jolt.pkgs import compiler, openssl
+from jolt.pkgs import compiler, ssl
 from jolt.plugins import cmake, cxxinfo, git
 from jolt.tasks import TaskRegistry
 
@@ -17,7 +17,7 @@ class PahoMQTT_C(cmake.CMake):
     ssl = BooleanParameter(True, help="Enable SSL support.")
     requires_compiler = ["virtual/compiler/c"]
     requires_git = ["git:url=https://github.com/eclipse/paho.mqtt.c.git,rev=v{version}"]
-    requires_ssl_on = ["openssl"]
+    requires_ssl_on = ["virtual/ssl"]
     srcdir = "{git[paho.mqtt.c]}"
     options = [
         "PAHO_BUILD_SHARED={shared[ON,OFF]}",

@@ -1,6 +1,6 @@
 import os
 from jolt import attributes, Parameter
-from jolt.pkgs import cmake, compiler, openssl
+from jolt.pkgs import cmake, compiler, ssl
 from jolt.plugins import cxxinfo, git, cmake, pkgconfig
 from jolt.tasks import TaskRegistry
 
@@ -19,7 +19,7 @@ class LibEvent(cmake.CMake):
     options = ["CMAKE_POLICY_VERSION_MINIMUM=3.5"]
     requires_compiler = ["virtual/compiler/c"]
     requires_git = ["git:url=https://github.com/libevent/libevent.git,rev=release-{version}-stable"]
-    requires_ssl = ["openssl"]
+    requires_ssl = ["virtual/ssl"]
     srcdir = "{git[libevent]}"
 
     def run(self, deps, tools):
