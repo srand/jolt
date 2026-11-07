@@ -134,6 +134,7 @@ from jolt.pkgs import perl
 from jolt.pkgs import pkgconfig
 from jolt.pkgs import poco
 from jolt.pkgs import protobuf
+from jolt.pkgs import protobuf_c
 from jolt.pkgs import pugixml
 from jolt.pkgs import pybind11
 from jolt.pkgs import python
@@ -271,6 +272,7 @@ class Default(Alias):
         "pcre2",
         "poco",
         "protobuf",
+        "protobuf-c",
         "protobuf/lib-compiler",
         "protobuf/lib-lite",
         "protobuf/lib",
