@@ -120,6 +120,7 @@ from jolt.pkgs import numactl
 from jolt.pkgs import onetbb
 from jolt.pkgs import opencv
 from jolt.pkgs import openjdk
+from jolt.pkgs import openjpeg
 from jolt.pkgs import openldap
 from jolt.pkgs import openssl
 from jolt.pkgs import paho
@@ -255,6 +256,7 @@ class Default(Alias):
         "onetbb",
         "opencv",
         "openjdk",
+        "openjpeg",
         "openssl",
         "paho/mqtt-c",
         "paho/mqtt-cxx",
