@@ -1,4 +1,4 @@
-from jolt import Parameter, attributes
+from jolt import Alias, Parameter, attributes
 from jolt.plugins import autotools, fetch, pkgconfig
 from jolt.tasks import TaskRegistry
 from jolt.pkgs import compiler
@@ -15,4 +15,17 @@ class Readline(autotools.Autotools):
     srcdir = "{fetch[src]}/readline-{version}"
 
 
+class VirtualReadline(Alias):
+    """
+    The line editing library that packages use.
+
+    Selects GNU Readline. libedit is a BSD-licensed alternative for projects
+    that support its emulation of the Readline API, ``editline/readline.h``.
+    """
+
+    name = "virtual/readline"
+    requires = ["readline"]
+
+
 TaskRegistry.get().add_task_class(Readline)
+TaskRegistry.get().add_task_class(VirtualReadline)
