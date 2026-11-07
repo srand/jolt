@@ -58,6 +58,7 @@ from jolt.pkgs import grpc
 from jolt.pkgs import harfbuzz
 from jolt.pkgs import hdf5
 from jolt.pkgs import help2man
+from jolt.pkgs import hiredis
 from jolt.pkgs import icu
 from jolt.pkgs import inja
 from jolt.pkgs import json_c
@@ -216,6 +217,7 @@ class Default(Alias):
         "grpc/c++",
         "harfbuzz",
         "hdf5",
+        "hiredis",
         "inja",
         "json-c",
         "jsoncpp",
