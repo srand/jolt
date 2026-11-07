@@ -81,6 +81,12 @@ class MySQLBase(cmake.CMake):
                     "ssl.cmake",
                     'MESSAGE(FATAL_ERROR "Cannot find SSL dynamic libraries")',
                     "LINK_LIBRARIES(crypt32)")
+                # Release builds are meant to link with /debug, but a missing $
+                # drops the flag, and the installation of the PDB files fails.
+                tools.replace_in_file(
+                    "os/Windows.cmake",
+                    "SET(CMAKE_{{type}}_LINKER_FLAGS_RELEASE",
+                    "SET(CMAKE_${{type}}_LINKER_FLAGS_RELEASE")
             # The bundled libfido2 uses HMAC functions that OpenSSL 3 deprecated.
             # It disables the warning, but /sdl of MySQL turns it into an error.
             with tools.environ(
