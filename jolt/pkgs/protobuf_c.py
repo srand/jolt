@@ -30,11 +30,12 @@ class ProtobufC(cmake.CMake):
 
     def run(self, deps, tools):
         # Protobuf 33 removed FieldDescriptor::label(). Derive the label from
-        # the predicates that remain instead.
+        # the predicates that remain instead. The searches don't include line
+        # endings, which are CRLF in checkouts on Windows.
         with tools.cwd(self.srcdir, "..", "protoc-gen-c"):
             tools.replace_in_file(
                 "compat.h",
-                "namespace compat {{\n",
+                "namespace compat {{",
                 "namespace compat {{\n\n"
                 "inline google::protobuf::FieldDescriptor::Label GetLabel(const google::protobuf::FieldDescriptor *field) {{\n"
                 "  if (field->is_repeated()) return google::protobuf::FieldDescriptor::LABEL_REPEATED;\n"
