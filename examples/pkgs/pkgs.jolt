@@ -121,6 +121,7 @@ from jolt.pkgs import nng
 from jolt.pkgs import nodejs
 from jolt.pkgs import numactl
 from jolt.pkgs import onetbb
+from jolt.pkgs import open62541
 from jolt.pkgs import opencv
 from jolt.pkgs import openjdk
 from jolt.pkgs import openjpeg
@@ -260,6 +261,7 @@ class Default(Alias):
         "nng",
         "nodejs",
         "onetbb",
+        "open62541",
         "opencv",
         "openjdk",
         "openjpeg",
