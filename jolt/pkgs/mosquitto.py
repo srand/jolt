@@ -23,9 +23,10 @@ class Mosquitto(cmake.CMake):
     requires_ssl_on = ["virtual/ssl"]
     srcdir = "{git[mosquitto]}"
     # The library is always shared, and the broker loads plugins.
-    # Disabled features would use libraries of the build host: argon2
-    # (password-file plugin), readline (ctrl shell), microhttpd (HTTP API),
-    # SQLite (persistence plugin) and xsltproc (documentation).
+    # Disabled features would use libraries of the build host: readline
+    # (ctrl shell), microhttpd (HTTP API), SQLite (persistence plugin) and
+    # xsltproc (documentation). Mosquitto 2.1 links argon2 if found but
+    # doesn't use it yet, so it isn't looked for.
     options = [
         "CMAKE_DISABLE_FIND_PACKAGE_argon2=ON",
         "WITH_CTRL_SHELL=OFF",

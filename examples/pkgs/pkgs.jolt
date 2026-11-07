@@ -3,6 +3,7 @@ from jolt import Alias
 
 from jolt.pkgs import abseil
 from jolt.pkgs import alsa_lib
+from jolt.pkgs import argon2
 from jolt.pkgs import asio
 from jolt.pkgs import autoconf
 from jolt.pkgs import automake
@@ -316,6 +317,7 @@ class Default(Alias):
     ]
 
     requires_darwin = [
+        "argon2",
         "asio",
         "autoconf",
         "automake",
