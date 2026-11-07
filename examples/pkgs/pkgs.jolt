@@ -82,6 +82,7 @@ from jolt.pkgs import libpciaccess
 from jolt.pkgs import libpng
 from jolt.pkgs import libpq
 from jolt.pkgs import libseccomp
+from jolt.pkgs import libsocketcan
 from jolt.pkgs import libsodium
 from jolt.pkgs import libtiff
 from jolt.pkgs import libtirpc
@@ -361,6 +362,7 @@ class Default(Alias):
         "libglvnd",
         "libpciaccess",
         "libseccomp",
+        "libsocketcan",
         "libtirpc",
         "libudev-zero",
         "libunwind",
