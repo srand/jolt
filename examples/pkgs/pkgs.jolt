@@ -15,6 +15,7 @@ from jolt.pkgs import boringssl
 from jolt.pkgs import brotli
 from jolt.pkgs import busybox
 from jolt.pkgs import bzip2
+from jolt.pkgs import capnproto
 from jolt.pkgs import cares
 from jolt.pkgs import catch2
 from jolt.pkgs import cbindgen
@@ -179,6 +180,7 @@ class Default(Alias):
         "boringssl",
         "brotli",
         "c-ares",
+        "capnproto",
         "catch2",
         "cbindgen",
         "ccache",
