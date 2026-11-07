@@ -61,6 +61,7 @@ from jolt.pkgs import harfbuzz
 from jolt.pkgs import hdf5
 from jolt.pkgs import help2man
 from jolt.pkgs import hiredis
+from jolt.pkgs import i2c_tools
 from jolt.pkgs import icu
 from jolt.pkgs import inja
 from jolt.pkgs import json_c
@@ -359,6 +360,7 @@ class Default(Alias):
         "gcc/glibc:target=aarch64-linux-gnu",
         "gcc/musl:target=aarch64-linux-musl",
         "glibc",
+        "i2c-tools",
         "libcap",
         "libdrm",
         "libffi",
