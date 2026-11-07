@@ -35,11 +35,13 @@ class Nanopb(cmake.CMake):
     requires_git = ["git:url=https://github.com/nanopb/nanopb.git,rev=nanopb-{version}"]
     srcdir = "{git[nanopb]}"
     # The generator is installed in the artifact instead of the site
-    # packages of the Python that runs the build
+    # packages of the Python that runs the build. The .bat wrappers on
+    # Windows run the python in PATH instead of the path of the build's.
     options = [
         "BUILD_SHARED_LIBS={shared[ON,OFF]}",
         "BUILD_STATIC_LIBS={shared[OFF,ON]}",
         "CMAKE_POSITION_INDEPENDENT_CODE={pic[ON,OFF]}",
+        "Python_EXECUTABLE=python",
         "nanopb_PYTHON_INSTDIR_OVERRIDE:STRING=lib/python",
     ]
 
