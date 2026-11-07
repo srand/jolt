@@ -45,6 +45,13 @@ class ProtobufC(cmake.CMake):
             tools.replace_in_file("compat.h", "\nnamespace protobuf_c {{", "\n#include <google/protobuf/descriptor.h>\n\nnamespace protobuf_c {{")
             for source in tools.glob("c_*field.cc"):
                 tools.replace_in_file(source, "descriptor_->label()", "compat::GetLabel(descriptor_)")
+        # Static builds use the static C runtime of MSVC, unlike other
+        # packages and the protobuf libraries that the plugin links with
+        with tools.cwd(self.srcdir):
+            tools.replace_in_file(
+                "CMakeLists.txt",
+                'set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")',
+                "")
         super().run(deps, tools)
 
     def publish(self, artifact, tools):
