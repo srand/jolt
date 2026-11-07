@@ -111,6 +111,7 @@ from jolt.pkgs import mpfr
 from jolt.pkgs import mstch
 from jolt.pkgs import musl
 from jolt.pkgs import mysql
+from jolt.pkgs import nanopb
 from jolt.pkgs import nasm
 from jolt.pkgs import ncurses
 from jolt.pkgs import ng_log
@@ -252,6 +253,7 @@ class Default(Alias):
         "mbedtls",
         "meson",
         "mstch",
+        "nanopb",
         "nasm",
         "ng-log",
         "nghttp2",
