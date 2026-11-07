@@ -38,13 +38,16 @@ class Open62541(cmake.CMake):
 
     def run(self, deps, tools):
         super().run(deps, tools)
+        with tools.cwd(tools.cmake().installdir, "jolt-prefix", "lib"):
+            # The pkg-config file is only installed on Linux
+            if not tools.exists("pkgconfig/open62541.pc"):
+                return
         with tools.cwd(tools.cmake().installdir, "jolt-prefix", "lib", "pkgconfig"):
             # Shared libraries list the paths to the OpenSSL libraries of the
             # build as -l options. pkg-config finds OpenSSL by its package name.
             tools.replace_in_file("open62541.pc", r" -l/\S+", "", regex=True)
-        if not self.shared:
-            # The static library is useless without its dependencies, also without --static
-            with tools.cwd(tools.cmake().installdir, "jolt-prefix", "lib", "pkgconfig"):
+            if not self.shared:
+                # The static library is useless without its dependencies, also without --static
                 tools.replace_in_file("open62541.pc", "Requires.private:", "Requires:")
                 tools.replace_in_file("open62541.pc", "\nLibs.private:", "")
 
