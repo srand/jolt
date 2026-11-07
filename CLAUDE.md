@@ -87,6 +87,12 @@ cache shared between users and build workers.
 - Prefer depending on other Jolt packages over bundled copies and libraries on the
   build host. Check configure output for dependencies found on the host (paths in
   `/usr`) or silently skipped (`not found`), and add packages for them.
+- Where there are alternative implementations, require the `virtual/*` alias,
+  not the package: `virtual/ssl` (OpenSSL, BoringSSL), `virtual/zlib`,
+  `virtual/readline` (GNU Readline, libedit), `virtual/perl`, `virtual/python`
+  (built CPython or the host's, `cpython/host`) and `virtual/pkgconf`, which
+  `pkgconfig.requires()` and `python.requires()` already use. A recipe can
+  replace an alias by registering a task of the same name.
 
 ### Versions and sources
 
