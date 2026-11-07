@@ -29,8 +29,8 @@ class I2cTools(Task):
         self.installdir = tools.builddir("install", incremental=False)
         with tools.cwd(self.srcdir):
             tools.run("make clean")
-            tools.run("make {} {_make_args} prefix=/jolt-prefix", tools.make_jobs())
-            tools.run("make {_make_args} prefix=/jolt-prefix DESTDIR={installdir} install")
+            tools.run("make {} {_make_args} PREFIX=/jolt-prefix", tools.make_jobs())
+            tools.run("make {_make_args} PREFIX=/jolt-prefix DESTDIR={installdir} install")
 
     def publish(self, artifact, tools):
         with tools.cwd(self.installdir, "jolt-prefix"):
