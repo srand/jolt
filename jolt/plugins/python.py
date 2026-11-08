@@ -192,11 +192,17 @@ class PythonEnv(Task):
                 artifact.collect("bin/*.dll")
                 artifact.collect("lib")
                 artifact.collect("DLLs")
+                # Headers and import libraries, to build extension modules.
+                # Extensions are linked with the import libraries in libs/.
+                artifact.collect("include")
+                artifact.collect("lib/*.lib", "libs/")
             else:
                 artifact.collect(py_exe, "bin/python3")
                 artifact.collect("lib/python3")
                 artifact.collect("lib/python{version_major}")
                 artifact.collect("lib/libpython{version_major}.*")
+                # Headers, to build extension modules
+                artifact.collect("include/python{version_major}")
 
         # Create common symlinks
         if self.system != "windows":
