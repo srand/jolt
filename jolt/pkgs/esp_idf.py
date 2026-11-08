@@ -115,6 +115,15 @@ class EspIdfPython(python.PythonEnv, _EspIdfVersion):
     requires_git = [_GIT]
 
     def publish(self, artifact, tools):
+        # Python environments lack the headers, which pip needs to build
+        # tree-sitter. It has no wheels for new Python releases.
+        py_exe = tools.which(self.executable)
+        if py_exe:
+            py_home = os.path.dirname(os.path.dirname(os.path.realpath(py_exe)))
+            with tools.cwd(py_home):
+                if tools.exists("include"):
+                    artifact.collect("include")
+
         # The packages of the core feature, pinned by the constraints of the release
         self.requirements = [
             "-r " + tools.expand_path("{git[esp-idf]}/tools/requirements/requirements.core.txt"),
