@@ -72,7 +72,9 @@ class EspIdfTools(Task, _EspIdfVersion):
 
     def run(self, deps, tools):
         self.installdir = tools.builddir("tools", incremental=False)
-        with tools.environ(IDF_TOOLS_PATH=self.installdir, IDF_PATH=tools.expand_path("{git[esp-idf]}")):
+        # idf_tools.py refuses to run in MSYS2 shells, such as Git Bash, but it
+        # only needs the variable that identifies them to be unset
+        with tools.environ(IDF_TOOLS_PATH=self.installdir, IDF_PATH=tools.expand_path("{git[esp-idf]}"), MSYSTEM=None):
             self._idf_tools(tools, "install", "--targets={}".format(tools.expand("{targets}")), "required")
             exports = self._idf_tools(tools, "export", "--format", "key-value", output=False)
 
@@ -119,9 +121,11 @@ class EspIdfPython(python.PythonEnv, _EspIdfVersion):
 
     def publish(self, artifact, tools):
         # The packages of the core feature, pinned by the constraints of the release
+        # pip parses the requirements file like a shell, so backslashes in
+        # Windows paths are escape characters
         self.requirements = [
-            "-r " + tools.expand_path("{git[esp-idf]}/tools/requirements/requirements.core.txt"),
-            "-c " + tools.expand_path("{fetch[constraints]}"),
+            "-r " + tools.expand_path("{git[esp-idf]}/tools/requirements/requirements.core.txt").replace("\\", "/"),
+            "-c " + tools.expand_path("{fetch[constraints]}").replace("\\", "/"),
         ]
         super().publish(artifact, tools)
         if self.system == "windows":
