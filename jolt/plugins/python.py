@@ -195,7 +195,7 @@ class PythonEnv(Task):
                 # Headers and import libraries, to build extension modules.
                 # Extensions are linked with the import libraries in libs/.
                 artifact.collect("include")
-                artifact.collect("lib/*.lib", "libs/")
+                artifact.collect("lib/*.lib", "libs/", flatten=True)
             else:
                 artifact.collect(py_exe, "bin/python3")
                 artifact.collect("lib/python3")
