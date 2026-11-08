@@ -78,12 +78,15 @@ class EspIdfTools(Task, _EspIdfVersion):
 
         # The directories of the tools' executables, relative to the artifact
         self.bindirs = []
+        installdir = os.path.normcase(os.path.normpath(self.installdir))
         for line in exports.splitlines():
             if not line.startswith("PATH="):
                 continue
             for path in line[len("PATH="):].split(os.pathsep):
-                if path.startswith(self.installdir):
-                    self.bindirs.append(path[len(self.installdir):].lstrip("/\\"))
+                # Separators and case of drive letters differ on Windows
+                path = os.path.normcase(os.path.normpath(path))
+                if path.startswith(installdir + os.sep):
+                    self.bindirs.append(os.path.relpath(path, installdir))
 
         # idf.py checks the Python environment against the constraints
         constraints = tools.expand_path("{fetch[constraints]}")
@@ -115,21 +118,21 @@ class EspIdfPython(python.PythonEnv, _EspIdfVersion):
     requires_git = [_GIT]
 
     def publish(self, artifact, tools):
-        # Python environments lack the headers, which pip needs to build
-        # tree-sitter. It has no wheels for new Python releases.
-        py_exe = tools.which(self.executable)
-        if py_exe:
-            py_home = os.path.dirname(os.path.dirname(os.path.realpath(py_exe)))
-            with tools.cwd(py_home):
-                if tools.exists("include"):
-                    artifact.collect("include")
-
         # The packages of the core feature, pinned by the constraints of the release
         self.requirements = [
             "-r " + tools.expand_path("{git[esp-idf]}/tools/requirements/requirements.core.txt"),
             "-c " + tools.expand_path("{fetch[constraints]}"),
         ]
         super().publish(artifact, tools)
+        if self.system == "windows":
+            # idf_tools.py looks for the interpreter of virtual environments,
+            # Scripts/python.exe. Python finds its prefix by searching up for
+            # lib/os.py, and the DLLs are loaded from the directory of the
+            # executable.
+            with tools.cwd(artifact.path):
+                tools.copy("bin/python3.exe", "Scripts/python.exe")
+                for dll in tools.glob("bin/*.dll"):
+                    tools.copy(dll, "Scripts/")
         # The artifact path itself: idf.py checks that the interpreter's path
         # starts with it, which "." in the path breaks
         artifact.environ.IDF_PYTHON_ENV_PATH = ""
