@@ -112,6 +112,8 @@ class CPythonWin32(Task):
         artifact.strings.version_major = str(self.version_major)
         with tools.cwd(self.srcdir):
             artifact.collect("Include", "include")
+            # Installations have the configuration header of Windows with the others
+            artifact.collect("PC/pyconfig.h", "include/pyconfig.h")
             artifact.collect("Lib", "lib")
         with tools.cwd(self.srcdir, "PCbuild", "amd64"):
             artifact.collect("python.exe", "bin/python3.exe")
