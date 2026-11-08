@@ -136,7 +136,7 @@ class EspIdfPython(python.PythonEnv, _EspIdfVersion):
             with tools.cwd(artifact.path):
                 tools.copy("bin/python3.exe", "Scripts/python.exe")
                 for dll in tools.glob("bin/*.dll"):
-                    tools.copy(dll, "Scripts/")
+                    tools.copy(dll, os.path.join("Scripts", os.path.basename(dll)))
         # The artifact path itself: idf.py checks that the interpreter's path
         # starts with it, which "." in the path breaks
         artifact.environ.IDF_PYTHON_ENV_PATH = ""
