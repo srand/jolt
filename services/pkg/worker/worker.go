@@ -358,7 +358,7 @@ func (w *worker) deployClient(client *protocol.Client, workspace *protocol.Works
 		return "", err
 	}
 
-	err = w.runClientCmd(clientDigest, w.cwd, "pip", "install", "--upgrade", "pip")
+	err = w.runPipInstall(clientDigest, "--upgrade", "pip")
 	if err != nil {
 		os.RemoveAll(deployPath)
 		return "", err
@@ -426,7 +426,7 @@ func (w *worker) deployClient(client *protocol.Client, workspace *protocol.Works
 			log.Fatal("Unsupported file extension:", url)
 		}
 
-		err = w.runClientCmd(clientDigest, w.cwd, "pip", "install", srcPath)
+		err = w.runPipInstall(clientDigest, srcPath)
 		if err != nil {
 			os.RemoveAll(deployPath)
 			return "", err
@@ -434,8 +434,8 @@ func (w *worker) deployClient(client *protocol.Client, workspace *protocol.Works
 	} else {
 		log.Info("Deploying client from the Python Package Index:", client.Version)
 
-		args := append([]string{"pip", "install", "jolt==" + client.Version}, client.Requirements...)
-		err = w.runClientCmd(clientDigest, w.cwd, args...)
+		args := append([]string{"jolt==" + client.Version}, client.Requirements...)
+		err = w.runPipInstall(clientDigest, args...)
 		if err != nil {
 			os.RemoveAll(deployPath)
 			return "", err
@@ -670,6 +670,45 @@ func (w *worker) runCmdWindows(workdir string, args ...string) error {
 	}
 
 	return utils.RunWaitCwd(workdir, cmd...)
+}
+
+// Installs packages into the virtual environment of a client. Packages
+// built from source compile with as many jobs as the worker has threads.
+// Python build backends have no common setting for the number of jobs,
+// so the settings of the common ones are all set.
+//
+// With a jobserver, make and Ninja take their jobs from it instead. They
+// ignore the jobserver if they are given a number of jobs, so neither
+// MAKEFLAGS nor CMAKE_BUILD_PARALLEL_LEVEL, which CMake passes on as -j,
+// has one then.
+func (w *worker) runPipInstall(clientDigest string, args ...string) error {
+	jobs := fmt.Sprint(w.config.ThreadCount)
+	env := [][2]string{
+		{"MAX_JOBS", jobs}, // PyTorch extensions
+		{"GRPC_PYTHON_BUILD_EXT_COMPILER_JOBS", jobs}, // grpcio
+		{"CARGO_BUILD_JOBS", jobs},                    // Rust, maturin
+		{"NPY_NUM_BUILD_JOBS", jobs},                  // numpy distutils, pybind11
+	}
+	if jobserver := os.Getenv("JOLT_JOBSERVER_PATH"); jobserver != "" {
+		env = append(env, [2]string{"MAKEFLAGS", "--jobserver-auth=fifo:" + jobserver})
+	} else {
+		env = append(env,
+			[2]string{"MAKEFLAGS", "-j" + jobs},           // make
+			[2]string{"CMAKE_BUILD_PARALLEL_LEVEL", jobs}) // CMake, scikit-build-core
+	}
+
+	var prefix []string
+	for _, kv := range env {
+		if runtime.GOOS == "windows" {
+			// No space before && or it becomes part of the value
+			prefix = append(prefix, fmt.Sprintf("set %s=%s&&", kv[0], kv[1]))
+		} else {
+			prefix = append(prefix, fmt.Sprintf("%s='%s'", kv[0], kv[1]))
+		}
+	}
+
+	args = append(append(prefix, "pip", "install"), args...)
+	return w.runClientCmd(clientDigest, w.cwd, args...)
 }
 
 func (w *worker) runClientCmd(clientDigest, workdir string, args ...string) error {
