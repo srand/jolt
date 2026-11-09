@@ -307,42 +307,99 @@ class Index(object):
 
 
 _workspace_index = None
+_workspace_index_changes = set()
+_workspace_index_frozen = False
 _workspace_index_lock = threading.Lock()
 
 
-def get_workspace_index():
+def index_workspace():
     """
-    Returns an up-to-date index of the workspace.
+    Indexes the workspace with fstree.
 
-    The index is refreshed with fstree the first time this function is
-    called in a process and is then reused. Files ignored by .joltignore,
-    .git, files in the build and cache directories and files in directories
-    added with :func:`add_ignored_path` are not indexed.
+    The workspace is indexed once, by the command line entrypoints that
+    compute task identities, before tasks are loaded into a graph. It is
+    never indexed anywhere else. Resources that change files in the
+    workspace refresh their paths with :func:`update_workspace_index`.
+
+    Nothing is done if the workspace is already indexed. Files ignored by
+    .joltignore, .git, files in the build and cache directories and files
+    in directories added with :func:`add_ignored_path` are not indexed.
     """
     global _workspace_index
     with _workspace_index_lock:
         if _workspace_index is None:
             _workspace_index = _refresh_workspace_index()
+            _workspace_index_changes.clear()
+
+
+def get_workspace_index():
+    """
+    Returns the index of the workspace.
+
+    The workspace must have been indexed with :func:`index_workspace`, and
+    paths changed since, as told by :func:`invalidate_workspace_index`,
+    refreshed with :func:`update_workspace_index`. The index is never
+    refreshed here: an error is raised if it is missing or out of date.
+    """
+    with _workspace_index_lock:
+        raise_error_if(
+            _workspace_index is None,
+            "The workspace has not been indexed")
+        raise_error_if(
+            _workspace_index_changes,
+            "The workspace index is out of date, paths have changed: {}",
+            ", ".join(sorted(_workspace_index_changes)))
         return _workspace_index
 
 
-def invalidate_workspace_index(path=None):
+def update_workspace_index():
     """
-    Discards the index of the workspace so that it is refreshed again
-    when next requested.
+    Refreshes the paths of the workspace index that have changed, as told
+    by :func:`invalidate_workspace_index`.
 
-    Call this after files in the workspace have been changed, for
-    example by cloning a repository. If a path is given, the index is
-    only discarded if the path is indexed.
+    Resources call this as soon as they have changed files in the workspace,
+    such as when cloning, fetching or cleaning them. Nothing is indexed if
+    the workspace has not been indexed yet.
     """
     global _workspace_index
     with _workspace_index_lock:
-        if path is not None and _workspace_index is not None:
-            if _workspace_index.relpath(path) is None:
-                return
-            if any(fs.is_relative_to(path, excluded) for excluded in _workspace_index.excluded):
-                return
-        _workspace_index = None
+        if _workspace_index is not None and _workspace_index_changes:
+            _workspace_index = _refresh_workspace_index(sorted(_workspace_index_changes))
+            _workspace_index_changes.clear()
+
+
+def freeze_workspace_index():
+    """
+    Keeps the index of the workspace for the rest of the process.
+
+    Once frozen, :func:`invalidate_workspace_index` has no effect, and the
+    index is never refreshed. Executors on workers freeze the index of the
+    tree that they checked out, so that changes to the workspace, such as
+    repositories cloned and cleaned by tasks, never make them index it
+    again, and influence stays as the client hashed it.
+    """
+    global _workspace_index_frozen
+    with _workspace_index_lock:
+        _workspace_index_frozen = True
+
+
+def invalidate_workspace_index(path):
+    """
+    Tells that files in the workspace have changed, so that the path is
+    refreshed by :func:`update_workspace_index`.
+
+    Call this after files in the workspace have been changed, for example
+    by cloning a repository. Nothing is done if the path isn't indexed or
+    the index is frozen with :func:`freeze_workspace_index`.
+    """
+    with _workspace_index_lock:
+        if _workspace_index_frozen or _workspace_index is None:
+            return
+        if _workspace_index.relpath(path) is None:
+            return
+        if any(fs.is_relative_to(path, excluded) for excluded in _workspace_index.excluded):
+            return
+        _workspace_index_changes.add(os.path.normpath(path))
 
 
 _ignored_paths = []
@@ -448,7 +505,11 @@ def workspace_index_files():
         yield indexfile, patterns
 
 
-def _refresh_workspace_index():
+def _refresh_workspace_index(paths=None):
+    """
+    Refreshes the index of the workspace, or only the given paths of it,
+    and loads it. fstree keeps the rest of the index as it was.
+    """
     from jolt.loader import JoltLoader
 
     loader = JoltLoader.get()
@@ -468,7 +529,7 @@ def _refresh_workspace_index():
         try:
             with log.progress("Indexing workspace", count=None, unit="objects", estimates=False) as progress:
                 process = subprocess.Popen(
-                    [executable, "write-tree", "--json", "--cache", cachedir] + ignore_args(ignore_patterns) + permission_args() + ["--index", indexfile, "--threads", str(t.thread_count())] + jobserver_args + [root],
+                    [executable, "write-tree", "--json", "--cache", cachedir] + ignore_args(ignore_patterns) + permission_args() + ["--index", indexfile, "--threads", str(t.thread_count())] + jobserver_args + [root] + (paths or []),
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
                     cwd=root)

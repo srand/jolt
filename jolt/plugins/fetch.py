@@ -3,6 +3,7 @@ from jolt import BooleanParameter, Parameter
 from jolt.plugins.git import ErrorDict
 from jolt.tasks import Resource, TaskRegistry
 from jolt import filesystem as fs
+from jolt import fstree
 from jolt import utils
 from jolt.error import raise_error_if
 from jolt.loader import JoltLoader
@@ -83,6 +84,14 @@ class Fetch(Resource):
         return bool(self.extract)
 
     def _acquire_ws(self):
+        try:
+            self._fetch()
+        finally:
+            # The files are indexed as soon as they are in place
+            fstree.invalidate_workspace_index(self.abspath)
+            fstree.update_workspace_index()
+
+    def _fetch(self):
         # Create the destination directory if it does not exist
         self.tools.rmtree(self.abspath, ignore_errors=True)
         self.tools.mkdir(fs.path.dirname(self.abspath), recursively=True)

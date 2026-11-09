@@ -703,9 +703,13 @@ def executor(ctx, worker, build, request):
     for cls in tasks:
         TaskRegistry.get().add_task_class(cls)
 
-    # The worker checked out the tree with the index, so this only checks file status
-    if request.environment.workspace.tree:
-        fstree.get_workspace_index()
+    # The workspace is indexed once, here, and never again: tasks that clone
+    # or clean repositories don't cause it to be indexed again, neither when
+    # their influence is verified nor when their artifacts are committed.
+    # The worker checked out the tree with the index, so this only checks
+    # file status.
+    fstree.freeze_workspace_index()
+    fstree.index_workspace()
 
     # Create the
     acache = cache.ArtifactCache.get(options)

@@ -1,9 +1,11 @@
+from contextlib import contextmanager
 import sys
 sys.path.append(".")
 
 from unittest.mock import MagicMock, patch
 
 from testsupport import JoltTest
+from jolt import fstree
 from jolt import influence
 
 
@@ -81,3 +83,69 @@ class InfluenceInternal(JoltTest):
         self.assertEqual(
             influence.TaskAttributeInfluence("url").get_influence(task),
             ["https://example.com/tool-{system}.zip"])
+
+    @contextmanager
+    def workspace_index(self):
+        """ Replaces the index of the workspace with one that counts refreshes. """
+        refresh = MagicMock(side_effect=lambda paths=None: MagicMock(excluded=["/ws/build"]))
+        with patch.object(fstree, "_workspace_index", None), \
+                patch.object(fstree, "_workspace_index_changes", set()), \
+                patch.object(fstree, "_workspace_index_frozen", False), \
+                patch.object(fstree, "_refresh_workspace_index", refresh):
+            yield refresh
+
+    def test_workspace_index_is_indexed_once(self):
+        with self.workspace_index() as refresh:
+            fstree.index_workspace()
+            index = fstree.get_workspace_index()
+            fstree.index_workspace()
+            self.assertIs(fstree.get_workspace_index(), index)
+            refresh.assert_called_once_with()
+
+    def test_workspace_index_is_never_indexed_when_requested(self):
+        with self.workspace_index() as refresh:
+            with self.assertRaisesRegex(Exception, "has not been indexed"):
+                fstree.get_workspace_index()
+            refresh.assert_not_called()
+
+    def test_workspace_index_refreshes_only_changed_paths(self):
+        with self.workspace_index() as refresh:
+            fstree.index_workspace()
+            fstree.invalidate_workspace_index("/ws/repo/")
+            fstree.invalidate_workspace_index("/ws/other")
+            fstree.invalidate_workspace_index("/ws/build/out")
+            fstree.update_workspace_index()
+            refresh.assert_called_with(["/ws/other", "/ws/repo"])
+
+            # Nothing changed since
+            fstree.update_workspace_index()
+            fstree.get_workspace_index()
+            self.assertEqual(refresh.call_count, 2)
+
+    def test_workspace_index_out_of_date_is_an_error(self):
+        with self.workspace_index() as refresh:
+            fstree.index_workspace()
+            fstree.invalidate_workspace_index("/ws/repo")
+            with self.assertRaisesRegex(Exception, "out of date.*/ws/repo"):
+                fstree.get_workspace_index()
+            self.assertEqual(refresh.call_count, 1)
+
+    def test_workspace_index_is_not_updated_before_it_is_indexed(self):
+        with self.workspace_index() as refresh:
+            fstree.invalidate_workspace_index("/ws/repo")
+            fstree.update_workspace_index()
+            refresh.assert_not_called()
+
+            fstree.index_workspace()
+            fstree.get_workspace_index()
+            refresh.assert_called_once_with()
+
+    def test_frozen_workspace_index_is_never_refreshed(self):
+        with self.workspace_index() as refresh:
+            fstree.freeze_workspace_index()
+            fstree.index_workspace()
+            index = fstree.get_workspace_index()
+            fstree.invalidate_workspace_index("/ws/repo")
+            fstree.update_workspace_index()
+            self.assertIs(fstree.get_workspace_index(), index)
+            self.assertEqual(refresh.call_count, 1)

@@ -2076,10 +2076,6 @@ class ArtifactCache(StorageProvider):
         if not artifact.is_cacheable():
             return
 
-        # May index the workspace, which must not happen under the global cache lock
-        if artifact._influence is None and artifact._node:
-            artifact._influence = influence.HashInfluenceRegistry.get().get_strings(artifact._node.task)
-
         with self._cache_lock(), self._db() as db:
             self._fs_commit_artifact(artifact, uploadable, temporary)
             with utils.ignore_exception():  # Possibly already exists in DB, e.g. unpacked

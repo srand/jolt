@@ -32,13 +32,21 @@ def locked(func):
 
 
 def _changes_workspace(func):
-    """ Discards the workspace index after the decorated method has run. """
+    """
+    Marks the repository as changed in the workspace index after the
+    decorated method has run, unless it returned False to tell that it
+    changed nothing. The resource refreshes the index when it is done.
+    """
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
+        changed = True
         try:
-            return func(*args, **kwargs)
+            result = func(*args, **kwargs)
+            changed = result is not False
+            return result
         finally:
-            fstree.invalidate_workspace_index(args[0].path)
+            if changed:
+                fstree.invalidate_workspace_index(args[0].path)
     return wrapper
 
 
@@ -330,7 +338,7 @@ class GitRepository(object):
     @_changes_workspace
     def patch(self, patch):
         if not patch:
-            return
+            return False
         with self.tools.cwd(self.path), self.tools.tmpdir("git") as tmp:
             patchfile = fs.path.join(tmp, "jolt.diff")
             with open(patchfile, "wb") as f:
@@ -482,6 +490,7 @@ class GitRepository(object):
             log.debug("Checkout skipped, already @ {}", rev)
             if submodules:
                 self._update_submodules()
+                fstree.invalidate_workspace_index(self.path)
             return False
         log.verbose("Checking out {0} in {1}", rev, self.path)
         with self.tools.cwd(self.path):
@@ -707,8 +716,11 @@ class Git(WorkspaceResource, FileInfluence):
 
     def release(self, artifact, deps, tools, owner):
         if self.clean:
-            self.git.clean()
-            self.git.reset()
+            try:
+                self.git.clean()
+                self.git.reset()
+            finally:
+                fstree.update_workspace_index()
 
     def prepare_ws_for(self, task):
         """ Prepare the workspace for the task.
@@ -728,6 +740,13 @@ class Git(WorkspaceResource, FileInfluence):
 
     @locked
     def _acquire_ws(self):
+        try:
+            self._materialize()
+        finally:
+            # The repository is indexed as soon as it is in place
+            fstree.update_workspace_index()
+
+    def _materialize(self):
         commit = None
         if not self.git.is_cloned():
             self.git.clone(submodules=bool(self.submodules), rev=self._get_revision(), shallow=bool(self.shallow))
@@ -766,7 +785,10 @@ class Git(WorkspaceResource, FileInfluence):
     @utils.cached.instance
     def get_influence(self, task):
         if not self.git.is_cloned():
-            self.git.clone(submodules=bool(self.submodules), rev=self._get_revision(), shallow=bool(self.shallow))
+            try:
+                self.git.clone(submodules=bool(self.submodules), rev=self._get_revision(), shallow=bool(self.shallow))
+            finally:
+                fstree.update_workspace_index()
         if not self._revision.is_imported:
             self.git.diff_unchecked()
         rev = self._get_revision()
