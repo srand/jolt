@@ -37,17 +37,19 @@ func TestCheckoutArgsIgnorePatterns(t *testing.T) {
 		"fstree", "pull-checkout", "--cache", "/cache",
 		"--ignore", ".joltignore",
 		"--ignore-pattern", ".git", "--ignore-pattern", "/build/",
+		"--permissions", "git",
 		"--index", "/index", "--remote", "tcp://cache:9090", "--threads", "4",
 		"--jobserver-path", "/jobserver",
 		"blake3:1234", "monorepo",
 	}, w.checkoutArgs(workspace, "/index", "/jobserver"))
 
-	// Without patterns, from an older client, the option is left out, so
-	// that older fstree versions work as before
+	// Without patterns, from an older client, no --ignore-pattern options
+	// are given
 	workspace.IgnorePatterns = nil
 	assert.Equal(t, []string{
 		"fstree", "pull-checkout", "--cache", "/cache",
 		"--ignore", ".joltignore",
+		"--permissions", "git",
 		"--index", "/index", "--remote", "tcp://cache:9090", "--threads", "4",
 		"blake3:1234", "monorepo",
 	}, w.checkoutArgs(workspace, "/index", ""))

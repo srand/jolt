@@ -14,7 +14,7 @@ from jolt.error import raise_error_if
 from jolt import common_pb2 as common_pb
 from jolt import config
 from jolt import filesystem as fs
-from jolt.fstree import find_executable as find_fstree, ignore_args, workspace_ignore_patterns, workspace_index_files
+from jolt.fstree import find_executable as find_fstree, ignore_args, permission_args, workspace_ignore_patterns, workspace_index_files
 from jolt import log
 from jolt import utils
 from jolt.tools import Tools
@@ -470,7 +470,7 @@ def export_workspace(tasks=None) -> common_pb.Workspace:
                 try:
                     with log.progress("Indexing workspace for the first time", count=None, unit="objects", estimates=False) as progress:
                         process = subprocess.Popen(
-                            [fstree, "write-tree", "--json", "--cache", cachedir] + ignore_args(ignore_patterns) + ["--index", indexfile, "--remote", cache_grpc_uri.geturl(), "--threads", str(tools.thread_count())] + jobserver_args,
+                            [fstree, "write-tree", "--json", "--cache", cachedir] + ignore_args(ignore_patterns) + permission_args() + ["--index", indexfile, "--remote", cache_grpc_uri.geturl(), "--threads", str(tools.thread_count())] + jobserver_args,
                             stdout=subprocess.DEVNULL,
                             stderr=subprocess.PIPE,
                             cwd=tools.getcwd(),
@@ -500,7 +500,7 @@ def export_workspace(tasks=None) -> common_pb.Workspace:
             try:
                 with log.progress("Pushing workspace to remote cache", count=None, unit="objects", estimates=False) as progress:
                     process = subprocess.Popen(
-                        [fstree, "write-tree-push", "--json", "--cache", cachedir] + ignore_args(ignore_patterns) + ["--index", indexfile, "--remote", cache_grpc_uri.geturl(), "--threads", str(tools.thread_count())] + jobserver_args,
+                        [fstree, "write-tree-push", "--json", "--cache", cachedir] + ignore_args(ignore_patterns) + permission_args() + ["--index", indexfile, "--remote", cache_grpc_uri.geturl(), "--threads", str(tools.thread_count())] + jobserver_args,
                         stdout=subprocess.DEVNULL,
                         stderr=subprocess.PIPE,
                         cwd=tools.getcwd(),

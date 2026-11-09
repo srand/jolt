@@ -475,11 +475,14 @@ func (w *worker) checkoutArgs(workspace *protocol.Workspace, indexPath, jobserve
 		"--ignore",
 		".joltignore",
 	}
-	// Older fstree versions lack the option, so it is only given if needed
 	for _, pattern := range workspace.IgnorePatterns {
 		args = append(args, "--ignore-pattern", pattern)
 	}
+	// Permissions are restored as Jolt wrote them, see permission_args()
+	// in jolt/fstree.py
 	args = append(args,
+		"--permissions",
+		"git",
 		"--index",
 		indexPath,
 		"--remote",

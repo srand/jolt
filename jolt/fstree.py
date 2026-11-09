@@ -413,6 +413,16 @@ def ignore_args(patterns):
     return args
 
 
+def permission_args():
+    """
+    Returns the arguments that make fstree record permissions as git does:
+    only whether a file is executable, not the bits that the umask decides,
+    so that checkouts of the same commit by different users give the same
+    tree. Workers check out trees with the same option.
+    """
+    return ["--permissions", "git"]
+
+
 @contextmanager
 def workspace_index_files():
     """
@@ -458,7 +468,7 @@ def _refresh_workspace_index():
         try:
             with log.progress("Indexing workspace", count=None, unit="objects", estimates=False) as progress:
                 process = subprocess.Popen(
-                    [executable, "write-tree", "--json", "--cache", cachedir] + ignore_args(ignore_patterns) + ["--index", indexfile, "--threads", str(t.thread_count())] + jobserver_args + [root],
+                    [executable, "write-tree", "--json", "--cache", cachedir] + ignore_args(ignore_patterns) + permission_args() + ["--index", indexfile, "--threads", str(t.thread_count())] + jobserver_args + [root],
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
                     cwd=root)
