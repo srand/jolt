@@ -567,56 +567,6 @@ func (w *worker) nixWrapperCmd(clientWsName string, cmdline []string) ([]string,
 	return nixCmd, nil
 }
 
-// If bubblewrap is installed, returns a command prefix that
-// will setup a namespace with workspace and cache mounted
-// at the same paths as on the client.
-func (w *worker) nsWrapperCmd(clientWs, clientCache string) ([]string, []string) {
-	return []string{}, nil
-
-	if clientWs == "" || clientWs == "/tmp" {
-		return []string{}, nil
-	}
-
-	wd, err := os.Getwd()
-	if err != nil {
-		log.Warn("Current working directory unknown:", err)
-		return []string{}, nil
-	}
-
-	// The client workspace must not be a subdirectory of the
-	// current working directory for bubblewrap to be able to mount it.
-	if strings.HasPrefix(clientWs, wd) {
-		return []string{}, nil
-	}
-
-	path, err := exec.LookPath("bwrap")
-	if err != nil {
-		return []string{}, nil
-	}
-
-	cmd := []string{
-		path,
-		"--bind", "/", "/",
-		"--bind", "/tmp", "/tmp",
-		"--dev", "/dev",
-		"--bind", wd, clientWs,
-		"--chdir", clientWs,
-	}
-	config := []string{}
-
-	// If the client cache is specified, bind it to the same path as on the client.
-	// Also set the jolt.cachedir config option to the client cache path.
-	if clientCache != "" {
-		cmd = append(cmd, "--bind", w.cachePath(), clientCache)
-		config = append(config, "-c", "jolt.cachedir="+clientCache)
-		os.MkdirAll(clientCache, 0777)
-	}
-
-	os.MkdirAll(clientWs, 0777)
-
-	return cmd, config
-}
-
 // Downloads a file, from the cache with its token if there is one.
 func (w *worker) httpGet(url string) (*http.Response, error) {
 	tlsConfig, err := auth.TLSConfig(w.config.CACert)
@@ -642,15 +592,11 @@ func (w *worker) httpGet(url string) (*http.Response, error) {
 }
 
 func (w *worker) runCmd(workdir string, args ...string) error {
-	// Build bubblewrap command prefix to run the executor in a namespace.
-	// If a namespace cannot be used, the command prefix will be empty.
-
 	if runtime.GOOS == "windows" {
 		return w.runCmdWindows(workdir, args...)
 	}
 
-	cmd, _ := w.nsWrapperCmd("", "")
-	cmd = append(cmd, "/bin/sh", "-c", strings.Join(args, " "))
+	cmd := []string{"/bin/sh", "-c", strings.Join(args, " ")}
 
 	if workdir != "" && !filepath.IsAbs(workdir) {
 		workdir = filepath.Join(w.cwd, workdir)
@@ -712,15 +658,11 @@ func (w *worker) runPipInstall(clientDigest string, args ...string) error {
 }
 
 func (w *worker) runClientCmd(clientDigest, workdir string, args ...string) error {
-	activate := w.activateVEnvPath(clientDigest)
-
-	// Build bubblewrap command prefix to run the executor in a namespace.
-	// If a namespace cannot be used, the command prefix will be empty.
-
 	if runtime.GOOS == "windows" {
 		return w.runClientCmdWindows(clientDigest, workdir, args...)
 	}
 
+	activate := w.activateVEnvPath(clientDigest)
 	cmd := []string{fmt.Sprintf(". %s && %s", activate, strings.Join(args, " "))}
 	return w.runCmd(workdir, cmd...)
 }
@@ -735,16 +677,8 @@ func (w *worker) runClientCmdWindows(clientDigest, workdir string, args ...strin
 func (w *worker) startExecutor(clientDigest string, client *protocol.Client, workspace *protocol.Workspace, worker, build, request string) (chan error, *utils.Command, error) {
 	activate := w.activateVEnvPath(clientDigest)
 
-	// Build bubblewrap command prefix to run the executor in a namespace.
-	// If a namespace cannot be used, the command prefix will be empty.
-	nsCmd, config := w.nsWrapperCmd(workspace.Rootdir, workspace.Cachedir)
-
 	// Build the executor command.
-	jolt := []string{"jolt", "-vv"}
-	if config != nil {
-		jolt = append(jolt, config...)
-	}
-	jolt = append(jolt, "executor", "-w", worker, "-b", build, request)
+	jolt := []string{"jolt", "-vv", "executor", "-w", worker, "-b", build, request}
 
 	// Add exec prefix on platforms running Jolt in shells
 	if runtime.GOOS != "windows" {
@@ -766,9 +700,6 @@ func (w *worker) startExecutor(clientDigest string, client *protocol.Client, wor
 	} else {
 		cmd = []string{"/bin/sh", "-c", fmt.Sprintf(". %s && %s", activate, strings.Join(jolt, " "))}
 	}
-
-	// Run the executor in a namespace if possible.
-	cmd = append(nsCmd, cmd...)
 
 	// If the client version is less than 0.9.242, the executor must be run
 	// in the anonymous workspace directory.
