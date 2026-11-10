@@ -1069,7 +1069,7 @@ class Rule(HashInfluenceProvider):
                 writer.build(outfiles_rel, self.name, infile_rel, variables=variables, implicit=implicit, implicit_outputs=implicit_outfiles_rel, order_only=order_only)
                 result.extend(outfiles)
         if self.phony:
-            writer.build(self.phony, "phony", outfiles_rel)
+            writer.build(self.phony, "phony", [fs.path.relpath(outfile, project.tools.wsroot) for outfile in result])
         return result
 
     @utils.cached.instance
@@ -2388,6 +2388,26 @@ if __name__ == "__main__":
                     writer.objects.extend(output)
                     sources.extend(zip(output, [rule] * len(output)))
 
+        # The rules whose outputs are inputs of each rule, directly or
+        # through other rules
+        upstream = {
+            rule: {origin for _, origin in source_list_origin if origin}
+            for rule, source_list_origin in rule_source_list.items()
+        }
+        changed = True
+        while changed:
+            changed = False
+            for rule, origins in upstream.items():
+                for origin in list(origins):
+                    new = upstream.get(origin, set()) - origins
+                    if new:
+                        origins |= new
+                        changed = True
+
+        # Rules with a phony target generate files, such as headers, that any
+        # source may include, not only those that are their outputs
+        generators = [rule for rule in rule_source_list if rule.phony]
+
         # No more inputs/outputs to process, now emit all build rules
         for rule, source_list_origin in rule_source_list.items():
             source_list, origins = [], set()
@@ -2395,7 +2415,16 @@ if __name__ == "__main__":
                 source_list.append(source)
                 origins.add(origin)
             source_list = list(map(tools.expand_path, source_list))
-            rule.build(self, writer, source_list, order_only=[origin.phony for origin in origins if origin and origin.phony])
+            order_only = [origin.phony for origin in origins if origin and origin.phony]
+
+            # Other rules run after all generators, except those that make
+            # inputs of a generator, which would then wait for itself
+            if not rule.phony:
+                for generator in generators:
+                    if rule not in upstream[generator] and generator.phony not in order_only:
+                        order_only.append(generator.phony)
+
+            rule.build(self, writer, source_list, order_only=order_only)
 
         # Done
         writer.newline()

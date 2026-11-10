@@ -765,6 +765,32 @@ class NinjaApi(JoltTest):
         """
         self.build("exe")
 
+    def test_generated_headers_before_sources(self):
+        """
+        --- file: a.x
+        #define A 1
+        --- file: b.x
+        #define B 2
+        --- file: test.cpp
+        #include "a.h"
+        #include "b.h"
+        int main() {{return A + B;}}
+
+        --- tasks:
+        class Exe(CXXExecutable):
+            x_rule = Rule(
+                command="sleep 2 && cp $in $out",
+                infiles=[".x"],
+                outfiles=["{{outdir}}/{{binary}}.dir/{{in_base}}.h"],
+                phony=True,
+            )
+            sources = ["a.x", "b.x", "test.cpp"]
+        ---
+        """
+        # Sources that include generated headers are compiled after all of
+        # them have been generated, although they are not outputs of the rule
+        self.build("exe")
+
     def test_selfsustained_merge(self):
         """
         --- file: a.cpp
