@@ -617,6 +617,97 @@ class TaskApi(JoltTest):
             self.build("a:arg=")
         self.build("a:arg=value")
 
+    def build_in(self, subdir, task):
+        """ Build from a subdirectory of the workspace. """
+        with self.tools.cwd(self.ws, subdir):
+            return self.tools.run("python3 -m jolt -c {0}/test.conf -c {0}/net.conf -vv build {1}", self.ws, task)
+
+    def test_global_files_is_anchored_on_workspace(self):
+        """
+        --- file: globaltasks.py
+        from jolt import Task
+        from jolt.tasks import TaskRegistry
+
+        class Global(Task):
+            name = "global"
+
+        TaskRegistry.get().add_task_class(Global)
+        --- file: src/a.txt
+        a
+        --- file: sub/dir/b.txt
+        b
+        --- tasks:
+        import os
+        import sys
+        sys.path.insert(0, os.path.dirname(__file__))
+        import globaltasks
+        from jolt import influence
+
+        influence.global_files("src/*.txt")
+        ---
+        """
+        r = self.build("global")
+        self.assertBuild(r, "global")
+
+        # Tasks registered outside of recipes run in the current directory,
+        # which must not change what the global influence refers to
+        for subdir in ["sub", "sub/dir"]:
+            r = self.build_in(subdir, "global")
+            self.assertNoBuild(r)
+
+        with self.tools.cwd(self.ws):
+            self.tools.append_file("src/a.txt", "changed")
+        r = self.build_in("sub", "global")
+        self.assertBuild(r, "global")
+        r = self.build_in("sub/dir", "global")
+        self.assertNoBuild(r)
+
+    def test_global_files_is_anchored_on_recipe(self):
+        """
+        --- file: lib/lib.jolt
+        from jolt import influence
+
+        influence.global_files("src")
+        --- file: lib/src/a.txt
+        a
+        --- file: src/a.txt
+        a
+        --- file: sub/src/a.txt
+        a
+        --- file: sub/dir/b.txt
+        b
+        --- tasks:
+        from jolt import include
+        include("lib/lib.jolt")
+
+        class Root(Task):
+            pass
+        ---
+        """
+        r = self.build("root")
+        self.assertBuild(r, "root")
+
+        # Relative paths are relative to the recipe, not to the workspace
+        # root or the current directory
+        for subdir in ["sub", "sub/dir"]:
+            r = self.build_in(subdir, "root")
+            self.assertNoBuild(r)
+
+        with self.tools.cwd(self.ws):
+            self.tools.append_file("src/a.txt", "changed")
+            self.tools.append_file("sub/src/a.txt", "changed")
+        r = self.build("root")
+        self.assertNoBuild(r)
+        r = self.build_in("sub", "root")
+        self.assertNoBuild(r)
+
+        with self.tools.cwd(self.ws):
+            self.tools.append_file("lib/src/a.txt", "changed")
+        r = self.build_in("sub/dir", "root")
+        self.assertBuild(r, "root")
+        r = self.build_in("sub", "root")
+        self.assertNoBuild(r)
+
     def test_param_influence(self):
         """
         --- tasks:

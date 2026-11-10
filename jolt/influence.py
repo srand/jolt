@@ -1,5 +1,6 @@
 import datetime
 import os
+import sys
 from pathlib import Path, PurePath
 
 from jolt import config as jolt_config
@@ -617,12 +618,24 @@ class FileInfluence(HashInfluenceProvider):
     .joltignore, files in the build and cache directories and files in
     directories excluded by plugins, such as symlinks, are not indexed
     and never influence the hash.
+
+    Relative paths are relative to the directory of the task, or to the
+    directory of the recipe that added the influence if it is global.
     """
+
+    root = None
+    """ Directory that relative paths are relative to instead of the task's directory. """
 
     def __init__(self, path):
         self.path = path.rstrip(fs.sep)
         self.name = "File"
         self._files = {}
+
+    def expand_pattern(self, task):
+        """ Absolute path or pattern of the influencing files. """
+        if self.root is None:
+            return task.tools.expand_path(self.path)
+        return fs.path.normpath(fs.path.join(self.root, task.tools.expand(self.path)))
 
     def get_file_influence(self, path):
         return utils.hashfile(str(path))
@@ -636,7 +649,7 @@ class FileInfluence(HashInfluenceProvider):
         except KeyError:
             pass
 
-        path = task.tools.expand_path(self.path)
+        path = self.expand_pattern(task)
         if index.isdir(path):
             path = path + fs.sep + "**"
 
@@ -694,7 +707,7 @@ class FileInfluence(HashInfluenceProvider):
         index = fstree.get_workspace_index()
         if index.get(path) is not None:
             return False
-        pattern = task.tools.expand_path(self.path)
+        pattern = self.expand_pattern(task)
         return bool(utils.pathmatch(path, pattern) or utils.pathmatch(path, pattern + fs.sep + "**"))
 
 
@@ -737,8 +750,24 @@ def files(pathname):
     return _decorate
 
 
+def caller_dir(depth=1):
+    """ Directory of the source file of a caller, such as a recipe.
+
+    Args:
+        depth (int): Number of frames above the caller of this function.
+    """
+    filename = sys._getframe(depth + 1).f_code.co_filename
+    return fs.path.dirname(fs.path.abspath(filename))
+
+
 def global_files(pathname, cls=FileInfluence):
-    HashInfluenceRegistry.get().register(cls(pathname))
+    """ Add file content hash influence to all tasks.
+
+    Relative paths are relative to the directory of the calling recipe.
+    """
+    provider = cls(pathname)
+    provider.root = caller_dir()
+    HashInfluenceRegistry.get().register(provider)
 
 
 class WhitelistInfluence(FileInfluence):
@@ -751,7 +780,7 @@ class WhitelistInfluence(FileInfluence):
 
     def is_influenced_by(self, task, path):
         path = task.tools.expand_path(path)
-        pattern = task.tools.expand_path(self.path)
+        pattern = self.expand_pattern(task)
         return utils.pathmatch(path, pattern)
 
 

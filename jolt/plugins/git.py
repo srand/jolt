@@ -7,7 +7,7 @@ from threading import RLock
 import urllib.parse
 
 from jolt.tasks import BooleanParameter, Export, IntParameter, Parameter, TaskRegistry, WorkspaceResource
-from jolt.influence import FileInfluence, HashInfluenceRegistry
+from jolt.influence import FileInfluence, HashInfluenceRegistry, caller_dir
 from jolt.tools import Tools
 from jolt.loader import JoltLoader, workspace_locked
 from jolt import config
@@ -551,18 +551,24 @@ class GitInfluenceProvider(FileInfluence):
 
     def get_influence(self, task):
         index = fstree.get_workspace_index()
-        path = task.tools.expand_path(self.path)
+        path = self.expand_pattern(task)
         relpath = index.relpath(path)
         tree = index.tree_hash(path)
         return "{0}: {1}".format(relpath or self.path, tree or "N/A")
 
     def is_influenced_by(self, task, path):
-        gitpath = task.tools.expand_path(self.path)
+        gitpath = self.expand_pattern(task)
         return fs.is_relative_to(task.tools.expand_path(path), gitpath)
 
 
 def global_influence(path, cls=GitInfluenceProvider):
-    HashInfluenceRegistry.get().register(cls(path))
+    """ Add the influence of a workspace path to all tasks.
+
+    Relative paths are relative to the directory of the calling recipe.
+    """
+    provider = cls(path)
+    provider.root = caller_dir()
+    HashInfluenceRegistry.get().register(provider)
 
 
 def influence(path, git_cls=GitInfluenceProvider):
