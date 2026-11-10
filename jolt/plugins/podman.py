@@ -616,9 +616,8 @@ class ContainerImage(Task):
     Abstract Task: Builds and publishes a Podman image.
 
     Builds the selected ``Dockerfile`` and optionally tags and pushes the
-    image to a registry. The image can also be saved to file and published
-    in the task artifact. Compression formats supported are bzip2, gzip and
-    lzma.
+    image to a registry. The image can also be saved in the formats listed
+    in :attr:`output` and published in the task artifact.
 
     By default, base images referenced in the ``Dockerfile`` will be pulled
     during the build. Note that Jolt has no way of knowing beforehand if
@@ -636,7 +635,7 @@ class ContainerImage(Task):
 
     Example:
 
-    .. code-block:: podman
+    .. code-block:: docker
 
         # Dockerfile
 
@@ -650,8 +649,8 @@ class ContainerImage(Task):
         from jolt.plugins.podman import ContainerImage
 
         class Busybox(ContainerImage):
-            \"\"\" Publishes Busybox image as gzip-compressed tarball \"\"\"
-            compression = "gz"
+            \"\"\" Publishes Busybox image as an OCI archive \"\"\"
+            output = ["oci-archive"]
             tags = ["busybox:{identity}"]
 
     """
