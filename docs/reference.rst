@@ -549,6 +549,109 @@ PkgConfig
 .. reference-pkgconfig-end
 
 
+Podman
+------
+
+.. reference-podman-start
+
+Compose
+^^^^^^^
+
+.. reference-podman-compose-start
+
+.. autoclass:: jolt.plugins.podman.Compose
+   :members: build, composefile, environment, profiles, project, pull, remove_volumes, services, stop_timeout, wait, wait_timeout
+
+.. reference-podman-compose-end
+
+Container
+^^^^^^^^^
+
+.. reference-podman-container-start
+
+.. autoclass:: jolt.plugins.podman.Container
+   :members: arguments, cap_adds, cap_drops, chroot, entrypoint, environment, image, labels, privileged, ports, stop_timeout, volumes, volumes_default, user
+
+.. reference-podman-container-end
+
+ContainerImage
+^^^^^^^^^^^^^^
+
+.. reference-podman-containerimage-start
+
+.. autoclass:: jolt.plugins.podman.ContainerImage
+   :members: annotations, autoload, buildargs, cleanup, context, dockerfile, imagefile, labels, output, pull, push, size, squash, tags, target
+
+.. reference-podman-containerimage-end
+
+PodmanLogin
+^^^^^^^^^^^
+
+.. reference-podman-podmanlogin-start
+
+.. autoclass:: jolt.plugins.podman.PodmanLogin
+   :members: name, user, passwd, server
+
+.. reference-podman-podmanlogin-end
+
+Metadata
+^^^^^^^^
+
+.. reference-podman-artifact-start
+
+The Podman module registers and makes available these artifact metadata attributes:
+
+  - ``artifact.podman.load`` - List of image files to be loaded from the artifact
+    into the local Podman image store when the artifact is consumed.
+
+    Example:
+
+    .. code-block:: python
+
+      def publish(self, artifact, tools):
+          artifact.podman.load.append("image.tar")
+
+  - ``artifact.podman.imprt`` - List of root filesystem tarballs to be imported
+    from the artifact into the local Podman image store as images when the
+    artifact is consumed. The first tag in ``artifact.podman.tags`` names the
+    image, and the remaining tags are added to it.
+
+    Example:
+
+    .. code-block:: python
+
+      def publish(self, artifact, tools):
+          artifact.podman.imprt.append("rootfs.tar")
+          artifact.podman.tags.append("rootfs:latest")
+
+  - ``artifact.podman.pull`` - List of image tags to be pulled from a remote registry
+    to the local Podman image store when the artifact is consumed.
+
+    Example:
+
+    .. code-block:: python
+
+      def publish(self, artifact, tools):
+          artifact.podman.pull.append("docker.io/library/busybox:latest")
+
+  - ``artifact.podman.rmi`` - List of image tags to remove from the local Podman
+    image store when a consuming task has finished.
+
+    Example:
+
+    .. code-block:: python
+
+      def publish(self, artifact, tools):
+          artifact.podman.rmi.append("docker.io/library/busybox:latest")
+
+  - ``artifact.podman.tags`` - List of tags given to images imported with
+    ``artifact.podman.imprt``.
+
+.. reference-podman-artifact-end
+
+.. reference-podman-end
+
+
 Packages
 --------
 
