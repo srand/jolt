@@ -16,6 +16,7 @@ import contextlib
 import json
 from os import path
 import tarfile
+import uuid
 
 
 class PodmanListVariable(ArtifactListAttribute):
@@ -296,6 +297,223 @@ class Container(Resource):
         finally:
             self._info("Deleting container '{container}'")
             tools.run("podman rm -f {container}", output_on_error=True)
+
+
+class Compose(Resource):
+    """
+    Resource: Starts and stops the services of a Compose specification.
+
+    The services are started with ``podman compose up`` when the resource is
+    acquired and stopped and removed with ``podman compose down`` when it is
+    released. Every acquisition uses a unique project name, so concurrent
+    consumers get separate sets of containers, networks and volumes.
+
+    ``podman compose`` runs an external Compose provider, either
+    ``podman-compose`` or ``docker-compose`` (which requires the Podman API
+    socket). Select it with the ``PODMAN_COMPOSE_PROVIDER`` environment variable
+    or ``compose_providers`` in ``containers.conf``. Waiting for services
+    requires ``podman-compose`` 1.4 or later.
+
+    The artifact of the resource tells consumers about the started containers:
+
+      - ``artifact.project`` is the Compose project name.
+      - ``artifact.containers`` is a list of the ``podman inspect`` information
+        of all containers in the project.
+      - ``artifact.services`` maps service names to the ``podman inspect``
+        information of the service's first container.
+
+    No automatic influence for the Compose file is collected. Make sure to use
+    an appropriate influence decorator, or write the specification inline.
+
+    Example:
+
+    .. code-block:: python
+
+        from jolt.plugins.podman import Compose
+
+        class Database(Compose):
+            composefile = \"\"\"
+            services:
+              postgres:
+                image: docker.io/library/postgres:17
+                environment:
+                  POSTGRES_PASSWORD: secret
+                ports:
+                  - "5432"
+                healthcheck:
+                  test: ["CMD", "pg_isready", "-U", "postgres"]
+                  interval: 1s
+            \"\"\"
+
+        class IntegrationTest(Task):
+            requires = ["database"]
+
+            def run(self, deps, tools):
+                db = deps["database"].services["postgres"]
+                port = db["NetworkSettings"]["Ports"]["5432/tcp"][0]["HostPort"]
+                ...
+
+    """
+
+    build = False
+    """ Build images before starting the services (``--build``). """
+
+    composefile = "compose.yaml"
+    """
+    Path to the Compose file, a list of such paths, or the full source code
+    of a Compose specification.
+
+    Paths are relative to ``joltdir``. Relative paths in the specification are
+    resolved against the directory of the first Compose file, which for an
+    inline specification is the build directory of the resource; use
+    ``{joltdir}`` to refer to the workspace. A specification written inline is
+    expanded like other task attributes, so literal braces must be doubled.
+    """
+
+    environment = []
+    """
+    A list of environment variables (``"NAME=VALUE"``) used for variable
+    interpolation in the Compose specification.
+    """
+
+    profiles = []
+    """ A list of Compose profiles to enable. """
+
+    project = "{canonical_name}-{uuid}"
+    """
+    Compose project name.
+
+    Only lowercase letters, digits, dashes and underscores are kept. The default
+    is unique for every acquisition of the resource.
+    """
+
+    pull = None
+    """ Image pull policy: ``"always"``, ``"missing"`` or ``"never"``. """
+
+    release_on_error = True
+    """ Stop and remove the services on error to avoid resource leaks. """
+
+    remove_volumes = True
+    """ Remove named and anonymous volumes of the project when released. """
+
+    services = []
+    """ A list of services to start. Starts all services if empty. """
+
+    stop_timeout = 10
+    """
+    Timeout in seconds for stopping the containers.
+
+    When stopping the services, Compose waits for the containers to stop for
+    the specified number of seconds before forcefully killing them.
+
+    Default: 10 seconds.
+    """
+
+    wait = True
+    """
+    Wait for the services to be running, or healthy if they have a
+    healthcheck, before the consumer starts (``--wait``).
+    """
+
+    wait_timeout = None
+    """ Timeout in seconds when waiting for services. """
+
+    def _info(self, fmt, *args, **kwargs):
+        fmt = self.tools.expand(fmt, *args, **kwargs)
+        log.info(fmt, *args, **kwargs)
+
+    def _composefiles(self, tools):
+        files = self.composefile
+        if isinstance(files, str):
+            if "\n" in files:
+                with tools.cwd(tools.builddir()):
+                    tools.write_file("compose.yaml", files)
+                    return [tools.expand_path("compose.yaml")]
+            files = [files]
+        return [tools.expand_path(f) for f in files]
+
+    def _project_name(self, tools):
+        name = tools.expand(self.project, uuid=uuid.uuid4().hex[:8]).lower()
+        name = "".join([c if c.isalnum() or c in "-_" else "-" for c in name])
+        return name.lstrip("-_")
+
+    def _compose(self, tools):
+        args = ["podman compose", f"-p {self.project_name}"]
+        args += [utils.option("-f ", f) for f in self._composefiles(tools)]
+        args += [utils.option("--profile ", tools.expand(p)) for p in self.profiles]
+        return " ".join(filter(None, args))
+
+    def _env(self, tools):
+        env = {"PODMAN_COMPOSE_WARNING_LOGS": "false"}
+        for var in self.environment:
+            name, _, value = tools.expand(var).partition("=")
+            env[name] = value
+        return env
+
+    def acquire(self, artifact, deps, tools, owner):
+        self.project_name = self._project_name(tools)
+        self._command = self._compose(tools)
+        self._started = False
+
+        options = ["up", "-d"]
+        if self.build:
+            options.append("--build")
+        if self.pull:
+            options.append(f"--pull {tools.expand(self.pull)}")
+        if self.wait:
+            options.append("--wait")
+            if self.wait_timeout:
+                options.append(f"--wait-timeout {self.wait_timeout}")
+        options += [utils.quote(tools.expand(s)) for s in self.services]
+
+        self._info("Starting Compose project '{project_name}'")
+        with tools.environ(**self._env(tools)), utils.delayed_interrupt():
+            self._started = True
+            tools.run("{} {}", self._command, " ".join(options), output_on_error=True)
+
+        artifact.project = self.project_name
+        artifact.containers = []
+        artifact.services = {}
+
+        containers = tools.run(
+            "podman ps -a -q --filter label=com.docker.compose.project={project_name}",
+            output_on_error=True).split()
+        if containers:
+            info = tools.run("podman inspect {}", " ".join(containers), output_on_error=True)
+            artifact.containers = json.loads(info)
+        for container in artifact.containers:
+            service = container["Config"]["Labels"].get("com.docker.compose.service")
+            if service and service not in artifact.services:
+                artifact.services[service] = container
+
+        if self.wait:
+            self._check_containers(artifact.containers)
+
+    def _check_containers(self, containers):
+        # podman-compose ignores errors when waiting for services
+        for container in containers:
+            state = container.get("State", {})
+            name = container.get("Name", container.get("Id"))
+            health = state.get("Health") or state.get("Healthcheck") or {}
+            raise_task_error_if(
+                state.get("Status") == "exited" and state.get("ExitCode", 0) != 0, self,
+                "Container '{}' exited with code {}", name, state.get("ExitCode"))
+            raise_task_error_if(
+                health.get("Status") == "unhealthy", self,
+                "Container '{}' is unhealthy", name)
+
+    def release(self, artifact, deps, tools, owner):
+        if not getattr(self, "_started", False):
+            return
+
+        options = ["down", "--remove-orphans", f"-t {self.stop_timeout}"]
+        if self.remove_volumes:
+            options.append("-v")
+
+        self._info("Stopping Compose project '{project_name}'")
+        with tools.environ(**self._env(tools)):
+            tools.run("{} {}", self._command, " ".join(options), output_on_error=True)
+        self._started = False
 
 
 class PodmanLogin(Resource):
