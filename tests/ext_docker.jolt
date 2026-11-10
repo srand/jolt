@@ -548,3 +548,162 @@ class DockerExt(JoltTest):
         """
         r = self.build("atest")
         self.assertIn("Resource release finished after 03s", r)
+
+    def _compose_projects(self, r):
+        import re
+        return re.findall(r"Stopping Compose project '([^']+)'", r)
+
+    def _assertComposeProjectRemoved(self, project):
+        containers = self.tools.run(
+            "docker ps -a -q --filter label=com.docker.compose.project={}", project)
+        self.assertEqual(containers, "")
+        networks = self.tools.run(
+            "docker network ls -q --filter label=com.docker.compose.project={}", project)
+        self.assertEqual(networks, "")
+
+    def test_compose_inline(self):
+        """
+        --- tasks:
+        from jolt.plugins.docker import *
+
+        class A(DockerCompose):
+            composefile = '''
+            services:
+              first:
+                image: busybox:latest
+                command: sleep 3600
+                environment:
+                  VALUE: ${{{{VALUE}}}}
+              second:
+                image: busybox:latest
+                command: sleep 3600
+            '''
+            environment = ["VALUE=value"]
+            stop_timeout = 0
+
+        class ATest(Task):
+            requires = "a"
+
+            def run(self, deps, tools):
+                a = deps["a"]
+                assert a.project.startswith("a-"), a.project
+                assert sorted(a.services.keys()) == ["first", "second"], a.services.keys()
+                assert len(a.containers) == 2
+                for service in a.services.values():
+                    assert service["State"]["Running"]
+                self.id = a.services["first"]["Id"]
+                assert tools.run("docker exec {{id}} sh -c 'echo $VALUE'") == "value"
+        ---
+        """
+        r = self.build("atest")
+        projects = self._compose_projects(r)
+        self.assertEqual(len(projects), 1)
+        self._assertComposeProjectRemoved(projects[0])
+
+    def test_compose_file(self):
+        """
+        --- file: compose/compose.yaml
+        services:
+          first:
+            image: busybox:latest
+            command: sleep 3600
+            volumes:
+              - ./data:/data
+          second:
+            image: busybox:latest
+            command: sleep 3600
+            profiles: [extra]
+          third:
+            image: busybox:latest
+            command: sleep 3600
+
+        --- file: compose/data/a.txt
+        --- tasks:
+        from jolt.plugins.docker import *
+
+        class A(DockerCompose):
+            composefile = "compose/compose.yaml"
+            services = ["first"]
+            stop_timeout = 0
+
+        class ATest(Task):
+            requires = "a"
+
+            def run(self, deps, tools):
+                a = deps["a"]
+                assert list(a.services.keys()) == ["first"], a.services.keys()
+                self.id = a.services["first"]["Id"]
+                tools.run("docker exec {{id}} cat /data/a.txt")
+        ---
+        """
+        r = self.build("atest")
+        projects = self._compose_projects(r)
+        self.assertEqual(len(projects), 1)
+        self._assertComposeProjectRemoved(projects[0])
+
+    def test_compose_profiles(self):
+        """
+        --- file: compose.yaml
+        services:
+          first:
+            image: busybox:latest
+            command: sleep 3600
+          second:
+            image: busybox:latest
+            command: sleep 3600
+            profiles: [extra]
+
+        --- tasks:
+        from jolt.plugins.docker import *
+
+        class A(DockerCompose):
+            profiles = ["{{profile}}"]
+            profile = Parameter()
+            stop_timeout = 0
+
+        class ATest(Task):
+            requires = "a:profile={{profile}}"
+            profile = Parameter()
+
+            def run(self, deps, tools):
+                services = sorted(deps[self.requires[0]].services.keys())
+                if self.profile == "extra":
+                    assert services == ["first", "second"], services
+                else:
+                    assert services == ["first"], services
+        ---
+        """
+        r = self.build("atest:profile=extra atest:profile=none")
+        for project in self._compose_projects(r):
+            self._assertComposeProjectRemoved(project)
+
+    def test_compose_error(self):
+        """
+        --- tasks:
+        from jolt.plugins.docker import *
+
+        class A(DockerCompose):
+            composefile = '''
+            services:
+              first:
+                image: busybox:latest
+                command: sleep 3600
+              second:
+                image: busybox:latest
+                command: "false"
+                restart: "no"
+                healthcheck:
+                  test: ["CMD", "true"]
+            '''
+            stop_timeout = 0
+
+        class ATest(Task):
+            requires = "a"
+        ---
+        """
+        with self.assertRaises(Exception, msg="Expected compose up to fail"):
+            self.build("atest")
+        r = self.lastLog()
+        projects = self._compose_projects(r)
+        self.assertEqual(len(projects), 1)
+        self._assertComposeProjectRemoved(projects[0])

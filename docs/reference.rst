@@ -309,6 +309,16 @@ DockerClient
 
 .. reference-docker-dockerclient-end
 
+DockerCompose
+^^^^^^^^^^^^^
+
+.. reference-docker-dockercompose-start
+
+.. autoclass:: jolt.plugins.docker.DockerCompose
+   :members: build, composefile, environment, profiles, project, project_directory, pull, remove_volumes, services, stop_timeout, wait, wait_timeout
+
+.. reference-docker-dockercompose-end
+
 DockerContainer
 ^^^^^^^^^^^^^^^
 

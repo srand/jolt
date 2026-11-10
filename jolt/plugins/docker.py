@@ -17,6 +17,7 @@ import json
 from os import path
 from platform import system
 import tarfile
+import uuid
 
 
 class DockerListVariable(ArtifactListAttribute):
@@ -355,6 +356,213 @@ class DockerContainer(Resource):
         finally:
             self._info("Deleting container '{container}'")
             tools.run("docker rm -f {container}", output_on_error=True)
+
+
+class DockerCompose(Resource):
+    """
+    Resource: Starts and stops the services of a Docker Compose specification.
+
+    The services are started with ``docker compose up`` when the resource is
+    acquired and stopped and removed with ``docker compose down`` when it is
+    released. Every acquisition uses a unique project name, so concurrent
+    consumers get separate sets of containers, networks and volumes.
+
+    The artifact of the resource tells consumers about the started containers:
+
+      - ``artifact.project`` is the Compose project name.
+      - ``artifact.containers`` is a list of the ``docker inspect`` information
+        of all containers in the project.
+      - ``artifact.services`` maps service names to the ``docker inspect``
+        information of the service's first container.
+
+    No automatic influence for the Compose file is collected. Make sure to use
+    an appropriate influence decorator, or write the specification inline.
+
+    Example:
+
+    .. code-block:: python
+
+        from jolt.plugins.docker import DockerCompose
+
+        class Database(DockerCompose):
+            composefile = \"\"\"
+            services:
+              postgres:
+                image: postgres:17
+                environment:
+                  POSTGRES_PASSWORD: secret
+                ports:
+                  - "5432"
+                healthcheck:
+                  test: ["CMD", "pg_isready", "-U", "postgres"]
+                  interval: 1s
+            \"\"\"
+
+        class IntegrationTest(Task):
+            requires = ["database"]
+
+            def run(self, deps, tools):
+                db = deps["database"].services["postgres"]
+                port = db["NetworkSettings"]["Ports"]["5432/tcp"][0]["HostPort"]
+                ...
+
+    """
+
+    build = False
+    """ Build images before starting the services (``--build``). """
+
+    composefile = "compose.yaml"
+    """
+    Path to the Compose file, a list of such paths, or the full source code
+    of a Compose specification.
+
+    Paths are relative to ``joltdir``. A specification written inline is
+    expanded like other task attributes, so literal braces must be doubled.
+    """
+
+    environment = []
+    """
+    A list of environment variables (``"NAME=VALUE"``) used for variable
+    interpolation in the Compose specification.
+    """
+
+    profiles = []
+    """ A list of Compose profiles to enable. """
+
+    project = "{canonical_name}-{uuid}"
+    """
+    Compose project name.
+
+    Only lowercase letters, digits, dashes and underscores are kept. The default
+    is unique for every acquisition of the resource.
+    """
+
+    project_directory = None
+    """
+    Project directory that relative paths in the specification are resolved
+    against.
+
+    Defaults to the directory of the first Compose file, or ``joltdir`` if the
+    specification is written inline.
+    """
+
+    pull = None
+    """ Image pull policy: ``"always"``, ``"missing"`` or ``"never"``. """
+
+    release_on_error = True
+    """ Stop and remove the services on error to avoid resource leaks. """
+
+    remove_volumes = True
+    """ Remove named and anonymous volumes of the project when released. """
+
+    services = []
+    """ A list of services to start. Starts all services if empty. """
+
+    stop_timeout = 10
+    """
+    Timeout in seconds for stopping the containers.
+
+    When stopping the services, Compose waits for the containers to stop for
+    the specified number of seconds before forcefully killing them.
+
+    Default: 10 seconds.
+    """
+
+    wait = True
+    """
+    Wait for the services to be running, or healthy if they have a
+    healthcheck, before the consumer starts (``--wait``).
+    """
+
+    wait_timeout = None
+    """ Timeout in seconds when waiting for services. """
+
+    def _info(self, fmt, *args, **kwargs):
+        fmt = self.tools.expand(fmt, *args, **kwargs)
+        log.info(fmt, *args, **kwargs)
+
+    def _composefiles(self, tools):
+        files = self.composefile
+        if isinstance(files, str):
+            if "\n" in files:
+                with tools.cwd(tools.builddir()):
+                    tools.write_file("compose.yaml", files)
+                    return [tools.expand_path("compose.yaml")], True
+            files = [files]
+        return [tools.expand_path(f) for f in files], False
+
+    def _project_name(self, tools):
+        name = tools.expand(self.project, uuid=uuid.uuid4().hex[:8]).lower()
+        name = "".join([c if c.isalnum() or c in "-_" else "-" for c in name])
+        return name.lstrip("-_")
+
+    def _compose(self, tools):
+        files, inline = self._composefiles(tools)
+        project_directory = self.project_directory
+        if project_directory:
+            project_directory = tools.expand_path(project_directory)
+        elif inline:
+            project_directory = self.joltdir
+
+        args = ["docker compose", f"-p {self.project_name}"]
+        args += [utils.option("-f ", f) for f in files]
+        args += [utils.option("--project-directory ", project_directory)]
+        args += [utils.option("--profile ", tools.expand(p)) for p in self.profiles]
+        return " ".join(filter(None, args))
+
+    def _env(self, tools):
+        env = {}
+        for var in self.environment:
+            name, _, value = tools.expand(var).partition("=")
+            env[name] = value
+        return env
+
+    def acquire(self, artifact, deps, tools, owner):
+        self.project_name = self._project_name(tools)
+        self._command = self._compose(tools)
+        self._started = False
+
+        options = ["up", "-d"]
+        if self.build:
+            options.append("--build")
+        if self.pull:
+            options.append(f"--pull {tools.expand(self.pull)}")
+        if self.wait:
+            options.append("--wait")
+            if self.wait_timeout:
+                options.append(f"--wait-timeout {self.wait_timeout}")
+        options += [utils.quote(tools.expand(s)) for s in self.services]
+
+        self._info("Starting Compose project '{project_name}'")
+        with tools.environ(**self._env(tools)), utils.delayed_interrupt():
+            self._started = True
+            tools.run("{} {}", self._command, " ".join(options), output_on_error=True)
+
+        artifact.project = self.project_name
+        artifact.containers = []
+        artifact.services = {}
+
+        containers = tools.run("{} ps -a -q", self._command, output_on_error=True).split()
+        if containers:
+            info = tools.run("docker inspect {}", " ".join(containers), output_on_error=True)
+            artifact.containers = json.loads(info)
+        for container in artifact.containers:
+            service = container["Config"]["Labels"].get("com.docker.compose.service")
+            if service and service not in artifact.services:
+                artifact.services[service] = container
+
+    def release(self, artifact, deps, tools, owner):
+        if not getattr(self, "_started", False):
+            return
+
+        options = ["down", "--remove-orphans", f"-t {self.stop_timeout}"]
+        if self.remove_volumes:
+            options.append("-v")
+
+        self._info("Stopping Compose project '{project_name}'")
+        with tools.environ(**self._env(tools)):
+            tools.run("{} {}", self._command, " ".join(options), output_on_error=True)
+        self._started = False
 
 
 class DockerLogin(Resource):
