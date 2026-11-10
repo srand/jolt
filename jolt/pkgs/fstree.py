@@ -6,7 +6,7 @@ from jolt.tasks import TaskRegistry
 @influence.attribute("system")
 class Fstree(Task):
     name = "fstree"
-    version = Parameter("26.11.205", help="fstree version.")
+    version = Parameter("26.11.209", help="fstree version.")
 
     def publish(self, artifact, tools):
         self.ext = ".exe" if self.system == "windows" else ""
