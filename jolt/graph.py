@@ -1,6 +1,8 @@
+from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from contextlib import contextmanager, ExitStack, nullcontext
 import copy
 from os import getenv
+import threading
 from threading import RLock
 from collections import OrderedDict
 import uuid
@@ -778,33 +780,151 @@ class TaskProxy(object):
             if child.is_resource() and self._acquires_resource(child)
         ]
 
+        # Order resources as acquired one at a time: in reverse order of requirement,
+        # each after the resources it requires. A resource required both directly
+        # and by another resource is acquired once.
+        order = []
+        visited = set()
+
+        def visit(resource):
+            if resource in visited:
+                return
+            visited.add(resource)
+            for nested in reversed([child for child in resource.children if child.is_resource()]):
+                visit(nested)
+            order.append(resource)
+
+        for resource in reversed(resource_deps):
+            visit(resource)
+
+        # Consecutive concurrent resources are acquired together
+        batches = []
+        for resource in order:
+            if batches and resource.task.concurrent and batches[-1][0].task.concurrent:
+                batches[-1].append(resource)
+            else:
+                batches.append([resource])
+
         with ExitStack() as exitstack:
-            # Acquire resource dependencies in reverse order.
-            acquired = set()
-            for resource in reversed(resource_deps):
-                exitstack.enter_context(self._acquire_resource(resource, log_prefix, acquired))
+            for batch in batches:
+                if len(batch) == 1:
+                    exitstack.enter_context(self._acquire_resource(batch[0], log_prefix))
+                else:
+                    exitstack.enter_context(self._acquire_resources_concurrently(batch, log_prefix))
 
             yield
 
     @contextmanager
-    def _acquire_resource(self, resource, log_prefix, acquired):
+    def _acquire_resources_concurrently(self, resources, log_prefix):
         """
-        Acquires a resource dependency of this task and releases it on exit.
+        Acquires resources in a thread pool and releases them on exit.
 
-        Resources required by the resource are acquired first and released last.
+        A resource is acquired after, and released before, the resources that it requires.
+        """
+        requires = {
+            resource: [child for child in resource.children if child in resources]
+            for resource in resources
+        }
+
+        required_by = {resource: [] for resource in requires}
+        for resource, nested_deps in requires.items():
+            for nested in nested_deps:
+                required_by[nested].append(resource)
+
+        owner_thread = threading.current_thread()
+        stacks = {}
+
+        def acquire(resource):
+            stack = ExitStack()
+            # Log as the owner, so that the build log of the owner includes the messages
+            with log.map_thread(threading.current_thread(), owner_thread):
+                stack.enter_context(self._acquire_resource(resource, log_prefix))
+            stacks[resource] = stack
+
+        def release(resource):
+            with log.map_thread(threading.current_thread(), owner_thread):
+                stacks[resource].close()
+
+        max_workers = min(self.tools.thread_count(), len(resources))
+
+        with ThreadPoolExecutor(max_workers=max_workers) as pool:
+            acquired = []
+
+            def release_all():
+                # A resource is released before the resources that it requires
+                dependents = {
+                    resource: [r for r in required_by[resource] if r in acquired]
+                    for resource in acquired
+                }
+                return self._run_resource_graph(pool, dependents, release, [], stop_on_error=False)
+
+            try:
+                errors = self._run_resource_graph(pool, requires, acquire, acquired, stop_on_error=True)
+                if errors:
+                    raise errors[0]
+                yield
+            except (KeyboardInterrupt, Exception):
+                release_all()
+                raise
+
+            errors = release_all()
+            if errors:
+                raise errors[0]
+
+    @staticmethod
+    def _run_resource_graph(pool, dependencies, func, completed, stop_on_error):
+        """
+        Calls func for each resource in a thread pool, after it has completed for its dependencies.
+
+        Resources for which func completes are appended to the completed list.
+        Returns the list of raised exceptions.
+        """
+        remaining = {resource: set(deps) for resource, deps in dependencies.items()}
+        futures = {}
+        errors = []
+
+        def submit_ready():
+            for resource, deps in list(remaining.items()):
+                if not deps:
+                    del remaining[resource]
+                    futures[pool.submit(func, resource)] = resource
+
+        try:
+            submit_ready()
+            while futures:
+                finished, _ = wait(futures, return_when=FIRST_COMPLETED)
+                for future in finished:
+                    resource = futures.pop(future)
+                    try:
+                        future.result()
+                        completed.append(resource)
+                    except (KeyboardInterrupt, Exception) as e:
+                        errors.append(e)
+                        if stop_on_error:
+                            remaining.clear()
+                            continue
+                    for deps in remaining.values():
+                        deps.discard(resource)
+                submit_ready()
+        finally:
+            # Wait for calls still running after an interrupt, so that their resources are released
+            for future, resource in futures.items():
+                try:
+                    future.result()
+                    completed.append(resource)
+                except (KeyboardInterrupt, Exception) as e:
+                    errors.append(e)
+
+        return errors
+
+    @contextmanager
+    def _acquire_resource(self, resource, log_prefix):
+        """
+        Acquires a resource, but not the resources it requires, and releases it on exit.
+
         The owner passed to the resource is always this task, never an intermediate resource.
         """
-        # A resource required both directly and by another resource is acquired once
-        if resource in acquired:
-            yield resource
-            return
-        acquired.add(resource)
-
         with ExitStack() as exitstack:
-            nested_deps = [child for child in resource.children if child.is_resource()]
-            for nested in reversed(nested_deps):
-                exitstack.enter_context(self._acquire_resource(nested, log_prefix, acquired))
-
             acquired = []
 
             try:

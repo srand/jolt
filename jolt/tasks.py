@@ -3097,6 +3097,18 @@ class Resource(Task):
     abstract = True
     """ An abstract resource class indended to be subclassed. """
 
+    concurrent = False
+    """
+    Acquire and release the resource concurrently with other concurrent resources.
+
+    Resources are acquired one at a time in reverse order of requirement and
+    released in the opposite order. Concurrent resources next to each other in
+    that order are instead acquired and released at the same time, in separate
+    threads, but still after, and before, the resources that they require.
+    Implementors must not rely on any order between them. The number of threads
+    is limited by :func:`Tools.thread_count`.
+    """
+
     release_on_error = False
     """ Call release if an exception occurs during acquire. """
 

@@ -1523,6 +1523,189 @@ class TaskApi(JoltTest):
         import re
         assert re.search(r".*Acquire R0.*\n.*Acquire R1.*", r, re.MULTILINE)
 
+    def test_resource_concurrency(self):
+        """
+        --- tasks:
+        import threading
+
+        acquired = threading.Barrier(2, timeout=10)
+        released = threading.Barrier(2, timeout=10)
+
+        class R(Resource):
+            abstract = True
+            concurrent = True
+
+            def acquire(self, artifact, deps, tools, owner):
+                acquired.wait()
+
+            def release(self, artifact, deps, tools, owner):
+                released.wait()
+
+        class R1(R):
+            pass
+
+        class R2(R):
+            pass
+
+        class A(Task):
+            requires = ["r1", "r2"]
+        ---
+        """
+        self.build("a")
+
+    def test_resource_concurrency_threads(self):
+        """
+        --- tasks:
+        import threading
+        import time
+
+        busy = threading.Lock()
+
+        class R(Resource):
+            abstract = True
+            concurrent = True
+
+            def acquire(self, artifact, deps, tools, owner):
+                assert busy.acquire(blocking=False), "Concurrent acquisition"
+                time.sleep(0.5)
+                busy.release()
+
+            def release(self, artifact, deps, tools, owner):
+                assert busy.acquire(blocking=False), "Concurrent release"
+                time.sleep(0.5)
+                busy.release()
+
+        class R1(R):
+            pass
+
+        class R2(R):
+            pass
+
+        class A(Task):
+            requires = ["r1", "r2"]
+
+        --- config:
+        threads = 1
+        ---
+        """
+        self.build("a")
+
+    def test_resource_concurrency_order(self):
+        """
+        --- tasks:
+        class C1(Resource):
+            concurrent = True
+
+        class C2(Resource):
+            concurrent = True
+
+        class S(Resource):
+            pass
+
+        class A(Task):
+            requires = ["c1", "s", "c2"]
+        ---
+        """
+        r = self.build("a")
+        self.assertLess(
+            r.index("Resource acquisition finished after"),
+            r.index("Resource acquisition started (s for a)"))
+        self.assertLess(
+            r.index("Resource acquisition started (c2 for a)"),
+            r.index("Resource acquisition started (s for a)"))
+        self.assertLess(
+            r.index("Resource acquisition started (s for a)"),
+            r.index("Resource acquisition started (c1 for a)"))
+        self.assertLess(
+            r.index("Resource release started (c1 for a)"),
+            r.index("Resource release started (s for a)"))
+        self.assertLess(
+            r.index("Resource release started (s for a)"),
+            r.index("Resource release started (c2 for a)"))
+
+    def test_resource_concurrency_nested(self):
+        """
+        --- tasks:
+        class R(Resource):
+            abstract = True
+            concurrent = True
+
+            def acquire(self, artifact, deps, tools, owner):
+                assert owner.name == "a", "Incorrect owner: " + owner.name
+
+        class R1(R):
+            pass
+
+        class R2(R):
+            requires = ["r1"]
+
+        class R3(R):
+            requires = ["r1"]
+
+        class A(Task):
+            requires = ["r2", "r3", "r1"]
+        ---
+        """
+        r = self.build("a")
+        self.assertEqual(1, r.count("Resource acquisition started (r1 for a)"))
+        self.assertEqual(1, r.count("Resource release started (r1 for a)"))
+        for name in ["r2", "r3"]:
+            self.assertLess(
+                r.index("Resource acquisition finished after"),
+                r.index(f"Resource acquisition started ({name} for a)"))
+            self.assertLess(
+                r.index("Resource acquisition started (r1 for a)"),
+                r.index(f"Resource acquisition started ({name} for a)"))
+            self.assertLess(
+                r.index(f"Resource release started ({name} for a)"),
+                r.index("Resource release started (r1 for a)"))
+
+    def test_resource_concurrency_failure(self):
+        """
+        --- tasks:
+        import time
+
+        class R1(Resource):
+            concurrent = True
+
+            def acquire(self, artifact, deps, tools, owner):
+                time.sleep(1)
+                print("Acquire R1")
+
+            def release(self, artifact, deps, tools, owner):
+                print("Release R1")
+
+        class R2(Resource):
+            concurrent = True
+
+            def acquire(self, artifact, deps, tools, owner):
+                assert False, "Acquisition Error"
+
+            def release(self, artifact, deps, tools, owner):
+                assert False, "Unexpected R2 release"
+
+        class R3(Resource):
+            concurrent = True
+            requires = ["r2"]
+
+            def acquire(self, artifact, deps, tools, owner):
+                assert False, "Unexpected R3 acquisition"
+
+        class A(Task):
+            requires = ["r1", "r3"]
+
+            def run(self, deps, tools):
+                assert False, "Unexpected run"
+        ---
+        """
+        with self.assertRaises(Exception, msg="Acquisition Error"):
+            self.build("a")
+        r = self.lastLog()
+        self.assertIn("Acquire R1", r)
+        self.assertIn("Release R1", r)
+        self.assertNotIn("Resource acquisition started (r3 for a)", r)
+        self.assertNotIn("Unexpected", r)
+
     def test_runner(self):
         '''
         --- tasks:
