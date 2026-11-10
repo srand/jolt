@@ -1,5 +1,5 @@
 import os
-from jolt import attributes, Alias, BooleanParameter, Download, IntParameter, Parameter
+from jolt import attributes, Alias, BooleanParameter, Download, IntParameter, ListParameter, Parameter
 from jolt.pkgs import compiler, cpython, icu
 from jolt.plugins import git
 from jolt.tasks import Task, TaskRegistry
@@ -20,6 +20,9 @@ class Boost(Task):
     icu = BooleanParameter(False, help="Enable ICU support.")
     python = BooleanParameter(False, help="Build Boost.Python.")
     bits = IntParameter(64, values=[32, 64], help="Address model, in bits.")
+    libraries = ListParameter(
+        [], required=False,
+        help="Libraries to build and publish, such as context+thread; all if empty. Headers of all libraries are installed.")
     requires_compiler = ["virtual/compiler/c", "virtual/compiler/cxx"]
     requires_git = ["git:url=https://github.com/boostorg/boost.git,path={buildroot}/git-boost,rev=boost-{version},submodules=true"]
     requires_icu_on = ["icu"]
@@ -68,12 +71,15 @@ class Boost(Task):
         self.userconfigfile = tools.expand_path("{builddir}/user-config.jam")
         self.write_user_config(deps, tools)
 
+        libraries = list(self.libraries)
         without_libs = []
-        if not self.python:
+        if not self.python and not libraries:
             without_libs.append("python")
 
         bootstrap_cmd = []
-        if without_libs:
+        if libraries:
+            bootstrap_cmd = ["--with-libraries={}".format(",".join(libraries))]
+        elif without_libs:
             bootstrap_cmd = ["--without-libraries={}".format(",".join(without_libs))]
 
         b2_cmd = [
@@ -84,7 +90,7 @@ class Boost(Task):
             "--build-dir={builddir}",
             "--user-config={userconfigfile}",
             "-j{}".format(tools.cpu_count()),
-        ]
+        ] + ["--with-{}".format(lib) for lib in libraries]
 
         # Boost.Locale and Boost.Regex otherwise use ICU from the host if it is found
         if self.icu:
