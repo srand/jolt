@@ -417,11 +417,18 @@ Linux
 .. autoclass:: jolt.plugins.linux.DebianHostSdk
    :members: arch
 
+.. autoclass:: jolt.plugins.linux.Ext4
+   :members: arch, dockerfile, size
+
+   Other options are inherited from :class:`jolt.plugins.podman.ContainerImage`.
+
 .. autoclass:: jolt.plugins.linux.FIT
-   :members: configs, signature_key_name, signature_key_path
+   :members: config_default, configs, signature_key_name, signature_key_path
 
 .. autoclass:: jolt.plugins.linux.Initramfs
    :members: arch, dockerfile
+
+   Other options are inherited from :class:`jolt.plugins.podman.ContainerImage`.
 
 .. autoclass:: jolt.plugins.linux.Kernel
    :members: arch, configpaths, defconfig, defconfigpath, dtbs, features, loadaddr, loadaddr_fdt, srcdir, targets
@@ -430,10 +437,12 @@ Linux
    :members: arch, configpaths, defconfig, defconfigpath, features, srcdir, srcdir_module
 
 .. autoclass:: jolt.plugins.linux.Qemu
-   :members: arch, arguments, dtb, initrd, kernel, machine, memory, rootfs
+   :members: arch, arguments, binary, dtb, initrd, kernel, machine, memory, rootfs
 
 .. autoclass:: jolt.plugins.linux.Squashfs
    :members: arch, dockerfile, size
+
+   Other options are inherited from :class:`jolt.plugins.podman.ContainerImage`.
 
 .. autoclass:: jolt.plugins.linux.UBoot
    :members: arch, configpaths, defconfig, defconfigpath, features, srcdir, targets

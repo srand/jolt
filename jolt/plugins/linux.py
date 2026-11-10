@@ -282,8 +282,8 @@ class Ext4(_ContainerImageBase):
     applications for the target architecture. The package is available in most
     Linux distributions.
 
-    The location of the resulting squashfs image is stored in the
-    ``artifact.paths.squashfs`` artifact attribute.
+    The location of the resulting ext4 image is stored in the
+    ``artifact.paths.ext4`` artifact attribute.
     """
     abstract = True
     """ Must be subclassed """
