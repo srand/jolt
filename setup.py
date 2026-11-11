@@ -28,7 +28,6 @@ except FileNotFoundError:
         "keyring",
         "keyrings.alt",
         "lief>=1.0",
-        "multi_key_dict",
         "ninja",
         "protobuf",
         "psutil",
