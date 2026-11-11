@@ -17,6 +17,7 @@ from jolt import utils
 from jolt import colors
 from jolt import hooks
 from jolt import filesystem as fs
+from jolt import fstree
 from jolt.error import raise_error
 from jolt.error import raise_task_error_if
 from jolt.influence import HashInfluenceRegistry, TaskRequirementInfluence
@@ -1381,6 +1382,10 @@ class GraphBuilder(object):
             self.graph._nodes_by_name = self.nodes
 
         if influence:
+            # Index the workspace only once the graph is built, so that
+            # unknown tasks and bad requirements fail without waiting for it.
+            fstree.index_workspace()
+
             topological_nodes = self.graph.topological_nodes
             with self._progress("Collecting task influence", len(self.graph.tasks), "tasks") as p:
                 for node in reversed(topological_nodes):

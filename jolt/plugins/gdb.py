@@ -5,7 +5,6 @@ import sys
 from jolt import cache
 from jolt import cli
 from jolt import filesystem as fs
-from jolt import fstree
 from jolt import graph
 from jolt import log
 from jolt import scheduler
@@ -82,7 +81,6 @@ def gdb(ctx, task, default, machine_interface, no_binary, gdb_args):
     for params in default:
         registry.set_default_parameters(params)
 
-    fstree.index_workspace()
     gb = graph.GraphBuilder(registry, acache, options, progress=True)
     dag = gb.build([task])
 

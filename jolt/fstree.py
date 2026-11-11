@@ -316,9 +316,10 @@ def index_workspace():
     """
     Indexes the workspace with fstree.
 
-    The workspace is indexed once, by the command line entrypoints that
-    compute task identities, before tasks are loaded into a graph. It is
-    never indexed anywhere else. Resources that change files in the
+    The workspace is indexed once, by the graph builder after the task
+    graph is built and before task identities are computed, or by command
+    line entrypoints that compute identities without a graph. It is never
+    indexed anywhere else. Resources that change files in the
     workspace refresh their paths with :func:`update_workspace_index`.
 
     Nothing is done if the workspace is already indexed. Files ignored by

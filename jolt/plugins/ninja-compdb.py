@@ -7,7 +7,6 @@ from jolt import cache
 from jolt import cli
 from jolt import config
 from jolt import filesystem as fs
-from jolt import fstree
 from jolt import graph
 from jolt import log
 from jolt import scheduler
@@ -254,7 +253,6 @@ def compdb(ctx, task, default):
     for params in default:
         registry.set_default_parameters(params)
 
-    fstree.index_workspace()
     gb = graph.GraphBuilder(registry, acache, options, progress=True)
     dag = gb.build(task)
 

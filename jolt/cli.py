@@ -389,7 +389,6 @@ def build(ctx, task, network, keep_going, default, local,
 
     log.info("Started: {}", datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
 
-    fstree.index_workspace()
     gb = graph.GraphBuilder(registry, acache, options, progress=True, buildenv=buildenv)
     dag = gb.build(task)
 
@@ -530,7 +529,6 @@ def clean(ctx, task, deps, expired):
     if task:
         task = [utils.stable_task_name(t) for t in task]
         registry = TaskRegistry.get()
-        fstree.index_workspace()
         dag = graph.GraphBuilder(registry, acache).build(task)
         if deps:
             tasks = dag.tasks
@@ -678,8 +676,6 @@ def display(ctx, task, reverse=None, show_cache=False, prune=False):
     registry = TaskRegistry.get()
     options = JoltOptions()
     acache = cache.ArtifactCache.get(options)
-    if show_cache:
-        fstree.index_workspace()
     gb = graph.GraphBuilder(registry, acache)
     dag = gb.build(task, influence=show_cache)
 
@@ -784,7 +780,6 @@ def download(ctx, task, deps, copy, copy_all):
     registry = TaskRegistry.get()
     strategy = scheduler.DownloadStrategy(executors, acache)
     queue = scheduler.TaskQueue()
-    fstree.index_workspace()
     gb = graph.GraphBuilder(registry, acache, options, progress=True)
     dag = gb.build(task)
 
@@ -1058,7 +1053,7 @@ def inspect(ctx, task, influence=False, artifact=False, salt=None):
     if salt:
         task.taint = salt
 
-    if artifact or influence:
+    if influence:
         fstree.index_workspace()
 
     if artifact:
@@ -1128,7 +1123,6 @@ def _export(ctx, task):
     executors = scheduler.ExecutorRegistry.get()
     strategy = scheduler.LocalStrategy(executors, acache)
 
-    fstree.index_workspace()
     dag = graph.GraphBuilder(registry, acache)
     dag = dag.build(task)
 
