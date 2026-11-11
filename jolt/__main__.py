@@ -30,13 +30,42 @@ def dump_threads(sig, frame):
     print("\n===============================================================================\n")
 
 
+def terminate(sig, frame):
+    import signal
+    if os.name != "posix":
+        signal.default_int_handler(sig, frame)
+
+    # Interrupt Jolt and the commands in its process group, as the terminal does on Ctrl-C
+    import psutil
+    # Scripts that start Jolt in the background make it and its commands ignore SIGINT
+    ignored = signal.getsignal(signal.SIGINT) is signal.SIG_IGN
+    pgrp = os.getpgrp()
+    try:
+        children = psutil.Process().children(recursive=True)
+    except psutil.Error:
+        children = []
+    for child in children:
+        try:
+            if os.getpgid(child.pid) == pgrp:
+                child.send_signal(signal.SIGTERM if ignored else signal.SIGINT)
+        except (OSError, psutil.Error):
+            pass
+    if ignored:
+        signal.default_int_handler(sig, frame)
+    os.kill(os.getpid(), signal.SIGINT)
+
+
 def main():
     setproctitle(_build_process_title("jolt"))
 
+    import signal
     if os.name == "posix":
-        import signal
         signal.signal(signal.SIGUSR1, start_pdb)
         signal.signal(signal.SIGUSR2, dump_threads)
+    signal.signal(signal.SIGTERM, terminate)
+    if hasattr(signal, "SIGBREAK"):
+        # Ctrl-Break, used on Windows to stop console programs gracefully
+        signal.signal(signal.SIGBREAK, terminate)
 
     try:
         cli.cli(obj=dict())
