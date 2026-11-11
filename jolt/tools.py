@@ -1992,7 +1992,7 @@ class Tools(object):
             if pure:
                 self._env = env
             else:
-                self._env = copy.deepcopy(env)
+                self._env = dict(old_env)
                 self._env.update(env)
             yield
         finally:
