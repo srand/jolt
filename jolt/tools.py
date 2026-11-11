@@ -929,7 +929,7 @@ class Tools(object):
         self._deadline = None
         self._run_prefix = []
         self._cwd = fs.path.normpath(fs.path.join(config.get_workdir(), cwd or config.get_workdir()))
-        self._env = copy.deepcopy(env or os.environ)
+        self._env = dict(env or os.environ)
         self._task = task
         if task:
             self._env["JOLTDIR"] = task.joltdir
