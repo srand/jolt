@@ -1846,18 +1846,23 @@ class ArtifactCache(StorageProvider):
         recorded for the running process to prevent eviction by other
         processes.
         """
+        with self._cache_lock(), self._db() as db:
+            return self._is_available_locally(db, artifact)
+
+    def _is_available_locally(self, db, artifact):
+        """ Check presence of an artifact. Cache lock must be held. """
         if not artifact.is_cacheable():
             return False
-
-        with self._cache_lock(), self._db() as db:
-            if self._db_select_artifact(db, artifact.identity) or self._db_select_reference(db, artifact.identity):
-                artifact.reload()
-                if artifact.is_temporary():
-                    self._db_delete_artifact(db, artifact.identity, and_refs=False)
-                    return False
-                self._db_insert_reference(db, artifact.identity)
-                return True
-        return False
+        referenced = self._db_select_reference(db, artifact.identity)
+        if not referenced and not self._db_select_artifact(db, artifact.identity):
+            return False
+        artifact.reload()
+        if artifact.is_temporary():
+            self._db_delete_artifact(db, artifact.identity, and_refs=False)
+            return False
+        if not referenced:
+            self._db_insert_reference(db, artifact.identity)
+        return True
 
     def is_available_remotely(self, artifact, cache=True):
         """
@@ -1892,11 +1897,12 @@ class ArtifactCache(StorageProvider):
         artifacts = utils.as_list(artifacts)
 
         # Check presence of all artifacts in the local cache
-        for artifact in artifacts:
-            if self.is_available_locally(artifact):
-                present.add(artifact)
-            else:
-                missing.add(artifact)
+        with utils.delayed_interrupt(), self._cache_lock(), self._db() as db:
+            for artifact in artifacts:
+                if self._is_available_locally(db, artifact):
+                    present.add(artifact)
+                else:
+                    missing.add(artifact)
 
         if not remote:
             return list(present), list(missing)
