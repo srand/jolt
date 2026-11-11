@@ -46,7 +46,7 @@ Chroot
 .. reference-chroot-start
 
 .. autoclass:: jolt.Chroot
-   :members: chroot
+   :members: chroot, concurrent
 
 .. reference-chroot-end
 
@@ -88,7 +88,7 @@ Fetch
 .. reference-fetch-start
 
 .. autoclass:: jolt.plugins.fetch.Fetch
-   :members: url, extract, path, alias, sha256
+   :members: url, extract, path, alias, sha256, concurrent
 
 .. reference-fetch-end
 
@@ -97,7 +97,7 @@ Git
 .. reference-git-start
 
 .. autoclass:: jolt.plugins.git.Git
-   :members: hash, path, rev, url, submodules
+   :members: hash, path, rev, url, submodules, concurrent
 
 .. reference-git-end
 
@@ -162,7 +162,7 @@ Resource
 .. reference-resource-start
 
 .. autoclass:: jolt.tasks.Resource
-   :members: acquire, release
+   :members: acquire, concurrent, release
    :show-inheritance:
 
 .. reference-resource-end
@@ -315,7 +315,7 @@ DockerCompose
 .. reference-docker-dockercompose-start
 
 .. autoclass:: jolt.plugins.docker.DockerCompose
-   :members: build, composefile, environment, profiles, project, project_directory, pull, remove_volumes, services, stop_timeout, wait, wait_timeout
+   :members: build, composefile, concurrent, environment, profiles, project, project_directory, pull, remove_volumes, services, stop_timeout, wait, wait_timeout
 
 .. reference-docker-dockercompose-end
 
@@ -325,7 +325,7 @@ DockerContainer
 .. reference-docker-dockercontainer-start
 
 .. autoclass:: jolt.plugins.docker.DockerContainer
-   :members: arguments, cap_adds, cap_drops, entrypoint, environment, image, labels, privileged, ports, volumes, volumes_default, user
+   :members: arguments, cap_adds, cap_drops, concurrent, entrypoint, environment, image, labels, privileged, ports, volumes, volumes_default, user
 
 .. reference-docker-dockercontainer-end
 
@@ -345,7 +345,7 @@ DockerLogin
 .. reference-docker-dockerlogin-start
 
 .. autoclass:: jolt.plugins.docker.DockerLogin
-   :members: name, user, passwd
+   :members: name, user, passwd, concurrent
 
 .. reference-docker-dockerlogin-end
 
@@ -569,7 +569,7 @@ Compose
 .. reference-podman-compose-start
 
 .. autoclass:: jolt.plugins.podman.Compose
-   :members: build, composefile, environment, profiles, project, pull, remove_volumes, services, stop_timeout, wait, wait_timeout
+   :members: build, composefile, concurrent, environment, profiles, project, pull, remove_volumes, services, stop_timeout, wait, wait_timeout
 
 .. reference-podman-compose-end
 
@@ -579,7 +579,7 @@ Container
 .. reference-podman-container-start
 
 .. autoclass:: jolt.plugins.podman.Container
-   :members: arguments, cap_adds, cap_drops, chroot, entrypoint, environment, image, labels, privileged, ports, stop_timeout, volumes, volumes_default, user
+   :members: arguments, cap_adds, cap_drops, chroot, concurrent, entrypoint, environment, image, labels, privileged, ports, stop_timeout, volumes, volumes_default, user
 
 .. reference-podman-container-end
 
@@ -599,7 +599,7 @@ PodmanLogin
 .. reference-podman-podmanlogin-start
 
 .. autoclass:: jolt.plugins.podman.PodmanLogin
-   :members: name, user, passwd, server
+   :members: name, user, passwd, server, concurrent
 
 .. reference-podman-podmanlogin-end
 
