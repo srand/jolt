@@ -19,29 +19,40 @@ _modules = {}
 
 def _populate_cache(module):
 
-    class _ClassFinder(ast.NodeVisitor):
+    class _ClassFinder:
         """ Collects all classes and functions in an Abstract Syntax Tree. """
+
+        # Classes and functions can only be defined in statement blocks,
+        # so expressions are not traversed.
+        _blocks = ("body", "orelse", "finalbody", "handlers", "cases")
 
         def __init__(self):
             self._stack = []
             self.classes = {}
             self.functions = {}
 
-        def visit_FunctionDef(self, node):
-            self._stack.append(node.name)
-            self.functions['.'.join(self._stack)] = node
-            self._stack.append('<locals>')
-            self.generic_visit(node)
-            self._stack.pop()
-            self._stack.pop()
+        def visit(self, node):
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                self._stack.append(node.name)
+                self.functions['.'.join(self._stack)] = node
+                self._stack.append('<locals>')
+                self._visit_blocks(node)
+                self._stack.pop()
+                self._stack.pop()
+            elif isinstance(node, ast.ClassDef):
+                self._stack.append(node.name)
+                self.classes['.'.join(self._stack)] = node
+                self._visit_blocks(node)
+                self._stack.pop()
+            else:
+                self._visit_blocks(node)
 
-        visit_AsyncFunctionDef = visit_FunctionDef
-
-        def visit_ClassDef(self, node):
-            self._stack.append(node.name)
-            self.classes['.'.join(self._stack)] = node
-            self.generic_visit(node)
-            self._stack.pop()
+        def _visit_blocks(self, node):
+            for field in self._blocks:
+                block = getattr(node, field, None)
+                if isinstance(block, list):
+                    for child in block:
+                        self.visit(child)
 
     with open(module.__file__) as modfp:
         tree = ast.parse(modfp.read())
