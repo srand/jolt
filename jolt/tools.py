@@ -911,6 +911,19 @@ def _default_idmap(type, inner):
     return map
 
 
+_environ_snapshot = (None, None)
+
+
+def _environ():
+    """ Decoded copy of os.environ, which is slow to decode for every Tools object. """
+    global _environ_snapshot
+    data, environ = _environ_snapshot
+    if data != os.environ._data:
+        data, environ = dict(os.environ._data), dict(os.environ)
+        _environ_snapshot = (data, environ)
+    return environ
+
+
 class Tools(object):
     """ A collection of useful tools.
 
@@ -929,7 +942,7 @@ class Tools(object):
         self._deadline = None
         self._run_prefix = []
         self._cwd = fs.path.normpath(fs.path.join(config.get_workdir(), cwd or config.get_workdir()))
-        self._env = dict(env or os.environ)
+        self._env = dict(env or _environ())
         self._task = task
         if task:
             self._env["JOLTDIR"] = task.joltdir
