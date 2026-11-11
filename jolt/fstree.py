@@ -481,6 +481,48 @@ def permission_args():
     return ["--permissions", "git"]
 
 
+def write_tree(path, ignore_patterns=None):
+    """
+    Returns the fstree hash of the directory tree at the path.
+
+    Any directory can be hashed, also those that the workspace index
+    excludes, such as repositories cloned into the build directory. .git
+    and paths that match the ignore patterns, in gitignore syntax, are not
+    hashed, while .joltignore is not consulted. Permissions are recorded as
+    git does.
+
+    An index of the tree is kept in the cache, so that only files that have
+    changed since the last time are read.
+    """
+    executable = find_executable()
+    raise_error_if(not executable, "fstree executable not found, it is required to calculate file influence")
+
+    path = os.path.normpath(path)
+    cachedir = config.get_cachedir()
+    pathhash = utils.hashstring(path)
+    indexdir = os.path.join(cachedir, "indexes", pathhash[:2])
+    indexfile = os.path.join(indexdir, pathhash[2:])
+    ignorefile = indexfile + ".ignore"
+    fs.makedirs(indexdir)
+
+    jobserver_path = os.getenv("JOLT_JOBSERVER_PATH")
+    jobserver_args = ["--jobserver-path", jobserver_path] if jobserver_path else []
+
+    with fasteners.InterProcessLock(indexfile + ".lock"):
+        # There can be too many patterns for a command line
+        with open(ignorefile, "wb") as f:
+            for pattern in ignore_patterns or []:
+                f.write(os.fsencode(pattern) + b"\n")
+        result = subprocess.run(
+            [executable, "write-tree", "--cache", cachedir, "--ignore", ignorefile, "--ignore-pattern", ".git"] + permission_args() + ["--index", indexfile, "--threads", str(tools.Tools().thread_count())] + jobserver_args + [path],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE)
+        raise_error_if(
+            result.returncode != 0,
+            "Failed to hash directory tree '{}': {}", path, result.stderr.decode(errors="replace").strip())
+        return result.stdout.decode().strip()
+
+
 @contextmanager
 def workspace_index_files():
     """

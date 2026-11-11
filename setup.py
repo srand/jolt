@@ -32,7 +32,6 @@ except FileNotFoundError:
         "ninja",
         "protobuf",
         "psutil",
-        "pygit2",
         "py7zr",
         "requests",
         "rich",

@@ -1,7 +1,6 @@
 from contextlib import contextmanager
 import functools
 import os
-import pygit2
 import re
 from threading import RLock
 import urllib.parse
@@ -104,7 +103,6 @@ class GitRepository(object):
             '+refs/tags/*:refs/tags/*',
         ]
         self.refspecs = refspecs or []
-        self._tree_hash = {}
         self._original_head = True
         self._last_rev = None
         self._init_repo()
@@ -113,14 +111,12 @@ class GitRepository(object):
         gitpath = os.path.join(self.path, ".git")
         if os.path.isdir(os.path.join(self.path, ".git")):
             self.gitpath = gitpath
-            self.repository = pygit2.Repository(self.gitpath)
         elif os.path.exists(gitpath):
             with self.tools.cwd(self.path):
                 path = self.tools.run("git rev-parse --git-dir", output=False, new_session=True)
             self.gitpath = os.path.join(self.path, path)
-            self.repository = pygit2.Repository(self.gitpath)
         else:
-            self.repository = None
+            self.gitpath = None
 
     @utils.cached.instance
     def _git_folder(self):
@@ -302,11 +298,11 @@ class GitRepository(object):
 
         self._init_repo()
         raise_error_if(
-            self.repository is None,
+            not self.is_cloned(),
             "Failed to clone repository '{0}'", self.relpath)
         # Git clones a repository whose HEAD names a missing branch without
         # checking anything out, which would leave the workspace empty
-        if not rev and self.repository.head_is_unborn:
+        if not rev and self.head() is None:
             self._raise_no_default_branch()
         if submodules:
             self._update_submodules()
@@ -347,9 +343,10 @@ class GitRepository(object):
             self.tools.run("git apply --whitespace=nowarn {patchfile}", patchfile=patchfile, new_session=True)
 
     def head(self):
+        """ Returns the commit that is checked out, or None if there is none. """
         if not self.is_cloned():
             return None
-        return str(self.repository.head.target)
+        return self._rev_parse("HEAD")
 
     def is_head(self, rev):
         return self.is_indexed() and self.head() == rev
@@ -363,19 +360,22 @@ class GitRepository(object):
     def rev_parse(self, rev):
         if self.is_valid_sha(rev):
             return rev
+        commit = self._rev_parse(rev)
+        if commit is None:
+            self.fetch(commit=rev)
+            commit = self._rev_parse(rev)
+            raise_error_if(commit is None, "Invalid git reference: {}", rev)
+        return commit
+
+    def _rev_parse(self, rev):
+        """ Returns the commit that the revision names, or None if it is unknown. """
         with self.tools.cwd(self.path):
             try:
-                commit = self.repository.revparse_single(rev)
-            except KeyError:
-                self.fetch(commit=rev)
-                try:
-                    commit = self.repository.revparse_single(rev)
-                except Exception:
-                    raise_error("Invalid git reference: {}", rev)
-            try:
-                return str(commit.id)
-            except Exception:
-                return str(commit)
+                return self.tools.run(
+                    "git rev-parse --verify --quiet --end-of-options '{rev}^{{commit}}'",
+                    rev=rev, output=False, new_session=True)
+            except JoltCommandError:
+                return None
 
     @utils.cached.instance
     @workspace_locked
@@ -390,38 +390,41 @@ class GitRepository(object):
                 new_session=True)
         return tree
 
-    def tree_hash(self, rev=None, path="/"):
-        path = fs.path.normpath(path)
-        full_path = fs.path.join(self.path, path) if path != "/" else self.path
+    def _ls_files(self, *args):
+        """ Lists paths in the working tree with git ls-files. """
+        # Paths are separated by NUL and returned as they are, since they
+        # can contain, and end with, whitespace
+        with self.tools.cwd(self.path):
+            output = self.tools.run(
+                "git ls-files -z {0}", " ".join(args),
+                output_on_error=True,
+                output_rstrip=False,
+                new_session=True)
+        return set(output.split("\0")) - {""}
 
-        # When a checkout has been made, there can be no local changes, so treat
-        # an unspecified rev as an explicit request for the current head commit.
-        if rev is None and not self.is_original_head():
-            rev = self.head()
+    def _unversioned_paths(self):
+        """
+        Returns the paths in the working tree that git neither tracks nor
+        would add: ignored files and directories, and empty directories.
+        """
+        others = ["--others", "--exclude-standard", "--directory"]
+        ignored = self._ls_files("--ignored", *others)
+        empty = self._ls_files(*others) - self._ls_files("--no-empty-directory", *others)
+        return sorted(ignored | empty)
 
-        value = self._tree_hash.get((full_path, rev))
-        if value is not None:
-            return value
+    def tree_hash(self):
+        """
+        Returns the fstree hash of the working tree.
 
-        if rev is None:
-            # Original head: capture current workspace state including uncommitted changes.
-            tree = self.repository.get(self.write_tree())
-        else:
-            commit = self.rev_parse(rev)
-            obj = self.repository.get(commit)
-            try:
-                tree = obj.tree
-            except AttributeError:
-                tree = obj.get_object().tree
-
-        # Traverse tree from root to requested path
-        if path != "/":
-            tree = tree[fs.as_posix(path)]
-
-        # Update tree hash cache
-        self._tree_hash[(full_path, rev)] = value = tree.id
-
-        return value
+        The hash covers the content that git sees: tracked files as they
+        are in the working tree, with uncommitted changes, and untracked
+        files that aren't ignored. That is also what a worker gets when it
+        checks out the head commit and applies the diff, so the hash is the
+        same there, whatever ignored files, such as build output, there are
+        in either working tree.
+        """
+        patterns = ["/" + re.sub(r"([\\*?\[\] ])", r"\\\1", path) for path in self._unversioned_paths()]
+        return fstree.write_tree(self.path, patterns)
 
     @_changes_workspace
     def clean(self):
@@ -790,24 +793,10 @@ class Git(WorkspaceResource, FileInfluence):
     @locked
     @utils.cached.instance
     def get_influence(self, task):
-        if not self.git.is_cloned():
-            try:
-                self.git.clone(submodules=bool(self.submodules), rev=self._get_revision(), shallow=bool(self.shallow))
-            finally:
-                fstree.update_workspace_index()
-        if not self._revision.is_imported:
-            self.git.diff_unchecked()
-        rev = self._get_revision()
-
-        try:
-            if rev is not None:
-                th = self.git.tree_hash(rev)
-            else:
-                th = self.git.tree_hash()
-        except KeyError:
-            th = "N/A"
-
-        return "{0}: {1}".format(self.git.relpath, th)
+        # The working tree is hashed, so the requested revision has to be
+        # checked out first
+        self._acquire_ws()
+        return "{0}: {1}".format(self.git.relpath, self.git.tree_hash())
 
 
 TaskRegistry.get().add_task_class(Git)
