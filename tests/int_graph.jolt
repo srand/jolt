@@ -1,0 +1,135 @@
+import sys
+import threading
+sys.path.append(".")
+
+from testsupport import JoltTest
+from jolt import graph
+from jolt import log
+from jolt.error import JoltError
+from jolt.options import JoltOptions
+
+
+class FakeTools(object):
+    def __init__(self, threads):
+        self.threads = threads
+
+    def thread_count(self):
+        return self.threads
+
+
+class FakeProxy(object):
+    _acquires_resource = graph.TaskProxy._acquires_resource
+    _collect_download_dependencies = graph.TaskProxy._collect_download_dependencies
+    _run_download_dependencies = graph.TaskProxy._run_download_dependencies
+
+    def __init__(self, name, children=None, resource=False, local=False, available=False,
+                 download=None, threads=4, **options):
+        self.short_qualified_name = name
+        self.children = children or []
+        self.resource = resource
+        self.local = local
+        self.available = available
+        self.on_download = download
+        self.downloads = 0
+        self.is_unstable = False
+        self.options = JoltOptions(**options)
+        self.tools = FakeTools(threads)
+
+    def __str__(self):
+        return self.short_qualified_name
+
+    def has_artifact(self):
+        return True
+
+    def is_resource(self):
+        return self.resource
+
+    def is_local(self):
+        return self.local
+
+    def is_completed(self):
+        return True
+
+    def is_available_locally(self, extensions=True):
+        return self.available
+
+    def download(self, force=False):
+        self.downloads += 1
+        return self.on_download() if self.on_download else True
+
+
+class GraphInternal(JoltTest):
+    name = "int/graph"
+
+    def test_download_dependencies_concurrently(self):
+        barrier = threading.Barrier(3, timeout=10)
+
+        def download():
+            barrier.wait()
+            return True
+
+        deps = [FakeProxy(name, download=download) for name in ("a", "b", "c")]
+        FakeProxy("task", deps)._run_download_dependencies()
+        self.assertEqual([1, 1, 1], [dep.downloads for dep in deps])
+
+    def test_download_dependencies_limited_by_thread_count(self):
+        lock = threading.Lock()
+
+        def download():
+            assert lock.acquire(blocking=False), "Concurrent download"
+            try:
+                threading.Event().wait(0.1)
+            finally:
+                lock.release()
+            return True
+
+        deps = [FakeProxy(name, download=download) for name in ("a", "b", "c")]
+        FakeProxy("task", deps, threads=1)._run_download_dependencies()
+        self.assertEqual([1, 1, 1], [dep.downloads for dep in deps])
+
+    def test_download_dependencies_available_locally(self):
+        a = FakeProxy("a", available=True)
+        b = FakeProxy("b")
+        FakeProxy("task", [a, b])._run_download_dependencies()
+        self.assertEqual(0, a.downloads)
+        self.assertEqual(1, b.downloads)
+
+    def test_download_dependencies_once(self):
+        a = FakeProxy("a")
+        r = FakeProxy("r", [a], resource=True)
+        FakeProxy("task", [a, r])._run_download_dependencies()
+        self.assertEqual(1, a.downloads)
+        self.assertEqual(0, r.downloads)
+
+    def test_download_dependencies_resource_only(self):
+        a = FakeProxy("a")
+        b = FakeProxy("b")
+        r = FakeProxy("r", [b], resource=True)
+        FakeProxy("task", [a, r])._run_download_dependencies(resource_only=True)
+        self.assertEqual(0, a.downloads)
+        self.assertEqual(1, b.downloads)
+
+    def test_download_dependencies_of_acquired_resource_as_worker(self):
+        a = FakeProxy("a")
+        local = FakeProxy("local", [a], resource=True, local=True, worker=True)
+        FakeProxy("task", [local], worker=True)._run_download_dependencies(resource_only=True)
+        self.assertEqual(1, local.downloads)
+        self.assertEqual(0, a.downloads)
+
+    def test_download_dependencies_failure(self):
+        a = FakeProxy("a", download=lambda: False)
+        b = FakeProxy("b")
+        with self.assertRaises(JoltError) as ctx:
+            FakeProxy("task", [a, b])._run_download_dependencies()
+        self.assertIn("Failed to download task artifact (a)", str(ctx.exception))
+        self.assertEqual(1, a.downloads)
+
+    def test_download_dependencies_logged_by_owner(self):
+        def download():
+            log.info("Downloading in another thread")
+            return True
+
+        deps = [FakeProxy(name, download=download) for name in ("a", "b")]
+        with log.threadsink() as buf:
+            FakeProxy("task", deps)._run_download_dependencies()
+        self.assertEqual(2, buf.getvalue().count("Downloading in another thread"))

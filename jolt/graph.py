@@ -647,7 +647,8 @@ class TaskProxy(object):
             return resource.is_local()
         return True
 
-    def _run_download_dependencies(self, resource_only=False):
+    def _collect_download_dependencies(self, downloads, resource_only=False):
+        """ Appends the dependencies that must be downloaded to the list. """
         for child in self.children:
             if not child.has_artifact():
                 continue
@@ -655,12 +656,11 @@ class TaskProxy(object):
             if child.is_resource():
                 if self._acquires_resource(child):
                     # Resource about to be acquired here, make its dependencies available
-                    child._run_download_dependencies()
+                    child._collect_download_dependencies(downloads)
                 elif self.options.worker:
                     # Resource already acquired by the client when running as worker
-                    raise_task_error_if(
-                        not child.download(force=True),
-                        child, "Failed to download task artifact")
+                    if child not in downloads:
+                        downloads.append(child)
                 continue
 
             if resource_only:
@@ -669,10 +669,26 @@ class TaskProxy(object):
             raise_task_error_if(
                 not child.is_completed() and child.is_unstable,
                 self, "Task depends on failed task '{}'", child.short_qualified_name)
-            if not child.is_available_locally(extensions=False):
+            if child not in downloads and not child.is_available_locally(extensions=False):
+                downloads.append(child)
+
+    def _run_download_dependencies(self, resource_only=False):
+        downloads = []
+        self._collect_download_dependencies(downloads, resource_only)
+        if not downloads:
+            return
+
+        owner_thread = threading.current_thread()
+
+        def download(child):
+            # Log as the owner, so that the build log of the owner includes the messages
+            with log.map_thread(threading.current_thread(), owner_thread):
                 raise_task_error_if(
                     not child.download(force=True),
                     child, "Failed to download task artifact")
+
+        max_workers = min(self.tools.thread_count(), len(downloads))
+        utils.map_concurrent(download, downloads, max_workers=max_workers)
 
     def partially_available_locally(self):
         availability = map(lambda a: self.cache.is_available_locally(a), self.artifacts)

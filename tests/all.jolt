@@ -36,6 +36,7 @@ class All(Alias):
         "flake8",
         "int/binaries",
         "int/git",
+        "int/graph",
         "int/http",
         "int/influence",
         "int/jobserver/k8s",
