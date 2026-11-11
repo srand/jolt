@@ -1,6 +1,9 @@
+import atexit
 import datetime
+import json
 import os
 import sys
+import threading
 from pathlib import Path, PurePath
 
 from jolt import config as jolt_config
@@ -299,8 +302,71 @@ def global_config(section, key):
     HashInfluenceRegistry.get().register(ConfigInfluence(section, key))
 
 
+class _ClassSourceDigests(object):
+    """
+    Persistent cache of the digests of class source code.
+
+    Unparsing the AST of classes is expensive, so digests are saved in
+    the cache directory, keyed by the contents of the module file and
+    the Python version, whose unparser output may differ.
+    """
+
+    max_files = 10000
+
+    def __init__(self):
+        self._lock = threading.Lock()
+        self._path = None
+        self._keys = {}
+        self._digests = None
+        self._dirty = False
+
+    def _load(self):
+        self._path = fs.path.join(jolt_config.get_cachedir(), "classdigests.json")
+        try:
+            with open(self._path) as f:
+                self._digests = json.load(f)
+        except (OSError, ValueError):
+            self._digests = {}
+        atexit.register(self._save)
+
+    def _save(self):
+        if not self._dirty:
+            return
+        digests = dict(list(self._digests.items())[-self.max_files:])
+        temp = "{}.{}".format(self._path, os.getpid())
+        try:
+            with open(temp, "w") as f:
+                json.dump(digests, f)
+            os.replace(temp, self._path)
+        except OSError:
+            fs.unlink(temp, ignore_errors=True)
+
+    def _key(self, cls):
+        path = inspection.getfile(cls)
+        key = self._keys.get(path)
+        if key is None:
+            with open(path) as f:
+                key = self._keys[path] = utils.hashstring(sys.version + "\0" + f.read())
+        return key
+
+    def get(self, cls):
+        key = self._key(cls)
+        with self._lock:
+            if self._digests is None:
+                self._load()
+            classes = self._digests.pop(key, {})
+            self._digests[key] = classes
+            digest = classes.get(cls.__qualname__)
+            if digest is None:
+                digest = utils.hashstring(inspection.getclasssource(cls))
+                classes[cls.__qualname__] = digest
+                self._dirty = True
+            return digest
+
+
 class TaskClassSourceInfluence(HashInfluenceProvider):
     name = "Source"
+    digests = _ClassSourceDigests()
 
     def get_influence(self, task):
         # Calculate hash sum for classes in hierarchy
@@ -312,7 +378,7 @@ class TaskClassSourceInfluence(HashInfluenceProvider):
                 cls.__dict__["_TaskClassSourceInfluence__influence"]
             except KeyError:
                 try:
-                    cls.__influence = utils.hashstring(inspection.getclasssource(cls))
+                    cls.__influence = self.digests.get(cls)
                 except TypeError:
                     continue
             result += cls.__dict__["_TaskClassSourceInfluence__influence"] + \
