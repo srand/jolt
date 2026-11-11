@@ -11,11 +11,9 @@ Build-Depends: debhelper (>= 9), dh-python,
                python3-jinja2,
                python3-keyring,
                python3-keyrings.alt,
-               python3-lxml,
                python3-psutil,
                python3-requests,
                python3-setuptools,
-               python3-tqdm,
 Standards-Version: 4.2.0
 Homepage: https://github.com/srand/jolt
 
