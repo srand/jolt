@@ -390,6 +390,78 @@ that will be accessible to the rule.
     $ CUSTOM_CXXFLAGS=-DDEBUG jolt build myqtproject
 
 
+Modules
+~~~~~~~
+
+C++ modules are supported with GCC (14 or later) and Clang. List module
+interface files as sources, like any other source file. Files with the
+extensions ``.c++m``, ``.ccm``, ``.cppm``, ``.cxxm`` and ``.ixx`` are
+recognized as C++ sources.
+
+.. code-block:: c++
+
+    // greet.cppm
+    export module greet;
+    import std;
+
+    export void greet(std::string_view name) {
+        std::println("Hello {}!", name);
+    }
+
+.. code-block:: c++
+
+    // main.cpp
+    import greet;
+
+    int main() {
+        greet("world");
+    }
+
+.. code-block:: python
+
+    class Greet(CXXLibrary):
+        cxxstd = 23
+        sources = ["greet.cppm"]
+
+    class Hello(CXXExecutable):
+        cxxstd = 23
+        requires = ["greet"]
+        sources = ["main.cpp"]
+
+Modules must be compiled before the sources that import them. Jolt
+therefore lets the compiler scan each C++ source file for the modules it
+exports and imports before anything is compiled, and Ninja then compiles
+the sources in the order their imports dictate. A source file is recompiled
+when the interface of a module that it imports has changed.
+
+Sources are scanned if any of them has a module interface extension, or if
+a requirement publishes modules. A module may also be exported from a file
+with a regular extension, such as ``.cpp``. If that is the only kind of
+module in a project, or if the project imports nothing but ``std``, turn
+scanning on with the ``cxxmodules`` attribute:
+
+.. code-block:: python
+
+    class Hello(CXXExecutable):
+        cxxmodules = True
+        cxxstd = 23
+        sources = ["main.cpp"]   # import std;
+
+The standard library modules ``std`` and ``std.compat`` are compiled into
+the project that imports them, from the source that comes with the compiler,
+unless a requirement already publishes them.
+
+A library publishes its compiled module interfaces together with a manifest
+listing them. The manifest is exported as metadata in
+``artifact.cxxinfo.modules``, from where tasks that depend on the library
+pick the modules up. Compiled module interfaces are specific to the compiler
+and sensitive to some of its flags. Importers must use the same compiler as
+the library and compatible flags, the same ``cxxstd`` for example.
+The compiler reports an error otherwise.
+
+Header units, ``import <header>;``, are not supported.
+
+
 Code Coverage
 ~~~~~~~~~~~~~
 

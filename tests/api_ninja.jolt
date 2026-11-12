@@ -1130,3 +1130,183 @@ class NinjaApi(JoltTest):
 
         with self.assertRaises(Exception):
             self.build("withillegal")
+
+    def _skip_unless_modules(self, gcc=14):
+        """ Skips the test if the compiler can't scan C++ module dependencies. """
+        cxx = self.tools.getenv("CXX", "g++")
+        version = self.tools.run(cxx + " --version", output=False)
+        if "clang" in version.lower():
+            return
+        major = int(self.tools.run(cxx + " -dumpversion", output=False).split(".")[0])
+        if major < gcc:
+            self.skipTest("C++ modules require GCC {} or later".format(gcc))
+
+    def test_modules(self):
+        """
+        --- file: lib/greet.cppm
+        export module greet;
+        export import :name;
+        export int greet();
+
+        --- file: lib/name.cppm
+        export module greet:name;
+        export int name() {{ return 42; }}
+
+        --- file: lib/greet.cpp
+        module greet;
+        int greet() {{ return name(); }}
+
+        --- file: main.cpp
+        import greet;
+        int main() {{ return greet() == 42 ? 0 : 1; }}
+
+        --- tasks:
+        class Lib(CXXLibrary):
+            cxxstd = 20
+            sources = ["lib/*.cppm", "lib/*.cpp"]
+
+        class Exe(CXXExecutable):
+            cxxstd = 20
+            requires = ["lib"]
+            sources = ["main.cpp"]
+
+        class Run(Task):
+            requires = ["exe"]
+
+            def run(self, deps, tools):
+                tools.run("exe")
+        ---
+        """
+        self._skip_unless_modules()
+        r = self.jolt("build run")
+        self.assertIn("[SCAN] greet.cppm", r)
+        self.assertIn("[SCAN] main.cpp", r)
+        r = self.jolt("build lib")
+        lib = [path for path in self.artifacts(r) if os.path.exists(os.path.join(path, "lib"))][0]
+        self.assertDataInFile('"greet:name"', lib, "lib", "modules", "lib", "modules.json")
+
+    def test_modules_incremental(self):
+        """
+        --- file: greet.cppm
+        export module greet;
+        export int greet();
+
+        --- file: greet.cpp
+        module greet;
+        int greet() {{ return 42; }}
+
+        --- file: main.cpp
+        import greet;
+        int main() {{ return greet() == 42 ? 0 : 1; }}
+
+        --- tasks:
+        class Exe(CXXExecutable):
+            cxxstd = 20
+            sources = ["greet.cppm", "greet.cpp", "main.cpp"]
+        ---
+        """
+        self._skip_unless_modules()
+        r = self.jolt("build exe")
+        self.assertCompiled(r, "[CXX] greet.cppm")
+        self.assertCompiled(r, "[CXX] greet.cpp\n")
+        self.assertCompiled(r, "[CXX] main.cpp")
+
+        # Importers are not recompiled when a module implementation changes
+        with self.tools.cwd(self.ws):
+            self.tools.append_file("greet.cpp", "int unused() {{ return 0; }}\n")
+        r = self.jolt("build exe")
+        self.assertNotCompiled(r, "[CXX] greet.cppm")
+        self.assertCompiled(r, "[CXX] greet.cpp\n")
+        self.assertNotCompiled(r, "[CXX] main.cpp")
+
+        # But they are when its interface changes
+        with self.tools.cwd(self.ws):
+            self.tools.append_file("greet.cppm", "export int added();\n")
+        r = self.jolt("build exe")
+        self.assertCompiled(r, "[CXX] greet.cppm")
+        self.assertCompiled(r, "[CXX] greet.cpp\n")
+        self.assertCompiled(r, "[CXX] main.cpp")
+
+    def test_modules_std(self):
+        """
+        --- file: text.cpp
+        export module text;
+        import std;
+        export std::string text() {{ return "text"; }}
+
+        --- file: main.cpp
+        import std;
+        import text;
+        int main() {{ return text() == std::string("text") ? 0 : 1; }}
+
+        --- tasks:
+        class Lib(CXXLibrary):
+            cxxmodules = True
+            cxxstd = 23
+            sources = ["text.cpp"]
+
+        class Exe(CXXExecutable):
+            cxxstd = 23
+            requires = ["lib"]
+            sources = ["main.cpp"]
+
+        class Run(Task):
+            requires = ["exe"]
+
+            def run(self, deps, tools):
+                tools.run("exe")
+        ---
+        """
+        self._skip_unless_modules(gcc=15)
+
+        # The library builds the std module and publishes it
+        r = self.jolt("build lib")
+        self.assertCompiled(r, "[CXX] std.cc")
+        self.assertNotIn("Missing influence", r)
+
+        # The executable, which requires the library, imports it from there
+        r = self.jolt("build run")
+        self.assertNotCompiled(r, "[CXX] std.cc")
+        self.assertCompiled(r, "[CXX] main.cpp")
+
+    def test_modules_errors(self):
+        """
+        --- file: one.cppm
+        export module same;
+
+        --- file: two.cppm
+        export module same;
+
+        --- file: main.cpp
+        import nonexistent;
+        int main() {{ return 0; }}
+
+        --- tasks:
+        class Duplicate(CXXLibrary):
+            cxxstd = 20
+            sources = ["one.cppm", "two.cppm"]
+
+        class Missing(CXXExecutable):
+            cxxmodules = True
+            cxxstd = 20
+            sources = ["main.cpp"]
+
+        class Disabled(CXXExecutable):
+            cxxstd = 20
+            sources = ["main.cpp"]
+        ---
+        """
+        self._skip_unless_modules()
+
+        with self.assertRaises(Exception):
+            self.jolt("build duplicate")
+        self.assertIn("module 'same' is provided by both", self.lastLog())
+
+        with self.assertRaises(Exception):
+            self.jolt("build missing")
+        self.assertIn("imports module 'nonexistent'", self.lastLog())
+
+        # Sources are not scanned unless modules are used
+        with self.assertRaises(Exception):
+            self.jolt("build disabled")
+        self.assertNotIn("[SCAN]", self.lastLog())

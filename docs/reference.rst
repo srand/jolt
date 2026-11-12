@@ -468,6 +468,7 @@ CXXExecutable
   .. autoattribute:: coverage
   .. autoattribute:: cstd
   .. autoattribute:: cxxflags
+  .. autoattribute:: cxxmodules
   .. autoattribute:: cxxstd
   .. autoattribute:: incpaths
   .. autoattribute:: incremental
@@ -500,6 +501,7 @@ CXXLibrary
   .. autoattribute:: coverage
   .. autoattribute:: cstd
   .. autoattribute:: cxxflags
+  .. autoattribute:: cxxmodules
   .. autoattribute:: cxxstd
   .. autoattribute:: headers
   .. autoattribute:: incpaths
@@ -517,6 +519,7 @@ CXXLibrary
   .. autoattribute:: strip
   .. automethod:: debugshell
   .. automethod:: publish
+  .. automethod:: publish_modules
   .. automethod:: run
 
 

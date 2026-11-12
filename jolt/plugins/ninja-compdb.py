@@ -161,6 +161,18 @@ class CompDBHooks(TaskHook):
             return
         with tools.cwd(tools.wsroot):
             utils.call_and_catch(tools.run, "ninja -f {outdir}/build.ninja -t compdb > {outdir}/compile_commands.json")
+            utils.call_and_catch(self._remove_module_scans, tools.expand_path("{outdir}/compile_commands.json"))
+
+    def _remove_module_scans(self, path):
+        """ Removes the commands that scan sources for C++ module dependencies. """
+        with open(path) as f:
+            commands = json.load(f)
+        compiles = [
+            command for command in commands
+            if not command.get("output", "").endswith((".ddi", ".dd", ".probe.json"))]
+        if len(compiles) != len(commands):
+            with open(path, "w") as f:
+                json.dump(compiles, f, indent=2)
 
     def task_postpublish(self, task, artifact, tools):
         if artifact.name != "compdb":

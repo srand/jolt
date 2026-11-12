@@ -45,6 +45,8 @@ class CppInfo(ArtifactAttributeSet):
             return CppInfoListVariable(self._artifact, "libraries")
         if name == "macros":
             return CppInfoDictVariable(self._artifact, "macros")
+        if name == "modules":
+            return CppInfoListVariable(self._artifact, "modules")
         if name == "sources":
             return CppInfoListVariable(self._artifact, "sources")
         assert False, "No such cxxinfo attribute: {0}".format(name)

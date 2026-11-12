@@ -2,6 +2,7 @@ from collections import OrderedDict
 import contextlib
 import copy
 import functools
+import json
 from ninja import ninja_syntax as ninja
 import os
 import platform
@@ -26,6 +27,7 @@ c_standard_default = None
 cxx_standard_default = None
 c_standards_list = [90, 99, 11, 17, 23]
 cxx_standards_list = [98, 11, 14, 17, 20, 23, 26]
+cxx_module_extensions = [".c++m", ".ccm", ".cppm", ".cxxm", ".ixx"]
 
 
 class CompileError(JoltError):
@@ -1066,11 +1068,15 @@ class Rule(HashInfluenceProvider):
                     implicit_outfiles_rel = [fs.path.relpath(outfile, project.tools.wsroot) for outfile in implicit_outfiles]
                 else:
                     implicit_outfiles_rel = []
-                writer.build(outfiles_rel, self.name, infile_rel, variables=variables, implicit=implicit, implicit_outputs=implicit_outfiles_rel, order_only=order_only)
+                self._build_edge(project, writer, outfiles_rel, infile_rel, variables=variables, implicit=implicit, implicit_outputs=implicit_outfiles_rel, order_only=order_only)
                 result.extend(outfiles)
         if self.phony:
             writer.build(self.phony, "phony", [fs.path.relpath(outfile, project.tools.wsroot) for outfile in result])
         return result
+
+    def _build_edge(self, project, writer, outfiles, infile, **kwargs):
+        """ Writes the build statement that transforms one input file. """
+        writer.build(outfiles, self.name, infile, **kwargs)
 
     @utils.cached.instance
     def get_influence(self, task):
@@ -1234,6 +1240,7 @@ class MakeDirectory(Rule):
 class GNUCompiler(Rule):
     def __init__(self, *args, **kwargs):
         self.covfiles = kwargs.pop("covfiles", [])
+        self.modules = kwargs.pop("modules", False)
         super(GNUCompiler, self).__init__(*args, **kwargs)
 
     def create(self, project, writer, deps, tools):
@@ -1251,9 +1258,250 @@ class GNUCompiler(Rule):
 
         return super().build(project, writer, infiles, implicit=implicit, implicit_outputs=implicit_outputs, order_only=order_only)
 
+    def _build_edge(self, project, writer, outfiles, infile, **kwargs):
+        modules = getattr(writer, "modules", None)
+        if self.modules and modules:
+            modules.build(self, outfiles, infile, **kwargs)
+        else:
+            super()._build_edge(project, writer, outfiles, infile, **kwargs)
+
     @utils.cached.instance
     def get_influence(self, task):
-        return "GC" + super().get_influence(task)
+        return "GC" + ("M" if self.modules else "") + super().get_influence(task)
+
+
+class GNUModules(object):
+    """
+    C++ module support for a project being written to a Ninja file.
+
+    Modules must be compiled in dependency order, which is only known once
+    the sources have been read. Each C++ source is therefore first scanned
+    by the compiler for the modules it provides and requires. The results
+    are collated by ``ninja_modules.py`` into a Ninja dyndep file, that adds
+    the compiled module interfaces (BMIs) as outputs and inputs of the
+    compilations, and a module map for each object file, that tells the
+    compiler where the BMIs are.
+    """
+
+    bmi_ext = {"gcc": ".gcm", "clang": ".pcm"}
+
+    def __init__(self, project, writer, deps, tools):
+        self.project = project
+        self.writer = writer
+        self.tools = tools
+        self.compiler = self.compiler_id(project, tools)
+        self.dir = tools.expand_relpath("{outdir}/{binary}.dir/modules", tools.wsroot)
+        self.dd = self.dir + ".dd"
+        self.manifest = self.dir + ".json"
+        self.probe = self.dir + ".probe.json"
+        self.imports = self.dir + ".imports.json"
+        self.std_sources = {
+            fs.path.normpath(source) for source in project._modules_std_sources}
+        self.scans = []
+        self.modmaps = []
+        self.imported = self._import(deps)
+
+        script = fs.path.join(fs.path.dirname(fs.path.abspath(__file__)), "ninja_modules.py")
+        writer.variable("modcollate", "{} {}".format(
+            utils.quote_path(sys.executable), utils.quote_path(script)))
+        if self.compiler == "clang":
+            writer.variable("scandeps", utils.quote_path(self._scandeps()))
+
+    @staticmethod
+    def cxx(project, tools):
+        """ Returns the C++ compiler command of a project. """
+        var = getattr(project, "cxx", None)
+        if not isinstance(var, ToolEnvironmentVariable):
+            var = project.toolchain.cxx
+        return tools.getenv((var._envname or var.name).upper(), var._default)
+
+    @staticmethod
+    def compiler_id(project, tools):
+        """ Returns the kind of C++ compiler used: 'gcc' or 'clang'. """
+        cxx = GNUModules.cxx(project, tools)
+        key = (cxx, tools.which(cxx.split(maxsplit=1)[0]))
+        if key not in _compiler_ids:
+            try:
+                version = tools.run(cxx + " --version", output=False)
+            except JoltCommandError:
+                version = ""
+            _compiler_ids[key] = "clang" if "clang" in version.lower() else "gcc"
+        return _compiler_ids[key]
+
+    def _scandeps(self):
+        """ Finds the clang-scan-deps that belongs to the compiler. """
+        scandeps = self.tools.getenv("CLANG_SCAN_DEPS")
+        if scandeps:
+            return scandeps
+        cxx = GNUModules.cxx(self.project, self.tools).split(maxsplit=1)[0]
+        cxx = self.tools.which(cxx) or cxx
+        dirname, basename = fs.path.split(cxx)
+        for name in ["clang++", "clang"]:
+            if name in basename:
+                scandeps = fs.path.join(dirname, basename.replace(name, "clang-scan-deps"))
+                if fs.path.exists(scandeps):
+                    return scandeps
+        return self.tools.which("clang-scan-deps") or "clang-scan-deps"
+
+    def _import(self, deps):
+        """ Collects the modules published by requirements. """
+        imported = {}
+        for depname, artifact in deps.items():
+            manifests = artifact.cxxinfo.modules.items()
+            if not manifests:
+                continue
+            sandbox = self.tools.sandbox(artifact, self.project.incremental)
+            for manifest in manifests:
+                manifest = fs.path.join(sandbox, manifest)
+                with open(manifest) as f:
+                    data = json.load(f)
+                raise_task_error_if(
+                    data.get("compiler") != self.compiler, self.project,
+                    "C++ modules of '{0}' are compiled with {1} and can't be imported with {2}",
+                    depname, data.get("compiler"), self.compiler)
+                for name, module in data.get("modules", {}).items():
+                    bmi = fs.path.join(fs.path.dirname(manifest), module["bmi"])
+                    imported[name] = {
+                        "bmi": self.tools.expand_relpath(bmi, self.tools.wsroot),
+                        "requires": module.get("requires", []),
+                    }
+        return imported
+
+    def is_std_source(self, infile):
+        infile = fs.path.normpath(fs.path.join(self.tools.wsroot, infile))
+        return infile in self.std_sources
+
+    def build(self, rule, outfiles, infile, variables=None, implicit=None, implicit_outputs=None, order_only=None):
+        """ Writes the build statements that scan and compile a source file. """
+        obj = outfiles[0]
+        ddi = obj + ".ddi"
+        modmap = obj + ".modmap"
+        variables = OrderedDict(variables or {})
+        implicit = list(implicit or [])
+        order_only = list(order_only or [])
+
+        self.writer.build(
+            ddi, "modscan", infile,
+            variables={"obj": obj, "desc": "[SCAN] " + fs.path.basename(infile)},
+            implicit=implicit,
+            order_only=order_only)
+        self.scans.append(ddi)
+        self.modmaps.append(modmap)
+
+        if self.compiler == "clang":
+            modflags = "@" + modmap
+        else:
+            modflags = "-fmodules-ts -fmodule-mapper={} -fdeps-format=p1689r5".format(modmap)
+        if self.is_std_source(infile):
+            # Not the project's code: warnings are of no use
+            modflags += " -w"
+        variables["modflags"] = modflags
+
+        self.writer.build(
+            outfiles, rule.name, infile,
+            variables=variables,
+            implicit=implicit + [modmap],
+            implicit_outputs=implicit_outputs,
+            order_only=order_only + [self.dd],
+            dyndep=self.dd)
+
+    def finish(self):
+        """ Writes the build statements that collate the scan results. """
+        if not self.scans:
+            return
+
+        data = json.dumps({"modules": self.imported}, indent=2, sort_keys=True) + "\n"
+        imports = fs.path.join(self.tools.wsroot, self.imports)
+        try:
+            unchanged = self.tools.read_file(imports) == data
+        except Exception:
+            unchanged = False
+        if not unchanged:
+            fs.makedirs(fs.path.dirname(imports))
+            self.tools.write_file(imports, data, expand=False)
+
+        desc = "[MODULES] " + self.project.binary
+        self.writer.build(
+            self.dd, "modcollate", self.scans,
+            variables={
+                "compiler": self.compiler,
+                "desc": desc,
+                "imports": self.imports,
+                "manifest": self.manifest,
+                "moddir": self.dir,
+            },
+            implicit=[self.imports],
+            implicit_outputs=[self.manifest] + self.modmaps)
+        self.writer.build(
+            self.probe, "modprobe", self.scans,
+            variables={"imports": self.imports, "desc": "[IMPORTS] " + self.project.binary},
+            implicit=[self.imports])
+        self.writer.newline()
+
+    def read_manifest(self):
+        """ Returns the manifest of built modules. """
+        with open(fs.path.join(self.tools.wsroot, self.manifest)) as f:
+            return json.load(f)
+
+    def read_missing(self):
+        """ Returns the names of required modules that no one provides. """
+        with open(fs.path.join(self.tools.wsroot, self.probe)) as f:
+            return json.load(f).get("missing", [])
+
+    def std_modules(self):
+        """ Returns the sources of the standard library modules: {name: path}. """
+        cxx = GNUModules.cxx(self.project, self.tools)
+        for manifest in ["libstdc++.modules.json", "libc++.modules.json"]:
+            try:
+                path = self.tools.run("{} -print-file-name={}", cxx, manifest, output=False).strip()
+            except JoltCommandError:
+                continue
+            if not fs.path.isabs(path) or not fs.path.exists(path):
+                continue
+            try:
+                with open(path) as f:
+                    data = json.load(f)
+            except (OSError, ValueError):
+                continue
+            return {
+                module["logical-name"]: fs.path.normpath(
+                    fs.path.join(fs.path.dirname(path), module["source-path"]))
+                for module in data.get("modules", [])
+                if module.get("is-std-library")
+            }
+        return {}
+
+
+class GNUModuleRule(Rule):
+    """ A rule that is only written to projects that use C++ modules. """
+
+    def __init__(self, *args, **kwargs):
+        self.restat = kwargs.pop("restat", False)
+        self.rspfile = kwargs.pop("rspfile", None)
+        self.rspfile_content = kwargs.pop("rspfile_content", None)
+        self.clang_command = kwargs.pop("clang_command", None)
+        super().__init__(*args, **kwargs)
+
+    def create(self, project, writer, deps, tools):
+        modules = getattr(writer, "modules", None)
+        if not modules:
+            return
+        command = self.command
+        if modules.compiler == "clang" and self.clang_command:
+            command = self.clang_command
+        writer.rule(
+            self.name, tools.expand(command),
+            depfile=self.depfile,
+            deps=self.deps,
+            description="$desc",
+            restat=self.restat,
+            rspfile=self.rspfile,
+            rspfile_content=self.rspfile_content)
+        writer.newline()
+
+    @utils.cached.instance
+    def get_influence(self, task):
+        return "GM: clang={}".format(self.clang_command) + super().get_influence(task)
 
 
 class FileListWriter(Rule):
@@ -1657,14 +1905,33 @@ class GNUToolchain(Toolchain):
         implicit=["$cc_path"])
 
     compile_cxx = GNUCompiler(
-        command="$cxxwrap $cxx -x c++ $cxxstd $pch_flags $optflag $cxxflags $shared_flags $imported_cxxflags $extra_cxxflags $covflags $macros $incpaths -MMD -MF $out.d -c $in -o $out",
+        command="$cxxwrap $cxx -x c++ $cxxstd $pch_flags $optflag $cxxflags $shared_flags $imported_cxxflags $extra_cxxflags $covflags $macros $incpaths $modflags -MMD -MF $out.d -c $in -o $out",
         deps="gcc",
         depfile="$out.d",
-        infiles=[".cc", ".cpp", ".cxx"],
+        infiles=[".cc", ".cpp", ".cxx"] + cxx_module_extensions,
         outfiles=["{outdir}/{binary}.dir/{in_path}/{in_base}{in_ext}.o"],
         covfiles=["{outdir}/{binary}.dir/{in_path}/{in_base}{in_ext}.gcno"],
         variables={"desc": "[CXX] {in_base}{in_ext}"},
-        implicit=["$cxx_path"])
+        implicit=["$cxx_path"],
+        modules=True)
+
+    modscan = GNUModuleRule(
+        command="$cxx -x c++ $cxxstd $pch_flags $optflag $cxxflags $shared_flags $imported_cxxflags $extra_cxxflags $macros $incpaths -fmodules-ts -fdeps-format=p1689r5 -fdeps-file=$out -fdeps-target=$obj -MM -MF $out.d -MT $out $in",
+        clang_command="$scandeps -format=p1689 -- $cxx -x c++ $cxxstd $pch_flags $optflag $cxxflags $shared_flags $imported_cxxflags $extra_cxxflags $macros $incpaths -MMD -MF $out.d -MT $out -c $in -o $obj > $out",
+        deps="gcc",
+        depfile="$out.d")
+
+    modcollate = GNUModuleRule(
+        command="$modcollate collate --compiler $compiler --dd $out --manifest $manifest --moddir $moddir --imports $imports @$out.rsp",
+        rspfile="$out.rsp",
+        rspfile_content="$in_newline",
+        restat=True)
+
+    modprobe = GNUModuleRule(
+        command="$modcollate probe --out $out --imports $imports @$out.rsp",
+        rspfile="$out.rsp",
+        rspfile_content="$in_newline",
+        restat=True)
 
     compile_asm = GNUCompiler(
         command="$ccwrap $cc -x assembler $pch_flags $asflags $shared_flags $imported_asflags $extra_asflags -MMD -MF $out.d -c $in -o $out",
@@ -1958,6 +2225,8 @@ class MSVCToolchain(Toolchain):
         suffix=".lib")
 
 
+_compiler_ids = {}
+
 _toolchains = {
     GNUToolchain: GNUToolchain(),
     DarwinGNUToolchain: DarwinGNUToolchain(),
@@ -2017,6 +2286,33 @@ class CXXProject(Task):
 
     cxxflags = []
     """ A list of compiler flags used when compiling C++ files. """
+
+    cxxmodules = None
+    """
+    Build with support for C++ modules (boolean). Default: automatic
+
+    With modules, each C++ source file is first scanned for the modules it
+    exports and imports. The sources are then compiled in the order their
+    imports dictate. A file that exports a module may have any C++ source
+    file extension.
+
+    By default, modules are used if the sources include a file with a
+    module interface extension (.c++m, .ccm, .cppm, .cxxm, .ixx), or if a
+    requirement publishes modules. Set the attribute to ``True`` to use
+    modules in other cases, for example if the only module imported is
+    ``std``. Set it to ``False`` to never scan the sources.
+
+    The standard library modules ``std`` and ``std.compat`` are built into
+    the project if imported and not published by a requirement.
+
+    A :class:`CXXLibrary` publishes its modules. Tasks that depend on the
+    library can import them. The compiled module interfaces are published,
+    which requires importers to use the same compiler and compatible flags,
+    for example the same ``cxxstd``.
+
+    Only implemented for GCC (14 or later) and Clang toolchains.
+    Header units are not supported.
+    """
 
     cxxstd = None
     """
@@ -2147,11 +2443,15 @@ class CXXProject(Task):
         self.libraries = utils.as_list(utils.call_or_return(self, self.__class__._libraries))
         self.macros = utils.as_list(utils.call_or_return(self, self.__class__._macros))
         self._pch_out = None
+        self._modules_std_sources = []
         self.publishdir = self.expand(self.__class__.publishdir or '')
 
         self.influence.append(TaskAttributeInfluence("asflags"))
         self.influence.append(TaskAttributeInfluence("cflags"))
         self.influence.append(TaskAttributeInfluence("cxxflags"))
+        if self.cxxmodules is not None:
+            # Not influencing by default, to keep the identity of existing tasks
+            self.influence.append(TaskAttributeInfluence("cxxmodules"))
         self.influence.append(TaskAttributeInfluence("depimports"))
         self.influence.append(TaskAttributeInfluence("incpaths"))
         self.influence.append(TaskAttributeInfluence("ldflags"))
@@ -2225,6 +2525,8 @@ class CXXProject(Task):
                     inputs = depline[1]
                     inputs = inputs.replace("\\ ", "\x00")
                     inputs = [dep.strip().replace("\x00", " ") for dep in inputs.split()]
+                    # Standard library module sources belong to the toolchain
+                    inputs = [input for input in inputs if tools.expand_path(input) not in self._modules_std_sources]
                     inputs = [tools.expand_relpath(input, self.joltdir) for input in filter(lambda n: n, inputs)]
                     sources = sources.union(inputs)
         super()._verify_influence(deps, artifact, tools, sources)
@@ -2266,11 +2568,55 @@ class CXXProject(Task):
                 tools.expand_relpath(dep, tools.wsroot)
                 for dep in self.depimports]
             writer.objects = []
-            writer.sources = copy.copy(self.sources)
+            writer.sources = copy.copy(self.sources) + self._modules_std_sources
+            writer.modules = None
+            if self._use_modules(deps):
+                raise_task_error_if(
+                    not getattr(self.toolchain, "modscan", None), self,
+                    "C++ modules are not supported with {0}", self.toolchain)
+                writer.modules = GNUModules(self, writer, deps, tools)
             self._populate_rules_and_variables(writer, deps, tools)
             self._populate_inputs(writer, deps, tools)
+            if writer.modules:
+                writer.modules.finish()
             writer.close()
             return writer
+
+    def _use_modules(self, deps):
+        """ Returns True if the project is to be built with support for C++ modules. """
+        if self.cxxmodules is not None:
+            return bool(self.cxxmodules)
+        for source in self.sources:
+            _, ext = fs.path.splitext(source)
+            if ext in cxx_module_extensions:
+                return True
+        for _, artifact in deps.items():
+            if artifact.cxxinfo.modules.items():
+                return True
+        return False
+
+    def _add_std_modules(self, deps, tools, ninja):
+        """
+        Adds the sources of the standard library modules to the project, if imported.
+
+        Which modules the project imports is known first when its sources
+        are scanned. The scan is therefore run on its own. If a standard
+        library module turns out to be imported, and no requirement
+        publishes it, the Ninja file is written anew with the module source
+        that comes with the compiler included.
+        """
+        writer = self._writer
+        while writer.modules and writer.modules.scans:
+            ninja(writer.modules.probe)
+            missing = writer.modules.read_missing()
+            available = writer.modules.std_modules() if missing else {}
+            sources = [
+                available[name] for name in missing
+                if name in available and available[name] not in self._modules_std_sources]
+            if not sources:
+                break
+            self._modules_std_sources.extend(sources)
+            writer = self._writer = self._write_ninja_file(self.outdir, deps, tools)
 
     def _write_shell_file(self, basedir, deps, tools, writer):
         filepath = fs.path.join(basedir, "compile")
@@ -2497,17 +2843,23 @@ if __name__ == "__main__":
         threads = " " + jobs if threads is not None and jobs else ""
         keep_going = " -k 0" if config.get_keep_going() else ""
         depsfile = self._get_keepdepfile(tools)
-        try:
-            self.buildlog = tools.run(
-                "ninja{3}{2}{5} -C {0} -f {4} {1}",
+
+        def ninja(target=""):
+            return tools.run(
+                "ninja{3}{2}{5} -C {0} -f {4} {1} {6}",
                 tools.wsroot,
                 verbose,
                 threads,
                 depsfile,
                 fs.path.join(self.outdir, "build.ninja"),
                 keep_going,
+                target,
                 output=True,
             )
+
+        try:
+            self._add_std_modules(deps, tools, ninja)
+            self.buildlog = ninja()
             self._report_errors(self.buildlog)
         except JoltCommandError as e:
             self.buildlog = "\n".join(e.stdout)
@@ -2560,7 +2912,15 @@ if __name__ == "__main__":
         self._expand_sources(deps, tools)
         self.outdir = tools.builddir("ninja", self.incremental)
         self.outdir_rel = self.tools.expand_relpath(self.outdir, tools.wsroot)
-        writer = self._write_ninja_file(self.outdir, deps, tools)
+        self._writer = self._write_ninja_file(self.outdir, deps, tools)
+
+        def ninja(target):
+            with tools.cwd(tools.wsroot):
+                tools.run("ninja -f {} {}", fs.path.join(self.outdir, "build.ninja"), target, output=False)
+
+        with utils.ignore_exception():
+            self._add_std_modules(deps, tools, ninja)
+        writer = self._writer
         self._write_shell_file(self.outdir, deps, tools, writer)
         pathenv = self.outdir + os.pathsep + tools.getenv("PATH")
         with tools.cwd(tools.wsroot), tools.environ(PATH=pathenv):
@@ -2705,11 +3065,53 @@ class CXXLibrary(CXXProject):
                 artifact.collect(header, self.publishapi)
             artifact.cxxinfo.incpaths.append(self.publishapi)
 
+        self.publish_modules(artifact, tools)
+
         if hasattr(self, "_binaries"):
             artifact.cxxinfo.libpaths.append(self.publishlib)
             artifact.cxxinfo.libraries.append(self.binary)
             artifact.strings.library = fs.path.join(
                 self.publishdir, fs.path.basename(self._binaries[0]))
+
+    def publish_modules(self, artifact, tools):
+        """
+        Publishes the C++ modules of the library.
+
+        The compiled module interfaces (BMIs) are collected into the directory
+        ``modules/<binary>`` within the ``publishdir`` directory, together
+        with a manifest, ``modules.json``, that lists the modules, their
+        BMIs and the modules they import. The path to the manifest is
+        exported as metadata in ``artifact.cxxinfo.modules``.
+
+        If the library is self-sustained, the modules of its requirements
+        are published too.
+        """
+        modules = getattr(getattr(self, "_writer", None), "modules", None)
+        if not modules or not modules.scans:
+            return
+
+        manifest = modules.read_manifest()
+        published = dict(manifest["modules"])
+        if self.selfsustained:
+            for name, module in manifest["imported"].items():
+                published.setdefault(name, module)
+        if not published:
+            return
+
+        moddir = fs.path.join(self.publishlib, "modules", self.binary)
+        data = {"compiler": manifest["compiler"], "modules": {}}
+        with tools.cwd(tools.wsroot):
+            for name, module in sorted(published.items()):
+                artifact.collect(module["bmi"], moddir + "/", flatten=True)
+                data["modules"][name] = {
+                    "bmi": fs.path.basename(module["bmi"]),
+                    "requires": module.get("requires", []),
+                }
+
+        with tools.cwd(tools.builddir("modules")):
+            tools.write_file("modules.json", json.dumps(data, indent=2, sort_keys=True) + "\n", expand=False)
+            artifact.collect("modules.json", moddir + "/")
+        artifact.cxxinfo.modules.append(fs.path.join(moddir, "modules.json"))
 
 
 CXXLibrary.__doc__ += CXXProject.__doc__
