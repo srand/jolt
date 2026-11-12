@@ -612,10 +612,11 @@ These configuration keys exist:
 
     * - ``path``
       - String
-      - | The path to the jobserver FIFO that is used to communicate with the jobserver helper process.
-        | By default, a temporary path is used.
-        | If set when ``launch`` is ``false``, Jolt will attempt to connect to an already running
-          jobserver helper process at the specified path.
+      - | When ``launch`` is ``true``, the directory in which the jobserver helper process
+          creates its FIFO. By default, a temporary directory is used.
+        | When ``launch`` is ``false``, Jolt connects to an already running jobserver
+          through the FIFO or character device, such as ``/dev/jobserver``, at the
+          specified path, or through the FIFO in the specified directory.
 
     * - ``pressure_max_cpu``
       - Integer

@@ -2,7 +2,7 @@ from jolt import cli
 from jolt import config
 from jolt import log
 from jolt import tools
-from jolt.error import raise_error
+from jolt.error import raise_error, raise_error_if
 from jolt.hooks import TaskHook, TaskHookFactory
 from jolt.plugins.jobserver_main import launch_jobserver
 from jolt.plugins.jobserver_main import find_jobserver
@@ -10,6 +10,7 @@ from jolt.plugins.jobserver_pressure import PressureMonitor, RESOURCES, parse_li
 from jolt.plugins.jobserver_pressure import DEFAULT_INTERVAL, DEFAULT_RAMP_TIME
 
 import click
+import os
 
 
 def _pressure_limits():
@@ -47,6 +48,10 @@ def jobserver_cmd(ctx, slots, path):
 # Launch the background jobserver helper process if configured to.
 path = config.get("jobserver", "path")
 if config.getboolean("jobserver", "launch", False):
+    # The launched jobserver creates its FIFO in the directory
+    raise_error_if(
+        path and os.path.exists(path) and not os.path.isdir(path),
+        "The jobserver path must be a directory when the jobserver is launched: {}", path)
     tools = tools.Tools()
     slots = config.getint("jobserver", "slots", tools.cpu_count())
     jobserver = launch_jobserver(

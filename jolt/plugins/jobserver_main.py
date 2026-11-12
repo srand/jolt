@@ -389,8 +389,6 @@ def launch_jobserver(slots, path=None, python_executable=None, new_session=True,
             os.close(parent_sentinel_fd)
 
     ready_line = process.stdout.readline().strip()
-    if process.stdout is not None:
-        process.stdout.close()
 
     if not ready_line.startswith("READY "):
         if parent_sentinel is not None:
@@ -401,9 +399,13 @@ def launch_jobserver(slots, path=None, python_executable=None, new_session=True,
         except subprocess.TimeoutExpired:
             process.kill()
             process.wait(timeout=5)
+        # Include the rest of the output, such as a traceback
+        output = (ready_line + "\n" + process.stdout.read()).strip()
+        process.stdout.close()
         raise RuntimeError("Failed to launch background jobserver: {}".format(
-            ready_line or "helper process exited before becoming ready"))
+            output or "helper process exited before becoming ready"))
 
+    process.stdout.close()
     return BackgroundJobserver(process, jobserver_path, parent_sentinel=parent_sentinel)
 
 
