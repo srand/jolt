@@ -16,7 +16,9 @@ import time
 import glob
 import multiprocessing
 import re
+import selectors
 import shutil
+import stat
 import tarfile
 import zipfile
 import bz2file
@@ -1408,6 +1410,117 @@ class Tools(object):
         if "--jobserver-" in (self.getenv("MAKEFLAGS") or ""):
             return ""
         return "-j{}".format(threads or self.thread_count())
+
+    def _jobserver_path(self):
+        """ Path of the FIFO or device of the jobserver in ``MAKEFLAGS``, or None. """
+        # The last option wins, like in make
+        paths = re.findall(r"(?:^|\s)--jobserver-auth=fifo:(\S+)", self.getenv("MAKEFLAGS") or "")
+        if not paths:
+            return None
+        path = self.expand_path(paths[-1])
+        try:
+            mode = os.stat(path).st_mode
+        except OSError:
+            return None
+        if not stat.S_ISFIFO(mode) and not stat.S_ISCHR(mode):
+            return None
+        return path
+
+    # Tasks that acquire several tokens take turns, so that two of them
+    # can't wait forever for tokens that the other holds.
+    _jobserver_lock = threading.Lock()
+
+    # Interval in seconds at which waits for jobserver tokens let task
+    # timeouts and aborted builds interrupt them
+    _jobserver_poll = 0.1
+
+    @contextmanager
+    def jobserver_token(self, count=1, timeout=None):
+        """ Acquire tokens from the jobserver.
+
+        Waits until ``count`` tokens are available and returns them to
+        the jobserver when the context exits. Use it to account for work
+        that the task does itself, outside of commands that use the
+        jobserver, such as Python threads.
+
+        Without a jobserver in ``MAKEFLAGS``, no tokens are acquired and
+        the context is entered immediately.
+
+        Args:
+            count (int, optional): Number of tokens to acquire.
+            timeout (float, optional): Maximum number of seconds to wait
+                for the tokens. The default is to wait forever.
+
+        Raises:
+            JoltTimeoutError: If the tokens aren't acquired in time.
+            KeyboardInterrupt: If the build is aborted while waiting.
+
+        Example:
+
+            .. code-block:: python
+
+                with tools.jobserver_token(4):
+                    tools.run("heavy-tool --threads=4")
+
+        """
+        raise_error_if(count < 0, "Invalid number of jobserver tokens: {}", count)
+        path = self._jobserver_path() if count > 0 else None
+        if path is None:
+            yield
+            return
+
+        deadline = time.monotonic() + timeout if timeout is not None else None
+
+        def poll_interval():
+            if utils.aborted.is_set():
+                raise KeyboardInterrupt()
+            if deadline is None:
+                return self._jobserver_poll
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise JoltTimeoutError("Timeout waiting for jobserver tokens")
+            return min(remaining, self._jobserver_poll)
+
+        # Waits are short, so that task timeouts can interrupt them, and task
+        # timeouts are deferred while the lock, the file or tokens change
+        # hands, so that they aren't lost.
+        locked = False
+        fd = None
+        tokens = b""
+        try:
+            while not locked:
+                interval = poll_interval()
+                with utils.deferred_timeout(interval):
+                    locked = self._jobserver_lock.acquire(timeout=interval)
+            with utils.deferred_timeout(0):
+                fd = os.open(path, os.O_RDWR | os.O_NONBLOCK)
+            with selectors.DefaultSelector() as selector:
+                selector.register(fd, selectors.EVENT_READ)
+                while len(tokens) < count:
+                    interval = poll_interval()
+                    with utils.deferred_timeout(interval):
+                        try:
+                            token = os.read(fd, count - len(tokens))
+                        except BlockingIOError:
+                            selector.select(interval)
+                        else:
+                            raise_error_if(not token, "Jobserver closed: {}", path)
+                            tokens += token
+            with utils.deferred_timeout(0):
+                self._jobserver_lock.release()
+                locked = False
+            yield
+        finally:
+            with utils.deferred_timeout(0):
+                try:
+                    if locked:
+                        self._jobserver_lock.release()
+                    # The CUSE jobserver takes one token per write
+                    while tokens:
+                        tokens = tokens[os.write(fd, tokens):]
+                finally:
+                    if fd is not None:
+                        os.close(fd)
 
     @contextmanager
     def cwd(self, pathname, *args):

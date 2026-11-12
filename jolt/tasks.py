@@ -8,7 +8,6 @@ import functools
 import os
 import platform
 from threading import RLock
-import stat
 import subprocess
 from os import environ
 from os import sys as os_sys
@@ -2324,24 +2323,9 @@ class _JobTokens(object):
         self._implicit = True
         self._fd = None
         self._available = tools.thread_count()
-        path = self._jobserver_path(tools)
+        path = tools._jobserver_path()
         if path:
             self._fd = os.open(path, os.O_RDWR | os.O_NONBLOCK)
-
-    @staticmethod
-    def _jobserver_path(tools):
-        # The last option wins, like in make
-        paths = re.findall(r"(?:^|\s)--jobserver-auth=fifo:(\S+)", tools.getenv("MAKEFLAGS") or "")
-        if not paths:
-            return None
-        path = tools.expand_path(paths[-1])
-        try:
-            mode = os.stat(path).st_mode
-        except OSError:
-            return None
-        if not stat.S_ISFIFO(mode) and not stat.S_ISCHR(mode):
-            return None
-        return path
 
     def acquire(self):
         """ Returns a token, or None if none is available. """

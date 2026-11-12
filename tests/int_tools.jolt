@@ -1,7 +1,9 @@
 import contextlib
+import os
 import subprocess
 import sys
 import threading
+import time
 sys.path.append(".")
 
 from unittest.mock import MagicMock, patch
@@ -90,6 +92,138 @@ class ToolsInternal(JoltTest):
         # Make before 4.2
         with t.environ(MAKEFLAGS=" -j --jobserver-fds=3,4"):
             self.assertEqual(t.make_jobs(), "")
+
+    @contextlib.contextmanager
+    def jobserver(self, tokens):
+        """ A FIFO jobserver with tokens, and a fd to inspect it. """
+        t = tools.Tools()
+        with t.tmpdir() as tmp:
+            path = os.path.join(tmp, "fifo")
+            os.mkfifo(path)
+            fd = os.open(path, os.O_RDWR | os.O_NONBLOCK)
+            try:
+                os.write(fd, b"+" * tokens)
+                with t.environ(MAKEFLAGS="-k --jobserver-auth=fifo:" + path):
+                    yield t, fd
+            finally:
+                os.close(fd)
+
+    def tokens(self, fd):
+        """ Drain and count the tokens in the jobserver. """
+        try:
+            return len(os.read(fd, 1024))
+        except BlockingIOError:
+            return 0
+
+    def test_jobserver_token_without_jobserver(self):
+        t = tools.Tools()
+        for makeflags in [None, "-j4", "--jobserver-auth=fifo:/nonexistent"]:
+            with t.environ(MAKEFLAGS=makeflags):
+                with t.jobserver_token(3):
+                    pass
+
+    def test_jobserver_token_acquires_and_releases(self):
+        with self.jobserver(4) as (t, fd):
+            with t.jobserver_token(3):
+                self.assertEqual(self.tokens(fd), 1)
+                os.write(fd, b"+")
+            self.assertEqual(self.tokens(fd), 4)
+
+    def test_jobserver_token_zero(self):
+        with self.jobserver(2) as (t, fd):
+            with t.jobserver_token(0):
+                self.assertEqual(self.tokens(fd), 2)
+
+    def test_jobserver_token_negative(self):
+        with self.assertRaises(Exception):
+            with tools.Tools().jobserver_token(-1):
+                pass
+
+    def test_jobserver_token_released_on_error(self):
+        with self.jobserver(2) as (t, fd):
+            with self.assertRaises(ValueError):
+                with t.jobserver_token(2):
+                    raise ValueError()
+            self.assertEqual(self.tokens(fd), 2)
+
+    def test_jobserver_token_waits_for_tokens(self):
+        with self.jobserver(1) as (t, fd):
+            acquired = threading.Event()
+
+            def acquire():
+                with t.jobserver_token(2):
+                    acquired.set()
+
+            thread = threading.Thread(target=acquire)
+            thread.start()
+            self.assertFalse(acquired.wait(0.2))
+            os.write(fd, b"+")
+            thread.join(5)
+            self.assertTrue(acquired.is_set())
+            self.assertEqual(self.tokens(fd), 2)
+
+    def run_thread(self, target):
+        """ Runs target in a thread and returns the exception it raised. """
+        result = []
+
+        def run():
+            try:
+                target()
+            except BaseException as exc:
+                result.append(exc)
+
+        thread = threading.Thread(target=run)
+        thread.start()
+        thread.join(5)
+        self.assertFalse(thread.is_alive())
+        return result[0] if result else None
+
+    def test_jobserver_token_timeout(self):
+        with self.jobserver(1) as (t, fd):
+            def acquire():
+                with t.jobserver_token(2, timeout=0.2):
+                    pass
+
+            self.assertIsInstance(self.run_thread(acquire), JoltTimeoutError)
+            self.assertEqual(self.tokens(fd), 1)
+
+    def test_jobserver_token_interrupted_by_task_timeout(self):
+        with self.jobserver(1) as (t, fd):
+            def acquire():
+                with t.timeout(0.2):
+                    with t.jobserver_token(2):
+                        pass
+
+            self.assertIsInstance(self.run_thread(acquire), JoltTimeoutError)
+            self.assertEqual(self.tokens(fd), 1)
+
+    def test_jobserver_token_interrupted_by_abort(self):
+        from jolt.scheduler import TaskQueue
+
+        with self.jobserver(1) as (t, fd), patch.object(utils, "aborted", threading.Event()):
+            def acquire():
+                with t.jobserver_token(2):
+                    pass
+
+            threading.Timer(0.2, TaskQueue().abort).start()
+            self.assertIsInstance(self.run_thread(acquire), KeyboardInterrupt)
+            self.assertEqual(self.tokens(fd), 1)
+
+    def test_jobserver_token_timeout_waiting_for_other_task(self):
+        with self.jobserver(1) as (t, fd):
+            waiting = threading.Thread(target=self.run_thread, args=(
+                lambda: t.jobserver_token(2, timeout=1).__enter__(),))
+            waiting.start()
+            time.sleep(0.2)
+
+            def acquire():
+                with t.timeout(0.2):
+                    with t.jobserver_token(1):
+                        pass
+
+            self.assertIsInstance(self.run_thread(acquire), JoltTimeoutError)
+            waiting.join(5)
+            self.assertEqual(self.tokens(fd), 1)
 
     def build_helper(self, cls, make_jobs):
         t = MagicMock()

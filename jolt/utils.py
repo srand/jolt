@@ -645,6 +645,12 @@ def hostname():
     return socket.gethostname()
 
 
+# Set when the build is aborted, by the user or because a task failed.
+# Only the main thread receives KeyboardInterrupt, so code that waits in
+# task threads checks this to stop waiting.
+aborted = threading.Event()
+
+
 # Maximum time by which a deferred operation's own timeout may expire after
 # a timeout() block for the block to wait for it instead of interrupting it.
 DEFERRED_TIMEOUT_GRACE = 1

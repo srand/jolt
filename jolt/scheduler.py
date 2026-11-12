@@ -89,6 +89,7 @@ class TaskQueue(object):
         before returning.
         """
         self._aborted = True
+        utils.aborted.set()
         with self.futures_lock:
             for future, executor in self.futures.items():
                 executor.cancel()
