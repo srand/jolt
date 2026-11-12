@@ -209,7 +209,7 @@ MultiTask
 .. reference-multitask-start
 
 .. autoclass:: jolt.tasks.MultiTask
-   :members: call, command, generate, mkdir, mkdirname, render, render_file
+   :members: call, command, dynamic, generate, mkdir, mkdirname, render, render_file
 
 .. reference-multitask-end
 

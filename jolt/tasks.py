@@ -2033,6 +2033,9 @@ class Task(TaskBase):
 
 
 class SubTask(object):
+    dynamic = False
+    """ True if the subtask expands into new subtasks when completed. """
+
     def __init__(self, task):
         self._deps = []
         self._depfiles = []
@@ -2119,6 +2122,15 @@ class SubTask(object):
 
     def run(self):
         pass
+
+    def expand(self):
+        """ Returns the subtasks that the subtask expands into. Called when it has completed. """
+        return []
+
+    @property
+    def expanded(self):
+        """ The subtasks that the subtask has expanded into. """
+        return []
 
     def add_dependency(self, dep):
         deps = utils.as_list(dep)
@@ -2228,6 +2240,41 @@ class FunctionSubtask(SubTask):
 
     def run(self):
         self.fn(self)
+
+
+class DynamicSubtask(SubTask):
+    """
+    A subtask that expands into new subtasks once its dependencies have completed.
+
+    The function is called with the subtask as argument, whether its
+    dependencies were executed or found to be up to date, and returns
+    the new subtasks. Subtasks that depend on the dynamic subtask also
+    depend on the new subtasks. The dynamic subtask itself does no work.
+    """
+
+    dynamic = True
+
+    def __init__(self, task, fn):
+        super().__init__(task)
+        self.add_identity(fn.__name__)
+        self._fn = fn
+        self._expanded = None
+
+    @functools.cached_property
+    def is_outdated(self):
+        return any(dep.is_outdated for dep in self.dependencies)
+
+    def set_uptodate(self):
+        pass
+
+    def expand(self):
+        if self._expanded is None:
+            self._expanded = utils.as_list(self._fn(self) or [])
+        return self._expanded
+
+    @property
+    def expanded(self):
+        return self._expanded or []
 
 
 class RenderSubtask(SubTask):
@@ -2435,6 +2482,7 @@ class MultiTask(Task):
         for subtask in subtasks:
             if isinstance(subtask, SubTask):
                 outputs.extend(subtask.outputs)
+                outputs.extend(self._to_output_files(subtask.expanded))
             else:
                 outputs.append(subtask)
         return outputs
@@ -2536,6 +2584,60 @@ class MultiTask(Task):
         for output in outputs:
             output = self.tools.expand_relpath(output, self.joltdir, outputs=outputs, **kwargs)
             subtask.add_output(output)
+        self._add_subtask(subtask)
+        return subtask
+
+    def dynamic(self, fn, inputs=None):
+        """
+        Create a subtask that expands into new subtasks.
+
+        Use a dynamic subtask when the subtasks needed are only known
+        once other subtasks have run, for example when sources must be
+        scanned before it's known in which order they are compiled.
+
+        The Python function is called with the subtask as argument once
+        the inputs have completed, whether they were executed or found to
+        be up to date. It creates new subtasks with the helper methods of
+        the task, and returns those that subtasks depending on the dynamic
+        subtask shall depend on. The outputs of the returned subtasks are
+        considered outputs of the dynamic subtask.
+
+        Subtasks that depend on a dynamic subtask aren't checked for
+        changes until it has expanded. A dynamic subtask may return other
+        dynamic subtasks.
+
+        Commands are expanded when subtasks are created. A subtask that
+        names the outputs of a dynamic subtask in its command must
+        therefore be created by the function, or read the outputs from
+        a file that is written once the dynamic subtask has expanded.
+
+        Args:
+            fn (func): Python function that creates and returns the new subtasks.
+            inputs (str, list): files or subtasks that must complete before
+                the function is called.
+
+        Returns:
+            Subtask object.
+
+        Example:
+
+            .. code-block:: python
+
+              def compile(subtask):
+                  sources = self.tools.read_file("sources.list").splitlines()
+                  objects = [
+                      self.command("gcc -c {inputs} -o {outputs}", inputs=[source], outputs=[source + ".o"])
+                      for source in sources
+                  ]
+                  return self.command("gcc {inputs} -o {outputs}", inputs=objects, outputs=["executable"])
+
+              listing = self.command("ls *.c > {outputs}", outputs=["sources.list"])
+              executable = self.dynamic(compile, inputs=[listing])
+
+        """
+        subtask = DynamicSubtask(self, fn)
+        for input in self._to_subtask_list(inputs) if inputs else []:
+            subtask.add_dependency(input)
         self._add_subtask(subtask)
         return subtask
 
@@ -2698,28 +2800,72 @@ class MultiTask(Task):
                     for depout in dep.outputs:
                         log.debug("  {}: {}", subtaskout, depout)
 
-        # Subtasks and the dependencies they wait for
-        waiting = {subtask: list(subtask.dependencies) for subtask in self._subtasks}
+        # Subtasks that have completed, whether executed or up to date
+        completed = set()
 
-        # Subtasks and the subtasks that depend on them
-        dependents = {subtask: [] for subtask in self._subtasks}
-        for subtask in self._subtasks:
-            for dep in subtask.dependencies:
-                dependents[dep].append(subtask)
+        # Subtasks being executed: {future: (subtask, token)}
+        futures = {}
 
-        def completed(subtask):
-            for dependent in dependents[subtask]:
-                if dependent in waiting:
-                    waiting[dependent].remove(subtask)
+        # Subtasks not yet started and the dependencies they wait for
+        waiting = {}
 
-        # Prune up-to-date subtasks
-        for subtask in list(filter(lambda subtask: not subtask.is_outdated, waiting.keys())):
-            log.debug("Pruning {}", subtask)
-            del waiting[subtask]
-            completed(subtask)
+        # Subtasks and the waiting subtasks that depend on them
+        dependents = {}
 
-        self.subtaskindex = 0
-        self.subtaskcount = len(waiting)
+        def complete(subtask):
+            """ Marks a subtask completed. Returns True if it expanded into new subtasks. """
+            completed.add(subtask)
+            if not subtask.dynamic:
+                for dependent in dependents.get(subtask, []):
+                    if dependent in waiting:
+                        waiting[dependent].remove(subtask)
+                return False
+
+            new = [self._add_input(new) for new in subtask.expand()]
+            for dependent in list(self._subtasks):
+                if dependent not in completed and dependent not in new and subtask in dependent.dependencies:
+                    dependent.add_dependency(new)
+            self._resolve_inputs()
+            return True
+
+        def deferred():
+            """ Subtasks that depend, directly or not, on dynamic subtasks yet to expand. """
+            result = {}
+
+            def visit(subtask):
+                if subtask not in result:
+                    result[subtask] = False
+                    result[subtask] = any(
+                        (dep.dynamic or visit(dep))
+                        for dep in subtask.dependencies if dep not in completed)
+                return result[subtask]
+
+            return {subtask for subtask in waiting if visit(subtask)}
+
+        def schedule():
+            """ Finds the dependencies that subtasks wait for and prunes up-to-date subtasks. """
+            while True:
+                running = {subtask for subtask, _ in futures.values()}
+                waiting.clear()
+                dependents.clear()
+                for subtask in self._subtasks:
+                    if subtask not in completed and subtask not in running:
+                        waiting[subtask] = [dep for dep in subtask.dependencies if dep not in completed]
+                for subtask, deps in waiting.items():
+                    for dep in deps:
+                        dependents.setdefault(dep, []).append(subtask)
+
+                # Subtasks waiting for dynamic subtasks to expand can't be checked yet
+                skip = deferred()
+                expanded = False
+                for subtask in [subtask for subtask in waiting if subtask not in skip]:
+                    if not subtask.is_outdated:
+                        log.debug("Pruning {}", subtask)
+                        del waiting[subtask]
+                        expanded = complete(subtask) or expanded
+                if not expanded:
+                    break
+            self.subtaskcount = started + len(waiting)
 
         lock = RLock()
 
@@ -2729,9 +2875,12 @@ class MultiTask(Task):
                 log.info("[{}/{}] {}", self.subtaskindex, self.subtaskcount, str(subtask))
             subtask.run()
 
+        self.subtaskindex = 0
+        started = 0
+        schedule()
+
         tokens = _JobTokens(tools)
         workers = max(1, tools.thread_count())
-        futures = {}
 
         with ThreadPoolExecutor(max_workers=workers) as pool:
             try:
@@ -2741,19 +2890,26 @@ class MultiTask(Task):
                         break
 
                     starved = False
+                    rescheduled = False
                     for subtask in ready:
-                        if not subtask.is_outdated:
+                        if subtask not in waiting or waiting[subtask]:
+                            continue
+                        if subtask.dynamic or not subtask.is_outdated:
                             del waiting[subtask]
-                            completed(subtask)
+                            if complete(subtask):
+                                schedule()
+                                rescheduled = True
+                                break
                             continue
                         token = tokens.acquire() if len(futures) < workers else None
                         if token is None:
                             starved = True
                             break
                         del waiting[subtask]
+                        started += 1
                         futures[pool.submit(runner, subtask)] = (subtask, token)
 
-                    if not futures:
+                    if rescheduled or not futures:
                         continue
 
                     # Poll the jobserver while subtasks are waiting for a token
@@ -2767,7 +2923,8 @@ class MultiTask(Task):
                         tokens.release(token)
                         future.result()
                         subtask.set_uptodate()
-                        completed(subtask)
+                        if complete(subtask):
+                            schedule()
             finally:
                 # Wait for subtasks that were running when one failed and return their tokens
                 for future, (_, token) in futures.items():
