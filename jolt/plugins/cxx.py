@@ -1,11 +1,282 @@
 from jolt import MultiTask, attributes
 from jolt import utils
-from jolt.error import raise_task_error, raise_task_error_if
+from jolt.error import JoltCommandError, raise_task_error, raise_task_error_if
 from jolt.influence import FileInfluence
 from jolt.plugins import ninja
+from jolt.plugins import ninja_modules
+from jolt.tasks import DynamicSubtask
 
 from copy import copy
+import json
 import os
+
+
+cxx_extensions = [".cc", ".cpp", ".cxx"]
+cxx_module_extensions = ninja.cxx_module_extensions
+bmi_extensions = list(ninja_modules.BMI_EXT.values())
+
+_compiler_ids = {}
+
+
+class GnuModuleCollation(DynamicSubtask):
+    """
+    Collates the module dependencies of the scanned C++ sources of a task,
+    and expands into the subtasks that compile them.
+
+    Dependencies added to the subtask, for example on generated headers,
+    apply to the scans and compilations of all its sources.
+    """
+
+    def __init__(self, task, modules):
+        super().__init__(task, modules.collate)
+        self.modules = modules
+
+    def add_dependency(self, dep):
+        self.modules.add_dependency([dep for dep in utils.as_list(dep) if dep is not self])
+
+    def add_scan(self, scan):
+        super().add_dependency(scan)
+
+
+class GnuModules(object):
+    """
+    The C++ modules of a compilation task.
+
+    Modules must be compiled in dependency order, which is only known once
+    the sources have been read. Each C++ source is therefore first scanned
+    by the compiler for the modules it provides and requires. A dynamic
+    subtask then collates the scan results and expands into the subtasks
+    that compile the sources. A compilation outputs the compiled module
+    interfaces (BMIs) of the modules its source provides, and depends on
+    the BMIs of the modules it imports. A module map, written for each
+    source, tells the compiler where the BMIs are.
+
+    The standard library modules, ``std`` and ``std.compat``, are compiled
+    from the sources that come with the compiler if imported and not
+    published by a requirement. They are scanned and collated anew once
+    found to be imported.
+    """
+
+    def __init__(self, task, deps, cxx):
+        self.task = task
+        self.tools = task.tools
+        self.cxx = cxx
+        self.compiler = self.compiler_id(self.tools, cxx)
+        self.dir = os.path.join(task.outdir_rel, "modules")
+        self.deps = []
+        self.imported = self._import(deps)
+        self.provided = {}
+        self.sources = []
+        self.std_sources = []
+        self.collation = None
+        self._kwargs = None
+        self._std_modules = None
+
+    @staticmethod
+    def compiler_id(tools, cxx):
+        """ Returns the kind of C++ compiler used: 'gcc' or 'clang'. """
+        if cxx not in _compiler_ids:
+            try:
+                version = tools.run(cxx + " --version", output=False)
+            except JoltCommandError:
+                version = ""
+            _compiler_ids[cxx] = "clang" if "clang" in version.lower() else "gcc"
+        return _compiler_ids[cxx]
+
+    def scandeps(self):
+        """ Finds the clang-scan-deps that belongs to the compiler. """
+        scandeps = self.tools.getenv("CLANG_SCAN_DEPS")
+        if scandeps:
+            return scandeps
+        cxx = self.cxx.split(maxsplit=1)[0]
+        dirname, basename = os.path.split(cxx)
+        for name in ["clang++", "clang"]:
+            if name in basename:
+                scandeps = os.path.join(dirname, basename.replace(name, "clang-scan-deps"))
+                if os.path.exists(scandeps):
+                    return scandeps
+        return self.tools.which("clang-scan-deps") or "clang-scan-deps"
+
+    def _import(self, deps):
+        """ Collects the modules published by requirements. """
+        imported = {}
+        for depname, artifact in deps.items():
+            manifests = artifact.cxxinfo.modules.items()
+            if not manifests:
+                continue
+            sandbox = self.tools.sandbox(artifact, self.task.incremental)
+            for manifest in manifests:
+                manifest = os.path.join(sandbox, manifest)
+                with open(manifest) as f:
+                    data = json.load(f)
+                raise_task_error_if(
+                    data.get("compiler") != self.compiler, self.task,
+                    "C++ modules of '{0}' are compiled with {1} and can't be imported with {2}",
+                    depname, data.get("compiler"), self.compiler)
+                for name, module in data.get("modules", {}).items():
+                    bmi = os.path.join(os.path.dirname(manifest), module["bmi"])
+                    imported[name] = {
+                        "bmi": self.tools.expand_relpath(bmi, self.task.joltdir),
+                        "requires": module.get("requires", []),
+                    }
+        return imported
+
+    def std_modules(self):
+        """ Returns the sources of the standard library modules: {name: path}. """
+        if self._std_modules is not None:
+            return self._std_modules
+        self._std_modules = {}
+        for manifest in ["libstdc++.modules.json", "libc++.modules.json"]:
+            try:
+                path = self.tools.run("{} -print-file-name={}", self.cxx, manifest, output=False).strip()
+            except JoltCommandError:
+                continue
+            if not os.path.isabs(path) or not os.path.exists(path):
+                continue
+            try:
+                with open(path) as f:
+                    data = json.load(f)
+            except (OSError, ValueError):
+                continue
+            self._std_modules = {
+                module["logical-name"]: os.path.normpath(
+                    os.path.join(os.path.dirname(path), module["source-path"]))
+                for module in data.get("modules", [])
+                if module.get("is-std-library")
+            }
+            break
+        return self._std_modules
+
+    def add_dependency(self, deps):
+        """ Makes the scans and compilations of all sources depend on subtasks. """
+        self.deps.extend(deps)
+        for source in self.sources:
+            source["scan"].add_dependency(deps)
+
+    def add(self, sources, **kwargs):
+        """ Adds C++ sources to be scanned and compiled. Returns the collation subtask. """
+        if self._kwargs is None:
+            # Standard library modules are compiled with the flags of the first sources
+            self._kwargs = kwargs
+        if self.collation is None:
+            self.collation = GnuModuleCollation(self.task, self)
+            self.task._add_subtask(self.collation)
+        for srcfile in utils.as_list(sources):
+            srcfile = self.tools.expand_relpath(srcfile, self.task.joltdir)
+            self._scan(srcfile, kwargs)
+        return [self.collation]
+
+    def _scan(self, srcfile, kwargs, std=False):
+        """ Creates the subtask that scans a source for the modules it provides and requires. """
+        task = self.task
+        if std:
+            objfile = os.path.join(task.outdir_rel, "std", os.path.basename(srcfile) + ".o")
+        else:
+            objfile = task._gnu_objfile(srcfile)
+        ddi = objfile + ".ddi"
+
+        if self.compiler == "clang":
+            kwargs = dict(kwargs, gnu_scandeps=self.scandeps())
+            cmd = task.gnu_scan_cxx_clang_cmd
+        else:
+            cmd = task.gnu_scan_cxx_cmd
+        cmd = self.tools.render(cmd, inputs=srcfile, outputs=ddi, **kwargs)
+        scan = task.command(cmd, srcfile, ddi, message="{inputs} [scan]", objfile=objfile, **kwargs)
+        scan.add_influence_depfile(ddi + ".d")
+        if self.deps:
+            scan.add_dependency(self.deps)
+        self.collation.add_scan(scan)
+
+        self.sources.append({
+            "source": srcfile,
+            "object": objfile,
+            "ddi": ddi,
+            "scan": scan,
+            "kwargs": kwargs,
+            "std": std,
+        })
+
+    def collate(self, collation):
+        """ Reads the scan results and returns the subtasks that compile the sources. """
+        task = self.task
+        ddis = [os.path.join(task.joltdir, source["ddi"]) for source in self.sources]
+        try:
+            modules = ninja_modules.Modules(ddis, None, self.compiler, self.dir)
+            modules.imported = self.imported
+
+            # Scan the standard library modules if imported, then collate again
+            missing = modules.missing()
+            available = self.std_modules() if missing else {}
+            std_sources = [
+                available[name] for name in missing
+                if name in available and available[name] not in self.std_sources]
+            if std_sources:
+                self.std_sources.extend(std_sources)
+                self.collation = GnuModuleCollation(task, self)
+                task._add_subtask(self.collation)
+                for source in self.sources:
+                    self.collation.add_scan(source["scan"])
+                for srcfile in std_sources:
+                    srcfile = self.tools.expand_relpath(srcfile, task.joltdir)
+                    self._scan(srcfile, self._kwargs, std=True)
+                return [self.collation]
+
+            modules.check()
+        except ninja_modules.CollateError as e:
+            raise_task_error(task, "{}", e)
+
+        self.provided = {
+            name: {"bmi": module["bmi"], "requires": module["requires"]}
+            for name, module in modules.provided.items()
+        }
+        units = {unit.ddi: unit for unit in modules.units}
+        return [
+            self._compile(source, modules, units[os.path.join(task.joltdir, source["ddi"])])
+            for source in self.sources
+        ]
+
+    def _compile(self, source, modules, unit):
+        """ Creates the subtask that compiles a scanned source. """
+        task = self.task
+        srcfile, objfile = source["source"], source["object"]
+
+        modmap = task.render("{{ modmap }}", objfile + ".modmap", modmap=modules.modmap(unit))
+        modmap_file = modmap.outputs[0]
+
+        if self.compiler == "clang":
+            modflags = "@" + modmap_file
+        else:
+            modflags = "-fmodules-ts -fmodule-mapper={} -fdeps-format=p1689r5".format(modmap_file)
+        if source["std"]:
+            # Not the project's code: warnings are of no use
+            modflags += " -w"
+
+        kwargs = dict(source["kwargs"], modflags=modflags)
+        cmd = self.tools.render(task.gnu_compile_cxx_cmd, inputs=srcfile, outputs=objfile, **kwargs)
+        obj = task.command(cmd, srcfile, objfile, message="{inputs}", **kwargs)
+
+        # The compiled interfaces of the modules provided are outputs too
+        for name in unit.provides:
+            bmi = modules.provided[name]["bmi"]
+            obj.add_output(bmi)
+            task._producers[bmi] = obj
+            obj.add_dependency(task.mkdirname(bmi))
+
+        obj.add_dependency(modmap)
+        for _, bmi in modules.closure(unit):
+            obj.add_dependency(bmi)
+        if self.deps:
+            obj.add_dependency(self.deps)
+        if hasattr(task, "_pch_objects"):
+            obj.add_dependency(task._pch_objects)
+        obj.add_influence_depfile(objfile + ".d")
+        return obj
+
+    def manifest(self, imported=False):
+        """ Returns the modules to publish: {name: {"bmi": path, "requires": [names]}}. """
+        modules = dict(self.imported) if imported else {}
+        modules.update(self.provided)
+        return modules
 
 
 class GnuToolchain(object):
@@ -26,9 +297,15 @@ class GnuToolchain(object):
     gnu_compile_asm_cmd = "{gnu_cc} -x assembler -MMD -MF {outputs}.d {asflags} -c {inputs} -o {outputs}"
     gnu_compile_asm_cpp_cmd = "{gnu_cc} -x assembler-with-cpp -MMD -MF {outputs}.d {% if shared %}-fPIC {% endif %}{asflags_imported} {asflags_environ} {asflags} {{(macros_imported+macros)|prefix('-D')|join(' ')}} {{(incpaths+incpaths_imported)|prefix('-I')|join(' ')}} -c {inputs} -o {outputs}"
     gnu_compile_c_cmd = "{gnu_cc} -x c -MMD -MF {outputs}.d {% if shared %}-fPIC {% endif %}{cflags_imported} {cflags_environ} {cflags} {{(macros_imported+macros)|prefix('-D')|join(' ')}} {{(incpaths+incpaths_imported)|prefix('-I')|join(' ')}} -c {inputs} -o {outputs}"
-    gnu_compile_cxx_cmd = "{gnu_cxx} -x c++ -MMD -MF {outputs}.d {% if shared %}-fPIC {% endif %}{cxxflags_imported} {cxxflags_environ} {cxxflags} {{(macros_imported+macros)|prefix('-D')|join(' ')}} {{(incpaths+incpaths_imported)|prefix('-I')|join(' ')}} -c {inputs} -o {outputs}"
+    gnu_compile_cxx_cmd = "{gnu_cxx} -x c++ -MMD -MF {outputs}.d {% if shared %}-fPIC {% endif %}{cxxflags_imported} {cxxflags_environ} {cxxflags} {{(macros_imported+macros)|prefix('-D')|join(' ')}} {{(incpaths+incpaths_imported)|prefix('-I')|join(' ')}} {modflags} -c {inputs} -o {outputs}"
+    gnu_scan_cxx_cmd = "{gnu_cxx} -x c++ {% if shared %}-fPIC {% endif %}{cxxflags_imported} {cxxflags_environ} {cxxflags} {{(macros_imported+macros)|prefix('-D')|join(' ')}} {{(incpaths+incpaths_imported)|prefix('-I')|join(' ')}} -fmodules-ts -fdeps-format=p1689r5 -fdeps-file={outputs} -fdeps-target={objfile} -MM -MF {outputs}.d -MT {outputs} {inputs}"
+    gnu_scan_cxx_clang_cmd = "{gnu_scandeps} -format=p1689 -- {gnu_cxx} -x c++ {% if shared %}-fPIC {% endif %}{cxxflags_imported} {cxxflags_environ} {cxxflags} {{(macros_imported+macros)|prefix('-D')|join(' ')}} {{(incpaths+incpaths_imported)|prefix('-I')|join(' ')}} -MMD -MF {outputs}.d -MT {outputs} -c {inputs} -o {objfile} > {outputs}"
     gnu_compile_pch_cmd = "{gnu_cxx} -x c++-header -MMD -MF {outputs}.d {% if shared %}-fPIC {% endif %}{cxxflags_imported} {cxxflags_environ} {cxxflags} {{(macros_imported+macros)|prefix('-D')|join(' ')}} {{(incpaths+incpaths_imported)|prefix('-I')|join(' ')}} -c {inputs} -o {outputs}"
     gnu_link_cmd = "{gnu_ld} {% if shared %}-shared {% endif %}{ldflags_imported} {ldflags_environ} {ldflags} -Wl,--start-group @{inputs} -Wl,--end-group {{(libpaths+libpaths_imported)|prefix('-L')|join(' ')}} -o {outputs} -Wl,--start-group {{(libraries+libraries_imported)|prefix('-l')|join(' ')}} -Wl,--end-group"
+
+    def _gnu_objfile(self, srcfile):
+        """ Returns the object file of a source file, relative to joltdir. """
+        return self.tools.expand_relpath(os.path.join(self.outdir, srcfile + ".o"), self.joltdir)
 
     def gnu_archive(self, binary, objects, **kwargs):
         command = kwargs.pop("command", self.gnu_archive_cmd)
@@ -53,7 +330,7 @@ class GnuToolchain(object):
 
         for srcfile in utils.as_list(sources):
             srcfile = self.tools.expand_relpath(srcfile, self.joltdir)
-            objfile = self.tools.expand_relpath(os.path.join(self.outdir, srcfile + ".o"), self.joltdir)
+            objfile = self._gnu_objfile(srcfile)
             rendered = self.tools.render(cmd, inputs=srcfile, outputs=objfile, **kwargs)
             obj = self.command(
                 rendered,
@@ -110,6 +387,11 @@ class GnuToolchain(object):
         kwargs["macros"] = kwargs.pop("macros", self._macros())
         kwargs["macros_imported"] = kwargs.pop("macros_imported", self._import_listattr("macros"))
 
+        modules = getattr(self, "_gnu_modules", None)
+        if modules is not None:
+            return modules.add(sources, **kwargs)
+
+        kwargs["modflags"] = kwargs.pop("modflags", "")
         return self.gnu_compile_generic(self.gnu_compile_cxx_cmd, sources, **kwargs)
 
     def gnu_compile_h(self, sources, **kwargs):
@@ -180,14 +462,19 @@ class GnuToolchain(object):
         return binary
 
     def gnu_mrilist(self, inputs, target, outputs):
-        inputs = self._to_subtask_list(inputs)
-        inputs = self._to_output_files(inputs)
         target = self.tools.expand(target)
-        mrilist = self.render(
-            "create {{target}}\n{% for input in inputs %}{% if input[-2:] == '.a' %}addlib {{input}}\n{% else %}addmod {{ input }}\n{% endif %}{% endfor %}save\nend\n",
-            outputs, target=target, inputs=inputs)
 
-        return mrilist
+        def mrilist(inputs):
+            lines = ["create " + target]
+            for input in inputs:
+                lines.append(("addlib " if input.endswith(".a") else "addmod ") + input)
+            lines += ["save", "end"]
+            return "".join(line + "\n" for line in lines)
+
+        return self._linklist(mrilist, inputs, outputs)
+
+    def gnu_init_modules(self, deps):
+        self._gnu_modules = GnuModules(self, deps, self._gnu_tool("CXX", self.gnu_cxx))
 
     def gnu_import_libraries(self, deps):
         archives = []
@@ -423,6 +710,7 @@ def protobuf():
 @attributes.method("compile_h", "{toolchain}_compile_h")
 @attributes.method("compile_pch", "{toolchain}_compile_pch")
 @attributes.method("import_libraries", "{toolchain}_import_libraries")
+@attributes.method("init_modules", "{toolchain}_init_modules")
 @attributes.method("link", "{toolchain}_link")
 @ninja.attributes.asflags("asflags")
 @ninja.attributes.cflags("cflags")
@@ -457,6 +745,32 @@ class Compilation(GnuToolchain, MultiTask):
     """
 
     toolchain = "gnu"
+
+    cxxmodules = None
+    """
+    Build with support for C++ modules (boolean). Default: automatic
+
+    With modules, each C++ source file is first scanned for the modules it
+    exports and imports. The sources are then compiled in the order their
+    imports dictate. A file that exports a module may have any C++ source
+    file extension.
+
+    By default, modules are used if the sources include a file with a
+    module interface extension (.c++m, .ccm, .cppm, .cxxm, .ixx), or if a
+    requirement publishes modules. Set the attribute to ``True`` to use
+    modules in other cases, for example if the only module imported is
+    ``std``. Set it to ``False`` to never scan the sources.
+
+    The standard library modules ``std`` and ``std.compat`` are built into
+    the task if imported and not published by a requirement.
+
+    A :class:`Library` publishes its modules. Tasks that depend on the
+    library can import them. The compiled module interfaces are published,
+    which requires importers to use the same compiler and compatible flags.
+
+    Only implemented for GCC (14 or later) and Clang.
+    Header units are not supported.
+    """
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -512,14 +826,59 @@ class Compilation(GnuToolchain, MultiTask):
                     result.append(path)
         return result
 
-    def filelist(self, inputs, outputs):
-        inputs = self._to_subtask_list(inputs)
-        inputs = self._to_output_files(inputs)
-        objlist = self.render(
-            "{% for input in inputs %}{{ input }}\n{% endfor %}",
-            outputs, inputs=inputs)
+    def _use_modules(self, deps, sources):
+        """ Returns True if the task is to be built with support for C++ modules. """
+        if self.cxxmodules is not None:
+            return bool(self.cxxmodules)
+        for source in sources:
+            _, ext = os.path.splitext(source)
+            if ext in cxx_module_extensions:
+                return True
+        for _, artifact in deps.items():
+            if artifact.cxxinfo.modules.items():
+                return True
+        return False
 
-        return objlist
+    def _init_modules(self, deps, sources):
+        self._gnu_modules = None
+        if self._use_modules(deps, sources):
+            self.init_modules(deps)
+
+    def _linklist(self, fn, inputs, outputs):
+        """
+        Creates a subtask that writes a list of link inputs to a file.
+
+        The list is made when the subtask is ready to run, once dynamic
+        subtasks among the inputs have expanded. Compiled module interfaces
+        are not linked and left out.
+        """
+        inputs = self._to_subtask_list(inputs)
+
+        def files():
+            return [
+                path for path in self._to_output_files(inputs)
+                if os.path.splitext(path)[1] not in bmi_extensions]
+
+        def write(subtask):
+            data = fn(files())
+            for output in subtask.outputs:
+                self.tools.write_file(output, data, expand=False)
+
+        write.__name__ = fn.__name__
+        subtask = self.call(write, outputs)
+        subtask.add_influence(lambda: fn(files()))
+        # Dynamic inputs must expand before the list can be made
+        dynamic = [input for input in inputs if input.dynamic]
+        if dynamic:
+            subtask.add_dependency(dynamic)
+        self._add_output_dirs(subtask)
+        return subtask
+
+    def filelist(self, inputs, outputs):
+        def filelist(inputs):
+            return "".join(input + "\n" for input in inputs)
+
+        return self._linklist(filelist, inputs, outputs)
 
     def filter_by_ext(self, inputs, exts):
         exts = utils.as_list(exts)
@@ -573,7 +932,7 @@ class Compilation(GnuToolchain, MultiTask):
                 outputs.extend(self.compile_lib(source))
             elif ext in [".c"]:
                 outputs.extend(self.compile_c(source))
-            elif ext in [".cc", ".cpp", ".cxx"]:
+            elif ext in cxx_extensions + cxx_module_extensions:
                 outputs.extend(self.compile_cxx(source))
             elif ext in [".h"]:
                 outputs.extend(self.compile_h(source))
@@ -588,7 +947,8 @@ class Compilation(GnuToolchain, MultiTask):
             else:
                 raise_task_error(self, "Unknown file extension: {}", source)
 
-        return outputs
+        # With modules, all C++ sources share one collation subtask
+        return utils.unique_list(outputs)
 
     def compile_lib(self, sources):
         return self._to_subtask_list(sources)
@@ -599,6 +959,7 @@ class Compilation(GnuToolchain, MultiTask):
         self.outdir_rel = self.tools.expand_relpath(self.outdir, self.joltdir)
 
         sources = self.glob_sources(deps)
+        self._init_modules(deps, sources)
         return self.compile(sources)
 
 
@@ -628,6 +989,7 @@ class Library(Compilation):
         self.outdir_rel = self.tools.expand_relpath(self.outdir, self.joltdir)
 
         sources = self.glob_sources(deps)
+        self._init_modules(deps, sources)
         if self.selfsustained:
             sources += self.import_libraries(deps)
         objects = self.compile(sources)
@@ -655,6 +1017,44 @@ class Library(Compilation):
                 artifact.cxxinfo.libpaths.append(self.publishdir)
                 artifact.cxxinfo.libraries.append("{binary}")
 
+        self.publish_modules(artifact, tools)
+
+    def publish_modules(self, artifact, tools):
+        """
+        Publishes the C++ modules of the library.
+
+        The compiled module interfaces (BMIs) are collected into the directory
+        ``modules/<binary>`` within the ``publishdir`` directory, together
+        with a manifest, ``modules.json``, that lists the modules, their
+        BMIs and the modules they import. The path to the manifest is
+        exported as metadata in ``artifact.cxxinfo.modules``.
+
+        If the library is self-sustained, the modules of its requirements
+        are published too.
+        """
+        modules = getattr(self, "_gnu_modules", None)
+        if not modules:
+            return
+
+        published = modules.manifest(imported=self.selfsustained)
+        if not published:
+            return
+
+        moddir = os.path.join(self.publishdir, "modules", self.binary)
+        data = {"compiler": modules.compiler, "modules": {}}
+        with tools.cwd(self.joltdir):
+            for name, module in sorted(published.items()):
+                artifact.collect(module["bmi"], moddir + "/", flatten=True)
+                data["modules"][name] = {
+                    "bmi": os.path.basename(module["bmi"]),
+                    "requires": module.get("requires", []),
+                }
+
+        with tools.cwd(tools.builddir("modules")):
+            tools.write_file("modules.json", json.dumps(data, indent=2, sort_keys=True) + "\n", expand=False)
+            artifact.collect("modules.json", moddir + "/")
+        artifact.cxxinfo.modules.append(os.path.join(moddir, "modules.json"))
+
 
 class Executable(Compilation):
     abstract = True
@@ -679,6 +1079,7 @@ class Executable(Compilation):
         self.outdir_rel = self.tools.expand_relpath(self.outdir, self.joltdir)
 
         sources = self.glob_sources(deps)
+        self._init_modules(deps, sources)
         objects = self.compile(sources)
         binary = self.link(self.binary, objects)
         return binary
