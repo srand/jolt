@@ -1,13 +1,15 @@
 import atexit
 import datetime
-import json
 import os
+import sqlite3
 import sys
 import threading
+import time
 from pathlib import Path, PurePath
 
 from jolt import config as jolt_config
 from jolt import inspection
+from jolt import log
 from jolt import utils
 from jolt import filesystem as fs
 from jolt import fstree
@@ -307,39 +309,92 @@ class _ClassSourceDigests(object):
     Persistent cache of the digests of class source code.
 
     Unparsing the AST of classes is expensive, so digests are saved in
-    the cache directory, keyed by the contents of the module file and
-    the Python version, whose unparser output may differ.
+    an SQLite database in the cache directory, which is safe to share
+    between concurrent processes. Digests are keyed by the contents of
+    the module file and the Python version, whose unparser output may
+    differ. New digests are written in a single transaction at exit,
+    when the least recently used files beyond max_files are evicted.
+    If the database can't be used, digests are only kept in memory.
     """
 
     max_files = 10000
 
     def __init__(self):
         self._lock = threading.Lock()
-        self._path = None
+        self._db = None
+        self._db_failed = False
         self._keys = {}
-        self._digests = None
-        self._dirty = False
+        self._digests = {}
+        self._new = []
 
-    def _load(self):
-        self._path = fs.path.join(jolt_config.get_cachedir(), "classdigests.json")
+    def _connect(self):
+        if self._db is not None or self._db_failed:
+            return self._db
+        path = fs.path.join(jolt_config.get_cachedir(), "classdigests.db")
         try:
-            with open(self._path) as f:
-                self._digests = json.load(f)
-        except (OSError, ValueError):
-            self._digests = {}
+            fs.makedirs(fs.path.dirname(path))
+            db = sqlite3.connect(path, timeout=30.0, check_same_thread=False)
+            db.execute("PRAGMA journal_mode = WAL")
+            db.execute("""
+                CREATE TABLE IF NOT EXISTS classdigests (
+                    key TEXT NOT NULL,
+                    qualname TEXT NOT NULL,
+                    digest TEXT NOT NULL,
+                    accessed INTEGER NOT NULL,
+                    PRIMARY KEY (key, qualname)
+                )
+            """)
+            db.commit()
+        except (OSError, sqlite3.Error) as e:
+            log.debug("Failed to open class digest database: {}", e)
+            self._db_failed = True
+            return None
+        self._db = db
         atexit.register(self._save)
+        return db
+
+    def _load(self, key):
+        classes = self._digests.get(key)
+        if classes is not None:
+            return classes
+        classes = {}
+        db = self._connect()
+        if db is not None:
+            try:
+                cursor = db.execute(
+                    "SELECT qualname, digest FROM classdigests WHERE key = ?", (key,))
+                classes = dict(cursor.fetchall())
+            except sqlite3.Error as e:
+                log.debug("Failed to read class digest database: {}", e)
+        self._digests[key] = classes
+        return classes
 
     def _save(self):
-        if not self._dirty:
-            return
-        digests = dict(list(self._digests.items())[-self.max_files:])
-        temp = "{}.{}".format(self._path, os.getpid())
-        try:
-            with open(temp, "w") as f:
-                json.dump(digests, f)
-            os.replace(temp, self._path)
-        except OSError:
-            fs.unlink(temp, ignore_errors=True)
+        with self._lock:
+            if self._db is None:
+                return
+            now = int(time.time())
+            try:
+                with self._db:
+                    self._db.executemany(
+                        "INSERT OR REPLACE INTO classdigests (key, qualname, digest, accessed) "
+                        "VALUES (?, ?, ?, ?)",
+                        [(key, qualname, digest, now) for key, qualname, digest in self._new])
+                    self._db.executemany(
+                        "UPDATE classdigests SET accessed = ? WHERE key = ?",
+                        [(now, key) for key in self._digests])
+                    self._db.execute(
+                        "DELETE FROM classdigests WHERE key IN ("
+                        "  SELECT key FROM classdigests GROUP BY key"
+                        "  ORDER BY MAX(accessed) DESC LIMIT -1 OFFSET ?)",
+                        (self.max_files,))
+                self._new = []
+            except sqlite3.Error as e:
+                log.debug("Failed to save class digests: {}", e)
+            finally:
+                self._db.close()
+                self._db = None
+                self._db_failed = True
 
     def _key(self, cls):
         path = inspection.getfile(cls)
@@ -352,15 +407,12 @@ class _ClassSourceDigests(object):
     def get(self, cls):
         key = self._key(cls)
         with self._lock:
-            if self._digests is None:
-                self._load()
-            classes = self._digests.pop(key, {})
-            self._digests[key] = classes
+            classes = self._load(key)
             digest = classes.get(cls.__qualname__)
             if digest is None:
                 digest = utils.hashstring(inspection.getclasssource(cls))
                 classes[cls.__qualname__] = digest
-                self._dirty = True
+                self._new.append((key, cls.__qualname__, digest))
             return digest
 
 
