@@ -525,7 +525,7 @@ func (w *worker) cachePath() string {
 	}
 }
 
-// If the client has a shell.nix file, run the command in a nix-shell.
+// If the client has a shell.nix or default.nix file, run the command in a nix-shell.
 func (w *worker) nixWrapperCmd(clientWsName string, cmdline []string) ([]string, error) {
 	if !w.config.Nix {
 		return nil, errors.New("Nix is not enabled on the worker")
@@ -535,13 +535,21 @@ func (w *worker) nixWrapperCmd(clientWsName string, cmdline []string) ([]string,
 		return nil, errors.New("Nix is not supported on Windows")
 	}
 
-	if _, err := os.Stat(filepath.Join(w.cwd, clientWsName, "shell.nix")); err != nil {
-		return nil, fmt.Errorf("No shell.nix file found in workspace")
+	nixFile := ""
+	for _, name := range []string{"shell.nix", "default.nix"} {
+		if _, err := os.Stat(filepath.Join(w.cwd, clientWsName, name)); err == nil {
+			nixFile = name
+			break
+		}
+	}
+	if nixFile == "" {
+		return nil, errors.New("No shell.nix or default.nix file found in workspace")
 	}
 
 	log.Info("Running in nix-shell:", cmdline)
 
-	nixCmd := []string{"nix-shell", "--pure", "--run", strings.Join(cmdline, " ")}
+	// Nix 2.26 doesn't follow a symlinked shell.nix unless it is given as an argument
+	nixCmd := []string{"nix-shell", "--pure", "--run", strings.Join(cmdline, " "), nixFile}
 
 	// Use cached-nix-shell if available.
 	if _, err := exec.LookPath("cached-nix-shell"); err == nil {
