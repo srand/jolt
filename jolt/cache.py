@@ -1387,6 +1387,8 @@ class ArtifactCache(StorageProvider):
         # If no storage providers supports the availability method,
         # we will not only use the local presence cache.
         self._remote_presence_cache = set()
+        # Identities of present artifacts that this process holds references to
+        self._local_presence_cache = set()
         self._presence_cache_only = self.has_availability()
 
         # Read configuration
@@ -1811,6 +1813,7 @@ class ArtifactCache(StorageProvider):
                 with utils.delayed_interrupt():
                     self._db_delete_artifact(db, identity)
                     self._fs_delete_artifact(identity, task_name, onerror=onerror)
+                    self._local_presence_cache.discard(identity)
                     evicted += 1
                     log.debug("Evicted {}: {}", identity, task_name)
         return evicted == len(artifacts)
@@ -1832,6 +1835,7 @@ class ArtifactCache(StorageProvider):
             self._db_invalidate_references(db, try_all=True)
             self._fs_invalidate_pids(db, try_all=True)
             self._pid_file.release()
+            self._local_presence_cache.clear()
 
             self._pid = self._pid_provider()
             self._pid_file = fasteners.InterProcessLock(self._fs_get_pid_file(self._pid))
@@ -1846,6 +1850,10 @@ class ArtifactCache(StorageProvider):
         recorded for the running process to prevent eviction by other
         processes.
         """
+        # Referenced artifacts can't be evicted, only discarded by forced rebuilds,
+        # which leave a reloaded artifact temporary.
+        if artifact.identity in self._local_presence_cache and not artifact.is_temporary():
+            return True
         with self._cache_lock(), self._db() as db:
             return self._is_available_locally(db, artifact)
 
@@ -1853,6 +1861,9 @@ class ArtifactCache(StorageProvider):
         """ Check presence of an artifact. Cache lock must be held. """
         if not artifact.is_cacheable():
             return False
+        if artifact.identity in self._local_presence_cache and not artifact.is_temporary():
+            return True
+        self._local_presence_cache.discard(artifact.identity)
         referenced = self._db_select_reference(db, artifact.identity)
         if not referenced and not self._db_select_artifact(db, artifact.identity):
             return False
@@ -1862,6 +1873,7 @@ class ArtifactCache(StorageProvider):
             return False
         if not referenced:
             self._db_insert_reference(db, artifact.identity)
+        self._local_presence_cache.add(artifact.identity)
         return True
 
     def is_available_remotely(self, artifact, cache=True):
