@@ -12,6 +12,7 @@ import os
 
 
 cxx_extensions = [".cc", ".cpp", ".cxx"]
+cxx_header_extensions = [".h", ".hh", ".hpp", ".hxx"]
 cxx_module_extensions = ninja.cxx_module_extensions
 bmi_extensions = list(ninja_modules.BMI_EXT.values())
 
@@ -934,7 +935,7 @@ class Compilation(GnuToolchain, MultiTask):
                 outputs.extend(self.compile_c(source))
             elif ext in cxx_extensions + cxx_module_extensions:
                 outputs.extend(self.compile_cxx(source))
-            elif ext in [".h"]:
+            elif ext in cxx_header_extensions:
                 outputs.extend(self.compile_h(source))
             elif ext in [".pch"]:
                 pass
