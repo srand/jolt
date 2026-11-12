@@ -1,14 +1,17 @@
 import atexit
 import datetime
+import functools
 import os
 import sqlite3
 import sys
 import threading
 import time
+import types
 from pathlib import Path, PurePath
 
 from jolt import config as jolt_config
 from jolt import inspection
+from jolt.error import raise_error
 from jolt import log
 from jolt import utils
 from jolt import filesystem as fs
@@ -404,7 +407,22 @@ class _ClassSourceDigests(object):
                 key = self._keys[path] = utils.hashstring(sys.version + "\0" + f.read())
         return key
 
+    @staticmethod
+    def _is_generated(cls):
+        if sys.version_info >= (3, 13):
+            return "__firstlineno__" not in cls.__dict__
+        try:
+            inspection.getclassast(cls)
+            return False
+        except KeyError:
+            return True
+
     def get(self, cls):
+        if self._is_generated(cls):
+            # The class has no source of its own; its digest depends on
+            # runtime values and can't be cached by file contents.
+            inspection.getfile(cls)
+            return _GeneratedClassDigest(cls).digest()
         key = self._key(cls)
         with self._lock:
             classes = self._load(key)
@@ -414,6 +432,140 @@ class _ClassSourceDigests(object):
                 classes[cls.__qualname__] = digest
                 self._new.append((key, cls.__qualname__, digest))
             return digest
+
+
+class _GeneratedClassDigest(object):
+    """
+    Digest of a class created in runtime, for example with type() by
+    a TaskGenerator, which has no source code of its own.
+
+    The digest covers the class namespace: functions by their source
+    code, or bytecode when the source can't be found, together with
+    their default arguments and closure variables, and other values
+    by their contents. Values whose contents can't be represented
+    deterministically are rejected.
+    """
+
+    # Attributes assigned by Jolt after the class is created.
+    excluded = frozenset([
+        "__dict__",
+        "__module__",
+        "__weakref__",
+        "_TaskClassSourceInfluence__influence",
+        "_workspace_resources",
+        "joltdir",
+        "joltproject",
+        "taint",
+    ])
+
+    def __init__(self, cls):
+        self._cls = cls
+        self._seen = set()
+
+    def digest(self):
+        cls = self._cls
+        parts = [
+            "generated class " + cls.__qualname__,
+            "bases " + ",".join(base.__qualname__ for base in cls.__bases__),
+        ]
+        for name in sorted(cls.__dict__):
+            if name in self.excluded:
+                continue
+            parts.append(name + " = " + self._value(cls.__dict__[name], name))
+        return utils.hashstring("\n".join(parts))
+
+    def _value(self, value, path):
+        if value is None or isinstance(value, (bool, int, float, complex, str, bytes)):
+            return repr(value)
+        if isinstance(value, type):
+            return "class " + value.__qualname__
+        if isinstance(value, types.ModuleType):
+            return "module " + value.__name__
+        if id(value) in self._seen:
+            return "<recursion>"
+        self._seen.add(id(value))
+        try:
+            return self._compound(value, path)
+        finally:
+            self._seen.discard(id(value))
+
+    def _compound(self, value, path):
+        if isinstance(value, (list, tuple)):
+            items = [self._value(item, path) for item in value]
+            return type(value).__name__ + "[" + ", ".join(items) + "]"
+        if isinstance(value, (set, frozenset)):
+            items = sorted(self._value(item, path) for item in value)
+            return type(value).__name__ + "{" + ", ".join(items) + "}"
+        if isinstance(value, dict):
+            items = sorted(
+                self._value(k, path) + ": " + self._value(v, path)
+                for k, v in value.items())
+            return type(value).__name__ + "{" + ", ".join(items) + "}"
+        if isinstance(value, types.FunctionType):
+            return self._function(value, path)
+        if isinstance(value, types.MethodType):
+            return "method " + self._value(value.__func__, path) + \
+                " of " + self._value(value.__self__, path)
+        if isinstance(value, (staticmethod, classmethod)):
+            return type(value).__name__ + " " + self._value(value.__func__, path)
+        if isinstance(value, property):
+            return "property " + self._value((value.fget, value.fset, value.fdel), path)
+        if isinstance(value, functools.partial):
+            return "partial " + self._value((value.func, value.args, value.keywords), path)
+        if hasattr(value, "__dict__"):
+            return type(value).__qualname__ + " " + self._value(vars(value), path)
+        text = repr(value)
+        if " at 0x" in text:
+            raise_error(
+                "Can't compute the identity of generated class '{}': "
+                "attribute '{}' of type '{}' has no deterministic representation",
+                self._cls.__qualname__, path, type(value).__qualname__)
+        return type(value).__qualname__ + " " + text
+
+    def _function(self, func, path):
+        closure = []
+        for name, cell in zip(func.__code__.co_freevars, func.__closure__ or ()):
+            try:
+                closure.append(name + "=" + self._value(cell.cell_contents, path))
+            except ValueError:
+                closure.append(name + "=<empty>")
+        return "function {} {} defaults={} kwdefaults={} closure=[{}]".format(
+            func.__qualname__,
+            self._function_source(func),
+            self._value(func.__defaults__, path),
+            self._value(func.__kwdefaults__, path),
+            ", ".join(closure))
+
+    @staticmethod
+    def _function_source(func):
+        try:
+            node = inspection.getfuncast(func)
+            firstlineno = min([node.lineno] + [d.lineno for d in node.decorator_list])
+            if firstlineno == func.__code__.co_firstlineno:
+                return utils.hashstring(inspection.getfuncsource(func))
+        except (KeyError, OSError, TypeError):
+            pass
+        return _GeneratedClassDigest._code(func.__code__)
+
+    @staticmethod
+    def _const(const):
+        if isinstance(const, types.CodeType):
+            return _GeneratedClassDigest._code(const)
+        if isinstance(const, tuple):
+            return "(" + ",".join(_GeneratedClassDigest._const(c) for c in const) + ")"
+        if isinstance(const, frozenset):
+            return "frozenset(" + ",".join(sorted(_GeneratedClassDigest._const(c) for c in const)) + ")"
+        return repr(const)
+
+    @staticmethod
+    def _code(code):
+        return utils.hashstring("\0".join([
+            code.co_code.hex(),
+            ",".join(_GeneratedClassDigest._const(const) for const in code.co_consts),
+            ",".join(code.co_names),
+            ",".join(code.co_varnames),
+            ",".join(code.co_freevars),
+        ]))
 
 
 class TaskClassSourceInfluence(HashInfluenceProvider):

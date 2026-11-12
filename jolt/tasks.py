@@ -906,6 +906,13 @@ class TaskGenerator(object):
     Generated tasks can be replaced by defining a task with
     the same name explicitly.
 
+    Task classes may be defined with class statements or created
+    with type(). The identity of a class created with type() is
+    computed from its attributes and the source code of its
+    functions, including their default arguments and closure
+    variables. Attribute values must have a deterministic
+    representation.
+
     """
 
     abstract = True

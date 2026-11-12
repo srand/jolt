@@ -4,9 +4,16 @@ sys.path.append(".")
 
 from unittest.mock import MagicMock, patch
 
+import threading
+
 from testsupport import JoltTest
+from jolt import error
 from jolt import fstree
 from jolt import influence
+
+
+class Static(object):
+    value = 1
 
 
 class InfluenceInternal(JoltTest):
@@ -83,6 +90,56 @@ class InfluenceInternal(JoltTest):
         self.assertEqual(
             influence.TaskAttributeInfluence("url").get_influence(task),
             ["https://example.com/tool-{system}.zip"])
+
+    def generated(self, name="Generated", value=1, bases=(object,), **attrs):
+        def run(self, deps, tools):
+            return value in {"x", "y", "z"}
+        return type(name, bases, dict(value=value, run=run, **attrs))
+
+    def generated_digest(self, cls):
+        return influence._GeneratedClassDigest(cls).digest()
+
+    def test_generated_class_is_detected(self):
+        digests = influence._ClassSourceDigests
+        self.assertFalse(digests._is_generated(Static))
+        self.assertTrue(digests._is_generated(self.generated()))
+
+    def test_generated_class_is_detected_by_missing_source_before_python_3_13(self):
+        with patch.object(influence.sys, "version_info", (3, 12)):
+            self.assertFalse(influence._ClassSourceDigests._is_generated(Static))
+            self.assertTrue(influence._ClassSourceDigests._is_generated(self.generated()))
+
+    def test_generated_class_with_name_of_static_class_is_detected(self):
+        if sys.version_info < (3, 13):
+            self.skipTest("requires Python 3.13")
+        cls = self.generated("Static", bases=(Static,))
+        self.assertTrue(influence._ClassSourceDigests._is_generated(cls))
+
+    def test_generated_class_digest_is_deterministic(self):
+        self.assertEqual(
+            self.generated_digest(self.generated()),
+            self.generated_digest(self.generated()))
+
+    def test_generated_class_digest_includes_attributes_and_closures(self):
+        digest = self.generated_digest(self.generated(value=1))
+        self.assertNotEqual(digest, self.generated_digest(self.generated(value=2)))
+        self.assertNotEqual(digest, self.generated_digest(self.generated(value=1, extra=[1])))
+        self.assertNotEqual(digest, self.generated_digest(self.generated("Other", value=1)))
+
+    def test_generated_class_digest_ignores_attributes_assigned_by_jolt(self):
+        self.assertEqual(
+            self.generated_digest(self.generated()),
+            self.generated_digest(self.generated(joltdir="/ws", joltproject="p", taint="salt")))
+
+    def test_generated_class_digest_rejects_nondeterministic_values(self):
+        with self.assertRaises(error.JoltError):
+            self.generated_digest(self.generated(lock=threading.Lock()))
+
+    def test_generated_class_digest_is_not_stored(self):
+        digests = influence._ClassSourceDigests()
+        digests.get(self.generated())
+        self.assertEqual(digests._new, [])
+        self.assertIsNone(digests._db)
 
     @contextmanager
     def workspace_index(self):
