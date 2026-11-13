@@ -298,10 +298,10 @@ class GnuToolchain(object):
     gnu_compile_asm_cmd = "{gnu_cc} -x assembler -MMD -MF {outputs}.d {asflags} -c {inputs} -o {outputs}"
     gnu_compile_asm_cpp_cmd = "{gnu_cc} -x assembler-with-cpp -MMD -MF {outputs}.d {% if shared %}-fPIC {% endif %}{asflags_imported} {asflags_environ} {asflags} {{(macros_imported+macros)|prefix('-D')|join(' ')}} {{(incpaths+incpaths_imported)|prefix('-I')|join(' ')}} -c {inputs} -o {outputs}"
     gnu_compile_c_cmd = "{gnu_cc} -x c -MMD -MF {outputs}.d {% if shared %}-fPIC {% endif %}{cflags_imported} {cflags_environ} {cflags} {{(macros_imported+macros)|prefix('-D')|join(' ')}} {{(incpaths+incpaths_imported)|prefix('-I')|join(' ')}} -c {inputs} -o {outputs}"
-    gnu_compile_cxx_cmd = "{gnu_cxx} -x c++ -MMD -MF {outputs}.d {% if shared %}-fPIC {% endif %}{cxxflags_imported} {cxxflags_environ} {cxxflags} {{(macros_imported+macros)|prefix('-D')|join(' ')}} {{(incpaths+incpaths_imported)|prefix('-I')|join(' ')}} {modflags} -c {inputs} -o {outputs}"
-    gnu_scan_cxx_cmd = "{gnu_cxx} -x c++ {% if shared %}-fPIC {% endif %}{cxxflags_imported} {cxxflags_environ} {cxxflags} {{(macros_imported+macros)|prefix('-D')|join(' ')}} {{(incpaths+incpaths_imported)|prefix('-I')|join(' ')}} -fmodules-ts -fdeps-format=p1689r5 -fdeps-file={outputs} -fdeps-target={objfile} -MM -MF {outputs}.d -MT {outputs} {inputs}"
-    gnu_scan_cxx_clang_cmd = "{gnu_scandeps} -format=p1689 -- {gnu_cxx} -x c++ {% if shared %}-fPIC {% endif %}{cxxflags_imported} {cxxflags_environ} {cxxflags} {{(macros_imported+macros)|prefix('-D')|join(' ')}} {{(incpaths+incpaths_imported)|prefix('-I')|join(' ')}} -MMD -MF {outputs}.d -MT {outputs} -c {inputs} -o {objfile} > {outputs}"
-    gnu_compile_pch_cmd = "{gnu_cxx} -x c++-header -MMD -MF {outputs}.d {% if shared %}-fPIC {% endif %}{cxxflags_imported} {cxxflags_environ} {cxxflags} {{(macros_imported+macros)|prefix('-D')|join(' ')}} {{(incpaths+incpaths_imported)|prefix('-I')|join(' ')}} -c {inputs} -o {outputs}"
+    gnu_compile_cxx_cmd = "{gnu_cxx} -x c++ {cxxstd} -MMD -MF {outputs}.d {% if shared %}-fPIC {% endif %}{cxxflags_imported} {cxxflags_environ} {cxxflags} {{(macros_imported+macros)|prefix('-D')|join(' ')}} {{(incpaths+incpaths_imported)|prefix('-I')|join(' ')}} {modflags} -c {inputs} -o {outputs}"
+    gnu_scan_cxx_cmd = "{gnu_cxx} -x c++ {cxxstd} {% if shared %}-fPIC {% endif %}{cxxflags_imported} {cxxflags_environ} {cxxflags} {{(macros_imported+macros)|prefix('-D')|join(' ')}} {{(incpaths+incpaths_imported)|prefix('-I')|join(' ')}} -fmodules-ts -fdeps-format=p1689r5 -fdeps-file={outputs} -fdeps-target={objfile} -MM -MF {outputs}.d -MT {outputs} {inputs}"
+    gnu_scan_cxx_clang_cmd = "{gnu_scandeps} -format=p1689 -- {gnu_cxx} -x c++ {cxxstd} {% if shared %}-fPIC {% endif %}{cxxflags_imported} {cxxflags_environ} {cxxflags} {{(macros_imported+macros)|prefix('-D')|join(' ')}} {{(incpaths+incpaths_imported)|prefix('-I')|join(' ')}} -MMD -MF {outputs}.d -MT {outputs} -c {inputs} -o {objfile} > {outputs}"
+    gnu_compile_pch_cmd = "{gnu_cxx} -x c++-header {cxxstd} -MMD -MF {outputs}.d {% if shared %}-fPIC {% endif %}{cxxflags_imported} {cxxflags_environ} {cxxflags} {{(macros_imported+macros)|prefix('-D')|join(' ')}} {{(incpaths+incpaths_imported)|prefix('-I')|join(' ')}} -c {inputs} -o {outputs}"
     gnu_link_cmd = "{gnu_ld} {% if shared %}-shared {% endif %}{ldflags_imported} {ldflags_environ} {ldflags} -Wl,--start-group @{inputs} -Wl,--end-group {{(libpaths+libpaths_imported)|prefix('-L')|join(' ')}} -o {outputs} -Wl,--start-group {{(libraries+libraries_imported)|prefix('-l')|join(' ')}} -Wl,--end-group"
 
     def _gnu_objfile(self, srcfile):
@@ -380,6 +380,7 @@ class GnuToolchain(object):
     def gnu_compile_cxx(self, sources, **kwargs):
         kwargs["gnu_cxx"] = self._gnu_tool("CXX", self.gnu_cxx)
 
+        kwargs["cxxstd"] = kwargs.pop("cxxstd", self._cxxstd())
         kwargs["cxxflags"] = kwargs.pop("cxxflags", self._cxxflags())
         kwargs["cxxflags_environ"] = kwargs.pop("cxxflags_environ", self.tools.getenv("CXXFLAGS", ""))
         kwargs["cxxflags_imported"] = kwargs.pop("cxxflags_imported", self._import_listattr("cxxflags"))
@@ -402,6 +403,7 @@ class GnuToolchain(object):
         raise_task_error_if(hasattr(self, "_pch_objects"), self, "Multiple precompiled headers found, only one allowed")
 
         kwargs["gnu_cxx"] = self._gnu_tool("CXX", self.gnu_cxx)
+        kwargs["cxxstd"] = kwargs.pop("cxxstd", self._cxxstd())
         kwargs["cxxflags"] = kwargs.pop("cxxflags", self._cxxflags())
         kwargs["cxxflags_environ"] = kwargs.pop("cxxflags_environ", self.tools.getenv("CXXFLAGS", ""))
         kwargs["cxxflags_imported"] = kwargs.pop("cxxflags_imported", self._import_listattr("cxxflags"))
@@ -773,6 +775,12 @@ class Compilation(GnuToolchain, MultiTask):
     Header units are not supported.
     """
 
+    cxxstd = None
+    """C++ language standard to use (int). Default: Compiler default.
+
+    Supported values are 98, 11, 14, 17, 20, 23, and 26.
+    """
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.binary = self.expand(utils.call_or_return(self, self.__class__.binary))
@@ -785,6 +793,25 @@ class Compilation(GnuToolchain, MultiTask):
         for _, artifact in self.deps.items():
             result.extend(list(getattr(artifact.cxxinfo, attribute, []).items()))
         return result
+
+    def _cxxstd(self):
+        value = getattr(self, "cxxstd", None)
+        if value is None:
+            return ""
+        raise_task_error_if(
+            type(value) is not int,
+            self,
+            "Illegal C++ language standard: '{}'. Expected integer.",
+            value,
+        )
+        raise_task_error_if(
+            value not in ninja.cxx_standards_list,
+            self,
+            "Illegal C++ language standard: '{}'. Expected one of: {}",
+            value,
+            ", ".join(str(v) for v in ninja.cxx_standards_list),
+        )
+        return "-std=c++{}".format(value)
 
     def _import_pathlistattr(self, attribute):
         result = []
