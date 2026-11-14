@@ -91,6 +91,53 @@ class NinjaCoverageApi(JoltTest):
         assertGcov(self, a[0])
         self.assertExists(a[0], "cov")
 
+    def test_coverage_gcov_headers(self):
+        """
+        --- file: inc/twice.h
+        #include <vector>
+        inline int twice(int x) {{ if (x > 100) return 0; return 2 * x; }}
+
+        --- file: lib.cpp
+        #include "inc/twice.h"
+        int lib() {{ std::vector<int> v; v.push_back(1); return twice(v[0]); }}
+
+        --- file: exe.cpp
+        #include "inc/twice.h"
+        extern int lib();
+        int main() {{ return twice(1) + lib() == 4 ? 0 : 1; }}
+
+        --- tasks:
+        class Exe(CXXExecutable):
+            coverage = True
+            optimize = "none"
+            sources = ["inc/twice.h", "lib.cpp", "exe.cpp"]
+
+        @attributes.coverage_data(publish=False)
+        @attributes.coverage_report_gcov()
+        class Report(Runner):
+            requires = ["exe"]
+            selfsustained = True
+        ---
+        """
+        r = self.build("report")
+        a = self.artifacts(r)
+
+        # One report for each source file in the workspace, none for system headers
+        reportdir = os.path.join(a[0], "report", "gcov")
+        reports = sorted(
+            os.path.relpath(os.path.join(root, name), reportdir)
+            for root, _, names in os.walk(reportdir) for name in names)
+        self.assertEqual(reports, ["exe.cpp.gcov", "inc/twice.h.gcov", "lib.cpp.gcov"])
+
+        # Each report has the source it is named after, and only that
+        self.assertDataInFile("0:Source:lib.cpp\n", reportdir, "lib.cpp.gcov")
+        report = self.tools.read_file(os.path.join(reportdir, "lib.cpp.gcov"))
+        self.assertEqual(report.count("0:Source:"), 1)
+
+        # The header is called from both translation units
+        self.assertDataInFile("0:Source:inc/twice.h\n", reportdir, "inc/twice.h.gcov")
+        self.assertDataInFile("function twice(int) called 2 returned 100%", reportdir, "inc/twice.h.gcov")
+
     def test_coverage_lcov(self):
         """
         --- file: lib.cpp

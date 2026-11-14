@@ -152,7 +152,10 @@ class attributes:
 
         A gcov report file is generated for each instrumented source
         file in the executable. The reports consists of plain-text
-        source code annotated with code coverage details.
+        source code annotated with code coverage details. A header
+        included by several translation units gets a single report
+        with their coverage combined. Source files outside the
+        workspace, such as system headers, are left out.
 
         The decorator can be used standalone or in combination with
         :func:`coverage_data`. In either case, coverage data is
@@ -212,24 +215,67 @@ class attributes:
                         datafiles = tools.glob("**/*.gcda")
 
                     reportdir = tools.builddir("coverage-report-gcov")
+                    if not datafiles:
+                        return
+
+                    # All data files are processed by one gcov invocation, which
+                    # combines the coverage of sources shared by translation units.
+                    # The files are listed in a response file to not exceed the
+                    # maximum length of a command line.
+                    rspfile = os.path.join(tools.builddir("coverage-report-gcov-input"), "datafiles.rsp")
+                    tools.write_file(
+                        rspfile,
+                        "".join(self._gcov_rsp_escape(os.path.join(self.covdatadir, file)) + "\n" for file in datafiles),
+                        expand=False)
 
                     with tools.cwd(tools.wsroot):
-                        for file in datafiles:
-                            infile = os.path.join(self.covdatadir, file)
-                            branchflag = "-b " if bool(getattr(self, "gcov_branches", branches)) else ""
-                            demangleflag = "-m " if bool(getattr(self, "gcov_demangle", demangle)) else ""
-                            output = tools.run(
-                                "{} {}{}-t -p -s {covdatadir} {}",
-                                gcov, branchflag, demangleflag, infile, output_on_error=True)
-                            output = output.replace(self.covdatadir, "")
-                            source = re.search(r"0:Source:(.*)", output)
-                            if not source:
-                                self.warning(f"No source file found in gcov output for {file}")
-                                continue
-                            report = source.group(1) + ".gcov"
-                            report_path = os.path.join(reportdir, report)
-                            tools.mkdirname(report_path)
-                            tools.write_file(report_path, output, expand=False)
+                        branchflag = "-b " if bool(getattr(self, "gcov_branches", branches)) else ""
+                        demangleflag = "-m " if bool(getattr(self, "gcov_demangle", demangle)) else ""
+                        output = tools.run(
+                            "{} {}{}-t -p -s {covdatadir} @{}",
+                            gcov, branchflag, demangleflag, rspfile, output_on_error=True)
+                    output = output.replace(self.covdatadir, "")
+
+                    reports = self._gcov_split_sources(output)
+                    if not reports:
+                        self.warning("No source files found in gcov output")
+
+                    for source, report in reports.items():
+                        path = self._gcov_report_path(tools, source)
+                        if path is None:
+                            self.verbose("Skipping gcov report of {}, outside of the workspace", source)
+                            continue
+                        report_path = os.path.join(reportdir, path + ".gcov")
+                        tools.mkdirname(report_path)
+                        tools.write_file(report_path, report, expand=False)
+
+                @staticmethod
+                def _gcov_rsp_escape(path):
+                    """ Escapes a path in a gcov response file. """
+                    return re.sub(r"([\s'\"\\])", r"\\\1", path)
+
+                @staticmethod
+                def _gcov_split_sources(output):
+                    """ Splits gcov output into the reports of each source file: {source: report}. """
+                    reports = OrderedDict()
+                    lines = None
+                    for line in output.splitlines():
+                        match = re.match(r"\s*-:\s*0:Source:(.*)$", line)
+                        if match:
+                            lines = reports.setdefault(match.group(1), [])
+                        if lines is not None:
+                            lines.append(line)
+                    return OrderedDict((source, "\n".join(lines) + "\n") for source, lines in reports.items())
+
+                @staticmethod
+                def _gcov_report_path(tools, source):
+                    """ Returns the path of a source file relative to the workspace, or None if outside. """
+                    if os.path.isabs(source):
+                        source = os.path.relpath(source, tools.wsroot)
+                    source = os.path.normpath(source)
+                    if source == os.pardir or source.startswith(os.pardir + os.sep):
+                        return None
+                    return source
 
                 @utils.cached.instance
                 def publish_coverage_data(self, artifact, tools):
