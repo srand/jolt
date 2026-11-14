@@ -1,4 +1,5 @@
-from jolt import MultiTask, attributes
+from jolt import MultiTask
+from jolt import attributes as jolt_attributes
 from jolt import utils
 from jolt.error import JoltCommandError, raise_task_error, raise_task_error_if
 from jolt.influence import FileInfluence
@@ -15,8 +16,21 @@ cxx_extensions = [".cc", ".cpp", ".cxx"]
 cxx_header_extensions = [".h", ".hh", ".hpp", ".hxx"]
 cxx_module_extensions = ninja.cxx_module_extensions
 bmi_extensions = list(ninja_modules.BMI_EXT.values())
+coverage_extensions = [".gcno"]
 
 _compiler_ids = {}
+
+
+class attributes:
+    """
+    Decorators for tasks that build or run code compiled with
+    ``coverage`` enabled. They are the decorators of the same names in
+    :class:`jolt.plugins.ninja.attributes`.
+    """
+
+    coverage_data = staticmethod(ninja.attributes.coverage_data)
+    coverage_report_gcov = staticmethod(ninja.attributes.coverage_report_gcov)
+    coverage_report_lcov = staticmethod(ninja.attributes.coverage_report_lcov)
 
 
 class GnuModuleCollation(DynamicSubtask):
@@ -248,11 +262,11 @@ class GnuModules(object):
             modflags = "@" + modmap_file
         else:
             modflags = "-fmodules-ts -fmodule-mapper={} -fdeps-format=p1689r5".format(modmap_file)
-        if source["std"]:
-            # Not the project's code: warnings are of no use
-            modflags += " -w"
-
         kwargs = dict(source["kwargs"], modflags=modflags)
+        if source["std"]:
+            # Not the project's code: warnings and coverage are of no use
+            kwargs["modflags"] += " -w"
+            kwargs["covflags"] = ""
         cmd = self.tools.render(task.gnu_compile_cxx_cmd, inputs=srcfile, outputs=objfile, **kwargs)
         obj = task.command(cmd, srcfile, objfile, message="{inputs}", **kwargs)
 
@@ -271,6 +285,7 @@ class GnuModules(object):
         if hasattr(task, "_pch_objects"):
             obj.add_dependency(task._pch_objects)
         obj.add_influence_depfile(objfile + ".d")
+        task._gnu_add_covfile(obj, objfile, kwargs)
         return obj
 
     def manifest(self, imported=False):
@@ -297,16 +312,28 @@ class GnuToolchain(object):
     gnu_archive_cmd = "{gnu_ar} -M <{inputs}"
     gnu_compile_asm_cmd = "{gnu_cc} -x assembler -MMD -MF {outputs}.d {asflags} -c {inputs} -o {outputs}"
     gnu_compile_asm_cpp_cmd = "{gnu_cc} -x assembler-with-cpp -MMD -MF {outputs}.d {% if shared %}-fPIC {% endif %}{asflags_imported} {asflags_environ} {asflags} {{(macros_imported+macros)|prefix('-D')|join(' ')}} {{(incpaths+incpaths_imported)|prefix('-I')|join(' ')}} -c {inputs} -o {outputs}"
-    gnu_compile_c_cmd = "{gnu_cc} -x c -MMD -MF {outputs}.d {% if shared %}-fPIC {% endif %}{cflags_imported} {cflags_environ} {cflags} {{(macros_imported+macros)|prefix('-D')|join(' ')}} {{(incpaths+incpaths_imported)|prefix('-I')|join(' ')}} -c {inputs} -o {outputs}"
-    gnu_compile_cxx_cmd = "{gnu_cxx} -x c++ {cxxstd} -MMD -MF {outputs}.d {% if shared %}-fPIC {% endif %}{cxxflags_imported} {cxxflags_environ} {cxxflags} {{(macros_imported+macros)|prefix('-D')|join(' ')}} {{(incpaths+incpaths_imported)|prefix('-I')|join(' ')}} {modflags} -c {inputs} -o {outputs}"
+    gnu_compile_c_cmd = "{gnu_cc} -x c -MMD -MF {outputs}.d {% if shared %}-fPIC {% endif %}{cflags_imported} {cflags_environ} {cflags} {covflags} {{(macros_imported+macros)|prefix('-D')|join(' ')}} {{(incpaths+incpaths_imported)|prefix('-I')|join(' ')}} -c {inputs} -o {outputs}"
+    gnu_compile_cxx_cmd = "{gnu_cxx} -x c++ {cxxstd} -MMD -MF {outputs}.d {% if shared %}-fPIC {% endif %}{cxxflags_imported} {cxxflags_environ} {cxxflags} {covflags} {{(macros_imported+macros)|prefix('-D')|join(' ')}} {{(incpaths+incpaths_imported)|prefix('-I')|join(' ')}} {modflags} -c {inputs} -o {outputs}"
     gnu_scan_cxx_cmd = "{gnu_cxx} -x c++ {cxxstd} {% if shared %}-fPIC {% endif %}{cxxflags_imported} {cxxflags_environ} {cxxflags} {{(macros_imported+macros)|prefix('-D')|join(' ')}} {{(incpaths+incpaths_imported)|prefix('-I')|join(' ')}} -fmodules-ts -fdeps-format=p1689r5 -fdeps-file={outputs} -fdeps-target={objfile} -MM -MF {outputs}.d -MT {outputs} {inputs}"
     gnu_scan_cxx_clang_cmd = "{gnu_scandeps} -format=p1689 -- {gnu_cxx} -x c++ {cxxstd} {% if shared %}-fPIC {% endif %}{cxxflags_imported} {cxxflags_environ} {cxxflags} {{(macros_imported+macros)|prefix('-D')|join(' ')}} {{(incpaths+incpaths_imported)|prefix('-I')|join(' ')}} -MMD -MF {outputs}.d -MT {outputs} -c {inputs} -o {objfile} > {outputs}"
-    gnu_compile_pch_cmd = "{gnu_cxx} -x c++-header {cxxstd} -MMD -MF {outputs}.d {% if shared %}-fPIC {% endif %}{cxxflags_imported} {cxxflags_environ} {cxxflags} {{(macros_imported+macros)|prefix('-D')|join(' ')}} {{(incpaths+incpaths_imported)|prefix('-I')|join(' ')}} -c {inputs} -o {outputs}"
-    gnu_link_cmd = "{gnu_ld} {% if shared %}-shared {% endif %}{ldflags_imported} {ldflags_environ} {ldflags} -Wl,--start-group @{inputs} -Wl,--end-group {{(libpaths+libpaths_imported)|prefix('-L')|join(' ')}} -o {outputs} -Wl,--start-group {{(libraries+libraries_imported)|prefix('-l')|join(' ')}} -Wl,--end-group"
+    gnu_compile_pch_cmd = "{gnu_cxx} -x c++-header {cxxstd} -MMD -MF {outputs}.d {% if shared %}-fPIC {% endif %}{cxxflags_imported} {cxxflags_environ} {cxxflags} {covflags} {{(macros_imported+macros)|prefix('-D')|join(' ')}} {{(incpaths+incpaths_imported)|prefix('-I')|join(' ')}} -c {inputs} -o {outputs}"
+    gnu_link_cmd = "{gnu_ld} {% if shared %}-shared {% endif %}{ldflags_imported} {ldflags_environ} {ldflags} {covflags} -Wl,--start-group @{inputs} -Wl,--end-group {{(libpaths+libpaths_imported)|prefix('-L')|join(' ')}} -o {outputs} -Wl,--start-group {{(libraries+libraries_imported)|prefix('-l')|join(' ')}} -Wl,--end-group"
 
     def _gnu_objfile(self, srcfile):
         """ Returns the object file of a source file, relative to joltdir. """
         return self.tools.expand_relpath(os.path.join(self.outdir, srcfile + ".o"), self.joltdir)
+
+    def _gnu_covflags(self):
+        return "--coverage" if self._coverage() else ""
+
+    def _gnu_add_covfile(self, obj, objfile, kwargs):
+        """ Adds the coverage note file written with an object file as an output of its subtask. """
+        if not kwargs.get("covflags"):
+            return
+        covfile = os.path.splitext(objfile)[0] + ".gcno"
+        obj.add_output(covfile)
+        self._producers[covfile] = obj
+        self._covfiles.append(covfile)
 
     def gnu_archive(self, binary, objects, **kwargs):
         command = kwargs.pop("command", self.gnu_archive_cmd)
@@ -339,6 +366,7 @@ class GnuToolchain(object):
                 message="{inputs}",
                 **kwargs)
             obj.add_influence_depfile(objfile + ".d")
+            self._gnu_add_covfile(obj, objfile, kwargs)
             if hasattr(self, "_pch_objects"):
                 obj.add_dependency(self._pch_objects)
             objects.append(obj)
@@ -371,6 +399,7 @@ class GnuToolchain(object):
         kwargs["cflags"] = kwargs.pop("cflags", self._cflags())
         kwargs["cflags_environ"] = kwargs.pop("cflags_environ", self.tools.getenv("CFLAGS", ""))
         kwargs["cflags_imported"] = kwargs.pop("cflags_imported", self._import_listattr("cflags"))
+        kwargs["covflags"] = kwargs.pop("covflags", self._gnu_covflags())
         kwargs["incpaths"] = ["{outdir_rel}"] + kwargs.pop("incpaths", self._task_incpaths())
         kwargs["incpaths_imported"] = kwargs.pop("incpaths_imported", self._imported_incpaths())
         kwargs["macros"] = kwargs.pop("macros", self._macros())
@@ -384,6 +413,7 @@ class GnuToolchain(object):
         kwargs["cxxflags"] = kwargs.pop("cxxflags", self._cxxflags())
         kwargs["cxxflags_environ"] = kwargs.pop("cxxflags_environ", self.tools.getenv("CXXFLAGS", ""))
         kwargs["cxxflags_imported"] = kwargs.pop("cxxflags_imported", self._import_listattr("cxxflags"))
+        kwargs["covflags"] = kwargs.pop("covflags", self._gnu_covflags())
         kwargs["incpaths"] = ["{outdir_rel}"] + kwargs.pop("incpaths", self._task_incpaths())
         kwargs["incpaths_imported"] = kwargs.pop("incpaths_imported", self._imported_incpaths())
         kwargs["macros"] = kwargs.pop("macros", self._macros())
@@ -407,6 +437,7 @@ class GnuToolchain(object):
         kwargs["cxxflags"] = kwargs.pop("cxxflags", self._cxxflags())
         kwargs["cxxflags_environ"] = kwargs.pop("cxxflags_environ", self.tools.getenv("CXXFLAGS", ""))
         kwargs["cxxflags_imported"] = kwargs.pop("cxxflags_imported", self._import_listattr("cxxflags"))
+        kwargs["covflags"] = kwargs.pop("covflags", self._gnu_covflags())
         kwargs["incpaths"] = ["{outdir_rel}"] + kwargs.pop("incpaths", self._task_incpaths())
         kwargs["incpaths_imported"] = kwargs.pop("incpaths_imported", self._imported_incpaths())
         kwargs["macros"] = kwargs.pop("macros", self._macros())
@@ -441,6 +472,7 @@ class GnuToolchain(object):
         kwargs["ldflags"] = kwargs.pop("ldflags", self._ldflags())
         kwargs["ldflags_environ"] = kwargs.pop("ldflags_environ", self.tools.getenv("LDFLAGS", ""))
         kwargs["ldflags_imported"] = kwargs.pop("ldflags_imported", self._import_listattr("ldflags"))
+        kwargs["covflags"] = kwargs.pop("covflags", self._gnu_covflags())
 
         kwargs["libpaths"] = kwargs.pop("libpaths", self._libpaths())
         kwargs["libpaths_imported"] = kwargs.pop("libpaths_imported", self._import_pathlistattr("libpaths"))
@@ -705,16 +737,16 @@ def protobuf():
     return decorate
 
 
-@attributes.method("archive", "{toolchain}_archive")
-@attributes.method("compile_asm", "{toolchain}_compile_asm")
-@attributes.method("compile_asm_cpp", "{toolchain}_compile_asm_cpp")
-@attributes.method("compile_c", "{toolchain}_compile_c")
-@attributes.method("compile_cxx", "{toolchain}_compile_cxx")
-@attributes.method("compile_h", "{toolchain}_compile_h")
-@attributes.method("compile_pch", "{toolchain}_compile_pch")
-@attributes.method("import_libraries", "{toolchain}_import_libraries")
-@attributes.method("init_modules", "{toolchain}_init_modules")
-@attributes.method("link", "{toolchain}_link")
+@jolt_attributes.method("archive", "{toolchain}_archive")
+@jolt_attributes.method("compile_asm", "{toolchain}_compile_asm")
+@jolt_attributes.method("compile_asm_cpp", "{toolchain}_compile_asm_cpp")
+@jolt_attributes.method("compile_c", "{toolchain}_compile_c")
+@jolt_attributes.method("compile_cxx", "{toolchain}_compile_cxx")
+@jolt_attributes.method("compile_h", "{toolchain}_compile_h")
+@jolt_attributes.method("compile_pch", "{toolchain}_compile_pch")
+@jolt_attributes.method("import_libraries", "{toolchain}_import_libraries")
+@jolt_attributes.method("init_modules", "{toolchain}_init_modules")
+@jolt_attributes.method("link", "{toolchain}_link")
 @ninja.attributes.asflags("asflags")
 @ninja.attributes.cflags("cflags")
 @ninja.attributes.cxxflags("cxxflags")
@@ -748,6 +780,31 @@ class Compilation(GnuToolchain, MultiTask):
     """
 
     toolchain = "gnu"
+
+    coverage = False
+    """Enable code coverage instrumentation (boolean). Default: False
+
+    Only implemented for the GNU toolchain (GCC and Clang).
+
+    When set, the --coverage flag is passed to the compiler and linker.
+    The compiler instruments the generated machine code and outputs
+    coverage note files (.gcno), one for each translation unit, which are
+    collected into the task artifact. Upon running the executable,
+    coverage data files are generated.
+
+    Use the :func:`attributes.coverage_data` decorator to
+    automatically collect and publish data files in tasks that run
+    instrumented binaries. The :func:`attributes.coverage_report_gcov`
+    decorator can then be used to process the notes and data files
+    into human readable coverage information. There is also a
+    :func:`attributes.coverage_report_lcov` decorator that will
+    generate and publish an HTML coverage report.
+
+    The artifact is annotated with ``artifact.paths.coverage_data``,
+    which points out the path to the note files within the artifact.
+    A self-sustained library also republishes the note files of its
+    requirements.
+    """
 
     cxxmodules = None
     """
@@ -784,6 +841,7 @@ class Compilation(GnuToolchain, MultiTask):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.binary = self.expand(utils.call_or_return(self, self.__class__.binary))
+        self._covfiles = []
         if self.source_influence:
             for source in self._sources():
                 self.influence.append(FileInfluence(source))
@@ -793,6 +851,9 @@ class Compilation(GnuToolchain, MultiTask):
         for _, artifact in self.deps.items():
             result.extend(list(getattr(artifact.cxxinfo, attribute, []).items()))
         return result
+
+    def _coverage(self):
+        return bool(getattr(self, "coverage", False))
 
     def _cxxstd(self):
         value = getattr(self, "cxxstd", None)
@@ -878,14 +939,14 @@ class Compilation(GnuToolchain, MultiTask):
 
         The list is made when the subtask is ready to run, once dynamic
         subtasks among the inputs have expanded. Compiled module interfaces
-        are not linked and left out.
+        and coverage note files are not linked and left out.
         """
         inputs = self._to_subtask_list(inputs)
 
         def files():
             return [
                 path for path in self._to_output_files(inputs)
-                if os.path.splitext(path)[1] not in bmi_extensions]
+                if os.path.splitext(path)[1] not in bmi_extensions + coverage_extensions]
 
         def write(subtask):
             data = fn(files())
@@ -990,6 +1051,41 @@ class Compilation(GnuToolchain, MultiTask):
         self._init_modules(deps, sources)
         return self.compile(sources)
 
+    def run(self, deps, tools):
+        super().run(deps, tools)
+        if self._coverage():
+            self.collect_coverage_data(deps, tools)
+
+    def collect_coverage_data(self, deps, tools):
+        """
+        Collects coverage note files into a build directory.
+
+        The files are kept at their absolute paths within the directory,
+        which is where coverage data files end up when an instrumented
+        executable is run with the directory in ``GCOV_PREFIX``.
+        """
+        self.covdatadir = tools.builddir("coverage-data")
+        with tools.cwd(self.joltdir):
+            for covfile in self._covfiles:
+                try:
+                    tools.copy(covfile, os.path.join(self.covdatadir, tools.expand_relpath(covfile, "/")))
+                except FileNotFoundError:
+                    pass
+        if self.selfsustained:
+            for _, artifact in deps.items():
+                if artifact.paths.coverage_data:
+                    tools.copy(str(artifact.paths.coverage_data), self.covdatadir)
+
+    def publish(self, artifact, tools):
+        if self._coverage():
+            self.publish_coverage_data(artifact, tools)
+
+    def publish_coverage_data(self, artifact, tools):
+        """ Publishes code coverage note files. """
+        with tools.cwd(self.covdatadir):
+            if artifact.collect("**/*.gcno", "cov/"):
+                artifact.paths.coverage_data = "cov"
+
 
 @ninja.attributes.headers("headers")
 class Library(Compilation):
@@ -1028,6 +1124,8 @@ class Library(Compilation):
         return binary
 
     def publish(self, artifact, tools):
+        super().publish(artifact, tools)
+
         for header in self._headers():
             artifact.collect(header, self.publishapi)
 
@@ -1113,6 +1211,8 @@ class Executable(Compilation):
         return binary
 
     def publish(self, artifact, tools):
+        super().publish(artifact, tools)
+
         with tools.cwd(self.outdir):
             if os.name == "nt":
                 binary = artifact.collect(self.binary + '.exe', self.publishdir)

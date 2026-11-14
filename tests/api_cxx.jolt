@@ -107,6 +107,77 @@ class CxxApi(JoltTest):
         self.jolt("build lib:arg=1337 exe:arg=1337")
 
 
+    def test_coverage(self):
+        """
+        --- file: lib.cpp
+        int lib(int argc) {{ if (argc >= 2) return 1; return 0; }}
+
+        --- file: unused.cpp
+        int unused() {{ return 0; }}
+
+        --- file: exe.cpp
+        extern int lib(int);
+        int main(int argc, char *argv[]) {{ if (argc >= 2) return 1; return lib(argc); }}
+
+        --- tasks:
+        from jolt.plugins import cxx
+
+        class Lib(CXXLibrary):
+            coverage = True
+            sources = ["lib.cpp", "unused.cpp"]
+
+        class Exe(CXXExecutable):
+            coverage = True
+            requires = ["lib"]
+            sources = ["exe.cpp"]
+
+        @cxx.attributes.coverage_data()
+        @cxx.attributes.coverage_report_gcov()
+        class ExeRunAndReport(Exe):
+            name = "linkrunreport"
+            def run(self, deps, tools):
+                super().run(deps, tools)
+                with tools.cwd(self.outdir):
+                    tools.run("./{{binary}}")
+
+        @cxx.attributes.coverage_data()
+        class Run(Runner):
+            requires = ["exe"]
+            selfsustained = True
+
+        @cxx.attributes.coverage_report_gcov(coverage_data=True)
+        class Report(Task):
+            requires = ["run"]
+        ---
+        """
+
+        def assertGcov(self, artifact):
+            self.assertExists(artifact, "report/gcov/lib.cpp.gcov")
+            self.assertDataInFile("function lib(int) called 1 returned 100% blocks executed 75%", artifact, "report/gcov/lib.cpp.gcov")
+            self.assertExists(artifact, "report/gcov/exe.cpp.gcov")
+            self.assertDataInFile("function main called 1 returned 100% blocks executed 80%", artifact, "report/gcov/exe.cpp.gcov")
+
+        r = self.build("lib")
+        a = self.artifacts(r)
+        self.assertExistsInPath(a[0], "cov")
+
+        # Note files are outputs of compilations, which are kept up to date
+        with self.tools.cwd(self.ws):
+            self.tools.append_file("unused.cpp", "// Foo")
+        r = self.build("lib")
+        self.assertCompiled(r, "unused.cpp")
+        self.assertNotCompiled(r, "lib.cpp")
+
+        r = self.build("report")
+        a = self.artifacts(r)
+        assertGcov(self, a[0])
+        self.assertExists(a[0], "cov")
+
+        r = self.build("linkrunreport")
+        a = self.artifacts(r)
+        assertGcov(self, a[0])
+        self.assertExists(a[0], "cov")
+
     def test_cxxflags(self):
         """
         --- file: test.cpp
