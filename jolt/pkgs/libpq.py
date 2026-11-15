@@ -14,7 +14,7 @@ class Libpq(autotools.Autotools):
     """ C client library of PostgreSQL """
 
     name = "libpq"
-    version = Parameter("18.6", help="PostgreSQL version.")
+    version = Parameter("18.7", help="PostgreSQL version.")
     shared = BooleanParameter(False, help="Build shared libraries.")
     ssl = BooleanParameter(True, help="Enable SSL support.")
     requires_compiler = ["virtual/compiler/c"]
