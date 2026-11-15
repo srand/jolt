@@ -5,7 +5,7 @@ from jolt.plugins import git, cmake
 from jolt.tasks import TaskRegistry
 
 
-VERSION = "23.1.4"
+VERSION = "23.1.5"
 
 # Target triples that libclc is built for, by LLVM target
 LIBCLC_TRIPLES = {
@@ -16,7 +16,7 @@ LIBCLC_TRIPLES = {
 @attributes.common_metadata()
 class LLVMFromBin(Download):
     name = "llvm/bin"
-    version = Parameter("23.1.4", help="LLVM version.")
+    version = Parameter("23.1.5", help="LLVM version.")
     url = [
         "https://github.com/llvm/llvm-project/releases/download/llvmorg-{version}/LLVM-{version}-Linux-X64.tar.xz"
     ]
