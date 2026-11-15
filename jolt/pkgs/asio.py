@@ -11,7 +11,7 @@ from jolt.pkgs import compiler
 @attributes.requires("requires_compiler")
 class Asio(autotools.Autotools):
     name = "asio"
-    version = Parameter("1.38.2", help="Asio version.")
+    version = Parameter("1.39.0", help="Asio version.")
     requires_compiler = ["virtual/compiler/c", "virtual/compiler/cxx"]
     requires_git = ["git:url=https://github.com/chriskohlhoff/asio.git,rev=asio-{_version}"]
     srcdir = "{git[asio]}"
