@@ -11,7 +11,7 @@ from jolt.pkgs import compiler
 @attributes.requires("requires_compiler")
 class Libexpat(cmake.CMake):
     name = "libexpat"
-    version = Parameter("2.9.0", help="Expat version.")
+    version = Parameter("2.10.0", help="Expat version.")
     pic = BooleanParameter(False, help="Build with position independent code.")
     shared = BooleanParameter(False, help="Build shared libraries.")
     version_tag = property(lambda self: str(self.version).replace('.', '_'))
