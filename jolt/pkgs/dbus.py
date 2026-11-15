@@ -11,7 +11,7 @@ from jolt.tasks import TaskRegistry
 @attributes.requires("requires_compiler")
 class DBus(cmake.CMake):
     name = "dbus"
-    version = Parameter("1.16.2", help="D-Bus version.")
+    version = Parameter("1.16.4", help="D-Bus version.")
     requires_compiler = ["virtual/compiler/c"]
     requires_git = ["git:url=https://gitlab.freedesktop.org/dbus/dbus.git,rev=dbus-{version}"]
     srcdir = "{git[dbus]}"
