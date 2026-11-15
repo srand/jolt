@@ -9,7 +9,7 @@ from jolt.tasks import TaskRegistry
 @attributes.system
 class Rust(Download):
     name = "rust"
-    version = Parameter("1.99.1", help="Rust version.")
+    version = Parameter("1.100.0", help="Rust version.")
     url = "https://static.rust-lang.org/dist/rust-{version}-{triple}.tar.xz"
     collect = [{"files": "*", "cwd": "rust-{version}-{triple}"}]
     components = ["cargo", "rustc", "rust-std-{triple}"]
