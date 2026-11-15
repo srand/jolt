@@ -26,7 +26,7 @@ class Nanopb(cmake.CMake):
     """ Protocol Buffers for embedded systems: the runtime library and the generator """
 
     name = "nanopb"
-    version = Parameter("0.4.9.2", help="nanopb version.")
+    version = Parameter("0.4.9.3", help="nanopb version.")
     pic = BooleanParameter(False, help="Build with position independent code.")
     shared = BooleanParameter(False, help="Build shared libraries.")
     requires_compiler = ["virtual/compiler/c"]
