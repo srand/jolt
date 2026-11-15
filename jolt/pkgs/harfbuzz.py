@@ -15,7 +15,7 @@ class Harfbuzz(meson.Meson):
     """ Text shaping engine """
 
     name = "harfbuzz"
-    version = Parameter("15.0.0", help="HarfBuzz version.")
+    version = Parameter("15.1.0", help="HarfBuzz version.")
     shared = BooleanParameter(False, help="Build shared libraries.")
     requires_compiler = ["virtual/compiler/c", "virtual/compiler/cxx"]
     requires_freetype = ["freetype:pic=true,shared={shared}"]
