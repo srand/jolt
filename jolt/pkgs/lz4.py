@@ -11,7 +11,7 @@ from jolt.pkgs import compiler
 @attributes.requires("requires_compiler")
 class Lz4(cmake.CMake):
     name = "lz4"
-    version = Parameter("1.10.0", help="LZ4 version.")
+    version = Parameter("1.11.1", help="LZ4 version.")
     shared = BooleanParameter(False, help="Build shared libraries.")
     requires_compiler = ["virtual/compiler/c"]
     requires_git = ["git:url=https://github.com/lz4/lz4.git,rev=v{version}"]
