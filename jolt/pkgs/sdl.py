@@ -14,7 +14,7 @@ from jolt.tasks import TaskRegistry
 @attributes.requires("requires_compiler")
 class SDL(cmake.CMake):
     name = "sdl"
-    version = Parameter("3.4.18", help="SDL version.")
+    version = Parameter("3.4.20", help="SDL version.")
     shared = BooleanParameter(False, help="Build shared libraries.")
     requires_compiler = ["virtual/compiler/c"]
     requires_git = ["git:url=https://github.com/libsdl-org/SDL.git,rev=release-{version}"]
