@@ -27,7 +27,7 @@ from jolt.tasks import TaskRegistry
 @attributes.requires("requires_compiler")
 class Mesa(Task):
     name = "mesa"
-    version = Parameter("26.2.6", help="Mesa version.")
+    version = Parameter("26.3.0", help="Mesa version.")
 
     requires_compiler = ["virtual/compiler/c", "virtual/compiler/cxx"]
     requires_cbindgen = ["cbindgen"]
