@@ -14,7 +14,7 @@ class Krb5(autotools.Autotools):
     """ MIT Kerberos """
 
     name = "krb5"
-    version = Parameter("1.22.2", help="MIT Kerberos version.")
+    version = Parameter("1.22.3", help="MIT Kerberos version.")
     requires_compiler = ["virtual/compiler/c"]
     requires_bison = ["bison"]
     requires_src = ["fetch:alias=src,url=https://kerberos.org/dist/krb5/{_major_minor}/krb5-{version}.tar.gz"]
