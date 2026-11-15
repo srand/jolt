@@ -9,7 +9,7 @@ from jolt.pkgs import compiler
 @attributes.requires("requires_compiler")
 class Libffi(autotools.Autotools):
     name = "libffi"
-    version = Parameter("3.8.0", help="libffi version.")
+    version = Parameter("3.8.1", help="libffi version.")
     requires_compiler = ["virtual/compiler/c"]
     requires_src = ["git:clean=true,url=https://github.com/libffi/libffi.git,rev=v{version}"]
     srcdir = "{git[libffi]}"
