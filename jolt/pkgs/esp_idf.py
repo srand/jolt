@@ -23,7 +23,7 @@ class EspIdfSource(Task, _EspIdfVersion):
     """ The ESP-IDF framework: components, build system and idf.py """
 
     name = "esp-idf/src"
-    version = Parameter("6.1", help="ESP-IDF version.")
+    version = Parameter("6.1.1", help="ESP-IDF version.")
     requires_git = [_GIT + ",submodules=true"]
 
     def run(self, deps, tools):
@@ -59,7 +59,7 @@ class EspIdfTools(Task, _EspIdfVersion):
     """
 
     name = "esp-idf/tools"
-    version = Parameter("6.1", help="ESP-IDF version.")
+    version = Parameter("6.1.1", help="ESP-IDF version.")
     targets = Parameter("all", help="Chips to install tools for, separated by commas (esp32,esp32c3).")
     requires_constraints = [_CONSTRAINTS]
     requires_git = [_GIT]
@@ -113,7 +113,7 @@ class EspIdfPython(python.PythonEnv, _EspIdfVersion):
     """ Python environment with the packages that ESP-IDF and idf.py need """
 
     name = "esp-idf/python"
-    version = Parameter("6.1", help="ESP-IDF version.")
+    version = Parameter("6.1.1", help="ESP-IDF version.")
     # tree-sitter is built from source for new Python releases
     requires_compiler = ["virtual/compiler/c"]
     requires_constraints = [_CONSTRAINTS]
@@ -149,7 +149,7 @@ class EspIdf(Alias):
     """
 
     name = "esp-idf"
-    version = Parameter("6.1", help="ESP-IDF version.")
+    version = Parameter("6.1.1", help="ESP-IDF version.")
     targets = Parameter("all", help="Chips to install tools for, separated by commas (esp32,esp32c3).")
     requires = [
         "esp-idf/src:version={version}",
