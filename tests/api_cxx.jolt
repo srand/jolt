@@ -124,10 +124,12 @@ class CxxApi(JoltTest):
 
         class Lib(CXXLibrary):
             coverage = True
+            optimize = "none"
             sources = ["lib.cpp", "unused.cpp"]
 
         class Exe(CXXExecutable):
             coverage = True
+            optimize = "none"
             requires = ["lib"]
             sources = ["exe.cpp"]
 
@@ -593,6 +595,57 @@ class CxxApi(JoltTest):
         """
         self.jolt("build lib:arg=1337 exe:arg=1337")
 
+
+    def test_optimize(self):
+        """
+        --- file: test.c
+        int c() {{return 0;}}
+
+        --- file: test.cpp
+        int cpp() {{return 0;}}
+
+        --- tasks:
+        class LibNone(CXXLibrary):
+            sources = ["test.c", "test.cpp"]
+            optimize = "none"
+
+        class LibDebug(CXXLibrary):
+            sources = ["test.c", "test.cpp"]
+            optimize = "debug"
+
+        class LibSize(CXXLibrary):
+            sources = ["test.c", "test.cpp"]
+            optimize = "size"
+
+        class LibRelease(CXXLibrary):
+            sources = ["test.c", "test.cpp"]
+
+        class LibIllegal(CXXLibrary):
+            sources = ["test.c", "test.cpp"]
+            optimize = "illegal"
+
+        class LibDisable(CXXLibrary):
+            sources = ["test.c", "test.cpp"]
+            optimize = None
+        ---
+        """
+        r = self.build("libnone")
+        self.assertRegex(r, r"-x c +-O0 ")
+        self.assertRegex(r, r"-x c\+\+ +-O0 ")
+        r = self.build("libdebug")
+        self.assertRegex(r, r"-x c +-Og ")
+        self.assertRegex(r, r"-x c\+\+ +-Og ")
+        r = self.build("libsize")
+        self.assertRegex(r, r"-x c +-Os ")
+        self.assertRegex(r, r"-x c\+\+ +-Os ")
+        r = self.build("librelease")
+        self.assertRegex(r, r"-x c +-O2 ")
+        self.assertRegex(r, r"-x c\+\+ +-O2 ")
+        r = self.build("libdisable")
+        self.assertNotIn(" -O", r)
+        with self.assertRaises(Exception):
+            self.build("libillegal")
+        self.assertIn("Illegal value assigned to 'optimize' (illegal)", self.lastLog())
 
     def test_precompiled_headers(self):
         """

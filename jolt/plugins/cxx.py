@@ -312,19 +312,30 @@ class GnuToolchain(object):
     gnu_archive_cmd = "{gnu_ar} -M <{inputs}"
     gnu_compile_asm_cmd = "{gnu_cc} -x assembler -MMD -MF {outputs}.d {asflags} -c {inputs} -o {outputs}"
     gnu_compile_asm_cpp_cmd = "{gnu_cc} -x assembler-with-cpp -MMD -MF {outputs}.d {% if shared %}-fPIC {% endif %}{asflags_imported} {asflags_environ} {asflags} {{(macros_imported+macros)|prefix('-D')|join(' ')}} {{(incpaths+incpaths_imported)|prefix('-I')|join(' ')}} -c {inputs} -o {outputs}"
-    gnu_compile_c_cmd = "{gnu_cc} -x c -MMD -MF {outputs}.d {% if shared %}-fPIC {% endif %}{cflags_imported} {cflags_environ} {cflags} {covflags} {{(macros_imported+macros)|prefix('-D')|join(' ')}} {{(incpaths+incpaths_imported)|prefix('-I')|join(' ')}} -c {inputs} -o {outputs}"
-    gnu_compile_cxx_cmd = "{gnu_cxx} -x c++ {cxxstd} -MMD -MF {outputs}.d {% if shared %}-fPIC {% endif %}{cxxflags_imported} {cxxflags_environ} {cxxflags} {covflags} {{(macros_imported+macros)|prefix('-D')|join(' ')}} {{(incpaths+incpaths_imported)|prefix('-I')|join(' ')}} {modflags} -c {inputs} -o {outputs}"
-    gnu_scan_cxx_cmd = "{gnu_cxx} -x c++ {cxxstd} {% if shared %}-fPIC {% endif %}{cxxflags_imported} {cxxflags_environ} {cxxflags} {{(macros_imported+macros)|prefix('-D')|join(' ')}} {{(incpaths+incpaths_imported)|prefix('-I')|join(' ')}} -fmodules-ts -fdeps-format=p1689r5 -fdeps-file={outputs} -fdeps-target={objfile} -MM -MF {outputs}.d -MT {outputs} {inputs}"
-    gnu_scan_cxx_clang_cmd = "{gnu_scandeps} -format=p1689 -- {gnu_cxx} -x c++ {cxxstd} {% if shared %}-fPIC {% endif %}{cxxflags_imported} {cxxflags_environ} {cxxflags} {{(macros_imported+macros)|prefix('-D')|join(' ')}} {{(incpaths+incpaths_imported)|prefix('-I')|join(' ')}} -MMD -MF {outputs}.d -MT {outputs} -c {inputs} -o {objfile} > {outputs}"
-    gnu_compile_pch_cmd = "{gnu_cxx} -x c++-header {cxxstd} -MMD -MF {outputs}.d {% if shared %}-fPIC {% endif %}{cxxflags_imported} {cxxflags_environ} {cxxflags} {covflags} {{(macros_imported+macros)|prefix('-D')|join(' ')}} {{(incpaths+incpaths_imported)|prefix('-I')|join(' ')}} -c {inputs} -o {outputs}"
+    gnu_compile_c_cmd = "{gnu_cc} -x c {optflag} -MMD -MF {outputs}.d {% if shared %}-fPIC {% endif %}{cflags_imported} {cflags_environ} {cflags} {covflags} {{(macros_imported+macros)|prefix('-D')|join(' ')}} {{(incpaths+incpaths_imported)|prefix('-I')|join(' ')}} -c {inputs} -o {outputs}"
+    gnu_compile_cxx_cmd = "{gnu_cxx} -x c++ {cxxstd} {optflag} -MMD -MF {outputs}.d {% if shared %}-fPIC {% endif %}{cxxflags_imported} {cxxflags_environ} {cxxflags} {covflags} {{(macros_imported+macros)|prefix('-D')|join(' ')}} {{(incpaths+incpaths_imported)|prefix('-I')|join(' ')}} {modflags} -c {inputs} -o {outputs}"
+    gnu_scan_cxx_cmd = "{gnu_cxx} -x c++ {cxxstd} {optflag} {% if shared %}-fPIC {% endif %}{cxxflags_imported} {cxxflags_environ} {cxxflags} {{(macros_imported+macros)|prefix('-D')|join(' ')}} {{(incpaths+incpaths_imported)|prefix('-I')|join(' ')}} -fmodules-ts -fdeps-format=p1689r5 -fdeps-file={outputs} -fdeps-target={objfile} -MM -MF {outputs}.d -MT {outputs} {inputs}"
+    gnu_scan_cxx_clang_cmd = "{gnu_scandeps} -format=p1689 -- {gnu_cxx} -x c++ {cxxstd} {optflag} {% if shared %}-fPIC {% endif %}{cxxflags_imported} {cxxflags_environ} {cxxflags} {{(macros_imported+macros)|prefix('-D')|join(' ')}} {{(incpaths+incpaths_imported)|prefix('-I')|join(' ')}} -MMD -MF {outputs}.d -MT {outputs} -c {inputs} -o {objfile} > {outputs}"
+    gnu_compile_pch_cmd = "{gnu_cxx} -x c++-header {cxxstd} {optflag} -MMD -MF {outputs}.d {% if shared %}-fPIC {% endif %}{cxxflags_imported} {cxxflags_environ} {cxxflags} {covflags} {{(macros_imported+macros)|prefix('-D')|join(' ')}} {{(incpaths+incpaths_imported)|prefix('-I')|join(' ')}} -c {inputs} -o {outputs}"
     gnu_link_cmd = "{gnu_ld} {% if shared %}-shared {% endif %}{ldflags_imported} {ldflags_environ} {ldflags} {covflags} -Wl,--start-group @{inputs} -Wl,--end-group {{(libpaths+libpaths_imported)|prefix('-L')|join(' ')}} -o {outputs} -Wl,--start-group {{(libraries+libraries_imported)|prefix('-l')|join(' ')}} -Wl,--end-group"
 
     def _gnu_objfile(self, srcfile):
         """ Returns the object file of a source file, relative to joltdir. """
         return self.tools.expand_relpath(os.path.join(self.outdir, srcfile + ".o"), self.joltdir)
 
+    gnu_optflags = {
+        "none": "-O0",
+        "debug": "-Og",
+        "size": "-Os",
+        "release": "-O2",
+        None: "",
+    }
+
     def _gnu_covflags(self):
         return "--coverage" if self._coverage() else ""
+
+    def _gnu_optflag(self):
+        return self.gnu_optflags[self._optimize()]
 
     def _gnu_add_covfile(self, obj, objfile, kwargs):
         """ Adds the coverage note file written with an object file as an output of its subtask. """
@@ -400,6 +411,7 @@ class GnuToolchain(object):
         kwargs["cflags_environ"] = kwargs.pop("cflags_environ", self.tools.getenv("CFLAGS", ""))
         kwargs["cflags_imported"] = kwargs.pop("cflags_imported", self._import_listattr("cflags"))
         kwargs["covflags"] = kwargs.pop("covflags", self._gnu_covflags())
+        kwargs["optflag"] = kwargs.pop("optflag", self._gnu_optflag())
         kwargs["incpaths"] = ["{outdir_rel}"] + kwargs.pop("incpaths", self._task_incpaths())
         kwargs["incpaths_imported"] = kwargs.pop("incpaths_imported", self._imported_incpaths())
         kwargs["macros"] = kwargs.pop("macros", self._macros())
@@ -414,6 +426,7 @@ class GnuToolchain(object):
         kwargs["cxxflags_environ"] = kwargs.pop("cxxflags_environ", self.tools.getenv("CXXFLAGS", ""))
         kwargs["cxxflags_imported"] = kwargs.pop("cxxflags_imported", self._import_listattr("cxxflags"))
         kwargs["covflags"] = kwargs.pop("covflags", self._gnu_covflags())
+        kwargs["optflag"] = kwargs.pop("optflag", self._gnu_optflag())
         kwargs["incpaths"] = ["{outdir_rel}"] + kwargs.pop("incpaths", self._task_incpaths())
         kwargs["incpaths_imported"] = kwargs.pop("incpaths_imported", self._imported_incpaths())
         kwargs["macros"] = kwargs.pop("macros", self._macros())
@@ -438,6 +451,7 @@ class GnuToolchain(object):
         kwargs["cxxflags_environ"] = kwargs.pop("cxxflags_environ", self.tools.getenv("CXXFLAGS", ""))
         kwargs["cxxflags_imported"] = kwargs.pop("cxxflags_imported", self._import_listattr("cxxflags"))
         kwargs["covflags"] = kwargs.pop("covflags", self._gnu_covflags())
+        kwargs["optflag"] = kwargs.pop("optflag", self._gnu_optflag())
         kwargs["incpaths"] = ["{outdir_rel}"] + kwargs.pop("incpaths", self._task_incpaths())
         kwargs["incpaths_imported"] = kwargs.pop("incpaths_imported", self._imported_incpaths())
         kwargs["macros"] = kwargs.pop("macros", self._macros())
@@ -838,6 +852,21 @@ class Compilation(GnuToolchain, MultiTask):
     Supported values are 98, 11, 14, 17, 20, 23, and 26.
     """
 
+    optimize = "release"
+    """Compiler optimization level. Default: "release".
+
+    Supported values are:
+
+        - "none" (-O0)
+        - "debug" (-Og)
+        - "size" (-Os)
+        - "release" (-O2)
+        - None, to pass no optimization flag and use the compiler default
+
+    The flag is passed to the C, C++ and precompiled header compilations,
+    before ``cflags`` and ``cxxflags``, which can override it.
+    """
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.binary = self.expand(utils.call_or_return(self, self.__class__.binary))
@@ -873,6 +902,18 @@ class Compilation(GnuToolchain, MultiTask):
             ", ".join(str(v) for v in ninja.cxx_standards_list),
         )
         return "-std=c++{}".format(value)
+
+    def _optimize(self):
+        value = getattr(self, "optimize", None)
+        if value is not None:
+            value = str(value)
+        raise_task_error_if(
+            value not in ["none", "debug", "size", "release", None],
+            self,
+            "Illegal value assigned to 'optimize' ({}). Expected: 'none', 'debug', 'size', or 'release'.",
+            value,
+        )
+        return value
 
     def _import_pathlistattr(self, attribute):
         result = []
