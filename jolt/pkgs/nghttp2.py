@@ -11,7 +11,7 @@ from jolt.tasks import TaskRegistry
 @attributes.requires("requires_compiler")
 class Nghttp2(cmake.CMake):
     name = "nghttp2"
-    version = Parameter("1.70.0", help="nghttp2 version.")
+    version = Parameter("1.71.0", help="nghttp2 version.")
     pic = BooleanParameter(False, help="Build with position independent code.")
     shared = BooleanParameter(False, help="Build shared libraries.")
     requires_compiler = ["virtual/compiler/c"]
