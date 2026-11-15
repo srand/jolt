@@ -12,7 +12,7 @@ from jolt.tasks import TaskRegistry
 @attributes.requires("requires_compiler")
 class OpenCV(cmake.CMake):
     name = "opencv"
-    version = Parameter("5.0.0", help="OpenCV version.")
+    version = Parameter("5.1.0", help="OpenCV version.")
     shared = BooleanParameter(False, help="Build shared libraries.")
     requires_compiler = ["virtual/compiler/c", "virtual/compiler/cxx"]
     requires_git = ["git:url=https://github.com/opencv/opencv.git,rev={version}"]
