@@ -10,7 +10,7 @@ from jolt.pkgs import compiler
 @attributes.requires("requires_compiler")
 class Automake(autotools.Autotools):
     name = "automake"
-    version = Parameter("1.19", help="Automake version.")
+    version = Parameter("1.20", help="Automake version.")
     requires_compiler = ["virtual/compiler/c"]
     requires_git = ["fetch:alias=src,url=https://ftpmirror.gnu.org/gnu/automake/automake-{version}.tar.xz"]
     requires_texinfo = ["texinfo"]
