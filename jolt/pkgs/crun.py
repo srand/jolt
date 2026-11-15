@@ -12,7 +12,7 @@ from jolt.tasks import TaskRegistry
 @attributes.requires("requires_compiler")
 class CRun(autotools.Autotools):
     name = "crun"
-    version = Parameter("1.30.1", help="crun version.")
+    version = Parameter("1.31", help="crun version.")
     caps = BooleanParameter(False, help="Enable capabilities support.")
     systemd = BooleanParameter(False, help="Enable systemd support.")
     requires_compiler = ["virtual/compiler/c"]
