@@ -750,6 +750,8 @@ class Artifact(object):
         self._influence = None
         self._valid = False
         self._temporary = True
+        # Otherwise publish() appends to metadata parsed from the discarded manifest
+        ArtifactAttributeSetRegistry.create_all(self)
 
     @property
     def name(self):
