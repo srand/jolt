@@ -372,7 +372,35 @@ class ToolsInternal(JoltTest):
             tools._wait_for_process(process, 7)
 
         process.wait.assert_called_once_with(timeout=7)
-        cleanup.assert_called_once_with(process)
+        cleanup.assert_not_called()
+
+    def test_run_interrupt_with_orphan_holding_pipe(self):
+        # An orphaned descendant keeps stdout open, so the reader stays
+        # blocked in readline(). Closing the stream under the reader would
+        # wait for the orphan to exit.
+        wait = subprocess.Popen.wait
+
+        def interrupted_wait(popen, timeout=None):
+            if timeout is None or timeout > 10:
+                raise KeyboardInterrupt
+            return wait(popen, timeout)
+
+        result = []
+
+        def invoke():
+            try:
+                tools._run("(sleep 20 &); exec sleep 20", None, None)
+            except BaseException as exc:
+                result.append(exc)
+
+        with patch("subprocess.Popen.wait", interrupted_wait):
+            worker = threading.Thread(target=invoke, daemon=True)
+            worker.start()
+            worker.join(15)
+
+        self.assertFalse(worker.is_alive())
+        self.assertEqual(len(result), 1)
+        self.assertIsInstance(result[0], KeyboardInterrupt)
 
     @patch("jolt.tools.utils.call_and_catch")
     @patch("jolt.tools._kill_process")

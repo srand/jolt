@@ -253,11 +253,11 @@ def _format_command(process):
 def _wait_for_process(process, timeout):
     timedout = False
 
+    # An interrupt propagates to the caller, which stops the process and
+    # joins its readers. Closing a stream here, while its reader may still
+    # be blocked reading from it, would hang until the pipe is closed.
     try:
         process.wait(timeout=timeout)
-    except KeyboardInterrupt:
-        _cleanup_interrupted_process(process)
-        raise
     except (subprocess.TimeoutExpired, JoltTimeoutError):
         timedout = True
         _stop_process(process)
