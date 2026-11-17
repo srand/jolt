@@ -23,7 +23,7 @@ class FakeProxy(object):
     _run_download_dependencies = graph.TaskProxy._run_download_dependencies
 
     def __init__(self, name, children=None, resource=False, local=False, available=False,
-                 download=None, threads=4, **options):
+                 download=None, threads=4, unstable=False, completed=True, **options):
         self.short_qualified_name = name
         self.children = children or []
         self.resource = resource
@@ -31,7 +31,8 @@ class FakeProxy(object):
         self.available = available
         self.on_download = download
         self.downloads = 0
-        self.is_unstable = False
+        self.is_unstable = unstable
+        self.completed = completed
         self.options = JoltOptions(**options)
         self.tools = FakeTools(threads)
 
@@ -48,7 +49,7 @@ class FakeProxy(object):
         return self.local
 
     def is_completed(self):
-        return True
+        return self.completed
 
     def is_available_locally(self, extensions=True):
         return self.available
@@ -122,6 +123,23 @@ class GraphInternal(JoltTest):
         with self.assertRaises(JoltError) as ctx:
             FakeProxy("task", [a, b])._run_download_dependencies()
         self.assertIn("Failed to download task artifact (a)", str(ctx.exception))
+        self.assertEqual(1, a.downloads)
+
+    def test_download_dependencies_failed_unstable(self):
+        a = FakeProxy("a", unstable=True, completed=False)
+        with self.assertRaises(JoltError) as ctx:
+            FakeProxy("task", [a])._run_download_dependencies()
+        self.assertIn("Task depends on failed task 'a'", str(ctx.exception))
+        self.assertEqual(0, a.downloads)
+
+    def test_download_dependencies_failed_unstable_before_remote_execution(self):
+        a = FakeProxy("a", unstable=True, completed=False)
+        with self.assertRaises(JoltError):
+            FakeProxy("task", [a], network=True)._run_download_dependencies(resource_only=True)
+
+    def test_download_dependencies_unstable_as_worker(self):
+        a = FakeProxy("a", unstable=True, completed=False, worker=True)
+        FakeProxy("task", [a], worker=True)._run_download_dependencies()
         self.assertEqual(1, a.downloads)
 
     def test_download_dependencies_logged_by_owner(self):

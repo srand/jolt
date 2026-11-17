@@ -663,12 +663,17 @@ class TaskProxy(object):
                         downloads.append(child)
                 continue
 
+            # Workers don't know the status of dependencies, which were built,
+            # pruned or failed on the client. The client checks before it
+            # schedules the task, and workers fail to download missing artifacts.
+            if not self.options.worker:
+                raise_task_error_if(
+                    not child.is_completed() and child.is_unstable,
+                    self, "Task depends on failed task '{}'", child.short_qualified_name)
+
             if resource_only:
                 continue
 
-            raise_task_error_if(
-                not child.is_completed() and child.is_unstable,
-                self, "Task depends on failed task '{}'", child.short_qualified_name)
             if child not in downloads and not child.is_available_locally(extensions=False):
                 downloads.append(child)
 
