@@ -13,6 +13,8 @@ const (
 	// tasks. Clients that build also need to read, to see the logs of their
 	// tasks.
 	BuildPermission auth.Permission = "build"
+	// Cancel builds with no authenticated owners. Also requires build permission.
+	CancelAnonymousPermission auth.Permission = "cancel-anonymous"
 	// Receive build instructions, required by workers.
 	WorkerPermission auth.Permission = "worker"
 	// List builds and workers, follow events and read logs.
@@ -22,7 +24,7 @@ const (
 )
 
 // Permissions of clients of the scheduler.
-var Permissions = []auth.Permission{BuildPermission, WorkerPermission, ReadPermission, AdminPermission}
+var Permissions = []auth.Permission{BuildPermission, CancelAnonymousPermission, WorkerPermission, ReadPermission, AdminPermission}
 
 var grpcPermissions = map[string]auth.Permission{
 	protocol.Scheduler_ScheduleBuild_FullMethodName:     BuildPermission,

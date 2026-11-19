@@ -1570,8 +1570,10 @@ The scheduler can be configured using environment variables and/or a configurati
 
     * - ``-``
       - ``auth.anonymous``
-      - | Permissions of clients without a token: ``build``, ``worker``, ``read`` and ``admin``.
-        | Default: ``[read, write]`` without tokens or ``auth.oidc``, ``[]`` with them.
+      - | Permissions of clients without a token: ``build``, ``cancel-anonymous``, ``worker``, ``read`` and ``admin``.
+          ``cancel-anonymous`` also requires ``build`` and allows cancellation
+          of any build with no authenticated owners. See :ref:`build-cluster-tokens`.
+        | Default: ``[build, cancel-anonymous, worker, read, admin]`` without tokens or ``auth.oidc``, ``[]`` with them.
 
     * - ``-``
       - ``auth.tokens``

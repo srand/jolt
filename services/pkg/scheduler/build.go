@@ -69,4 +69,7 @@ type Build interface {
 
 	// Returns true if the client submitted the build.
 	IsOwner(name string) bool
+
+	// Returns true if any authenticated client submitted the build.
+	HasOwners() bool
 }

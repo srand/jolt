@@ -97,14 +97,16 @@ func (s *schedulerService) ScheduleBuild(request *protocol.BuildRequest, stream 
 }
 
 func (s *schedulerService) CancelBuild(ctx context.Context, req *protocol.CancelBuildRequest) (*protocol.CancelBuildResponse, error) {
-	// Clients may only cancel the builds they submitted, unless they administer
-	// the scheduler
+	// Clients may cancel their own builds, or builds without authenticated owners
+	// with explicit permission. Administrators may cancel any build.
 	if identity, ok := auth.IdentityFromContext(ctx); ok && !identity.Allows(AdminPermission) {
 		build, err := s.scheduler.GetBuild(req.BuildId)
 		if err != nil {
 			return nil, utils.GrpcError(err)
 		}
-		if !build.IsOwner(identity.Name) || identity.Anonymous {
+		owner := !identity.Anonymous && build.IsOwner(identity.Name)
+		anonymous := identity.Allows(CancelAnonymousPermission) && !build.HasOwners()
+		if !owner && !anonymous {
 			return nil, status.Errorf(codes.PermissionDenied, "%s may only cancel its own builds", identity.Name)
 		}
 	}

@@ -295,9 +295,13 @@ The scheduler grants these permissions:
     * - Permission
       - Allows
     * - ``build``
-      - Building, cancelling the builds that the client submitted, and running
+      - Building, cancelling the builds that the authenticated client submitted, and running
         their tasks. Clients that build also need ``read`` to see the logs of
         their tasks.
+    * - ``cancel-anonymous``
+      - Cancelling any build with no authenticated owners. Also requires
+        ``build`` permission. Does not grant cancellation of authenticated
+        clients' builds.
     * - ``worker``
       - Receiving build instructions, required by workers. Executors use
         ``build`` permission.
@@ -320,6 +324,19 @@ Example:
         - name: workers
           sha256: 4c1e0fb8de8c8e4c4f5b4ba9c3aa6a9ac5c3d7fb22bb4b8b0f4cbf5e8b0b6c3e
           permissions: [worker]
+
+To support legacy clients without authentication, explicitly grant anonymous
+clients build and cancellation permissions:
+
+  .. code:: yaml
+
+    auth:
+      anonymous: [build, read, cancel-anonymous]
+
+Anonymous clients cannot be distinguished, so this allows them to cancel
+each other's builds. Identical submissions share a build; once an authenticated
+client submits that build, anonymous cancellation is no longer allowed.
+No client or protocol changes are required.
 
 Clients send their tokens as bearer tokens:
 

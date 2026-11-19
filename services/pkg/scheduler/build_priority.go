@@ -316,6 +316,12 @@ func (b *priorityBuild) IsOwner(name string) bool {
 	return slices.Contains(b.owners, name)
 }
 
+func (b *priorityBuild) HasOwners() bool {
+	b.RLock()
+	defer b.RUnlock()
+	return len(b.owners) > 0
+}
+
 // Schedule one the build's tasks for execution.
 // Returns the task and an observer for task updates.
 // Returns an error if the task does not exist.
