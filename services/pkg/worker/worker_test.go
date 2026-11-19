@@ -24,7 +24,7 @@ func TestExecutorReceivesSubmitterTokenWithoutChangingWorkerEnvironment(t *testi
 			t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
 			output := filepath.Join(w.cwd, "token")
 			t.Setenv("TOKEN_OUTPUT", output)
-			require.NoError(t, os.WriteFile(filepath.Join(bin, "jolt"), []byte("#!/bin/sh\nprintf '%s' \"$JOLT_SCHEDULER_TOKEN\" > \"$TOKEN_OUTPUT\"\n"), 0700))
+			require.NoError(t, os.WriteFile(filepath.Join(bin, "jolt"), []byte("#!/bin/sh\nprintf '%s' \"${JOLT_SCHEDULER_TOKEN-unset}\" > \"$TOKEN_OUTPUT\"\n"), 0700))
 			activate := w.activateVEnvPath("client")
 			require.NoError(t, os.MkdirAll(filepath.Dir(activate), 0700))
 			require.NoError(t, os.WriteFile(activate, nil, 0600))
@@ -41,7 +41,11 @@ func TestExecutorReceivesSubmitterTokenWithoutChangingWorkerEnvironment(t *testi
 			require.NoError(t, <-done)
 			value, err := os.ReadFile(output)
 			require.NoError(t, err)
-			assert.Equal(t, token, string(value))
+			if token == "" {
+				assert.Equal(t, "unset", string(value))
+			} else {
+				assert.Equal(t, token, string(value))
+			}
 			assert.Equal(t, "worker-token", os.Getenv("JOLT_SCHEDULER_TOKEN"))
 		}
 	}

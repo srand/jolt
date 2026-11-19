@@ -726,7 +726,16 @@ func (w *worker) startExecutor(clientDigest string, client *protocol.Client, wor
 	}
 
 	log.Infof("Starting %s executor in workspace %s", client.Version, runPath)
-	env := append(os.Environ(), "JOLT_SCHEDULER_TOKEN="+schedulerToken)
+	// Never expose the worker's credentials to a build executor.
+	var env []string
+	for _, entry := range os.Environ() {
+		if !strings.HasPrefix(entry, "JOLT_SCHEDULER_TOKEN=") {
+			env = append(env, entry)
+		}
+	}
+	if schedulerToken != "" {
+		env = append(env, "JOLT_SCHEDULER_TOKEN="+schedulerToken)
+	}
 	return utils.RunOptionsEnv(runPath, env, cmd...)
 }
 
