@@ -227,7 +227,7 @@ func (w *worker) run() error {
 					continue
 				}
 
-				currentDone, currentProc, err = w.startExecutor(clientDigest, currentClient, request.Build.Environment.Workspace, request.WorkerId, request.BuildId, currentBuildFile)
+				currentDone, currentProc, err = w.startExecutor(clientDigest, currentClient, request.Build.Environment.Workspace, request.WorkerId, request.BuildId, currentBuildFile, request.SchedulerToken)
 				if err != nil {
 					reply(protocol.WorkerUpdate_EXECUTOR_FAILED, err)
 					os.RemoveAll(currentBuildFile)
@@ -557,7 +557,7 @@ func (w *worker) nixWrapperCmd(clientWsName string, cmdline []string) ([]string,
 	}
 
 	// Add default environment variables to the nix-shell.
-	nixCmd = append(nixCmd, "--keep", "HOSTNAME")
+	nixCmd = append(nixCmd, "--keep", "HOSTNAME", "--keep", "JOLT_SCHEDULER_TOKEN")
 
 	// Add all environment variables with a JOLT prefix to the nix-shell.
 	for _, env := range os.Environ() {
@@ -682,7 +682,7 @@ func (w *worker) runClientCmdWindows(clientDigest, workdir string, args ...strin
 	return w.runCmdWindows(workdir, cmd...)
 }
 
-func (w *worker) startExecutor(clientDigest string, client *protocol.Client, workspace *protocol.Workspace, worker, build, request string) (chan error, *utils.Command, error) {
+func (w *worker) startExecutor(clientDigest string, client *protocol.Client, workspace *protocol.Workspace, worker, build, request, schedulerToken string) (chan error, *utils.Command, error) {
 	activate := w.activateVEnvPath(clientDigest)
 
 	// Build the executor command.
@@ -726,7 +726,8 @@ func (w *worker) startExecutor(clientDigest string, client *protocol.Client, wor
 	}
 
 	log.Infof("Starting %s executor in workspace %s", client.Version, runPath)
-	return utils.RunOptions(runPath, cmd...)
+	env := append(os.Environ(), "JOLT_SCHEDULER_TOKEN="+schedulerToken)
+	return utils.RunOptionsEnv(runPath, env, cmd...)
 }
 
 func (w *worker) enlist(stream protocol.Worker_GetInstructionsClient) error {

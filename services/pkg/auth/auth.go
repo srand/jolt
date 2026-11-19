@@ -221,15 +221,20 @@ func ContextWithIdentity(ctx context.Context, identity *Identity) context.Contex
 	return context.WithValue(ctx, identityKey{}, identity)
 }
 
+// TokenFromContext returns the token from incoming gRPC authorization metadata.
+func TokenFromContext(ctx context.Context) string {
+	if md, ok := metadata.FromIncomingContext(ctx); ok {
+		if values := md.Get("authorization"); len(values) > 0 {
+			return TokenFromHeader(values[0])
+		}
+	}
+	return ""
+}
+
 // authorizeContext returns the context of a call with its client, if the
 // client has the permission.
 func (a *Authenticator) authorizeContext(ctx context.Context, permission Permission) (context.Context, error) {
-	token := ""
-	if md, ok := metadata.FromIncomingContext(ctx); ok {
-		if values := md.Get("authorization"); len(values) > 0 {
-			token = TokenFromHeader(values[0])
-		}
-	}
+	token := TokenFromContext(ctx)
 	identity, err := a.Authorize(ctx, token, permission)
 	switch {
 	case errors.Is(err, ErrUnauthenticated):

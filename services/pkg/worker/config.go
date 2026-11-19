@@ -40,8 +40,7 @@ type WorkerConfig struct {
 	// Base URL to the scheduler service.
 	SchedulerGrpcUri string `mapstructure:"scheduler_grpc_uri"`
 
-	// Token that authenticates the worker and its executors with the
-	// scheduler service.
+	// Token that authenticates the worker with the scheduler service.
 	SchedulerToken string `mapstructure:"scheduler_token"`
 
 	// Thread count for the worker.

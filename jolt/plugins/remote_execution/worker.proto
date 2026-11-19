@@ -30,6 +30,9 @@ message WorkerRequest {
 
     // Id of the build that is concerned
     string build_id = 4;
+
+    // Build submitter's scheduler token, forwarded only to the executor.
+    string scheduler_token = 5;
 }
 
 // Updates sent from workers to scheduler

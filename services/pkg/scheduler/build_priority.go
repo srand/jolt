@@ -32,6 +32,9 @@ type priorityBuild struct {
 	// Names of the authenticated clients that submitted the build.
 	owners []string
 
+	// Credential of a submitter, never published in build metadata.
+	schedulerToken string
+
 	// Scheduler telemetry, separate from client observers that keep a build alive.
 	statusChanged func(*protocol.BuildInfo)
 
@@ -94,6 +97,18 @@ func (b *priorityBuild) Environment() *protocol.BuildEnvironment {
 	b.RLock()
 	defer b.RUnlock()
 	return b.environment
+}
+
+func (b *priorityBuild) SetSchedulerToken(token string) {
+	b.Lock()
+	defer b.Unlock()
+	b.schedulerToken = token
+}
+
+func (b *priorityBuild) SchedulerToken() string {
+	b.RLock()
+	defer b.RUnlock()
+	return b.schedulerToken
 }
 
 // Returns the priority of the build.

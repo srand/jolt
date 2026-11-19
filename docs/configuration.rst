@@ -1771,7 +1771,9 @@ The worker can be configured using environment variables and/or a configuration 
       - | Token that authenticates the worker with the scheduler. It needs the
           ``worker`` permission. See :ref:`build-cluster-tokens`.
 
-        | The worker passes the token on to the executors it starts.
+        | Executors instead receive the build submitter's scheduler token,
+          forwarded by the scheduler, as ``JOLT_SCHEDULER_TOKEN``. It needs
+          the ``build`` permission.
 
     * - ``JOLT_CA_CERT``
       - ``ca_cert``

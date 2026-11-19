@@ -13,7 +13,7 @@ const (
 	// tasks. Clients that build also need to read, to see the logs of their
 	// tasks.
 	BuildPermission auth.Permission = "build"
-	// Execute tasks, required by workers and the executors they start.
+	// Receive build instructions, required by workers.
 	WorkerPermission auth.Permission = "worker"
 	// List builds and workers, follow events and read logs.
 	ReadPermission auth.Permission = auth.Read
@@ -29,7 +29,7 @@ var grpcPermissions = map[string]auth.Permission{
 	protocol.Scheduler_CancelBuild_FullMethodName:       BuildPermission,
 	protocol.Scheduler_ScheduleTask_FullMethodName:      BuildPermission,
 	protocol.Worker_GetInstructions_FullMethodName:      WorkerPermission,
-	protocol.Worker_GetTasks_FullMethodName:             WorkerPermission,
+	protocol.Worker_GetTasks_FullMethodName:             BuildPermission,
 	protocol.Administration_ListBuilds_FullMethodName:   ReadPermission,
 	protocol.Administration_ListWorkers_FullMethodName:  ReadPermission,
 	protocol.Administration_StreamEvents_FullMethodName: ReadPermission,

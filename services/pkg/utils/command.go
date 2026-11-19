@@ -35,9 +35,15 @@ func Run(args ...string) (chan error, *Command, error) {
 }
 
 func RunOptions(cwd string, args ...string) (chan error, *Command, error) {
+	return RunOptionsEnv(cwd, nil, args...)
+}
+
+// RunOptionsEnv runs a command with the supplied environment, or inherits it if nil.
+func RunOptionsEnv(cwd string, env []string, args ...string) (chan error, *Command, error) {
 	output := bytes.Buffer{}
 
 	cmd := NewCommand(args...)
+	cmd.cmd.Env = env
 	cmd.SetStderr(io.MultiWriter(os.Stderr, &output))
 	if cwd != "" {
 		cmd.SetDir(cwd)

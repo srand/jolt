@@ -44,6 +44,14 @@ func (s *schedulerService) ScheduleBuild(request *protocol.BuildRequest, stream 
 		build = s.scheduler.NewBuild(id, request)
 	}
 
+	token := auth.TokenFromContext(stream.Context())
+	if token != "" {
+		build.SetSchedulerToken(token)
+	}
+	if identity, ok := auth.IdentityFromContext(stream.Context()); ok && !identity.Anonymous {
+		build.AddOwner(identity.Name)
+	}
+
 	observer, err := s.scheduler.ScheduleBuild(build)
 	if err != nil {
 		return utils.GrpcError(err)
@@ -55,6 +63,9 @@ func (s *schedulerService) ScheduleBuild(request *protocol.BuildRequest, stream 
 	if identity, ok := auth.IdentityFromContext(stream.Context()); ok && !identity.Anonymous {
 		if registered, err := s.scheduler.GetBuild(id); err == nil {
 			registered.AddOwner(identity.Name)
+			if token != "" {
+				registered.SetSchedulerToken(token)
+			}
 		}
 	}
 

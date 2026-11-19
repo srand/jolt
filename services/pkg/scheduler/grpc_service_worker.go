@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/srand/jolt/scheduler/pkg/auth"
 	"github.com/srand/jolt/scheduler/pkg/log"
 	"github.com/srand/jolt/scheduler/pkg/logstash"
 	"github.com/srand/jolt/scheduler/pkg/protocol"
@@ -113,8 +114,9 @@ func (s *workerService) GetInstructions(stream protocol.Worker_GetInstructionsSe
 				Build: &protocol.BuildRequest{
 					Environment: currentBuild.Environment(),
 				},
-				WorkerId: worker.Id(),
-				BuildId:  currentBuild.Id(),
+				WorkerId:       worker.Id(),
+				BuildId:        currentBuild.Id(),
+				SchedulerToken: currentBuild.SchedulerToken(),
 			}
 
 			if err := stream.Send(request); err != nil {
@@ -257,6 +259,16 @@ func (s *workerService) GetTasks(stream protocol.Worker_GetTasksServer) error {
 	if err != nil {
 		log.Trace("Executor read error:", err)
 		return utils.GrpcError(err)
+	}
+
+	if identity, ok := auth.IdentityFromContext(stream.Context()); ok && !identity.Anonymous {
+		build, err := s.scheduler.GetBuild(execInfo.Request.BuildId)
+		if err != nil {
+			return utils.GrpcError(err)
+		}
+		if !build.IsOwner(identity.Name) {
+			return grpcstatus.Error(codes.PermissionDenied, "executors may only execute their client's builds")
+		}
 	}
 
 	executor, err := s.scheduler.NewExecutor(execInfo.Worker.Id, execInfo.Request.BuildId)

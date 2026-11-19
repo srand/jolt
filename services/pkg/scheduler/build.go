@@ -10,6 +10,12 @@ type Build interface {
 	// Returns the build environment as provided by the client.
 	Environment() *protocol.BuildEnvironment
 
+	// Sets the scheduler token forwarded to executors, separate from build metadata.
+	SetSchedulerToken(token string)
+
+	// Returns the scheduler token forwarded to executors.
+	SchedulerToken() string
+
 	// Returns the priority of the build.
 	Priority() int
 

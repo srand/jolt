@@ -299,7 +299,8 @@ The scheduler grants these permissions:
         their tasks. Clients that build also need ``read`` to see the logs of
         their tasks.
     * - ``worker``
-      - Executing tasks, required by workers and the executors they start.
+      - Receiving build instructions, required by workers. Executors use
+        ``build`` permission.
     * - ``read``
       - Listing builds and workers, following events and reading logs.
     * - ``admin``
@@ -324,8 +325,13 @@ Clients send their tokens as bearer tokens:
 
 - Jolt uses ``cache.token`` and ``scheduler.token``, or the
   ``JOLT_CACHE_TOKEN`` and ``JOLT_SCHEDULER_TOKEN`` environment variables.
-- Workers use ``scheduler_token`` and ``cache_token``, and pass them on to the
-  executors they start, which upload artifacts.
+- Workers use ``scheduler_token`` to receive build instructions and pass
+  ``cache_token`` to executors, which upload artifacts. The scheduler forwards
+  the build submitter's scheduler token to the assigned worker, which sets
+  ``JOLT_SCHEDULER_TOKEN`` in that executor's environment. Executors authenticate
+  with ``build`` permission and may only execute their client's builds.
+  The forwarded token is not included in build identities or public metadata.
+  Workers must be trusted with the submitter's token; use TLS on both connections.
 - ``schedulerctl`` uses ``scheduler_token`` in ``schedulerctl.yaml`` or
   ``JOLT_SCHEDULER_TOKEN``, and the dashboard ``JOLT_SCHEDULER_TOKEN``.
 
