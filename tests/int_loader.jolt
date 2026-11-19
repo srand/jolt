@@ -30,3 +30,21 @@ class LoaderInternal(JoltTest):
             r = self.jolt("list")
 
         self.assertIn("unicode", r)
+
+    def test_inspection_with_utf8_characters(self):
+        with self.tools.cwd(self.ws):
+            self.tools.write_file(
+                "inspect_source.py",
+                "from jolt import inspection\n"
+                "\n"
+                "\n"
+                "class Unicode:\n"
+                "    # \u65e5\n"
+                "    pass\n"
+                "\n"
+                "\n"
+                "assert inspection.getclassast(Unicode).name == 'Unicode'\n",
+                expand=False)
+
+            with self.tools.environ(LC_ALL="C", LANG="C", PYTHONUTF8="0", PYTHONCOERCECLOCALE="0"):
+                self.tools.run("python3 inspect_source.py")

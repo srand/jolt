@@ -11,6 +11,7 @@ of already parsed modules in order to speed up those functions.
 
 import ast
 import sys
+import tokenize
 
 
 # Cache of parsed modules (ClassFinder objects), indexed by module.
@@ -54,7 +55,8 @@ def _populate_cache(module):
                     for child in block:
                         self.visit(child)
 
-    with open(module.__file__) as modfp:
+    # Use Python's source encoding (UTF-8 by default), not the locale's.
+    with tokenize.open(module.__file__) as modfp:
         tree = ast.parse(modfp.read())
     class_finder = _ClassFinder()
     class_finder.visit(tree)
