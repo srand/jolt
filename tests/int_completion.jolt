@@ -320,6 +320,44 @@ class CompletionInternal(JoltTest):
                 result = self.tools.run("{} {}", sys.executable, jolt_completion.__file__)
         self.assertIn("jolt_nospace,example", result)
 
+    def test_bash_initialization_refreshes_commands_without_tasks(self):
+        import jolt_completion
+        import sqlite3
+        configdir = os.path.join(self.ws, "initial-config")
+        self.tools.mkdir(configdir)
+        cachedir = os.path.join(self.ws, "initial-cache")
+        self.tools.write_file(os.path.join(configdir, "config"), "[jolt]\ncachedir={}\n".format(cachedir), expand=False)
+        self.tools.write_file(os.path.join(self.ws, "test.jolt"), "raise RuntimeError('recipe executed')\n", expand=False)
+        with self.tools.cwd(self.ws), self.tools.environ(JOLT_CONFIG_PATH=configdir):
+            source = self.tools.run("{} {} --bash-source", sys.executable, jolt_completion.__file__)
+            with sqlite3.connect(os.path.join(cachedir, "taskparameters.db")) as db:
+                self.assertIsNotNone(db.execute("SELECT metadata FROM completion_commands WHERE id = 1").fetchone())
+                self.assertIsNone(db.execute("SELECT 1 FROM sqlite_master WHERE name = 'workspace_tasks'").fetchone())
+                db.execute("UPDATE completion_commands SET metadata = '{}'")
+            self.tools.run("{} {} --bash-source", sys.executable, jolt_completion.__file__)
+            with sqlite3.connect(os.path.join(cachedir, "taskparameters.db")) as db:
+                self.assertNotEqual(db.execute("SELECT metadata FROM completion_commands WHERE id = 1").fetchone()[0], "{}")
+            with self.tools.environ(JOLT_COMPLETE_LINE="jolt bu"):
+                self.assertIn("plain,build", self.tools.run("{} -S {}", sys.executable, jolt_completion.__file__))
+            with self.tools.environ(JOLT_COMPLETE_LINE="jolt build ex"):
+                self.assertEqual(self.tools.run("{} -S {}", sys.executable, jolt_completion.__file__), "")
+        path = os.path.join(self.ws, "initial-completion.sh")
+        self.tools.write_file(path, source, expand=False)
+        self.tools.run("bash -n {}", path)
+
+    def test_refresh_commands_does_not_touch_task_index(self):
+        import jolt_completion
+        from jolt.loader import JoltLoader
+        cache = self.cache()
+        with patch.object(completion, "_parameters", cache), \
+                patch("jolt.influence.jolt_config.get_cachedir", return_value=self.ws):
+            expected = completion.update_index(self.ws, self.tasks())
+            with patch.object(JoltLoader.get(), "load", side_effect=AssertionError("recipes loaded")), \
+                    patch.object(JoltLoader.get(), "load_plugins") as plugins:
+                jolt_completion.refresh_commands()
+            plugins.assert_called_once_with()
+            self.assertEqual(completion.read_index(self.ws), expected)
+
     def test_standalone_bash_source_is_valid(self):
         import jolt_completion
         source = self.tools.run("{} {} --bash-source", sys.executable, jolt_completion.__file__)

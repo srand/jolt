@@ -12,11 +12,13 @@ When running from a source checkout without installing Jolt, use::
 
     eval "$(python3 /path/to/jolt/jolt_completion.py --bash-source)"
 
-The helper uses only the Python standard library and reads the completion index
-without importing Jolt or Click. It supports commands, options, choice values,
-file paths, and task parameters. Run ``jolt list`` once to populate the index.
-If the index is missing or unavailable, the helper returns no suggestions; it
-never starts Jolt or executes recipes. Global ``-c``/``--config`` and
+Shell initialization (``--bash-source``) imports Jolt once to refresh command
+and option metadata, including configured plugins, without loading recipes or
+updating tasks. Each subsequent completion request uses only the Python standard
+library and reads the index without importing Jolt or Click. It supports commands,
+options, choice values, file paths, and task parameters. Run ``jolt list`` once to
+populate the task index. If the task index is missing, task completion returns no
+suggestions; completion requests never start Jolt or execute recipes. Global ``-c``/``--config`` and
 ``-C``/``--chdir`` options select the cache and workspace used for completion.
 
 Click's integration remains available for Zsh and Fish (``zsh_source`` and

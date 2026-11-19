@@ -256,8 +256,20 @@ complete -o nosort -F _jolt_standalone_complete jolt
 '''
 
 
+def refresh_commands():
+    # Only shell initialization imports Jolt; each Tab request stays stdlib-only.
+    from contextlib import redirect_stdout
+    with redirect_stdout(sys.stderr):
+        from jolt.cli import cli
+        from jolt.completion import update_commands
+        from jolt.loader import JoltLoader
+        JoltLoader.get().load_plugins()
+        update_commands(cli)
+
+
 def main():
     if sys.argv[1:] == ["--bash-source"]:
+        refresh_commands()
         helper = shlex.quote(sys.executable) + " -S " + shlex.quote(os.path.abspath(__file__))
         print(BASH_SOURCE % {"helper": helper})
         return
