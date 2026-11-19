@@ -88,6 +88,7 @@ setup(
         "xcode",
     ],
     packages=find_packages(exclude=["contrib", "docs", "tests"]),
+    py_modules=["jolt_completion"],
     install_requires=install_requires,
     extras_require={
         "allure": ["allure-python-commons"],
@@ -102,6 +103,7 @@ setup(
     entry_points={
         "console_scripts": [
             "jolt=jolt.__main__:main",
+            "jolt-completion=jolt_completion:main",
         ],
     },
 )

@@ -35,6 +35,7 @@ class All(Alias):
         "ext/symlinks",
         "flake8",
         "int/binaries",
+        "int/completion",
         "int/git",
         "int/graph",
         "int/http",

@@ -1,0 +1,335 @@
+import os
+import sys
+sys.path.append(".")
+
+from unittest.mock import patch
+
+from testsupport import JoltTest
+from jolt import BooleanParameter, IntParameter, ListParameter, Parameter, Task
+from jolt import completion
+from jolt.loader import NativeRecipe
+
+
+class CompletionInternal(JoltTest):
+    name = "int/completion"
+
+    def tasks(self):
+        return [type("Example", (Task,), {
+            "name": "example",
+            "mode": Parameter(values=["debug", "release"]),
+            "jobs": IntParameter(values=[1, 2]),
+            "text": Parameter(required=False),
+            "enabled": BooleanParameter(),
+            "fixed": Parameter("constant", const=True),
+        }), type("Simple", (Task,), {"name": "simple"})]
+
+    def complete(self, value):
+        return [item.value for item in completion.complete_tasks(self.tasks(), value)]
+
+    def test_names_are_completed_before_parameters(self):
+        self.assertEqual(self.complete("ex"), ["example"])
+        self.assertEqual(self.complete(""), ["example", "simple"])
+        self.assertEqual(self.complete("simple"), [])
+        self.assertEqual(self.complete("missing:"), [])
+
+    def test_exact_name_suggests_parameters(self):
+        expected = ["example:enabled=", "example:jobs=", "example:mode=", "example:text="]
+        self.assertEqual(self.complete("example"), expected)
+        self.assertEqual(self.complete("example:"), expected)
+        self.assertEqual(self.complete("example:m"), ["example:mode="])
+
+    def test_predefined_values(self):
+        self.assertEqual(self.complete("example:mode="), ["example:mode=debug", "example:mode=release"])
+        self.assertEqual(self.complete("example:mode=r"), ["example:mode=release"])
+        self.assertEqual(self.complete("example:jobs="), ["example:jobs=1", "example:jobs=2"])
+        self.assertIn("example:enabled=true", self.complete("example:enabled="))
+        self.assertEqual(self.complete("example:mode=invalid"), [])
+
+    def test_finished_value_suggests_unused_parameters(self):
+        self.assertEqual(self.complete("example:mode=release"), [
+            "example:mode=release,enabled=", "example:mode=release,jobs=", "example:mode=release,text="])
+        self.assertEqual(self.complete("example:mode=release,"), [
+            "example:mode=release,enabled=", "example:mode=release,jobs=", "example:mode=release,text="])
+        self.assertEqual(self.complete("example:mode=release,j"), ["example:mode=release,jobs="])
+        self.assertEqual(self.complete("example:mode=release,mode="), [])
+        self.assertEqual(self.complete("example:mode=release,jobs=2,enabled=true,text=hello"), [])
+
+    def test_free_values_and_unknown_parameters(self):
+        self.assertEqual(self.complete("example:text="), [])
+        self.assertIn("example:text=hello,mode=", self.complete("example:text=hello"))
+        self.assertEqual(self.complete("example:missing=value"), [])
+
+    def test_no_space_until_final_value(self):
+        tasks = self.tasks()
+        self.assertEqual(completion.complete_tasks(tasks, "ex")[0].type, "jolt_nospace")
+        self.assertEqual(completion.complete_tasks(tasks, "sim")[0].type, "plain")
+        final = completion.complete_tasks(tasks, "example:mode=release,enabled=true,text=hello,jobs=")
+        self.assertEqual([item.type for item in final], ["plain", "plain"])
+
+    def test_list_parameter_values(self):
+        task = type("Features", (Task,), {"name": "features", "features": ListParameter(values=["a", "b", "c"])})
+
+        def complete(value):
+            return [item.value for item in completion.complete_tasks([task], value)]
+        self.assertEqual(complete("features:features=a+"), ["features:features=a+b", "features:features=a+c"])
+        self.assertEqual(complete("features:features=a+b"), ["features:features=a+b+c"])
+
+    def load_recipe(self, source):
+        path = os.path.join(self.ws, "parameters.jolt")
+        self.tools.write_file(path, source, expand=False)
+        recipe = NativeRecipe(path)
+        recipe.load()
+        return recipe.tasks[0]
+
+    def cache(self):
+        cache = completion._TaskParameters()
+        if not hasattr(self, "_parameter_caches"):
+            self._parameter_caches = []
+        self._parameter_caches.append(cache)
+        return cache
+
+    def cleanup(self):
+        for cache in getattr(self, "_parameter_caches", []):
+            cache._save()
+        super().cleanup()
+
+    def test_cache_is_persistent_and_skips_parameter_inspection(self):
+        task = self.load_recipe("from jolt import *\nclass Example(Task):\n    mode = Parameter(values=['a', 'b'])\n")
+        with patch("jolt.influence.jolt_config.get_cachedir", return_value=self.ws):
+            cache = self.cache()
+            expected = cache.get(task)
+            cache._save()
+            with patch.object(completion._TaskParameters, "_parameters", side_effect=AssertionError("cache miss")):
+                self.assertEqual(self.cache().get(task), expected)
+
+    def test_cache_invalidates_when_recipe_changes(self):
+        with patch("jolt.influence.jolt_config.get_cachedir", return_value=self.ws):
+            task = self.load_recipe("from jolt import *\nclass Example(Task):\n    mode = Parameter(values=['a'])\n")
+            cache = self.cache()
+            cache.get(task)
+            cache._save()
+            task = self.load_recipe("from jolt import *\nclass Example(Task):\n    mode = Parameter(values=['new'])\n")
+            self.assertEqual(self.cache().get(task)["mode"]["values"], ["new"])
+
+    def test_cache_invalidates_when_base_module_changes(self):
+        path = os.path.join(self.ws, "base.py")
+        source = "from jolt import *\nclass Base(Task):\n    mode = Parameter(values=['a'])\n"
+        self.tools.write_file(path, source, expand=False)
+        base = NativeRecipe(path)
+        base.load()
+        with patch.dict(sys.modules, completion_base=sys.modules[base.tasks[0].__module__]), \
+                patch("jolt.influence.jolt_config.get_cachedir", return_value=self.ws):
+            task = self.load_recipe("from completion_base import Base\nclass Example(Base):\n    pass\n")
+            cache = self.cache()
+            cache.get(task)
+            cache._save()
+            self.tools.write_file(path, source.replace("['a']", "['changed']"), expand=False)
+            base = NativeRecipe(path)
+            base.load()
+            sys.modules["completion_base"] = sys.modules[base.tasks[0].__module__]
+            task = self.load_recipe("from completion_base import Base\nclass Example(Base):\n    pass\n")
+            self.assertEqual(self.cache().get(task)["mode"]["values"], ["changed"])
+
+    def completion_output(self):
+        with self.tools.cwd(self.ws):
+            return self.tools.run("{} -c 'from jolt import config; config.load_or_set(\"jolt.cachedir=cache\"); from jolt.cli import cli; cli(prog_name=\"jolt\")'", sys.executable)
+
+    def test_cli_discovers_new_tasks_and_completes_arguments(self):
+        self.load_recipe("from jolt import *\nclass Example(Task):\n    mode = Parameter(values=['a', 'b'])\n")
+        self.jolt("-c jolt.cachedir=cache list")
+        with self.tools.environ(_JOLT_COMPLETE="bash_complete", COMP_WORDS="jolt build ex", COMP_CWORD="2"):
+            self.assertIn("jolt_nospace,example", self.completion_output())
+        with self.tools.environ(_JOLT_COMPLETE="bash_complete", COMP_WORDS="jolt build example : mode =", COMP_CWORD="5",
+                                JOLT_COMPLETE_LINE="jolt build example:mode="):
+            result = self.completion_output()
+            self.assertIn("plain,a", result)
+            self.assertIn("plain,b", result)
+        self.tools.write_file(os.path.join(self.ws, "new.jolt"), "from jolt import *\nclass New(Task):\n    pass\n", expand=False)
+        with self.tools.environ(_JOLT_COMPLETE="bash_complete", COMP_WORDS="jolt build ne", COMP_CWORD="2"):
+            self.assertNotIn("plain,new", self.completion_output())
+        self.jolt("-c jolt.cachedir=cache list")
+        with self.tools.environ(_JOLT_COMPLETE="bash_complete", COMP_WORDS="jolt build ne", COMP_CWORD="2"):
+            self.assertIn("plain,new", self.completion_output())
+
+    def test_workspace_index_skips_loading_even_when_empty(self):
+        from jolt.loader import JoltLoader
+        loader = type(JoltLoader.get())()
+        loader.set_workspace_path(self.ws)
+        cache = self.cache()
+        with patch.object(completion, "_parameters", cache), \
+                patch("jolt.influence.jolt_config.get_cachedir", return_value=self.ws):
+            completion.update_index(self.ws, [])
+            with patch.object(loader, "load", side_effect=AssertionError("recipes loaded")):
+                self.assertEqual(loader.completion_index(), {})
+
+    def test_workspace_index_is_persistent_and_isolated(self):
+        cache = self.cache()
+        with patch.object(completion, "_parameters", cache), \
+                patch("jolt.influence.jolt_config.get_cachedir", return_value=self.ws):
+            expected = completion.update_index(self.ws, self.tasks())
+            cache._save()
+            with patch.object(completion, "_parameters", self.cache()):
+                self.assertEqual(completion.read_index(self.ws), expected)
+                self.assertIsNone(completion.read_index(os.path.join(self.ws, "other")))
+
+    def test_workspace_index_filters_names_before_decoding_parameters(self):
+        cache = self.cache()
+        with patch.object(completion, "_parameters", cache), \
+                patch("jolt.influence.jolt_config.get_cachedir", return_value=self.ws):
+            expected = completion.update_index(self.ws, self.tasks())
+            cache._db.execute("UPDATE workspace_tasks SET parameters = 'invalid' WHERE name = 'simple'")
+            self.assertEqual(completion.read_index(self.ws, "ex"), {"example": expected["example"]})
+            self.assertEqual(completion.read_index(self.ws, "example:mode=r"), {"example": expected["example"]})
+            self.assertEqual(completion.read_index(self.ws, "EX"), {})
+            self.assertEqual(completion.read_index(self.ws, "missing"), {})
+            self.assertEqual(completion.read_index(self.ws, "%"), {})
+            self.assertEqual(completion.read_index(self.ws, "_"), {})
+            self.assertEqual(completion.read_index(self.ws, "examplex:"), {})
+            cache._db.commit()
+
+    def test_workspace_index_filters_literal_prefixes(self):
+        cache = self.cache()
+        with patch.object(completion, "_parameters", cache), \
+                patch("jolt.influence.jolt_config.get_cachedir", return_value=self.ws):
+            tasks = [type("Named", (Task,), {"name": name}) for name in ["a%b", "a_b", "abc", "Abc", "a\U0010ffff"]]
+            completion.update_index(self.ws, tasks)
+            self.assertEqual(completion.read_index(self.ws, "a%"), {"a%b": {}})
+            self.assertEqual(completion.read_index(self.ws, "a_"), {"a_b": {}})
+            self.assertEqual(completion.read_index(self.ws, "A"), {"Abc": {}})
+            self.assertEqual(completion.read_index(self.ws, "a\U0010ffff"), {"a\U0010ffff": {}})
+
+    def test_legacy_workspace_index_is_migrated_without_loading_recipes(self):
+        import json
+        cache = self.cache()
+        with patch.object(completion, "_parameters", cache), \
+                patch("jolt.influence.jolt_config.get_cachedir", return_value=self.ws):
+            db = cache._connect()
+            db.execute("CREATE TABLE workspaces (path TEXT PRIMARY KEY, tasks TEXT NOT NULL)")
+            db.execute("INSERT INTO workspaces VALUES (?, ?)",
+                       (os.path.realpath(self.ws), json.dumps({"example": {}, "simple": {}})))
+            db.commit()
+            self.assertEqual(completion.read_index(self.ws, "ex"), {"example": {}})
+            self.assertIsNone(db.execute("SELECT 1 FROM workspaces WHERE path = ?", (os.path.realpath(self.ws),)).fetchone())
+            self.assertEqual(completion.read_index(self.ws, "sim"), {"simple": {}})
+
+    def test_completion_index_loads_only_on_cache_miss(self):
+        from jolt.loader import JoltLoader
+        loader = type(JoltLoader.get())()
+        loader.set_workspace_path(self.ws)
+        with patch.object(completion, "read_index", return_value=None), \
+                patch.object(loader, "load", return_value=self.tasks()) as load:
+            self.assertIn("example", loader.completion_index())
+            load.assert_called_once_with()
+
+    def test_workspace_index_does_not_execute_changed_recipes(self):
+        self.load_recipe("from jolt import *\nclass Example(Task):\n    mode = Parameter(values=['a'])\n")
+        self.jolt("-c jolt.cachedir=cache list")
+        self.tools.write_file(os.path.join(self.ws, "parameters.jolt"), "raise RuntimeError('recipe executed')\n", expand=False)
+        with self.tools.environ(_JOLT_COMPLETE="bash_complete", COMP_WORDS="jolt build ex", COMP_CWORD="2"):
+            self.assertIn("jolt_nospace,example", self.completion_output())
+
+    def test_cache_covers_inheritance_and_overrides(self):
+        base = type("Base", (Task,), {"mode": Parameter(values=["a"]), "hidden": Parameter()})
+        task = type("Example", (base,), {"mode": Parameter(values=["b"]), "hidden": None})
+        self.assertEqual(self.cache().get(task), {"mode": {"values": ["b"], "list": False}})
+
+    def test_generated_classes_are_not_persisted(self):
+        cache = self.cache()
+        task = self.tasks()[0]
+        cache.get(task)
+        task.mode._accepted_values = ["new"]
+        self.assertEqual(cache.get(task)["mode"]["values"], ["new"])
+        self.assertEqual(cache._new, [])
+        self.assertIsNone(cache._db)
+
+    def test_unavailable_database_falls_back_to_memory(self):
+        task = self.load_recipe("from jolt import *\nclass Example(Task):\n    mode = Parameter(values=['a'])\n")
+        with patch("jolt.influence.sqlite3.connect", side_effect=OSError("unavailable")):
+            cache = self.cache()
+            self.assertEqual(cache.get(task)["mode"]["values"], ["a"])
+            with patch.object(cache, "_parameters", side_effect=AssertionError("cache miss")):
+                self.assertEqual(cache.get(task)["mode"]["values"], ["a"])
+
+    def test_bash_recovers_word_breaks_and_preserves_commas(self):
+        shell = completion.JoltBashComplete(None, {}, "jolt", "_JOLT_COMPLETE")
+        with patch.dict(os.environ, {
+                "JOLT_COMPLETE_LINE": "jolt build example:mode=release,j",
+                "COMP_WORDS": "jolt build example : mode = release,j",
+                "COMP_CWORD": "6"}):
+            self.assertEqual(shell.get_completion_args(), (["build"], "example:mode=release,j"))
+            self.assertEqual(shell.format_completion(completion._item("example:mode=release,jobs=")),
+                             "jolt_nospace,release,jobs=")
+
+    def standalone_output(self, line):
+        import jolt_completion
+        with self.tools.cwd(self.ws), self.tools.environ(JOLT_COMPLETE_LINE=line):
+            return self.tools.run("{} -S {}", sys.executable, jolt_completion.__file__)
+
+    def test_standalone_completes_without_importing_jolt(self):
+        import jolt_completion
+        self.load_recipe("from jolt import *\nclass Example(Task):\n    mode = Parameter(values=['a', 'b'])\n")
+        self.jolt("-c jolt.cachedir=cache list")
+        self.tools.write_file(os.path.join(self.ws, "parameters.jolt"), "raise RuntimeError('recipe executed')\n", expand=False)
+        self.assertIn("jolt_nospace,example", self.standalone_output("jolt -c jolt.cachedir=cache build ex"))
+        self.assertIn("plain,b", self.standalone_output("jolt -c jolt.cachedir=cache build example:mode="))
+        with self.tools.cwd(self.ws):
+            output = self.tools.run("{} -I -S -c 'import runpy, sys; runpy.run_path(\"{}\"); "
+                                    "assert \"jolt\" not in sys.modules; assert \"click\" not in sys.modules'",
+                                    sys.executable, jolt_completion.__file__)
+        self.assertEqual(output, "")
+
+    def test_standalone_missing_index_never_starts_jolt(self):
+        self.tools.write_file(os.path.join(self.ws, "test.jolt"), "raise RuntimeError('recipe executed')\n", expand=False)
+        self.assertEqual(self.standalone_output("jolt -c jolt.cachedir=missing build ex"), "")
+        self.assertFalse(os.path.exists(os.path.join(self.ws, "missing")))
+
+    def test_standalone_command_options_and_choices(self):
+        self.jolt("-c jolt.cachedir=cache list")
+        prefix = "jolt -c jolt.cachedir=cache "
+        self.assertIn("plain,build", self.standalone_output(prefix + "bu"))
+        self.assertIn("plain,--force", self.standalone_output(prefix + "build --f"))
+        self.assertNotIn("--worker", self.standalone_output(prefix + "build --"))
+        self.assertIn("plain,password", self.standalone_output(prefix + "login --grant p"))
+        self.assertIn("plain,password", self.standalone_output(prefix + "login --grant=p"))
+        self.assertIn("file,", self.standalone_output(prefix + "build --copy "))
+        self.assertIn("plain,--verbose", self.standalone_output(prefix + "--v"))
+        self.assertEqual(self.standalone_output(prefix + "build --jobs "), "")
+
+    def test_standalone_command_context_parsing(self):
+        import jolt_completion
+        from jolt.cli import cli
+        metadata = completion.command_metadata(cli)
+        command, args, pending, enabled = jolt_completion.resolve_command(metadata, ["-vv", "build", "-fj4", "example"])
+        self.assertEqual(args, ["example"])
+        self.assertIsNone(pending)
+        self.assertIn("--force", command["options"])
+        command, args, pending, enabled = jolt_completion.resolve_command(metadata, ["build", "--", "--force"])
+        self.assertEqual(args, ["--force"])
+        self.assertFalse(enabled)
+        self.assertEqual(jolt_completion.split_line('jolt build "example:mode=a'), ["jolt", "build", "example:mode=a"])
+        self.assertEqual(jolt_completion.split_line("jolt build example:mode=a,"), ["jolt", "build", "example:mode=a,"])
+
+    def test_standalone_chdir_and_config_files(self):
+        self.load_recipe("from jolt import *\nclass Example(Task):\n    mode = Parameter(values=['a'])\n")
+        self.jolt("-c jolt.cachedir=cache list")
+        self.tools.write_file(os.path.join(self.ws, "complete.conf"), "[jolt]\ncachedir=cache\n", expand=False)
+        with self.tools.cwd(os.path.dirname(self.ws)):
+            import jolt_completion
+            with self.tools.environ(JOLT_COMPLETE_LINE="jolt -C {} -c {} build ex".format(
+                    self.ws, os.path.join(self.ws, "complete.conf"))):
+                result = self.tools.run("{} {}", sys.executable, jolt_completion.__file__)
+        self.assertIn("jolt_nospace,example", result)
+
+    def test_standalone_bash_source_is_valid(self):
+        import jolt_completion
+        source = self.tools.run("{} {} --bash-source", sys.executable, jolt_completion.__file__)
+        path = os.path.join(self.ws, "completion.sh")
+        self.tools.write_file(path, source, expand=False)
+        self.tools.run("bash -n {}", path)
+        self.assertNotIn("bash_complete", source)
+
+    def test_shell_handlers_are_registered(self):
+        from click.shell_completion import get_completion_class
+        self.assertIs(get_completion_class("bash"), completion.JoltBashComplete)
+        self.assertIs(get_completion_class("zsh"), completion.JoltZshComplete)
+        self.assertIs(get_completion_class("fish"), completion.JoltFishComplete)

@@ -13,6 +13,7 @@ from jolt import scheduler
 from jolt import fstree
 from jolt import graph
 from jolt import cache
+from jolt.completion import complete_tasks, update_commands
 from jolt import colors
 from jolt import filesystem as fs
 from jolt import log
@@ -70,6 +71,7 @@ class PluginGroup(click.Group):
 
         # Load configured plugins
         JoltLoader.get().load_plugins()
+        update_commands(self)
 
         return click.Group.get_command(self, ctx, cmd_name)
 
@@ -160,6 +162,7 @@ def cli(ctx, verbose, config_file, debugger, profile,
     registry = TaskRegistry.get()
     loader = JoltLoader.get()
     loader.load(registry)
+    update_commands(ctx.command)
 
     if ctx.invoked_subcommand in ["build", "clean"] and loader.joltdir:
         ctx.obj["workspace_lock"] = utils.LockFile(
@@ -182,9 +185,7 @@ def cli(ctx, verbose, config_file, debugger, profile,
 
 def _autocomplete_tasks(ctx, args, incomplete):
     loader = JoltLoader.get()
-    tasks = loader.load()
-    tasks = [task.name for task in tasks if task.name.startswith(incomplete or '')]
-    return sorted(tasks)
+    return complete_tasks(loader.completion_index(incomplete), incomplete)
 
 
 def _interrupted(queue, executors):

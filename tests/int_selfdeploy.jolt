@@ -69,6 +69,7 @@ class SelfDeployInternal(JoltTest):
                 if "__pycache__" not in path
             }
         self.assertEqual(modules - artifact.files, set())
+        self.assertIn("jolt_completion.py", artifact.files)
 
     def test_dependencies_pin_requirements_of_jolt(self):
         with distributions(

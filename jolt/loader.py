@@ -272,7 +272,19 @@ class JoltLoader(object):
             for task in self._tasks:
                 registry.add_task_class(task)
 
+        from jolt.completion import update_index
+        update_index(self.workspace_path, self._tasks)
         return self._tasks
+
+    def completion_index(self, incomplete=""):
+        """Read completion metadata without executing recipes when an index exists."""
+        from jolt.completion import read_index, task_index
+        if not self.workspace_path:
+            self.set_workspace_path(self._find_workspace_path(os.getcwd()))
+        index = read_index(self.workspace_path, incomplete)
+        if index is not None:
+            return index
+        return task_index(self.load())
 
     def load_file(self, path, joltdir=None):
         """ Load a single recipe file. """

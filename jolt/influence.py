@@ -321,6 +321,7 @@ class _ClassSourceDigests(object):
     """
 
     max_files = 10000
+    filename = "classdigests.db"
 
     def __init__(self):
         self._lock = threading.Lock()
@@ -333,7 +334,7 @@ class _ClassSourceDigests(object):
     def _connect(self):
         if self._db is not None or self._db_failed:
             return self._db
-        path = fs.path.join(jolt_config.get_cachedir(), "classdigests.db")
+        path = fs.path.join(jolt_config.get_cachedir(), self.filename)
         try:
             fs.makedirs(fs.path.dirname(path))
             db = sqlite3.connect(path, timeout=30.0, check_same_thread=False)
@@ -403,7 +404,7 @@ class _ClassSourceDigests(object):
         path = inspection.getfile(cls)
         key = self._keys.get(path)
         if key is None:
-            with open(path) as f:
+            with open(path, encoding="utf-8") as f:
                 key = self._keys[path] = utils.hashstring(sys.version + "\0" + f.read())
         return key
 
