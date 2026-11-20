@@ -120,9 +120,8 @@ def command_metadata(command):
             data["kind"] = "dir"
         elif isinstance(param, click.Option) and "--config" in param.opts:
             data["kind"] = "file"
-        if isinstance(param, click.Argument):
-            callback = getattr(param, "_custom_shell_complete", None)
-            data["task"] = getattr(callback, "__name__", None) == "_autocomplete_tasks"
+        callback = getattr(param, "_custom_shell_complete", None)
+        data["task"] = getattr(callback, "__name__", None) == "_autocomplete_tasks"
         return data
 
     metadata = {"options": {}, "arguments": [], "commands": {}}

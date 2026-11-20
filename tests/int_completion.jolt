@@ -330,6 +330,15 @@ class CompletionInternal(JoltTest):
         self.assertIn("plain,--verbose", self.standalone_output(prefix + "--v"))
         self.assertEqual(self.standalone_output(prefix + "build --jobs "), "")
 
+    def test_standalone_completes_tasks_in_option_values(self):
+        self.load_recipe("from jolt import *\nclass Example(Task):\n    mode = Parameter(values=['a', 'b'])\n")
+        self.jolt("-c jolt.cachedir=cache list")
+        prefix = "jolt -c jolt.cachedir=cache build "
+        self.assertIn("jolt_nospace,example", self.standalone_output(prefix + "-d ex"))
+        self.assertIn("plain,b", self.standalone_output(prefix + "-d example:mode="))
+        self.assertIn("jolt_nospace,example", self.standalone_output(prefix + "--default=ex"))
+        self.assertIn("jolt_nospace,example", self.standalone_output(prefix + "-d example:mode=a ex"))
+
     def test_standalone_command_context_parsing(self):
         import jolt_completion
         from jolt.cli import cli

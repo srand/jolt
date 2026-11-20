@@ -206,6 +206,18 @@ def resolve_command(metadata, words):
     return command, positional, None, options_enabled
 
 
+def find_workspace(db, cwd):
+    workspace = os.path.realpath(cwd)
+    while True:
+        if glob.glob(os.path.join(workspace, "*.jolt")) or db.execute(
+                "SELECT 1 FROM workspace_indexes WHERE path = ?", (workspace,)).fetchone():
+            return workspace
+        parent = os.path.dirname(workspace)
+        if parent == workspace:
+            return None
+        workspace = parent
+
+
 def complete_line(line):
     words = split_line(line)[1:]
     if not words:
@@ -220,14 +232,22 @@ def complete_line(line):
             row = db.execute("SELECT metadata FROM completion_commands WHERE id = 1").fetchone()
             if row is None:
                 return []
+            def values(param, incomplete):
+                if not param.get("task"):
+                    return value_completions(param, incomplete)
+                workspace = find_workspace(db, cwd)
+                if workspace is None:
+                    return []
+                return complete_tasks(read_tasks(db, workspace, incomplete), incomplete)
+
             command, positional, pending, options_enabled = resolve_command(json.loads(row[0]), words[:-1])
             if pending:
-                return value_completions(pending, incomplete)
+                return values(pending, incomplete)
             if options_enabled and incomplete.startswith("-"):
                 name, equals, value = incomplete.partition("=")
                 if equals and name in command["options"]:
                     return [Item(name + "=" + item.value, item.type)
-                            for item in value_completions(command["options"][name], value)]
+                            for item in values(command["options"][name], value)]
                 return [Item(name, "plain") for name, option in sorted(command["options"].items())
                         if not option["hidden"] and name.startswith(incomplete)]
             commands = command.get("commands", {})
@@ -243,18 +263,7 @@ def complete_line(line):
                 offset -= candidate["nargs"]
             if not argument:
                 return []
-            if not argument.get("task"):
-                return value_completions(argument, incomplete)
-            workspace = os.path.realpath(cwd)
-            while True:
-                if glob.glob(os.path.join(workspace, "*.jolt")) or db.execute(
-                        "SELECT 1 FROM workspace_indexes WHERE path = ?", (workspace,)).fetchone():
-                    break
-                parent = os.path.dirname(workspace)
-                if parent == workspace:
-                    return []
-                workspace = parent
-            return complete_tasks(read_tasks(db, workspace, incomplete), incomplete)
+            return values(argument, incomplete)
     except (OSError, sqlite3.Error, ValueError, KeyError, TypeError, configparser.Error):
         return []
 

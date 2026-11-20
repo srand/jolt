@@ -210,7 +210,7 @@ def _interrupted(queue, executors):
 @click.argument("task", type=str, nargs=-1, shell_complete=_autocomplete_tasks, cls=ArgRequiredUnless, required_unless="worker")
 @click.option("-c", "--copy", type=click.Path(),
               help="Copy artifact content to directory PATH.")
-@click.option("-d", "--default", type=str, multiple=True, help="Override default parameter values.", metavar="DEFAULT")
+@click.option("-d", "--default", type=str, multiple=True, shell_complete=_autocomplete_tasks, help="Override default parameter values.", metavar="DEFAULT")
 @click.option("-f", "--force", is_flag=True, default=False, help="Force rebuild of TASK artifact.")
 @click.option("-g", "--debug", is_flag=True, default=False,
               help="Start debug shell before executing TASK.")
