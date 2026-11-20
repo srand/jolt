@@ -179,7 +179,8 @@ def complete_tasks(tasks, incomplete):
 class JoltBashComplete(BashComplete):
     source_template = BashComplete.source_template.replace(
         'COMP_WORDS="${COMP_WORDS[*]}"',
-        'JOLT_COMPLETE_LINE="${COMP_LINE:0:COMP_POINT}" COMP_WORDS="${COMP_WORDS[*]}"',
+        'JOLT_COMPLETE_LINE="${COMP_LINE:0:COMP_POINT}" JOLT_COMPLETE_TYPE="$COMP_TYPE" '
+        'COMP_WORDS="${COMP_WORDS[*]}"',
     ).replace(
         "    local response\n", "    local response\n    compopt +o nospace\n",
     ).replace(
@@ -199,15 +200,16 @@ class JoltBashComplete(BashComplete):
             return words[1:], ""
         return words[1:-1], words[-1] if words else ""
 
+    def complete(self):
+        args, incomplete = self.get_completion_args()
+        items = self.get_completions(args, incomplete)
+        comp_type = os.environ.get("JOLT_COMPLETE_TYPE", "")
+        return "\n".join(f"{kind},{value}"
+                         for kind, value in standalone.bash_completions(items, incomplete, comp_type))
+
     def format_completion(self, item):
-        # Readline replaces only the suffix after a word-break character.
         _, incomplete = self.get_completion_args()
-        value = item.value
-        boundary = max(incomplete.rfind(":"), incomplete.rfind("=")) + 1
-        prefix = incomplete[:boundary]
-        if value.startswith(prefix):
-            value = value[boundary:]
-        return f"{item.type},{value}"
+        return "{},{}".format(*standalone.bash_completions([item], incomplete)[0])
 
 
 @add_completion_class

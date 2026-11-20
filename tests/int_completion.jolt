@@ -260,6 +260,41 @@ class CompletionInternal(JoltTest):
             self.assertEqual(shell.format_completion(completion._item("example:mode=release,jobs=")),
                              "jolt_nospace,release,jobs=")
 
+    def test_bash_lists_parameters_after_last_comma(self):
+        def complete(line, comp_type):
+            import jolt_completion
+            incomplete = line.split(" ")[-1]
+            items = completion.complete_tasks(self.tasks(), incomplete)
+            return jolt_completion.bash_completions(items, incomplete, comp_type)
+
+        # Tab inserts, so matches must keep the whole word.
+        self.assertEqual(complete("jolt build example:mode=release,", "9"),
+                         [("jolt_nospace", "release,enabled="), ("jolt_nospace", "release,jobs="),
+                          ("jolt_nospace", "release,text=")])
+        # Repeated Tab and show-all-if-ambiguous only list the matches.
+        for comp_type in ("63", "33"):
+            self.assertEqual(complete("jolt build example:mode=release,", comp_type),
+                             [("jolt_nospace", "enabled="), ("jolt_nospace", "jobs="), ("jolt_nospace", "text=")])
+        self.assertEqual(complete("jolt build example:mode=release,jobs=1,", "64"),
+                         [("jolt_nospace", "enabled="), ("jolt_nospace", "text=")])
+        # Matches that extend the word are inserted, so they keep the whole word.
+        import jolt_completion
+        items = [jolt_completion._item("x:a=b,param" + suffix) for suffix in ("1=", "2=")]
+        self.assertEqual(jolt_completion.bash_completions(items, "x:a=b,param", "33"),
+                         [("jolt_nospace", "param1="), ("jolt_nospace", "param2=")])
+        self.assertEqual(jolt_completion.bash_completions(items, "x:a=b,", "33"),
+                         [("jolt_nospace", "b,param1="), ("jolt_nospace", "b,param2=")])
+        # Readline inserts the common prefix of matches with show-all-if-unmodified.
+        self.assertEqual(complete("jolt build example:mode=release,j", "64"),
+                         [("jolt_nospace", "release,jobs=")])
+        self.assertEqual(complete("jolt build example:text=x,jobs=1,", "64"),
+                         [("jolt_nospace", "enabled="), ("jolt_nospace", "mode=")])
+
+    def test_bash_passes_completion_type(self):
+        import jolt_completion
+        self.assertIn('JOLT_COMPLETE_TYPE="$COMP_TYPE"', jolt_completion.BASH_SOURCE)
+        self.assertIn('JOLT_COMPLETE_TYPE="$COMP_TYPE"', completion.JoltBashComplete.source_template)
+
     def standalone_output(self, line):
         import jolt_completion
         with self.tools.cwd(self.ws), self.tools.environ(JOLT_COMPLETE_LINE=line):

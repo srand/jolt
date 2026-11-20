@@ -80,6 +80,27 @@ def complete_tasks(tasks, incomplete):
     return result
 
 
+def bash_completions(items, incomplete, comp_type=""):
+    """Return (type, value) pairs relative to the word that Readline completes."""
+    # Readline replaces only the suffix after the last word-break character.
+    boundary = max(incomplete.rfind(":"), incomplete.rfind("=")) + 1
+    prefix, word = incomplete[:boundary], incomplete[boundary:]
+    result = [(item.type, item.value[boundary:] if item.value.startswith(prefix) else item.value)
+              for item in items]
+    # Readline lists matches as given, including parameters and values before
+    # the last "," or "+". When the matches don't extend the word, list them
+    # without that part on a repeated Tab (63) and with show-all-if-ambiguous
+    # (33): Readline then inserts their common prefix only if it is at least as
+    # long as the word. With show-all-if-unmodified (64), it lists nothing if
+    # they have a common prefix.
+    separator = max(word.rfind(","), word.rfind("+")) + 1
+    values = [value for _, value in result]
+    if separator and len(values) > 1 and os.path.commonprefix(values) == word and \
+            (comp_type in ("63", "33") or (comp_type == "64" and separator == len(word))):
+        result = [(kind, value[separator:]) for kind, value in result]
+    return result
+
+
 def split_line(line):
     lexer = shlex.shlex(line, posix=True)
     lexer.whitespace_split = True
@@ -242,7 +263,7 @@ BASH_SOURCE = '''_jolt_standalone_complete() {
     local response type value
     COMPREPLY=()
     compopt +o nospace
-    response=$(JOLT_COMPLETE_LINE="${COMP_LINE:0:COMP_POINT}" %(helper)s)
+    response=$(JOLT_COMPLETE_LINE="${COMP_LINE:0:COMP_POINT}" JOLT_COMPLETE_TYPE="$COMP_TYPE" %(helper)s)
     while IFS=, read -r type value; do
         case "$type" in
             jolt_nospace) compopt -o nospace; COMPREPLY+=("$value") ;;
@@ -279,12 +300,9 @@ def main():
     except (OSError, ValueError, configparser.Error):
         items = []
     incomplete = split_line(line)[-1]
-    boundary = max(incomplete.rfind(":"), incomplete.rfind("=")) + 1
-    prefix = incomplete[:boundary]
-    for item in items:
-        value = item.value[boundary:] if item.value.startswith(prefix) else item.value
+    for kind, value in bash_completions(items, incomplete, os.environ.get("JOLT_COMPLETE_TYPE", "")):
         if "\n" not in value and "\r" not in value:
-            print(f"{item.type},{value}")
+            print(f"{kind},{value}")
 
 
 if __name__ == "__main__":
