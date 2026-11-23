@@ -1,6 +1,83 @@
 Command Line
 ============
 
+Previewing rebuilds
+-------------------
+
+Use ``--dry-prepare`` and ``--dry-run`` to see which tasks are affected by a
+change before building them. First, save a workspace-wide baseline of task hashes::
+
+    jolt build --dry-prepare mytask
+
+Then edit a source file and compare the updated workspace against the
+saved baseline::
+
+    jolt build --dry-run mytask
+
+Jolt prints a ``Would build:`` line with the task name, current hash and rebuild
+reason for each new or changed task, followed by a total. The reason identifies
+each direct dependency whose hash changed, or which was added or removed. For
+example, changing a source file used by ``source`` can produce::
+
+    Would build: source (<hash>) - task inputs or definition changed
+    Would build: consumer (<hash>) - dependency 'source' changed
+    Would build: package (<hash>) - dependency 'consumer' changed
+    Dry run: 3 tasks would be built
+
+This shows the dependency chain responsible for the rebuild. A task with no
+baseline is marked ``new task (no baseline)``. If its dependencies are unchanged,
+the reason is ``task inputs or definition changed``; exact source files or other
+task-local inputs are not distinguished. Aliases and resources can be named as
+dependency causes even though they are not themselves listed as build tasks.
+Requirements expanded through an alias are also reported when they directly
+influence the consumer's hash. Dependency names include parameter values to
+distinguish task variants.
+Changes to a task's hash propagate to
+all its direct and transitive consumers, including packages outside the
+command-line target's dependency tree, so they are listed too. Files must be
+declared as hash influences by the recipe, for example with
+``@influence.files("src/**")``. Parameter changes can also be previewed::
+
+    jolt build --dry-prepare mytask:mode=debug
+    jolt build --dry-run mytask:mode=release
+
+Both options calculate task hashes without executing build tasks or acquiring
+regular task resources. Workspace resources needed to load recipes and
+calculate hashes are prepared as usual. Both commands include all registered
+tasks with usable default parameters, plus variants declared in requirements or
+passed on the command line. Tasks with unset required parameters are included
+when their parameters are supplied by a requirement, the command line, or
+``--default``. Arbitrary parameter combinations are not enumerated.
+Automatically discovered default tasks are included only when their complete
+dependency trees can be resolved. Unconfigured template defaults, including
+decorator wrappers, and defaults with invalid dependencies are skipped with a
+verbose message identifying the task and error, including unresolved macros,
+failures in dynamic requirement calculations, unsupported dependency parameters,
+or dependency cycles. Configured variants reached through valid requirements
+are still included. Errors in an explicitly requested target or its dependencies
+remain errors.
+If an automatically discovered task's hash cannot be calculated, that task and
+all of its consumers are excluded from the baseline
+and preview. Independent tasks and valid configured variants are still compared.
+Use ``-v`` to see diagnostics for skipped default configurations. These values
+are resolved during task construction and hash calculation, as in a normal build,
+without executing ``Task.run()``.
+The comparison covers the workspace regardless of whether artifacts are already
+cached. Unchanged tasks and non-buildable aliases and resources are omitted from
+the preview.
+
+The temporary SQLite database is stored as ``dry-run.db`` in the workspace's
+build directory (``build/dry-run.db`` by default). Each ``--dry-prepare`` replaces
+the baseline with the workspace tasks, requested variants and their direct
+dependency links. ``--dry-run``
+keeps it unchanged, so you can compare several edits against the same baseline.
+Removing the build directory removes the baseline; prepare it again before the
+next dry run. Multiple targets can be passed to either command. The two options
+are mutually exclusive and cannot be combined with ``--force``.
+Baselines prepared by older versions still support hash comparison and reporting
+changed dependencies. Run ``--dry-prepare`` again to also identify added or removed
+dependencies.
+
 Shell completion
 ----------------
 

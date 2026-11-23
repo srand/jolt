@@ -1,14 +1,16 @@
 import atexit
 import click
+from contextlib import closing
 import datetime
 import os
 import platform
+import sqlite3
 import subprocess
 import sys
 import uuid
 import webbrowser
 
-from jolt.tasks import Task, TaskRegistry, Parameter
+from jolt.tasks import Task, TaskRegistry, Parameter, Resource
 from jolt import scheduler
 from jolt import fstree
 from jolt import graph
@@ -26,7 +28,7 @@ from jolt import utils
 from jolt.influence import HashInfluenceRegistry
 from jolt.options import JoltOptions
 from jolt import hooks
-from jolt.error import JoltError
+from jolt.error import JoltError, TaskMacroError
 from jolt.error import raise_error
 from jolt.error import raise_error_if
 from jolt.error import raise_task_error_if
@@ -206,6 +208,118 @@ def _interrupted(queue, executors):
         os._exit(1)
 
 
+def _dry_build_targets(registry, targets, acache, options, buildenv=None):
+    """Include workspace defaults so consumers outside the requested graph are compared."""
+    targets = list(targets)
+    builder = graph.GraphBuilder(registry, acache, options, buildenv=buildenv)
+    requested_graph = builder.build(targets, influence=False)
+    validated = {node.qualified_name for node in requested_graph.topological_nodes if not node.is_resource()}
+    for cls in sorted(registry.get_task_classes(), key=lambda cls: cls.name or ""):
+        if not cls.name or cls.__dict__.get("abstract", False) or issubclass(cls, Resource):
+            continue
+        parameters = {name: getattr(cls, name)
+                      for base in cls.__mro__
+                      for name in base.__dict__.get("__param_list", {})}
+        if any(param.is_required() and param.is_unset()
+               for param in parameters.values() if isinstance(param, Parameter)):
+            continue
+        if cls.name in targets:
+            continue
+        try:
+            candidate = registry.get_task(cls.name, buildenv=buildenv)
+            if candidate.qualified_name not in validated:
+                builder = graph.GraphBuilder(registry, acache, options, buildenv=buildenv)
+                candidate_graph = builder.build([cls.name], influence=False)
+                # Check for cycles without calculating hashes or creating artifacts.
+                nodes = candidate_graph.topological_nodes
+                validated.update(node.qualified_name for node in nodes if not node.is_resource())
+        except TaskMacroError as e:
+            if e.task.__class__ is cls:
+                log.verbose("Skipped unconfigured task: {} (missing macro '{}')", cls.name, e.macro)
+            else:
+                log.verbose("Skipped unavailable default task: {} ({})", cls.name, log.format_exception_msg(e))
+            continue
+        except Exception as e:
+            log.verbose("Skipped unavailable default task: {} ({})", cls.name, log.format_exception_msg(e))
+            continue
+        targets.append(cls.name)
+    return utils.unique_list(targets)
+
+
+def _dry_task_name(node):
+    return node.exported_name if node.is_resource() else node.qualified_name
+
+
+def _dry_build_reasons(node, baseline, dependencies):
+    name = _dry_task_name(node)
+    if name not in baseline:
+        return ["new task (no baseline)"]
+
+    current = {_dry_task_name(child): child for child in node.neighbors}
+    previous = dependencies.get(name, set()) if dependencies is not None else None
+    reasons = []
+    for name, child in sorted(current.items()):
+        if previous is not None and name not in previous:
+            reasons.append("dependency '{}' added".format(name))
+        elif name not in baseline:
+            reasons.append("dependency '{}' has no baseline".format(name))
+        elif baseline[name] != child.identity:
+            reasons.append("dependency '{}' changed".format(name))
+    if previous is not None:
+        for name in sorted(previous - current.keys()):
+            reasons.append("dependency '{}' removed".format(name))
+    if not reasons:
+        reasons.append("task inputs or definition changed" if previous is not None else "task hash changed")
+    return reasons
+
+
+def _dry_build(dag, prepare, excluded):
+    path = fs.path.join(JoltLoader.get().build_path, "dry-run.db")
+
+    if prepare:
+        nodes = [node for node in dag.nodes if node not in excluded]
+        tasks = {_dry_task_name(node): node.identity for node in nodes}
+        dependencies = [(_dry_task_name(node), _dry_task_name(child))
+                        for node in nodes for child in node.neighbors]
+        try:
+            fs.makedirs(fs.path.dirname(path))
+            with closing(sqlite3.connect(path)) as db, db:
+                db.execute("CREATE TABLE IF NOT EXISTS tasks (name TEXT PRIMARY KEY, identity TEXT NOT NULL)")
+                db.execute("CREATE TABLE IF NOT EXISTS dependencies ("
+                           "task TEXT NOT NULL, dependency TEXT NOT NULL, PRIMARY KEY (task, dependency))")
+                db.execute("DELETE FROM tasks")
+                db.execute("DELETE FROM dependencies")
+                db.executemany("INSERT INTO tasks VALUES (?, ?)", tasks.items())
+                db.executemany("INSERT INTO dependencies VALUES (?, ?)", dependencies)
+        except (OSError, sqlite3.Error) as e:
+            raise_error("Failed to save dry-run database '{}': {}", path, e)
+        log.info("Saved dry-run baseline for {} tasks: {}", len(tasks), path)
+        return
+
+    raise_error_if(not fs.path.isfile(path),
+                   "No dry-run baseline found. Run 'jolt build --dry-prepare TASK' first.")
+    try:
+        with closing(sqlite3.connect(path)) as db:
+            baseline = dict(db.execute("SELECT name, identity FROM tasks"))
+            dependencies = None
+            if db.execute("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'dependencies'").fetchone():
+                dependencies = {}
+                for name, dependency in db.execute("SELECT task, dependency FROM dependencies"):
+                    dependencies.setdefault(name, set()).add(dependency)
+    except (OSError, sqlite3.Error) as e:
+        raise_error("Failed to read dry-run database '{}': {}", path, e)
+
+    changed = 0
+    for node in reversed(dag.topological_nodes):
+        if node in excluded or node.is_alias() or node.is_resource():
+            continue
+        if baseline.get(node.qualified_name) != node.identity:
+            reasons = _dry_build_reasons(node, baseline, dependencies)
+            log.info("Would build: {} ({}) - {}", node.short_qualified_name, node.identity, "; ".join(reasons))
+            changed += 1
+    log.info("Dry run: {} tasks would be built", changed)
+
+
 @cli.command()
 @click.argument("task", type=str, nargs=-1, shell_complete=_autocomplete_tasks, cls=ArgRequiredUnless, required_unless="worker")
 @click.option("-c", "--copy", type=click.Path(),
@@ -221,6 +335,10 @@ def _interrupted(queue, executors):
 @click.option("-s", "--salt", type=str, help="Add salt as hash influence for all tasks in dependency tree.", metavar="SALT")
 @click.option("-m", "--mute", is_flag=True, help="Display task log only if it fails.")
 @click.option("-v", "--verbose", count=True, help="Verbose output (repeat to raise verbosity).")
+@click.option("--dry-prepare", is_flag=True,
+              help="Save workspace task hashes for a subsequent --dry-run without executing tasks.")
+@click.option("--dry-run", is_flag=True,
+              help="Show all workspace tasks whose hashes differ from --dry-prepare and why, without executing tasks.")
 @click.option("--result", type=click.Path(), hidden=True,
               help="Write result manifest to this file.")
 @click.option("--no-download", is_flag=True, default=False,
@@ -243,7 +361,7 @@ def _interrupted(queue, executors):
 def build(ctx, task, network, keep_going, default, local,
           no_download, no_download_persistent, no_upload, download, upload, worker, force,
           salt, copy, debug, result, jobs, no_prune, verbose,
-          mute, environ):
+          mute, environ, dry_prepare, dry_run):
     """
     Build task artifact.
 
@@ -274,6 +392,14 @@ def build(ctx, task, network, keep_going, default, local,
     induce a cache miss. In both cases, existing intermediate files in build directories
     are removed before execution starts.
 
+    Use --dry-prepare to save task hashes across the workspace without executing
+    tasks. After changing sources or parameters, --dry-run lists all tasks with
+    new or changed hashes and identifies changed, added or removed dependencies,
+    including consumers outside TASK's dependency tree, without executing them.
+    Default task configurations and variants declared
+    in requirements or on the command line are included. The baseline is stored
+    in dry-run.db in the workspace build directory and replaced by --dry-prepare.
+
     """
 
     raise_error_if(network and local,
@@ -287,6 +413,12 @@ def build(ctx, task, network, keep_going, default, local,
 
     raise_error_if(no_upload and upload,
                    "The --upload and --no-upload flags are mutually exclusive")
+
+    raise_error_if(dry_prepare and dry_run,
+                   "The --dry-prepare and --dry-run flags are mutually exclusive")
+
+    raise_error_if(force and (dry_prepare or dry_run),
+                   "The --force flag cannot be combined with --dry-prepare or --dry-run")
 
     if verbose >= 3:
         log.set_level(log.EXCEPTION)
@@ -370,17 +502,18 @@ def build(ctx, task, network, keep_going, default, local,
 
     acache = cache.ArtifactCache.get(options)
 
-    executors = scheduler.ExecutorRegistry.get(options)
-    if worker:
-        log.set_worker()
-        log.verbose("Local build as a worker")
-        strategy = scheduler.WorkerStrategy(executors, acache)
-    elif network:
-        log.verbose("Distributed build as a user")
-        strategy = scheduler.DistributedStrategy(executors, acache)
-    else:
-        log.verbose("Local build as a user")
-        strategy = scheduler.LocalStrategy(executors, acache)
+    if not (dry_prepare or dry_run):
+        executors = scheduler.ExecutorRegistry.get(options)
+        if worker:
+            log.set_worker()
+            log.verbose("Local build as a worker")
+            strategy = scheduler.WorkerStrategy(executors, acache)
+        elif network:
+            log.verbose("Distributed build as a user")
+            strategy = scheduler.DistributedStrategy(executors, acache)
+        else:
+            log.verbose("Local build as a user")
+            strategy = scheduler.LocalStrategy(executors, acache)
 
     hooks.TaskHookRegistry.get(options)
     registry = TaskRegistry.get(options)
@@ -390,8 +523,17 @@ def build(ctx, task, network, keep_going, default, local,
 
     log.info("Started: {}", datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
 
+    strict_tasks = None
+    if dry_prepare or dry_run:
+        strict_tasks = list(task)
+        task = _dry_build_targets(registry, task, acache, options, buildenv=buildenv)
+
     gb = graph.GraphBuilder(registry, acache, options, progress=True, buildenv=buildenv)
-    dag = gb.build(task)
+    dag = gb.build(task, strict_tasks=strict_tasks, finalize_artifacts=not (dry_prepare or dry_run))
+
+    if dry_prepare or dry_run:
+        _dry_build(dag, prepare=dry_prepare, excluded=gb.excluded)
+        return
 
     # If asked to force rebuild, taint all goal tasks
     if force:

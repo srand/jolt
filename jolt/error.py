@@ -28,6 +28,15 @@ class LoggedJoltError(JoltError):
         self.exc = exc
 
 
+class TaskMacroError(JoltError):
+    """A task macro cannot be resolved in the current configuration."""
+
+    def __init__(self, task, macro, message):
+        super().__init__(message)
+        self.task = task
+        self.macro = macro
+
+
 def raise_error(msg, *args, **kwargs):
     raise JoltError(msg.format(*args, **kwargs))
 
