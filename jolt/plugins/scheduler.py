@@ -175,6 +175,10 @@ class RemoteExecutor(NetworkExecutor):
         """
         self.session.cancel()
 
+    def is_aborted(self):
+        """ Check if the executor or its build session has been aborted. """
+        return super().is_aborted() or self.session.aborted
+
     def download_persistent_artifacts(self, task):
         """ Download persistent artifacts from the cache. """
 
@@ -458,6 +462,11 @@ class RemoteSession(object):
     def make_build_request(self):
         """ Create a build request with the scheduler. """
 
+        # Don't register the build again after it has been aborted,
+        # e.g. when retrying after the connection was lost.
+        if self.aborted:
+            raise TaskCancelledException()
+
         # If a build is already registered, return.
         if self.build:
             return
@@ -521,9 +530,12 @@ class RemoteSession(object):
         if self.aborted:
             return
 
+        # Abort before cancelling, so that executors whose streams fail
+        # meanwhile don't register the build again.
+        self.aborted = True
+
         # If no build is registered, return.
         if not self.build:
-            self.aborted = True
             return
 
         if not self.build_id:
@@ -537,8 +549,6 @@ class RemoteSession(object):
                 log.warning("Failed to cancel build: {}", response.status)
         except grpc.RpcError as rpc_error:
             log.warning("Failed to cancel build: {}", rpc_error.details())
-        finally:
-            self.aborted = True
 
     def create_executor(self, task):
         """ Create an executor for the given task. """

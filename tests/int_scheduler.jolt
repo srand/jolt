@@ -1,10 +1,21 @@
 import sys
+import threading
 from unittest import mock
 sys.path.append(".")
+
+import grpc
 
 from testsupport import JoltTest
 from jolt import common_pb2 as common_pb
 from jolt.error import JoltError
+
+
+class RpcError(grpc.RpcError):
+    def code(self):
+        return grpc.StatusCode.UNAVAILABLE
+
+    def details(self):
+        return "recvmsg:Connection reset by peer"
 
 
 class SchedulerInternal(JoltTest):
@@ -33,3 +44,32 @@ class SchedulerInternal(JoltTest):
             self._update(common_pb.TaskStatus.TASK_PASSED),
         ])
         executor.run_task(None, response)
+
+    def _session(self):
+        from jolt.plugins import scheduler
+        session = scheduler.RemoteSession.__new__(scheduler.RemoteSession)
+        session.factory = mock.MagicMock()
+        session.exec = mock.MagicMock()
+        session.lock = threading.Lock()
+        session.build = None
+        session.build_id = None
+        session.aborted = False
+        session.buildenv = object()
+        return session
+
+    def test_build_not_registered_again_after_failed_cancel(self):
+        from jolt.plugins import scheduler
+        session = self._session()
+        session.build = mock.MagicMock()
+        session.build_id = "build"
+        session.exec.CancelBuild.side_effect = RpcError()
+
+        session.cancel()
+        session.clear_build_request()
+
+        executor = scheduler.RemoteExecutor(mock.MagicMock(), session, mock.MagicMock())
+        executor.factory.is_aborted.return_value = False
+        self.assertTrue(executor.is_aborted())
+        with self.assertRaises(scheduler.TaskCancelledException):
+            session.make_build_request()
+        session.exec.ScheduleBuild.assert_not_called()
