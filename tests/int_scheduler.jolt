@@ -1,0 +1,35 @@
+import sys
+from unittest import mock
+sys.path.append(".")
+
+from testsupport import JoltTest
+from jolt import common_pb2 as common_pb
+from jolt.error import JoltError
+
+
+class SchedulerInternal(JoltTest):
+    name = "int/scheduler"
+
+    def _executor(self):
+        from jolt.plugins import scheduler
+        task = mock.MagicMock()
+        task.extensions = []
+        return scheduler.RemoteExecutor(mock.MagicMock(), mock.MagicMock(), task)
+
+    def _update(self, status):
+        from jolt.plugins.remote_execution import scheduler_pb2 as scheduler_pb
+        return scheduler_pb.TaskUpdate(status=status)
+
+    def test_task_stream_ended_without_result(self):
+        executor = self._executor()
+        response = iter([self._update(common_pb.TaskStatus.TASK_QUEUED)])
+        with self.assertRaisesRegex(JoltError, "without a result"):
+            executor.run_task(None, response)
+
+    def test_task_stream_ended_with_result(self):
+        executor = self._executor()
+        response = iter([
+            self._update(common_pb.TaskStatus.TASK_QUEUED),
+            self._update(common_pb.TaskStatus.TASK_PASSED),
+        ])
+        executor.run_task(None, response)

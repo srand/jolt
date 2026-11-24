@@ -49,6 +49,7 @@ class All(Alias):
         "int/relocate/bundle",
         "int/relocate/framework",
         "int/rpath",
+        "int/scheduler",
         "int/selfdeploy",
         "int/tools",
         "int/utils",

@@ -393,6 +393,13 @@ class RemoteExecutor(NetworkExecutor):
 
             last_status = progress.status
 
+        else:
+            # The scheduler ends the stream without a result if it forgets the task,
+            # for example when the build has been removed.
+            raise_task_error(
+                self.task, "Scheduler ended the task without a result (last status: {})",
+                common_pb.TaskStatus.Name(last_status), type="Scheduler Error")
+
 
 class RemoteSession(object):
     """
