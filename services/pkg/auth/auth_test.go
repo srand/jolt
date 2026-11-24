@@ -9,7 +9,6 @@ import (
 	"crypto/x509/pkix"
 	"encoding/base64"
 	"encoding/pem"
-	"fmt"
 	"math/big"
 	"net"
 	"net/http"
@@ -191,6 +190,8 @@ func TestDialOptions(t *testing.T) {
 }
 
 // Writes a self-signed certificate for localhost and its key to files.
+// Tests dial the address, since resolving localhost through gRPC also
+// looks up a TXT record, which may stall until the DNS server times out.
 func writeCertificate(t *testing.T) (string, string) {
 	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	assert.NoError(t, err)
@@ -198,6 +199,7 @@ func writeCertificate(t *testing.T) (string, string) {
 		SerialNumber:          big.NewInt(1),
 		Subject:               pkix.Name{CommonName: "localhost"},
 		DNSNames:              []string{"localhost"},
+		IPAddresses:           []net.IP{net.IPv4(127, 0, 0, 1)},
 		NotBefore:             time.Now().Add(-time.Hour),
 		NotAfter:              time.Now().Add(time.Hour),
 		IsCA:                  true,
@@ -232,14 +234,13 @@ func TestTLSWithToken(t *testing.T) {
 		return stream.SendMsg(&emptypb.Empty{})
 	})
 	server := grpc.NewServer(append([]grpc.ServerOption{creds, echo}, a.ServerOptions(func(string) Permission { return Write })...)...)
-	listener, err := net.Listen("tcp", "localhost:0")
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	assert.NoError(t, err)
 	go server.Serve(listener)
 	defer server.Stop()
 
 	check := func(options ClientOptions) error {
-		port := listener.Addr().(*net.TCPAddr).Port
-		target, opts, err := DialOptions(fmt.Sprintf("tls://localhost:%d", port), options)
+		target, opts, err := DialOptions("tls://"+listener.Addr().String(), options)
 		assert.NoError(t, err)
 		conn, err := grpc.NewClient(target, opts...)
 		assert.NoError(t, err)
