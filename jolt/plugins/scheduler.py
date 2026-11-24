@@ -2,7 +2,7 @@ import click
 import collections
 import grpc
 import queue
-from threading import Lock
+from threading import Lock, Thread
 import time
 
 from google.protobuf.timestamp_pb2 import Timestamp
@@ -111,6 +111,25 @@ class LogHandler(object):
 class TaskCancelledException(JoltError):
     """ An exception raised when a task is cancelled by the scheduler. """
     pass
+
+
+class BuildLostError(grpc.RpcError):
+    """
+    Raised for tasks of a build that the scheduler has lost.
+
+    Like an unavailable scheduler, the error is retried by registering
+    the build again.
+    """
+
+    def __init__(self, details):
+        super().__init__(details)
+        self._details = details
+
+    def code(self):
+        return grpc.StatusCode.UNAVAILABLE
+
+    def details(self):
+        return self._details
 
 
 class Queue(object):
@@ -250,21 +269,26 @@ class RemoteExecutor(NetworkExecutor):
     def run_build(self, env):
         """ Initialize the build session and schedule the task. """
 
+        build = None
         try:
-            self.session.make_build_request()
+            build, build_id = self.session.make_build_request()
 
             self.task.queued(remote=True)
             for extension in self.task.extensions:
                 extension.queued(remote=True)
 
             request = scheduler_pb.TaskRequest(
-                build_id=self.session.build_id,
+                build_id=build_id,
                 task_id=self.task.identity,
             )
             response = self.session.exec.ScheduleTask(request)
 
-            self.update_logstash(self.task)
-            self.run_task(env, response)
+            self.session.add_task_stream(build, response)
+            try:
+                self.update_logstash(self.task)
+                self.run_task(env, response)
+            finally:
+                self.session.remove_task_stream(build, response)
             self.download_persistent_artifacts(self.task)
 
             self.task.finished_execution(remote=True)
@@ -281,6 +305,11 @@ class RemoteExecutor(NetworkExecutor):
                     for extension in self.task.extensions:
                         extension.failed_execution(remote=True, interrupt=True)
                 return
+
+            # The session has already forgotten the lost build, retry to register it again
+            lost = self.session.lost_build_reason(build)
+            if lost is not None:
+                raise BuildLostError(lost) from rpc_error
 
             if rpc_error.code() not in [grpc.StatusCode.NOT_FOUND, grpc.StatusCode.UNAVAILABLE]:
                 raise_task_error(self.task, rpc_error.details(), type="Scheduler Error")
@@ -449,6 +478,11 @@ class RemoteSession(object):
         # Lock to ensure only one build is registered at a time.
         self.lock = Lock()
 
+        # Streams of the tasks of each build, and the reasons why builds were lost.
+        self.streams_lock = Lock()
+        self.task_streams = {}
+        self.lost_builds = {}
+
         # The build environment: client, workspace, etc.
         self.buildenv = None
 
@@ -469,7 +503,7 @@ class RemoteSession(object):
 
         # If a build is already registered, return.
         if self.build:
-            return
+            return self.build, self.build_id
 
         if not self.buildenv:
             # Create the build environment.
@@ -491,20 +525,75 @@ class RemoteSession(object):
         )
 
         # Register the build with the scheduler.
-        self.build = self.exec.ScheduleBuild(req)
+        stream = self.exec.ScheduleBuild(req)
 
         # Wait for the scheduler to respond with a build id.
-        build = self.build.next()
+        build = stream.next()
 
         # Check if the build was rejected.
         if build.status == common_pb.BuildStatus.BUILD_REJECTED:
             raise_error("Build rejected by scheduler")
 
-        # Store the build id.
+        self.build = stream
         self.build_id = build.build_id
 
         log.info(colors.blue("Build {} registered with scheduler, waiting for worker"), self.build_id)
-        return self.build
+
+        # The scheduler keeps the build while the client reads its stream
+        Thread(target=self._watch_build, args=(stream, self.build_id), daemon=True).start()
+
+        return self.build, self.build_id
+
+    def _watch_build(self, stream, build_id):
+        """
+        Reads the build stream until it ends.
+
+        The scheduler doesn't end the stream until the build has been
+        cancelled. If it ends without that, or fails, the scheduler has lost
+        the build, and the tasks waiting for it would wait forever.
+        """
+        reason = "the scheduler ended the build"
+        try:
+            for update in stream:
+                if update.status != common_pb.BuildStatus.BUILD_ACCEPTED:
+                    # Tasks are cancelled by the scheduler
+                    return
+        except grpc.RpcError as rpc_error:
+            reason = rpc_error.details()
+
+        with self.lock:
+            # The client cleared the build itself
+            if self.build is not stream:
+                return
+            self.build = None
+            self.build_id = None
+
+        log.warning("Lost build {} in the scheduler: {}", build_id, reason)
+
+        with self.streams_lock:
+            self.lost_builds[stream] = f"Lost build {build_id} in the scheduler: {reason}"
+            task_streams = self.task_streams.pop(stream, [])
+
+        for task_stream in task_streams:
+            task_stream.cancel()
+
+    def add_task_stream(self, build, stream):
+        """ Tracks the stream of a task, to be cancelled if the build is lost. """
+        with self.streams_lock:
+            lost = build in self.lost_builds
+            if not lost:
+                self.task_streams.setdefault(build, set()).add(stream)
+        if lost:
+            stream.cancel()
+
+    def remove_task_stream(self, build, stream):
+        with self.streams_lock:
+            self.task_streams.get(build, set()).discard(stream)
+
+    def lost_build_reason(self, build):
+        """ Returns why the build was lost, or None if it wasn't. """
+        with self.streams_lock:
+            return self.lost_builds.get(build)
 
     @locked
     def clear_build_request(self, message=None):

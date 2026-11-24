@@ -18,6 +18,31 @@ class RpcError(grpc.RpcError):
         return "recvmsg:Connection reset by peer"
 
 
+class BuildStream(object):
+    """ A ScheduleBuild stream that ends, or fails with error, when released. """
+
+    def __init__(self, error=None):
+        self.error = error
+        self.release = threading.Event()
+        self.cancelled = threading.Event()
+
+    def next(self):
+        from jolt.plugins.remote_execution import scheduler_pb2 as scheduler_pb
+        return scheduler_pb.BuildUpdate(status=common_pb.BuildStatus.BUILD_ACCEPTED, build_id="build")
+
+    def __iter__(self):
+        self.release.wait(5)
+        if self.cancelled.is_set():
+            raise RpcError()
+        if self.error:
+            raise self.error
+        return iter([])
+
+    def cancel(self):
+        self.cancelled.set()
+        self.release.set()
+
+
 class SchedulerInternal(JoltTest):
     name = "int/scheduler"
 
@@ -54,7 +79,11 @@ class SchedulerInternal(JoltTest):
         session.build = None
         session.build_id = None
         session.aborted = False
-        session.buildenv = object()
+        session.buildenv = common_pb.BuildEnvironment()
+        session.priority = 0
+        session.streams_lock = threading.Lock()
+        session.task_streams = {}
+        session.lost_builds = {}
         return session
 
     def test_build_not_registered_again_after_failed_cancel(self):
@@ -73,3 +102,47 @@ class SchedulerInternal(JoltTest):
         with self.assertRaises(scheduler.TaskCancelledException):
             session.make_build_request()
         session.exec.ScheduleBuild.assert_not_called()
+
+    def _lose_build(self, error):
+        session = self._session()
+        stream = BuildStream(error)
+        session.exec.ScheduleBuild.return_value = stream
+        build, build_id = session.make_build_request()
+        self.assertIs(build, stream)
+        self.assertEqual(build_id, "build")
+
+        task = mock.MagicMock()
+        session.add_task_stream(build, task)
+        stream.release.set()
+
+        for _ in range(100):
+            if task.cancel.called:
+                break
+            threading.Event().wait(0.05)
+        task.cancel.assert_called_once()
+        self.assertIsNone(session.build)
+        self.assertIn("Lost build build", session.lost_build_reason(build))
+
+        late_task = mock.MagicMock()
+        session.add_task_stream(build, late_task)
+        late_task.cancel.assert_called_once()
+
+    def test_build_stream_ended(self):
+        self._lose_build(None)
+
+    def test_build_stream_failed(self):
+        self._lose_build(RpcError())
+
+    def test_cleared_build_not_lost(self):
+        session = self._session()
+        stream = BuildStream()
+        session.exec.ScheduleBuild.return_value = stream
+        build, _ = session.make_build_request()
+
+        task = mock.MagicMock()
+        session.add_task_stream(build, task)
+        session.clear_build_request()
+        threading.Event().wait(0.2)
+
+        task.cancel.assert_not_called()
+        self.assertIsNone(session.lost_build_reason(build))
