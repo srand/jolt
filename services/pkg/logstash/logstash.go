@@ -184,18 +184,28 @@ func (s *logStash) Append(id string) (LogWriter, error) {
 	if err != nil {
 		return nil, err
 	}
-	// The log of a task is appended to when the task runs again, and when
-	// the scheduler adds the details of an error to it.
-	file, err := s.fs.OpenFile(logPath(id), os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0666)
-	if err != nil {
-		return nil, err
-	}
-
 	s.Lock()
 	s.lru.Remove(logPath(id))
 	stream := s.streamLocked(id)
 	stream.writers++
 	s.Unlock()
+
+	// The log of a task is appended to when the task runs again, and when
+	// the scheduler adds the details of an error to it. Opening for append
+	// seeks to the end of the file, which must not race with other writers.
+	stream.writeMu.Lock()
+	file, err := s.fs.OpenFile(logPath(id), os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0666)
+	stream.writeMu.Unlock()
+	if err != nil {
+		s.Lock()
+		stream.writers--
+		if stream.writers == 0 {
+			s.wakeLocked(stream)
+		}
+		s.releaseLocked(id, stream)
+		s.Unlock()
+		return nil, err
+	}
 
 	log.Debug("add - log - id:", id)
 
