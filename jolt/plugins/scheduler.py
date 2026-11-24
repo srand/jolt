@@ -487,7 +487,7 @@ class RemoteSession(object):
         # Store the build id.
         self.build_id = build.build_id
 
-        log.info(colors.blue("Build registered with scheduler, waiting for worker"))
+        log.info(colors.blue("Build {} registered with scheduler, waiting for worker"), self.build_id)
         return self.build
 
     @locked
