@@ -285,6 +285,11 @@ func (s *workerService) GetTasks(stream protocol.Worker_GetTasksServer) error {
 	// Written before updates is closed.
 	var recvErr error
 
+	// Closed when the handler returns, so that the receiver doesn't block
+	// forever on a full channel that is no longer read.
+	done := make(chan struct{})
+	defer close(done)
+
 	updates := make(chan *protocol.TaskUpdate, 100)
 	go func() {
 		defer close(updates)
@@ -309,7 +314,11 @@ func (s *workerService) GetTasks(stream protocol.Worker_GetTasksServer) error {
 				update.Worker = execInfo.Worker
 				status = update.Status
 			}
-			updates <- update
+			select {
+			case updates <- update:
+			case <-done:
+				return
+			}
 		}
 	}()
 
