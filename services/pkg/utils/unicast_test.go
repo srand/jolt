@@ -27,6 +27,37 @@ func (c *MockUnicastCallbacks) NotSelected(item string, consumer interface{}) bo
 	return true
 }
 
+func (c *MockUnicastCallbacks) Acknowledged(item string, consumer interface{}) bool {
+	return false
+}
+
+// Queues acknowledged items again.
+type requeueUnicastCallbacks struct{ MockUnicastCallbacks }
+
+func (c *requeueUnicastCallbacks) Acknowledged(item string, consumer interface{}) bool {
+	return true
+}
+
+func TestUnicastRequeueOnAcknowledge(t *testing.T) {
+	bc := NewUnicast[string](&requeueUnicastCallbacks{})
+	bc.Send("test1")
+	consumer, err := bc.NewConsumerWithItem(nil)
+	assert.NoError(t, err)
+	assert.Equal(t, "test1", <-consumer.Chan)
+
+	// Sent while delivered: dropped as a duplicate, queued again when acknowledged.
+	bc.Send("test1")
+	assert.True(t, bc.Empty())
+	consumer.Close()
+	assert.Equal(t, 1, bc.Len())
+
+	consumer, err = bc.NewConsumerWithItem(nil)
+	assert.NoError(t, err)
+	consumer.Acknowledge()
+	assert.Equal(t, "test1", <-consumer.Chan)
+	assert.True(t, bc.HasUnackedData())
+}
+
 func TestUnicast(t *testing.T) {
 	bc := NewUnicast[string](&MockUnicastCallbacks{})
 	c1 := bc.NewConsumer(nil)

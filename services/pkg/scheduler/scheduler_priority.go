@@ -51,6 +51,13 @@ func (c *priorityUnicastCallbacks) NotSelected(item *Task, consumer interface{})
 	return true
 }
 
+func (c *priorityUnicastCallbacks) Acknowledged(item *Task, consumer interface{}) bool {
+	item.AssignToWorker(nil)
+	// A client may restart a completed task before the worker acknowledges it.
+	// The queue drops the task as a duplicate meanwhile, so queue it again now.
+	return !buildIsCancelled(item.build) && item.Status() == protocol.TaskStatus_TASK_QUEUED
+}
+
 // Returns true if the build has been cancelled or closed.
 //
 // These callbacks run with the unicast queue lock held, and priorityBuild.ScheduleTask

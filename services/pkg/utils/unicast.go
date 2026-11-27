@@ -41,6 +41,11 @@ type UnicastCallbacks[E comparable] interface {
 	// The callback is invoked with the unicast queue and the item that could not be delivered.
 	// Return true to continue processing, or false to stop.
 	NotSelected(item E, consumer interface{}) bool
+
+	// Callback invoked when a consumer acknowledges its item.
+	// Return true to queue the item again, e.g. when it was sent again
+	// while it was delivered but not yet acknowledged.
+	Acknowledged(item E, consumer interface{}) bool
 }
 
 // A reliable unicast queue.
@@ -207,7 +212,12 @@ func (bc *Unicast[E]) acknowledge(bcc *UnicastConsumer[E]) {
 	}
 
 	bc.availConsumers[bcc.ID] = bcc
-	delete(bc.consumerItem, bcc.ID)
+	if data, ok := bc.consumerItem[bcc.ID]; ok {
+		delete(bc.consumerItem, bcc.ID)
+		if bc.callbacks.Acknowledged(data, bcc.owner) {
+			bc.queue.PushBack(data)
+		}
+	}
 	bc.send()
 }
 
