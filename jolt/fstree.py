@@ -13,7 +13,7 @@ from jolt import filesystem as fs
 from jolt import log
 from jolt import tools
 from jolt import utils
-from jolt.error import raise_error_if
+from jolt.error import raise_error, raise_error_if
 
 
 _MAGIC = 0x3ee3
@@ -456,6 +456,59 @@ def workspace_ignore_patterns():
     return _ignore_patterns(root, _excluded_paths(loader))
 
 
+def _unescape(string):
+    """
+    Returns the string of an fstree event, which fstree writes as bytes,
+    escaping each byte outside of printable ASCII as \\u00XX.
+    """
+    try:
+        return string.encode("latin-1").decode(errors="replace")
+    except UnicodeEncodeError:
+        return string
+
+
+def run(args, what, on_event=None, **kwargs):
+    """
+    Runs fstree with events enabled (--json) and returns what it writes
+    to stdout.
+
+    fstree writes one JSON event per line to stderr. Each event is passed
+    to on_event, except errors and warnings. If fstree fails, an error is
+    raised with the message what, followed by the one that fstree
+    reported. Other keyword arguments are passed to subprocess.Popen.
+    """
+    message = None
+    with subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, **kwargs) as process:
+        try:
+            for line in iter(process.stderr.readline, b''):
+                line = line.decode(errors="replace").rstrip()
+                try:
+                    event = json.loads(line)
+                except json.JSONDecodeError:
+                    raise_error("{}: unexpected output from fstree: {}", what, line)
+
+                # fstree reports the message of an error in the path field
+                if event.get("type") == "error":
+                    message = _unescape(event.get("path", ""))
+                elif event.get("type") == "warning":
+                    log.debug("fstree: {}: {}", _unescape(event.get("path", "")), _unescape(event.get("message", "")))
+                elif on_event:
+                    on_event(event)
+
+            output = process.stdout.read().decode().strip()
+
+        except BaseException:
+            process.terminate()
+            raise
+
+    if process.returncode != 0:
+        if message:
+            raise_error("{}: {}", what, message)
+        raise_error("{}", what)
+
+    return output
+
+
 def ignore_args(patterns):
     """
     Returns the arguments that make fstree ignore the patterns of .joltignore
@@ -568,38 +621,17 @@ def _refresh_workspace_index(paths=None):
     jobserver_args = ["--jobserver-path", jobserver_path] if jobserver_path else []
 
     with workspace_index_files() as (indexfile, ignore_patterns):
-        process = None
-        try:
-            with log.progress("Indexing workspace", count=None, unit="objects", estimates=False) as progress:
-                process = subprocess.Popen(
-                    [executable, "write-tree", "--json", "--cache", cachedir] + ignore_args(ignore_patterns) + permission_args() + ["--index", indexfile, "--threads", str(t.thread_count())] + jobserver_args + [root] + (paths or []),
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    cwd=root)
+        with log.progress("Indexing workspace", count=None, unit="objects", estimates=False) as progress:
+            def on_event(event):
+                if event.get("type") in ["cache::add"]:
+                    progress.update(1)
 
-                for line in iter(process.stderr.readline, b''):
-                    try:
-                        event = json.loads(line.decode())
-                    except json.JSONDecodeError as exc:
-                        log.error("Failed to decode fstree event: {}", line.decode())
-                        raise exc
-
-                    if event.get("type") in ["cache::add"]:
-                        progress.update(1)
-
-                # The tree hash of the workspace root
-                root_hash = process.stdout.read().decode().strip()
-
-        except BaseException as exc:
-            if process:
-                process.terminate()
-            raise exc
-        finally:
-            if process:
-                process.wait()
-                process.stdout.close()
-                process.stderr.close()
-                raise_error_if(process.returncode != 0, "Failed to index workspace")
+            # The tree hash of the workspace root
+            root_hash = run(
+                [executable, "write-tree", "--json", "--cache", cachedir] + ignore_args(ignore_patterns) + permission_args() + ["--index", indexfile, "--threads", str(t.thread_count())] + jobserver_args + [root] + (paths or []),
+                "Failed to index workspace",
+                on_event,
+                cwd=root)
 
         index = Index.load(root, indexfile)
         index.excluded = _excluded_paths(loader)

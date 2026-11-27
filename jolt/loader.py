@@ -1,10 +1,8 @@
 from contextlib import contextmanager
 import fasteners
-import json
 import glob
 from importlib.machinery import SourceFileLoader
 import os
-import subprocess
 import sys
 from types import ModuleType
 
@@ -14,7 +12,7 @@ from jolt.error import raise_error_if
 from jolt import common_pb2 as common_pb
 from jolt import config
 from jolt import filesystem as fs
-from jolt.fstree import find_executable as find_fstree, ignore_args, permission_args, workspace_ignore_patterns, workspace_index_files
+from jolt.fstree import find_executable as find_fstree, ignore_args, permission_args, run as run_fstree, workspace_ignore_patterns, workspace_index_files
 from jolt import log
 from jolt import utils
 from jolt.tools import Tools
@@ -478,73 +476,38 @@ def export_workspace(tasks=None) -> common_pb.Workspace:
             jobserver_args = ["--jobserver-path", jobserver_path] if jobserver_path else []
 
             if not os.path.exists(indexfile):
-                process = None
-                try:
-                    with log.progress("Indexing workspace for the first time", count=None, unit="objects", estimates=False) as progress:
-                        process = subprocess.Popen(
-                            [fstree, "write-tree", "--json", "--cache", cachedir] + ignore_args(ignore_patterns) + permission_args() + ["--index", indexfile, "--remote", cache_grpc_uri.geturl(), "--threads", str(tools.thread_count())] + jobserver_args,
-                            stdout=subprocess.DEVNULL,
-                            stderr=subprocess.PIPE,
-                            cwd=tools.getcwd(),
-                            env=dict(os.environ, **config.get_service_environ()))
+                with log.progress("Indexing workspace for the first time", count=None, unit="objects", estimates=False) as progress:
+                    def on_index_event(event):
+                        if event.get("type") in ["cache::add"]:
+                            progress.update(1)
 
-                        for line in iter(process.stderr.readline, b''):
-                            try:
-                                event = json.loads(line.decode())
-                            except json.JSONDecodeError as exc:
-                                log.error("Failed to decode fstree event: {}", line.decode())
-                                raise exc
-
-                            if event.get("type") in ["cache::add"]:
-                                progress.update(1)
-
-                except BaseException as exc:
-                    if process:
-                        process.terminate()
-                    raise exc
-                finally:
-                    if process:
-                        process.wait()
-                        process.stderr.close()
-                        raise_error_if(process.returncode != 0, "Failed to index workspace")
-
-            process = None
-            try:
-                with log.progress("Pushing workspace to remote cache", count=None, unit="objects", estimates=False) as progress:
-                    process = subprocess.Popen(
-                        [fstree, "write-tree-push", "--json", "--cache", cachedir] + ignore_args(ignore_patterns) + permission_args() + ["--index", indexfile, "--remote", cache_grpc_uri.geturl(), "--threads", str(tools.thread_count())] + jobserver_args,
-                        stdout=subprocess.DEVNULL,
-                        stderr=subprocess.PIPE,
+                    run_fstree(
+                        [fstree, "write-tree", "--json", "--cache", cachedir] + ignore_args(ignore_patterns) + permission_args() + ["--index", indexfile, "--remote", cache_grpc_uri.geturl(), "--threads", str(tools.thread_count())] + jobserver_args,
+                        "Failed to index workspace",
+                        on_index_event,
                         cwd=tools.getcwd(),
                         env=dict(os.environ, **config.get_service_environ()))
 
-                    for line in iter(process.stderr.readline, b''):
-                        try:
-                            event = json.loads(line.decode())
-                        except json.JSONDecodeError as exc:
-                            log.error("Failed to decode fstree event: {}", line.decode())
-                            raise exc
+            with log.progress("Pushing workspace to remote cache", count=None, unit="objects", estimates=False) as progress:
+                def on_push_event(event):
+                    nonlocal tree
 
-                        if event.get("type") in ["cache::push"]:
-                            tree = event.get("path")
-                            log.info("Workspace tree: {} ({} objects)", tree, event.get("value"))
+                    if event.get("type") in ["cache::push"]:
+                        tree = event.get("path")
+                        log.info("Workspace tree: {} ({} objects)", tree, event.get("value"))
 
-                        if event.get("type") in ["cache::remote_missing_object", "cache::remote_missing_tree"]:
-                            progress.refresh()
+                    if event.get("type") in ["cache::remote_missing_object", "cache::remote_missing_tree"]:
+                        progress.refresh()
 
-                        if event.get("type") in ["cache::push_object", "cache::push_tree"]:
-                            progress.update(1)
+                    if event.get("type") in ["cache::push_object", "cache::push_tree"]:
+                        progress.update(1)
 
-            except BaseException as exc:
-                if process:
-                    process.terminate()
-                raise exc
-
-            finally:
-                if process:
-                    process.wait()
-                    process.stderr.close()
-                    raise_error_if(process.returncode != 0, "Failed to push workspace to remote cache")
+                run_fstree(
+                    [fstree, "write-tree-push", "--json", "--cache", cachedir] + ignore_args(ignore_patterns) + permission_args() + ["--index", indexfile, "--remote", cache_grpc_uri.geturl(), "--threads", str(tools.thread_count())] + jobserver_args,
+                    "Failed to push workspace to remote cache",
+                    on_push_event,
+                    cwd=tools.getcwd(),
+                    env=dict(os.environ, **config.get_service_environ()))
 
     workspace = common_pb.Workspace(
         builddir=loader.build_path_rel,

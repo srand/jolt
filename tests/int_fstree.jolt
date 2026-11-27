@@ -1,0 +1,92 @@
+import json
+import os
+import sys
+sys.path.append(".")
+
+from testsupport import JoltTest
+from jolt import error
+from jolt import fstree
+
+
+class FstreeInternal(JoltTest):
+    name = "int/fstree"
+
+    def fake_fstree(self, lines, returncode=0, output=""):
+        """
+        Returns the command of a fake fstree, which writes the lines to
+        stderr, as fstree writes its events, and the output to stdout,
+        and then exits with the return code.
+        """
+        events = "".join(line + "\n" for line in lines).encode()
+        script = os.path.join(self.ws, "fake_fstree.py")
+        with open(script, "w") as f:
+            f.write(
+                "import sys\n"
+                f"sys.stderr.buffer.write({events!r})\n"
+                f"sys.stdout.write({output!r})\n"
+                f"sys.exit({returncode})\n")
+        return [sys.executable, script]
+
+    def test_error_message_is_shown(self):
+        # fstree reports the message of an error in the path field
+        command = self.fake_fstree([
+            json.dumps({"type": "cache::push", "path": "blake3:0123", "value": 1}),
+            json.dumps({"type": "error", "path": "failed to connect to tcp://127.0.0.1:1: connection refused"}),
+        ], returncode=1)
+
+        with self.assertRaises(error.JoltError) as cm:
+            fstree.run(command, "Failed to push workspace to remote cache")
+
+        self.assertEqual(
+            str(cm.exception),
+            "Failed to push workspace to remote cache: failed to connect to tcp://127.0.0.1:1: connection refused")
+
+    def test_error_message_bytes_are_unescaped(self):
+        # fstree escapes every byte outside of printable ASCII as \u00XX
+        command = self.fake_fstree([
+            '{ "type": "error", "path": "failed to open /tmp/\\u00c3\\u00a5" }',
+        ], returncode=1)
+
+        with self.assertRaises(error.JoltError) as cm:
+            fstree.run(command, "Failed to index workspace")
+
+        self.assertEqual(str(cm.exception), "Failed to index workspace: failed to open /tmp/å")
+
+    def test_error_braces_are_not_formatted(self):
+        command = self.fake_fstree([
+            json.dumps({"type": "error", "path": "unexpected {name} in path"}),
+        ], returncode=1)
+
+        with self.assertRaises(error.JoltError) as cm:
+            fstree.run(command, "Failed to index workspace")
+
+        self.assertEqual(str(cm.exception), "Failed to index workspace: unexpected {name} in path")
+
+    def test_failure_without_error_event(self):
+        command = self.fake_fstree([], returncode=1)
+
+        with self.assertRaises(error.JoltError) as cm:
+            fstree.run(command, "Failed to index workspace")
+
+        self.assertEqual(str(cm.exception), "Failed to index workspace")
+
+    def test_events_and_output(self):
+        command = self.fake_fstree([
+            json.dumps({"type": "index::load", "path": "/index"}),
+            json.dumps({"type": "warning", "path": "/index", "message": "failed to load index: no such file"}),
+            json.dumps({"type": "cache::add", "path": "a.txt", "message": "dirty"}),
+        ], output="blake3:0123\n")
+
+        events = []
+        output = fstree.run(command, "Failed to index workspace", events.append)
+
+        self.assertEqual(output, "blake3:0123")
+        self.assertEqual([event["type"] for event in events], ["index::load", "cache::add"])
+
+    def test_unexpected_output(self):
+        command = self.fake_fstree(["not an event"], returncode=0)
+
+        with self.assertRaises(error.JoltError) as cm:
+            fstree.run(command, "Failed to index workspace")
+
+        self.assertEqual(str(cm.exception), "Failed to index workspace: unexpected output from fstree: not an event")
