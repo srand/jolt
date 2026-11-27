@@ -541,7 +541,7 @@ class RemoteSession(object):
             self.build = stream
             self.build_id = build.build_id
 
-        log.info(colors.blue("Build {} registered with scheduler, waiting for worker"), build.build_id)
+        log.info(colors.blue("Build {} registered with scheduler, waiting for worker"), build.build_id[:10])
 
         # The scheduler keeps the build while the client reads its stream
         Thread(target=self._watch_build, args=(stream, build.build_id), daemon=True).start()
