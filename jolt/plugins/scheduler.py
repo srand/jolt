@@ -257,7 +257,7 @@ class RemoteExecutor(NetworkExecutor):
             with hooks.task_run([self.task] + self.task.extensions), self.task.run_resources():
                 try:
                     self.run_build(env)
-                except (grpc.RpcError, grpc._channel._MultiThreadedRendezvous) as rpc_error:
+                except grpc.RpcError as rpc_error:
                     raise_task_error(self.task, rpc_error.details(), type="Scheduler Error")
         except Exception as e:
             if not self.task.is_unstable:
@@ -298,7 +298,7 @@ class RemoteExecutor(NetworkExecutor):
         except TaskCancelledException:
             pass
 
-        except (grpc.RpcError, grpc._channel._MultiThreadedRendezvous) as rpc_error:
+        except grpc.RpcError as rpc_error:
             if self.is_aborted():
                 if self.task.is_running():
                     self.task.failed_execution(remote=True, interrupt=True)
@@ -311,10 +311,13 @@ class RemoteExecutor(NetworkExecutor):
             if lost is not None:
                 raise BuildLostError(lost) from rpc_error
 
-            if rpc_error.code() not in [grpc.StatusCode.NOT_FOUND, grpc.StatusCode.UNAVAILABLE]:
+            code = rpc_error.code()
+            if code not in [grpc.StatusCode.NOT_FOUND, grpc.StatusCode.UNAVAILABLE]:
                 raise_task_error(self.task, rpc_error.details(), type="Scheduler Error")
 
-            self.session.clear_build_request(f"Scheduler Error: {rpc_error.details()}")
+            # A transport failure on one task stream does not invalidate the build stream.
+            if code == grpc.StatusCode.NOT_FOUND and build is not None:
+                self.session.clear_build_request(f"Scheduler Error: {rpc_error.details()}", expected_build=build)
             raise rpc_error
 
         except Exception as e:
@@ -478,7 +481,7 @@ class RemoteSession(object):
         # Lock to ensure only one build is registered at a time.
         self.lock = Lock()
 
-        # Streams of the tasks of each build, and the reasons why builds were lost.
+        # Protects build registration, abort state and task stream bookkeeping.
         self.streams_lock = Lock()
         self.task_streams = {}
         self.lost_builds = {}
@@ -496,14 +499,11 @@ class RemoteSession(object):
     def make_build_request(self):
         """ Create a build request with the scheduler. """
 
-        # Don't register the build again after it has been aborted,
-        # e.g. when retrying after the connection was lost.
-        if self.aborted:
-            raise TaskCancelledException()
-
-        # If a build is already registered, return.
-        if self.build:
-            return self.build, self.build_id
+        with self.streams_lock:
+            if self.aborted:
+                raise TaskCancelledException()
+            if self.build is not None:
+                return self.build, self.build_id
 
         if not self.buildenv:
             # Create the build environment.
@@ -534,15 +534,19 @@ class RemoteSession(object):
         if build.status == common_pb.BuildStatus.BUILD_REJECTED:
             raise_error("Build rejected by scheduler")
 
-        self.build = stream
-        self.build_id = build.build_id
+        with self.streams_lock:
+            if self.aborted:
+                stream.cancel()
+                raise TaskCancelledException()
+            self.build = stream
+            self.build_id = build.build_id
 
-        log.info(colors.blue("Build {} registered with scheduler, waiting for worker"), self.build_id)
+        log.info(colors.blue("Build {} registered with scheduler, waiting for worker"), build.build_id)
 
         # The scheduler keeps the build while the client reads its stream
-        Thread(target=self._watch_build, args=(stream, self.build_id), daemon=True).start()
+        Thread(target=self._watch_build, args=(stream, build.build_id), daemon=True).start()
 
-        return self.build, self.build_id
+        return stream, build.build_id
 
     def _watch_build(self, stream, build_id):
         """
@@ -561,30 +565,15 @@ class RemoteSession(object):
         except grpc.RpcError as rpc_error:
             reason = rpc_error.details()
 
-        with self.lock:
-            # The client cleared the build itself
-            if self.build is not stream:
-                return
-            self.build = None
-            self.build_id = None
-
-        log.warning("Lost build {} in the scheduler: {}", build_id, reason)
-
-        with self.streams_lock:
-            self.lost_builds[stream] = f"Lost build {build_id} in the scheduler: {reason}"
-            task_streams = self.task_streams.pop(stream, [])
-
-        for task_stream in task_streams:
-            task_stream.cancel()
+        self.clear_build_request(f"Lost build {build_id} in the scheduler: {reason}", expected_build=stream)
 
     def add_task_stream(self, build, stream):
         """ Tracks the stream of a task, to be cancelled if the build is lost. """
         with self.streams_lock:
-            lost = build in self.lost_builds
-            if not lost:
+            if not self.aborted and build is self.build:
                 self.task_streams.setdefault(build, set()).add(stream)
-        if lost:
-            stream.cancel()
+                return
+        stream.cancel()
 
     def remove_task_stream(self, build, stream):
         with self.streams_lock:
@@ -595,49 +584,49 @@ class RemoteSession(object):
         with self.streams_lock:
             return self.lost_builds.get(build)
 
-    @locked
-    def clear_build_request(self, message=None):
-        """ Clear the build request. Called when a build fails. """
+    def clear_build_request(self, message=None, *, expected_build=None):
+        """ Retire the build registration and cancel all its task streams. """
+        with self.streams_lock:
+            build = self.build
+            if build is None or (expected_build is not None and expected_build is not build):
+                return
+            self.lost_builds[build] = message or f"Build {self.build_id} registration closed"
+            task_streams = self.task_streams.pop(build, ())
+            self.build = None
+            self.build_id = None
 
-        # Close grpc server response stream
-        if self.build:
-            self.build.cancel()
-            if message:
-                log.warning(message)
-        self.build = None
-        self.build_id = None
+        if message:
+            log.warning(message)
+        build.cancel()
+        for stream in task_streams:
+            stream.cancel()
 
     def close(self):
         """ Close the session and terminate its open response streams. """
+        with self.streams_lock:
+            self.aborted = True
         self.clear_build_request()
         self.channel.close()
 
     def cancel(self):
         """ Send a cancel request to the scheduler. """
 
-        # If the build has already been aborted, return.
-        if self.aborted:
-            return
+        with self.streams_lock:
+            if self.aborted:
+                return
+            self.aborted = True
+            build_id = self.build_id
 
-        # Abort before cancelling, so that executors whose streams fail
-        # meanwhile don't register the build again.
-        self.aborted = True
-
-        # If no build is registered, return.
-        if not self.build:
-            return
-
-        if not self.build_id:
-            self.clear_build_request()
-            return
-
-        req = scheduler_pb.CancelBuildRequest(build_id=self.build_id)
         try:
-            response = self.exec.CancelBuild(req)
-            if response.status != common_pb.BuildStatus.BUILD_CANCELLED:
-                log.warning("Failed to cancel build: {}", response.status)
+            if build_id:
+                req = scheduler_pb.CancelBuildRequest(build_id=build_id)
+                response = self.exec.CancelBuild(req, timeout=2)
+                if response.status != common_pb.BuildStatus.BUILD_CANCELLED:
+                    log.warning("Failed to cancel build: {}", response.status)
         except grpc.RpcError as rpc_error:
             log.warning("Failed to cancel build: {}", rpc_error.details())
+        finally:
+            self.close()
 
     def create_executor(self, task):
         """ Create an executor for the given task. """

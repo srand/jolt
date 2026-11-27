@@ -75,6 +75,7 @@ class SchedulerInternal(JoltTest):
         session = scheduler.RemoteSession.__new__(scheduler.RemoteSession)
         session.factory = mock.MagicMock()
         session.exec = mock.MagicMock()
+        session.channel = mock.MagicMock()
         session.lock = threading.Lock()
         session.build = None
         session.build_id = None
@@ -92,9 +93,14 @@ class SchedulerInternal(JoltTest):
         session.build = mock.MagicMock()
         session.build_id = "build"
         session.exec.CancelBuild.side_effect = RpcError()
+        task = mock.Mock()
+        session.add_task_stream(session.build, task)
 
         session.cancel()
-        session.clear_build_request()
+        self.assertIsNone(session.build)
+        task.cancel.assert_called_once()
+        session.channel.close.assert_called_once()
+        self.assertGreater(session.exec.CancelBuild.call_args.kwargs["timeout"], 0)
 
         executor = scheduler.RemoteExecutor(mock.MagicMock(), session, mock.MagicMock())
         executor.factory.is_aborted.return_value = False
@@ -102,6 +108,26 @@ class SchedulerInternal(JoltTest):
         with self.assertRaises(scheduler.TaskCancelledException):
             session.make_build_request()
         session.exec.ScheduleBuild.assert_not_called()
+
+    def test_abort_during_build_registration(self):
+        from jolt.plugins import scheduler
+        session = self._session()
+        stream = BuildStream()
+        session.exec.ScheduleBuild.return_value = stream
+        reply = stream.next()
+
+        def accept_after_abort():
+            session.cancel()
+            return reply
+
+        with mock.patch.object(stream, "next", side_effect=accept_after_abort):
+            with self.assertRaises(scheduler.TaskCancelledException):
+                session.make_build_request()
+
+        self.assertTrue(stream.cancelled.is_set())
+        self.assertIsNone(session.build)
+        session.exec.CancelBuild.assert_not_called()
+        session.channel.close.assert_called_once()
 
     def _lose_build(self, error):
         session = self._session()
@@ -133,7 +159,40 @@ class SchedulerInternal(JoltTest):
     def test_build_stream_failed(self):
         self._lose_build(RpcError())
 
-    def test_cleared_build_not_lost(self):
+    def test_task_goaway_keeps_build_registration(self):
+        class Goaway(RpcError):
+            def details(self):
+                return "GOAWAY received; Error code: 0; Debug Text: "
+
+        session = self._session()
+        build = BuildStream()
+        session.exec.ScheduleBuild.return_value = build
+        session.http_uri = "http://scheduler"
+        executor = self._executor()
+        executor.session = session
+        executor.factory.is_aborted.return_value = False
+        executor.task.identity = "task-id"
+        executor.task.instance = "task"
+        sibling = mock.Mock()
+        failed_stream = mock.MagicMock()
+        failed_stream.__iter__.side_effect = Goaway()
+        retry_stream = iter([self._update(common_pb.TaskStatus.TASK_PASSED)])
+
+        try:
+            session.make_build_request()
+            session.add_task_stream(build, sibling)
+            session.exec.ScheduleTask.side_effect = [failed_stream, retry_stream]
+            executor.run_build(None)
+
+            self.assertEqual(session.exec.ScheduleTask.call_count, 2)
+            session.exec.ScheduleBuild.assert_called_once()
+            sibling.cancel.assert_not_called()
+            self.assertIs(session.build, build)
+            executor.task.finished_execution.assert_called_once_with(remote=True)
+        finally:
+            session.close()
+
+    def test_cleared_build_cancels_task_streams(self):
         session = self._session()
         stream = BuildStream()
         session.exec.ScheduleBuild.return_value = stream
@@ -141,8 +200,25 @@ class SchedulerInternal(JoltTest):
 
         task = mock.MagicMock()
         session.add_task_stream(build, task)
-        session.clear_build_request()
-        threading.Event().wait(0.2)
+        session.clear_build_request("Scheduler Error: connection lost", expected_build=build)
 
-        task.cancel.assert_not_called()
-        self.assertIsNone(session.lost_build_reason(build))
+        task.cancel.assert_called_once()
+        self.assertTrue(stream.cancelled.is_set())
+        self.assertEqual(session.lost_build_reason(build), "Scheduler Error: connection lost")
+
+        replacement = BuildStream()
+        session.exec.ScheduleBuild.return_value = replacement
+        new_build, _ = session.make_build_request()
+        try:
+            late_task = mock.Mock()
+            session.add_task_stream(build, late_task)
+            late_task.cancel.assert_called_once()
+
+            new_task = mock.Mock()
+            session.add_task_stream(new_build, new_task)
+            session.clear_build_request("Stale scheduler error", expected_build=build)
+            self.assertIs(session.build, new_build)
+            self.assertFalse(replacement.cancelled.is_set())
+            new_task.cancel.assert_not_called()
+        finally:
+            session.close()
