@@ -1,0 +1,1030 @@
+import os
+import re
+import sqlite3
+import sys
+sys.path.append(".")
+
+from testsupport import JoltTest
+
+
+class DryRunCli(JoltTest):
+    name = "cli/dry-run"
+
+    def _planned_tasks(self, output):
+        return re.findall(r"Would build: (.*?) \([0-9a-f]+\)", output)
+
+    def _rebuild_reasons(self, output):
+        return {name: reasons.split("; ") for name, reasons in
+                re.findall(r"Would build: (.*?) \([0-9a-f]+\) - ([^\n]+)", output)}
+
+    def _baseline(self):
+        with sqlite3.connect(os.path.join(self.ws, "build", "dry-run.db")) as db:
+            return dict(db.execute("SELECT name, identity FROM tasks"))
+
+    def test_source_change(self):
+        """
+        --- file: source.txt
+        original
+        --- tasks:
+        @influence.files("source.txt")
+        class Source(Task):
+            def run(self, deps, tools):
+                assert False, "Source must not execute"
+
+        class Consumer(Task):
+            requires = ["source"]
+
+            def run(self, deps, tools):
+                assert False, "Consumer must not execute"
+
+        class Unchanged(Task):
+            def run(self, deps, tools):
+                assert False, "Unchanged must not execute"
+
+        class Default(Alias):
+            requires = ["consumer", "unchanged"]
+        ---
+        """
+        r = self.build("--dry-prepare default")
+        self.assertNoBuild(r)
+        self.assertExists("build/dry-run.db")
+        baseline = self._baseline()
+        self.assertEqual({"default", "consumer", "source", "unchanged"}, set(baseline))
+        for identity in baseline.values():
+            self.assertRegex(identity, r"^[0-9a-f]{64}$")
+
+        r = self.build("--dry-run default")
+        self.assertNoBuild(r)
+        self.assertEqual([], self._planned_tasks(r))
+        self.assertIn("Dry run: 0 tasks would be built", r)
+
+        with self.tools.cwd(self.ws):
+            self.tools.write_file("source.txt", "modified source")
+
+        for _ in range(2):
+            r = self.build("--dry-run default")
+            self.assertNoBuild(r)
+            self.assertEqual(["source", "consumer"], self._planned_tasks(r))
+            self.assertEqual({"source": ["task inputs or definition changed"],
+                              "consumer": ["dependency 'source' changed"]}, self._rebuild_reasons(r))
+            self.assertIn("Dry run: 2 tasks would be built", r)
+            self.assertEqual(baseline, self._baseline())
+
+    def test_parameter_change(self):
+        """
+        --- tasks:
+        class Source(Task):
+            value = Parameter("original")
+
+            def run(self, deps, tools):
+                assert False, "Source must not execute"
+
+        class Consumer(Task):
+            requires = ["source"]
+
+            def run(self, deps, tools):
+                assert False, "Consumer must not execute"
+        ---
+        """
+        self.build("--dry-prepare consumer")
+        r = self.build("--dry-run consumer -d source:value=modified")
+        self.assertNoBuild(r)
+        self.assertEqual(["source", "consumer"], self._planned_tasks(r))
+        self.assertEqual(["dependency 'source:value=modified' added", "dependency 'source:value=original' removed"],
+                         self._rebuild_reasons(r)["consumer"])
+
+        r = self.build("--dry-run source:value=modified")
+        self.assertNoBuild(r)
+        self.assertEqual(["source:value=modified"], self._planned_tasks(r))
+
+        r = self.build("--dry-run source:value=original")
+        self.assertNoBuild(r)
+        self.assertEqual([], self._planned_tasks(r))
+
+    def test_new_requirement(self):
+        """
+        --- tasks:
+        class Consumer(Task):
+            requires = []
+
+            def run(self, deps, tools):
+                assert False, "Consumer must not execute"
+        ---
+        """
+        self.build("--dry-prepare consumer")
+        with self.tools.cwd(self.ws):
+            recipe = self.tools.read_file("test.jolt")
+            recipe += '\nclass Source(Task):\n    def run(self, deps, tools):\n        assert False, "Source must not execute"\n'
+            self.tools.write_file("test.jolt", recipe.replace("requires = []", 'requires = ["source"]'), expand=False)
+
+        r = self.build("--dry-run consumer")
+        self.assertNoBuild(r)
+        self.assertEqual(["source", "consumer"], self._planned_tasks(r))
+        self.assertEqual({"source": ["new task (no baseline)"],
+                          "consumer": ["dependency 'source' added"]}, self._rebuild_reasons(r))
+
+    def test_requirement_links_change(self):
+        """
+        --- tasks:
+        class Source(Task):
+            def run(self, deps, tools):
+                assert False, "Source must not execute"
+
+        class Other(Task):
+            def run(self, deps, tools):
+                assert False, "Other must not execute"
+
+        class Consumer(Task):
+            requires = ["source"]
+
+            def run(self, deps, tools):
+                assert False, "Consumer must not execute"
+        ---
+        """
+        self.build("--dry-prepare consumer")
+        with self.tools.cwd(self.ws):
+            recipe = self.tools.read_file("test.jolt")
+            self.tools.write_file("test.jolt", recipe.replace('requires = ["source"]', 'requires = ["other"]'),
+                                  expand=False)
+
+        r = self.build("--dry-run consumer")
+        self.assertNoBuild(r)
+        self.assertEqual(["consumer"], self._planned_tasks(r))
+        self.assertEqual(["dependency 'other' added", "dependency 'source' removed"],
+                         self._rebuild_reasons(r)["consumer"])
+
+        self.build("--dry-prepare consumer")
+        r = self.build("--dry-run consumer")
+        self.assertEqual([], self._planned_tasks(r))
+        with sqlite3.connect(os.path.join(self.ws, "build", "dry-run.db")) as db:
+            self.assertEqual([("consumer", "other")], list(db.execute("SELECT task, dependency FROM dependencies")))
+
+    def test_local_change_with_unchanged_dependency(self):
+        """
+        --- file: source.txt
+        original
+        --- tasks:
+        class Source(Task):
+            def run(self, deps, tools):
+                assert False, "Source must not execute"
+
+        @influence.files("source.txt")
+        class Consumer(Task):
+            requires = ["source"]
+
+            def run(self, deps, tools):
+                assert False, "Consumer must not execute"
+        ---
+        """
+        self.build("--dry-prepare consumer")
+        with self.tools.cwd(self.ws):
+            self.tools.write_file("source.txt", "modified source")
+        r = self.build("--dry-run consumer")
+        self.assertNoBuild(r)
+        self.assertEqual({"consumer": ["task inputs or definition changed"]}, self._rebuild_reasons(r))
+
+    def test_legacy_baseline(self):
+        """
+        --- file: source.txt
+        original
+        --- tasks:
+        @influence.files("source.txt")
+        class Source(Task):
+            def run(self, deps, tools):
+                assert False, "Source must not execute"
+
+        class Consumer(Task):
+            requires = ["source"]
+
+            def run(self, deps, tools):
+                assert False, "Consumer must not execute"
+        ---
+        """
+        self.build("--dry-prepare consumer")
+        with sqlite3.connect(os.path.join(self.ws, "build", "dry-run.db")) as db:
+            db.execute("DROP TABLE dependencies")
+        with self.tools.cwd(self.ws):
+            self.tools.write_file("source.txt", "modified source")
+        r = self.build("--dry-run consumer")
+        self.assertNoBuild(r)
+        self.assertEqual({"source": ["task hash changed"],
+                          "consumer": ["dependency 'source' changed"]}, self._rebuild_reasons(r))
+        with sqlite3.connect(os.path.join(self.ws, "build", "dry-run.db")) as db:
+            self.assertIsNone(db.execute("SELECT 1 FROM sqlite_master WHERE name = 'dependencies'").fetchone())
+
+    def test_alias_and_resource_causes(self):
+        """
+        --- file: source.txt
+        original
+        --- file: resource.txt
+        original
+        --- tasks:
+        @influence.files("source.txt")
+        class Source(Task):
+            def run(self, deps, tools):
+                assert False, "Source must not execute"
+
+        class Group(Alias):
+            requires = ["source"]
+
+        @influence.files("resource.txt")
+        class R(Resource):
+            def acquire(self, artifact, deps, tools, owner):
+                assert False, "Resource must not be acquired"
+
+        class Consumer(Task):
+            requires = ["group", "r"]
+
+            def run(self, deps, tools):
+                assert False, "Consumer must not execute"
+
+        class Other(Task):
+            requires = ["r"]
+
+            def run(self, deps, tools):
+                assert False, "Other must not execute"
+        ---
+        """
+        self.build("--dry-prepare consumer")
+        r = self.build("--dry-run consumer")
+        self.assertEqual([], self._planned_tasks(r))
+        with self.tools.cwd(self.ws):
+            self.tools.write_file("source.txt", "modified source")
+            self.tools.write_file("resource.txt", "modified resource")
+        r = self.build("--dry-run consumer")
+        self.assertNoBuild(r)
+        self.assertCountEqual(["source", "consumer", "other"], self._planned_tasks(r))
+        self.assertEqual({"source": ["task inputs or definition changed"],
+                          "consumer": ["dependency 'group' changed", "dependency 'r@@consumer' changed",
+                                       "dependency 'source' changed"],
+                          "other": ["dependency 'r@@other' changed"]}, self._rebuild_reasons(r))
+
+    def test_cached_tasks(self):
+        """
+        --- file: source.txt
+        original
+        --- tasks:
+        @influence.files("source.txt")
+        class Source(Task):
+            def run(self, deps, tools):
+                tools.write_file("executed.txt", "executed")
+
+        class Consumer(Task):
+            requires = ["source"]
+        ---
+        """
+        self.build("consumer")
+        self.build("--dry-prepare consumer")
+        with self.tools.cwd(self.ws):
+            self.tools.write_file("source.txt", "modified source")
+        self.build("consumer")
+        with self.tools.cwd(self.ws):
+            self.tools.unlink("executed.txt")
+
+        r = self.build("--dry-run consumer")
+        self.assertNoBuild(r)
+        self.assertEqual(["source", "consumer"], self._planned_tasks(r))
+        self.assertNotExists("executed.txt")
+
+    def test_multiple_goals_and_resources(self):
+        """
+        --- file: source.txt
+        original
+        --- tasks:
+        class R(Resource):
+            def acquire(self, artifact, deps, tools, owner):
+                assert False, "Resource must not be acquired"
+
+        @influence.files("source.txt")
+        class A(Task):
+            requires = ["r"]
+
+            def run(self, deps, tools):
+                assert False, "A must not execute"
+
+        class B(Task):
+            requires = ["r"]
+
+            def run(self, deps, tools):
+                assert False, "B must not execute"
+        ---
+        """
+        self.build("--dry-prepare a b")
+        self.assertEqual({"a", "b", "r@@a", "r@@b"}, set(self._baseline()))
+        r = self.build("--dry-run a b")
+        self.assertNoBuild(r)
+        self.assertEqual([], self._planned_tasks(r))
+
+        with self.tools.cwd(self.ws):
+            self.tools.write_file("source.txt", "modified source")
+        r = self.build("--dry-run a b")
+        self.assertNoBuild(r)
+        self.assertEqual(["a"], self._planned_tasks(r))
+
+    def test_prepare_replaces_baseline(self):
+        """
+        --- file: source.txt
+        original
+        --- tasks:
+        @influence.files("source.txt")
+        class A(Task):
+            def run(self, deps, tools):
+                assert False, "A must not execute"
+
+        class B(Task):
+            def run(self, deps, tools):
+                assert False, "B must not execute"
+        ---
+        """
+        self.build("--dry-prepare a b")
+        baseline = self._baseline()
+        with self.tools.cwd(self.ws):
+            self.tools.write_file("source.txt", "modified source")
+        self.build("--dry-prepare a")
+        self.assertEqual({"a", "b"}, set(self._baseline()))
+        self.assertNotEqual(baseline["a"], self._baseline()["a"])
+
+        r = self.build("--dry-run a")
+        self.assertNoBuild(r)
+        self.assertEqual([], self._planned_tasks(r))
+        r = self.build("--dry-run b")
+        self.assertNoBuild(r)
+        self.assertEqual([], self._planned_tasks(r))
+
+    def test_consumers_outside_target_graph(self):
+        """
+        --- file: source.txt
+        original
+        --- tasks:
+        @influence.files("source.txt")
+        class Source(Task):
+            def run(self, deps, tools):
+                assert False, "Source must not execute"
+
+        class Target(Task):
+            requires = ["source"]
+
+            def run(self, deps, tools):
+                assert False, "Target must not execute"
+
+        class OtherPackage(Task):
+            requires = ["source"]
+
+            def run(self, deps, tools):
+                assert False, "OtherPackage must not execute"
+
+        class TransitivePackage(Task):
+            requires = ["otherpackage"]
+
+            def run(self, deps, tools):
+                assert False, "TransitivePackage must not execute"
+
+        class Unchanged(Task):
+            def run(self, deps, tools):
+                assert False, "Unchanged must not execute"
+        ---
+        """
+        r = self.build("--dry-prepare target")
+        self.assertNoBuild(r)
+        self.assertEqual({"source", "target", "otherpackage", "transitivepackage", "unchanged"},
+                         set(self._baseline()))
+        baseline = self._baseline()
+        r = self.build("--dry-run target")
+        self.assertEqual([], self._planned_tasks(r))
+
+        with self.tools.cwd(self.ws):
+            self.tools.write_file("source.txt", "modified source")
+        planned = None
+        for target in ["target", "source", "unchanged"]:
+            r = self.build("--dry-run " + target)
+            self.assertNoBuild(r)
+            self.assertCountEqual(["source", "target", "otherpackage", "transitivepackage"],
+                                  self._planned_tasks(r))
+            self.assertEqual({"source": ["task inputs or definition changed"],
+                              "target": ["dependency 'source' changed"],
+                              "otherpackage": ["dependency 'source' changed"],
+                              "transitivepackage": ["dependency 'otherpackage' changed"]}, self._rebuild_reasons(r))
+            self.assertIn("Dry run: 4 tasks would be built", r)
+            identities = dict(re.findall(r"Would build: (.*?) \(([0-9a-f]+)\)", r))
+            if planned is None:
+                planned = identities
+            self.assertEqual(planned, identities)
+            self.assertEqual(baseline, self._baseline())
+
+    def test_required_parameters_and_variants(self):
+        """
+        --- file: source.txt
+        original
+        --- tasks:
+        class Base(Task):
+            abstract = True
+            value = Parameter()
+
+            def run(self, deps, tools):
+                assert False, "Parameterized task must not execute"
+
+        @influence.files("source.txt")
+        class Source(Base):
+            pass
+
+        class Unconfigured(Base):
+            pass
+
+        class UnusedResource(Resource):
+            def acquire(self, artifact, deps, tools, owner):
+                assert False, "Resource must not be acquired"
+
+        class Target(Task):
+            def run(self, deps, tools):
+                assert False, "Target must not execute"
+
+        class Consumer(Task):
+            requires = ["source:value=one", "source:value=two"]
+
+            def run(self, deps, tools):
+                assert False, "Consumer must not execute"
+        ---
+        """
+        r = self.build("--dry-prepare target source:value=three")
+        self.assertNoBuild(r)
+        self.assertEqual({"target", "consumer", "source:value=one", "source:value=two", "source:value=three"},
+                         set(self._baseline()))
+        with self.tools.cwd(self.ws):
+            self.tools.write_file("source.txt", "modified source")
+        r = self.build("--dry-run target source:value=three")
+        self.assertNoBuild(r)
+        self.assertCountEqual(["source:value=one", "source:value=two", "source:value=three", "consumer"],
+                              self._planned_tasks(r))
+        self.assertEqual(["dependency 'source:value=one' changed", "dependency 'source:value=two' changed"],
+                         self._rebuild_reasons(r)["consumer"])
+
+    def test_default_parameters_enable_workspace_task(self):
+        """
+        --- tasks:
+        class Source(Task):
+            value = Parameter()
+
+            def run(self, deps, tools):
+                assert False, "Source must not execute"
+
+        class Target(Task):
+            def run(self, deps, tools):
+                assert False, "Target must not execute"
+        ---
+        """
+        self.build("--dry-prepare target -d source:value=original")
+        self.assertEqual({"target", "source:value=original"}, set(self._baseline()))
+        r = self.build("--dry-run target -d source:value=modified")
+        self.assertNoBuild(r)
+        self.assertEqual(["source"], self._planned_tasks(r))
+
+    def test_unconfigured_macro_in_workspace_default(self):
+        """
+        --- file: source.txt
+        original
+        --- tasks:
+        @influence.files("source.txt")
+        class Source(Task):
+            def run(self, deps, tools):
+                assert False, "Source must not execute"
+
+        class Target(Task):
+            requires = ["source"]
+
+            def run(self, deps, tools):
+                assert False, "Target must not execute"
+
+        class Consumer(Task):
+            requires = ["source"]
+
+            def run(self, deps, tools):
+                assert False, "Consumer must not execute"
+
+        class Unconfigured(Task):
+            requires = ["source:family={{targetcpu_family}}"]
+        ---
+        """
+        r = self.build("--dry-prepare target")
+        self.assertNoBuild(r)
+        self.assertEqual({"source", "target", "consumer"}, set(self._baseline()))
+        self.assertIn("Skipped unconfigured task: unconfigured", r)
+        self.assertIn("targetcpu_family", r)
+
+        with self.tools.cwd(self.ws):
+            self.tools.write_file("source.txt", "modified source")
+        r = self.build("--dry-run target")
+        self.assertNoBuild(r)
+        self.assertCountEqual(["source", "target", "consumer"], self._planned_tasks(r))
+
+    def test_macro_error_in_explicit_target(self):
+        """
+        --- tasks:
+        class Broken(Task):
+            requires = ["other:family={{targetcpu_family}}"]
+        ---
+        """
+        for option in ["--dry-prepare", "--dry-run"]:
+            with self.assertRaises(Exception):
+                self.build(option + " broken")
+            self.assertIn("Invalid macro", self.lastLog())
+            self.assertIn("targetcpu_family", self.lastLog())
+            self.assertNotExists("build/dry-run.db")
+
+    def test_macro_error_in_requested_dependency(self):
+        """
+        --- tasks:
+        class Broken(Task):
+            requires = ["other:family={{targetcpu_family}}"]
+
+        class Target(Task):
+            requires = ["broken"]
+        ---
+        """
+        with self.assertRaises(Exception):
+            self.build("--dry-prepare target")
+        self.assertIn("Invalid macro", self.lastLog())
+        self.assertIn("targetcpu_family", self.lastLog())
+        self.assertNotExists("build/dry-run.db")
+
+    def test_configured_variant_with_unconfigured_default(self):
+        """
+        --- file: source.txt
+        original
+        --- tasks:
+        @influence.files("source.txt")
+        class Source(Task):
+            def run(self, deps, tools):
+                assert False, "Source must not execute"
+
+        class Consumer(Task):
+            configured = BooleanParameter(False)
+
+            @property
+            def targetcpu_family(self):
+                return "source" if self.configured else None
+
+            requires = ["{{targetcpu_family}}"]
+
+            def run(self, deps, tools):
+                assert False, "Consumer must not execute"
+
+        class Target(Task):
+            requires = ["consumer:configured=true"]
+
+            def run(self, deps, tools):
+                assert False, "Target must not execute"
+        ---
+        """
+        r = self.build("--dry-prepare target")
+        self.assertNoBuild(r)
+        self.assertEqual({"source", "consumer:configured=true", "target"}, set(self._baseline()))
+        with self.tools.cwd(self.ws):
+            self.tools.write_file("source.txt", "modified source")
+        r = self.build("--dry-run source")
+        self.assertNoBuild(r)
+        self.assertCountEqual(["source", "consumer:configured=true", "target"], self._planned_tasks(r))
+
+    def test_dynamic_requires_error_in_workspace_default(self):
+        """
+        --- file: source.txt
+        original
+        --- tasks:
+        @influence.files("source.txt")
+        class Source(Task):
+            def run(self, deps, tools):
+                assert False, "Source must not execute"
+
+        class Consumer(Task):
+            configured = BooleanParameter(False)
+
+            def requires(self):
+                requirements = ["source", "unused"] if self.configured else ["source"]
+                requirements.remove("unused")
+                return requirements
+
+            def run(self, deps, tools):
+                assert False, "Consumer must not execute"
+
+        class Target(Task):
+            requires = ["consumer:configured=true"]
+
+            def run(self, deps, tools):
+                assert False, "Target must not execute"
+
+        class OtherPackage(Task):
+            requires = ["source"]
+
+            def run(self, deps, tools):
+                assert False, "OtherPackage must not execute"
+        ---
+        """
+        r = self.build("--dry-prepare target")
+        self.assertNoBuild(r)
+        self.assertIn("Skipped unavailable default task: consumer", r)
+        self.assertIn("ValueError: list.remove(x): x not in list", r)
+        self.assertEqual({"source", "consumer:configured=true", "target", "otherpackage"},
+                         set(self._baseline()))
+        r = self.build("--dry-run target")
+        self.assertEqual([], self._planned_tasks(r))
+
+        with self.tools.cwd(self.ws):
+            self.tools.write_file("source.txt", "modified source")
+        r = self.build("--dry-run target")
+        self.assertNoBuild(r)
+        self.assertCountEqual(["source", "consumer:configured=true", "target", "otherpackage"],
+                              self._planned_tasks(r))
+
+    def test_dynamic_requires_error_in_requested_task(self):
+        """
+        --- tasks:
+        class Broken(Task):
+            def requires(self):
+                requirements = []
+                requirements.remove("missing")
+                return requirements
+
+        class Target(Task):
+            requires = ["broken"]
+        ---
+        """
+        for target in ["broken", "target"]:
+            for option in ["--dry-prepare", "--dry-run", ""]:
+                with self.assertRaises(Exception):
+                    self.build(option + " " + target)
+                self.assertIn("ValueError: list.remove(x): x not in list", self.lastLog())
+                self.assertNotExists("build/dry-run.db")
+
+    def test_invalid_parameter_in_discovered_dependency(self):
+        """
+        --- file: source.txt
+        original
+        --- tasks:
+        @influence.files("source.txt")
+        class Source(Task):
+            def run(self, deps, tools):
+                assert False, "Source must not execute"
+
+        class CodeQuality(Task):
+            name = "common/tools/test/code-quality"
+
+            def run(self, deps, tools):
+                assert False, "CodeQuality must not execute"
+
+        class Consumer(Task):
+            configured = BooleanParameter(False)
+
+            def requires(self):
+                if self.configured:
+                    return ["source"]
+                return ["source", "common/tools/test/code-quality:coverage=true"]
+
+            def run(self, deps, tools):
+                assert False, "Consumer must not execute"
+
+        class Target(Task):
+            requires = ["consumer:configured=true"]
+
+            def run(self, deps, tools):
+                assert False, "Target must not execute"
+
+        class OtherPackage(Task):
+            requires = ["source"]
+
+            def run(self, deps, tools):
+                assert False, "OtherPackage must not execute"
+
+        class InvalidAlias(Alias):
+            requires = ["consumer"]
+        ---
+        """
+        r = self.build("--dry-prepare target")
+        self.assertNoBuild(r)
+        self.assertIn("Skipped unavailable default task: consumer", r)
+        self.assertIn("Skipped unavailable default task: invalidalias", r)
+        self.assertIn("No such parameter 'coverage'", r)
+        self.assertEqual({"source", "consumer:configured=true", "target", "otherpackage",
+                          "common/tools/test/code-quality"}, set(self._baseline()))
+        r = self.build("--dry-run target")
+        self.assertEqual([], self._planned_tasks(r))
+        with self.tools.cwd(self.ws):
+            self.tools.write_file("source.txt", "modified source")
+        r = self.build("--dry-run source")
+        self.assertNoBuild(r)
+        self.assertCountEqual(["source", "consumer:configured=true", "target", "otherpackage"],
+                              self._planned_tasks(r))
+
+        for target in ["consumer", "invalidalias"]:
+            with self.assertRaises(Exception):
+                self.build("--dry-prepare " + target)
+            self.assertIn("No such parameter 'coverage'", self.lastLog())
+
+    def test_invalid_dependency_trees_in_workspace_defaults(self):
+        """
+        --- tasks:
+        class Target(Task):
+            def run(self, deps, tools):
+                assert False, "Target must not execute"
+
+        class Macro(Task):
+            requires = ["{{targetcpu_family}}"]
+
+        class MacroConsumer(Task):
+            requires = ["dependency=macro"]
+
+        class MissingResource(Resource):
+            requires = ["notregistered"]
+
+        class ResourceConsumer(Task):
+            requires = ["missingresource"]
+
+        class MissingExtension(Task):
+            extends = "notregistered"
+
+        class CycleA(Task):
+            requires = ["cycleb"]
+
+        class CycleB(Task):
+            requires = ["cyclea"]
+        ---
+        """
+        r = self.build("--dry-prepare target")
+        self.assertNoBuild(r)
+        self.assertEqual({"target"}, set(self._baseline()))
+        for task in ["macroconsumer", "resourceconsumer", "missingextension", "cyclea", "cycleb"]:
+            self.assertIn("Skipped unavailable default task: " + task, r)
+        r = self.build("--dry-run target")
+        self.assertNoBuild(r)
+        self.assertEqual([], self._planned_tasks(r))
+
+    def test_hash_failure_in_workspace_default(self):
+        """
+        --- file: source.txt
+        original
+        --- tasks:
+        @influence.files("source.txt")
+        class Source(Task):
+            def run(self, deps, tools):
+                assert False, "Source must not execute"
+
+        @influence.attribute("command", expand=True)
+        class Px2YangGenerator(Task):
+            configured = BooleanParameter(False)
+            command = "{{generator}}"
+            requires = ["source"]
+
+            @property
+            def generator(self):
+                return "yang" if self.configured else None
+
+            def run(self, deps, tools):
+                assert False, "Generator must not execute"
+
+        class Consumer(Task):
+            requires = ["px2yanggenerator"]
+
+            def run(self, deps, tools):
+                assert False, "Consumer must not execute"
+
+        class Transitive(Task):
+            requires = ["consumer"]
+
+        class InvalidAlias(Alias):
+            requires = ["transitive"]
+
+        class OtherPackage(Task):
+            requires = ["source"]
+
+            def run(self, deps, tools):
+                assert False, "OtherPackage must not execute"
+
+        class Target(Task):
+            requires = ["px2yanggenerator:configured=true"]
+
+            def run(self, deps, tools):
+                assert False, "Target must not execute"
+        ---
+        """
+        r = self.build("--dry-prepare target")
+        self.assertNoBuild(r)
+        self.assertIn("Skipped unavailable task: px2yanggenerator", r)
+        self.assertIn("generator", r)
+        for task in ["consumer", "transitive", "invalidalias"]:
+            self.assertIn("Skipped unavailable task: " + task, r)
+        baseline = self._baseline()
+        self.assertEqual({"source", "px2yanggenerator:configured=true", "target", "otherpackage"}, set(baseline))
+        self.assertIn("Saved dry-run baseline for 4 tasks", r)
+        r = self.build("--dry-run target")
+        self.assertNoBuild(r)
+        self.assertEqual([], self._planned_tasks(r))
+        with self.tools.cwd(self.ws):
+            self.tools.write_file("source.txt", "modified source")
+        r = self.build("--dry-run source")
+        self.assertNoBuild(r)
+        self.assertCountEqual(["source", "px2yanggenerator:configured=true", "target", "otherpackage"],
+                              self._planned_tasks(r))
+        self.assertEqual(baseline, self._baseline())
+
+    def test_hash_failure_in_requested_tree(self):
+        """
+        --- tasks:
+        @influence.attribute("command", expand=True)
+        class Px2YangGenerator(Task):
+            command = "{{generator}}"
+
+        class Consumer(Task):
+            requires = ["px2yanggenerator"]
+
+        class Target(Alias):
+            requires = ["consumer"]
+        ---
+        """
+        for target in ["px2yanggenerator", "consumer", "target"]:
+            for option in ["--dry-prepare", "--dry-run", ""]:
+                with self.assertRaises(Exception):
+                    self.build(option + " " + target)
+                self.assertIn("generator", self.lastLog())
+                self.assertNotExists("build/dry-run.db")
+
+    def test_abstract_decorator_wrappers(self):
+        """
+        --- file: source.txt
+        original
+        --- tasks:
+        def decorate(cls):
+            @influence.attribute("command", expand=True)
+            class Decorated(cls):
+                command = "{{generator}}"
+
+            return Decorated
+
+        @decorate
+        class Base(Task):
+            abstract = True
+            generator = None
+
+            def run(self, deps, tools):
+                assert False, "Task must not execute"
+
+        @influence.files("source.txt")
+        class Source(Base):
+            name = "source"
+            generator = "proto"
+
+        class Consumer(Base):
+            name = "consumer"
+            generator = "json"
+            requires = ["source"]
+
+        class SuiteGenerator(TaskGenerator):
+            def generate(self):
+                class Generated(Base):
+                    name = "generated"
+                    generator = "fbs"
+                    requires = ["source"]
+
+                @decorate
+                class DecoratedConcrete(Base):
+                    name = "decoratedconcrete"
+                    generator = "json"
+                    requires = ["source"]
+
+                return [Generated, DecoratedConcrete]
+
+        class Target(Task):
+            requires = ["source"]
+
+            def run(self, deps, tools):
+                assert False, "Target must not execute"
+
+        class Pipeline(Alias):
+            requires = ["target"]
+        ---
+        """
+        r = self.jolt("build --dry-prepare pipeline")
+        self.assertNoBuild(r)
+        self.assertNotIn("Skipped", r)
+        baseline = self._baseline()
+        self.assertEqual({"source", "consumer", "generated", "decoratedconcrete", "target", "pipeline"}, set(baseline))
+        for target in ["pipeline", "source", "consumer", "generated", "decoratedconcrete"]:
+            r = self.jolt("build --dry-run " + target)
+            self.assertNoBuild(r)
+            self.assertEqual([], self._planned_tasks(r))
+            self.assertEqual(baseline, self._baseline())
+        with self.tools.cwd(self.ws):
+            self.tools.write_file("source.txt", "modified source")
+        planned = None
+        for target in ["pipeline", "source", "consumer", "generated", "decoratedconcrete", "pipeline"]:
+            r = self.jolt("build --dry-run " + target)
+            self.assertNoBuild(r)
+            self.assertNotIn("Skipped", r)
+            self.assertCountEqual(["source", "consumer", "generated", "decoratedconcrete", "target"],
+                                  self._planned_tasks(r))
+            identities = dict(re.findall(r"Would build: (.*?) \(([0-9a-f]+)\)", r))
+            if planned is None:
+                planned = identities
+            self.assertEqual(planned, identities)
+            self.assertEqual(baseline, self._baseline())
+
+    def test_optional_defaults_are_quiet(self):
+        """
+        --- file: source.txt
+        original
+        --- tasks:
+        @influence.files("source.txt")
+        class Source(Task):
+            def run(self, deps, tools):
+                assert False, "Source must not execute"
+
+        @influence.attribute("command", expand=True)
+        class Generator(Task):
+            configured = BooleanParameter(False)
+            command = "{{generator}}"
+
+            @property
+            def generator(self):
+                return "proto" if self.configured else None
+
+            requires = ["source"]
+
+            def run(self, deps, tools):
+                assert False, "Generator must not execute"
+
+        class BadDefault(Task):
+            requires = ["notregistered:coverage=true"]
+
+        class MacroDefault(Task):
+            requires = ["{{targetcpu_family}}"]
+
+        class Target(Task):
+            requires = ["generator:configured=true"]
+
+            def run(self, deps, tools):
+                assert False, "Target must not execute"
+
+        class OtherPackage(Task):
+            requires = ["source"]
+        ---
+        """
+        r = self.jolt("build --dry-prepare target")
+        self.assertNoBuild(r)
+        self.assertNotIn("Skipped", r)
+        self.assertNotIn("Invalid macro", r)
+        self.assertNotIn("No such task", r)
+        self.assertEqual({"source", "generator:configured=true", "target", "otherpackage"}, set(self._baseline()))
+        with self.tools.cwd(self.ws):
+            self.tools.write_file("source.txt", "modified source")
+        r = self.jolt("build --dry-run target")
+        self.assertNoBuild(r)
+        self.assertNotIn("Skipped", r)
+        self.assertCountEqual(["source", "generator:configured=true", "target", "otherpackage"],
+                              self._planned_tasks(r))
+        r = self.jolt("build -v --dry-run target")
+        self.assertIn("Skipped unavailable default task: baddefault", r)
+        self.assertIn("Skipped unconfigured task: macrodefault", r)
+        self.assertIn("Skipped unavailable task: generator", r)
+
+    def test_missing_baseline(self):
+        """
+        --- tasks:
+        class A(Task):
+            def run(self, deps, tools):
+                assert False, "A must not execute"
+        ---
+        """
+        with self.assertRaises(Exception):
+            self.build("--dry-run a")
+        self.assertIn("No dry-run baseline found", self.lastLog())
+        self.assertIn("--dry-prepare", self.lastLog())
+        self.assertNoBuild(self.lastLog())
+        self.assertNotExists("build/dry-run.db")
+
+    def test_invalid_baseline(self):
+        """
+        --- tasks:
+        class A(Task):
+            pass
+        ---
+        """
+        self.build("--dry-prepare a")
+        with self.tools.cwd(self.ws):
+            self.tools.write_file("build/dry-run.db", "invalid database")
+        with self.assertRaises(Exception):
+            self.build("--dry-run a")
+        self.assertIn("Failed to read dry-run database", self.lastLog())
+        self.assertNoBuild(self.lastLog())
+
+    def test_conflicting_options(self):
+        """
+        --- tasks:
+        class A(Task):
+            pass
+        ---
+        """
+        with self.assertRaises(Exception):
+            self.build("--dry-prepare --dry-run a")
+        self.assertIn("mutually exclusive", self.lastLog())
+        for option in ["--dry-prepare", "--dry-run"]:
+            with self.assertRaises(Exception):
+                self.build("--force " + option + " a")
+            self.assertIn("--force flag cannot be combined", self.lastLog())
+        self.assertNotExists("build/dry-run.db")

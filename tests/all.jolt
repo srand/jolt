@@ -19,6 +19,7 @@ class All(Alias):
         "cli/clean",
         "cli/config",
         "cli/display",
+        "cli/dry-run",
         "cli/export",
         "cli/inspect",
         "cli/list",

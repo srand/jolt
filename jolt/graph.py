@@ -1323,6 +1323,7 @@ class GraphBuilder(object):
         self.buildenv = buildenv
         self.progress = progress
         self.options = options or JoltOptions()
+        self.excluded = set()
 
     def _get_owner(self, node):
         """ Returns the task consuming a resource required by node. """
@@ -1397,10 +1398,20 @@ class GraphBuilder(object):
             with log.progress_log(*args, **kwargs) as p:
                 yield p
 
-    def build(self, task_list, influence=True):
+    def build(self, task_list, influence=True, strict_tasks=None, finalize_artifacts=True):
         with self._progress("Building graph", len(self.graph.tasks), "tasks") as progress:
             goals = [self._get_node(progress, task) for task in task_list]
             self.graph._nodes_by_name = self.nodes
+
+        strict_nodes = set()
+        if strict_tasks is not None:
+            requested = dict(zip(task_list, goals))
+            pending = [requested[name] for name in strict_tasks]
+            while pending:
+                node = pending.pop()
+                if node not in strict_nodes:
+                    strict_nodes.add(node)
+                    pending.extend(self.graph.successors(node))
 
         if influence:
             # Index the workspace only once the graph is built, so that
@@ -1410,13 +1421,32 @@ class GraphBuilder(object):
             topological_nodes = self.graph.topological_nodes
             with self._progress("Collecting task influence", len(self.graph.tasks), "tasks") as p:
                 for node in reversed(topological_nodes):
-                    node.finalize(self.graph)
+                    if node not in self.excluded:
+                        try:
+                            node.finalize(self.graph)
+                        except Exception as e:
+                            if strict_tasks is None or node in strict_nodes:
+                                raise
+                            # Dependencies are finalized first. Exclude their consumers
+                            # before they can use an incomplete task identity.
+                            pending = [node]
+                            while pending:
+                                unavailable = pending.pop()
+                                if unavailable in self.excluded:
+                                    continue
+                                self.excluded.add(unavailable)
+                                reason = log.format_exception_msg(e) if unavailable is node else \
+                                    "dependency '{}' is unavailable".format(node.short_qualified_name)
+                                log.verbose("Skipped unavailable task: {} ({})", unavailable.short_qualified_name, reason)
+                                pending.extend(self.graph.predecessors(unavailable))
                     p.update(1)
 
+                topological_nodes = [node for node in topological_nodes if node not in self.excluded]
                 # Create artifacts in forward order so that parent identities are available
                 # when creating resource artifacts that depend on them.
-                for node in topological_nodes:
-                    node.finalize_artifacts()
+                if finalize_artifacts:
+                    for node in topological_nodes:
+                        node.finalize_artifacts()
 
             max_time = 0
             min_time = 0
@@ -1432,6 +1462,8 @@ class GraphBuilder(object):
         self.graph.requested_goals = goals
         self.graph.goals = []
         for goal in goals:
+            if goal in self.excluded:
+                continue
             goal.set_goal()
             self.graph.goals.append(goal)
             if goal.is_alias():

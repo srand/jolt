@@ -24,7 +24,7 @@ from jolt import utils
 from jolt.cache import ArtifactAttributeSetProvider
 from jolt.error import raise_error_if, raise_task_error, raise_task_error_if
 from jolt.error import raise_unreported_task_error_if
-from jolt.error import JoltError, JoltCommandError, LoggedJoltError
+from jolt.error import JoltError, JoltCommandError, LoggedJoltError, TaskMacroError
 from jolt.expires import Immediately
 from jolt.influence import FileInfluence, TaintInfluenceProvider
 from jolt.influence import TaskClassSourceInfluence
@@ -1882,7 +1882,10 @@ class TaskBase(object):
                 return [utils.expand(string, *args, **kwargs) for string in string_or_list]
             return utils.expand(string_or_list, *args, **kwargs)
         except KeyError as e:
-            raise_task_error(self, "Invalid macro '{0}' encountered - forgot to set a parameter?", e)
+            try:
+                raise_task_error(self, "Invalid macro '{0}' encountered - forgot to set a parameter?", e)
+            except JoltError as error:
+                raise TaskMacroError(self, e.args[0], str(error)) from e
 
     @property
     def identity(self):
